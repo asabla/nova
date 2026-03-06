@@ -69,12 +69,20 @@ health.get("/ready", async (c) => {
   const allOk = Object.values(checks).every((v) => v.status === "ok");
   const anyError = Object.values(checks).some((v) => v.status === "error");
 
+  // Build services array for SystemStatusBanner compatibility
+  const services = Object.entries(checks).map(([name, check]) => ({
+    name,
+    status: check.status === "ok" ? "healthy" as const : "down" as const,
+    message: check.error ?? (check.latencyMs ? `${check.latencyMs}ms` : undefined),
+  }));
+
   return c.json({
-    status: allOk ? "ready" : anyError ? "degraded" : "partial",
+    status: allOk ? "healthy" : anyError ? "down" : "degraded",
     version: env.APP_VERSION ?? "dev",
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     checks,
+    services,
   }, allOk ? 200 : 503);
 });
 
