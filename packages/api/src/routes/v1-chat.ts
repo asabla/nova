@@ -146,4 +146,67 @@ v1ChatRoutes.get("/../models/:modelId", async (c) => {
   });
 });
 
+// --- Agent REST API (Story #108) ---
+
+const agentRunSchema = z.object({
+  agent_id: z.string().uuid(),
+  input: z.string().min(1).max(50000),
+  stream: z.boolean().optional().default(false),
+});
+
+v1ChatRoutes.post("/../agents/run", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const body = agentRunSchema.parse(await c.req.json());
+
+  // Load agent config
+  const { agentService } = await import("../services/agent.service");
+  const agent = await agentService.get(orgId, body.agent_id);
+
+  await writeAuditLog({
+    orgId,
+    actorId: userId,
+    actorType: "user",
+    action: "api.agent_run",
+    resourceType: "agent",
+    resourceId: agent.id,
+  });
+
+  // Build messages from agent config
+  const messages: Array<{ role: string; content: string }> = [];
+  if (agent.systemPrompt) {
+    messages.push({ role: "system", content: agent.systemPrompt });
+  }
+  messages.push({ role: "user", content: body.input });
+
+  const modelParams = (agent.modelParams as Record<string, unknown>) ?? {};
+
+  if (body.stream) {
+    return streamChatCompletion(c, {
+      model: agent.modelId ?? "default",
+      messages,
+      temperature: modelParams.temperature as number | undefined,
+      max_tokens: modelParams.maxTokens as number | undefined,
+      top_p: modelParams.topP as number | undefined,
+    });
+  }
+
+  const result = await chatCompletion({
+    model: agent.modelId ?? "default",
+    messages,
+    stream: false,
+    temperature: modelParams.temperature as number | undefined,
+    max_tokens: modelParams.maxTokens as number | undefined,
+    top_p: modelParams.topP as number | undefined,
+  });
+
+  return c.json({
+    agent_id: agent.id,
+    agent_name: agent.name,
+    content: result.choices?.[0]?.message?.content ?? "",
+    model: result.model,
+    usage: result.usage,
+  });
+});
+
 export { v1ChatRoutes };

@@ -6,6 +6,7 @@ import { SystemStatusBanner } from "../components/layout/SystemStatusBanner";
 import { useAuthStore } from "../stores/auth.store";
 import { useUIStore } from "../stores/ui.store";
 import { useTheme } from "../hooks/useTheme";
+import { useWebSocket } from "../hooks/useWebSocket";
 
 export const Route = createFileRoute("/_auth")({
   component: AuthLayout,
@@ -13,6 +14,7 @@ export const Route = createFileRoute("/_auth")({
 
 function AuthLayout() {
   useTheme();
+  useWebSocket();
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
 
   return (

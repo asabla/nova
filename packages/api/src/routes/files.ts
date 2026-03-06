@@ -24,6 +24,36 @@ fileRoutes.post("/presign", zValidator("json", presignSchema), async (c) => {
   const userId = c.get("userId");
   const { filename, contentType, size } = c.req.valid("json");
 
+  // Check storage quota (story #69)
+  const quotaSettings = await db
+    .select()
+    .from(orgSettings)
+    .where(and(eq(orgSettings.orgId, orgId), eq(orgSettings.key, "storage_quotas")));
+
+  if (quotaSettings.length > 0) {
+    const quotas = JSON.parse(quotaSettings[0].value) as {
+      perUserBytes?: number;
+      orgTotalBytes?: number;
+    };
+
+    if (quotas.perUserBytes) {
+      const currentUsage = await fileService.getStorageUsage(orgId, userId);
+      if (currentUsage + size > quotas.perUserBytes) {
+        throw AppError.badRequest(
+          `Storage quota exceeded. Used: ${Math.round(currentUsage / 1024 / 1024)}MB, ` +
+          `Limit: ${Math.round(quotas.perUserBytes / 1024 / 1024)}MB`
+        );
+      }
+    }
+
+    if (quotas.orgTotalBytes) {
+      const orgUsage = await fileService.getOrgStorageUsage(orgId);
+      if (orgUsage + size > quotas.orgTotalBytes) {
+        throw AppError.badRequest("Organization storage quota exceeded");
+      }
+    }
+  }
+
   const result = await fileService.presignUpload(orgId, userId, filename, contentType, size);
   return c.json(result, 201);
 });
@@ -116,6 +146,49 @@ fileRoutes.delete("/admin/:id", requireRole("org-admin"), async (c) => {
 
   const file = await fileService.deleteFile(orgId, fileId);
   if (!file) throw AppError.notFound("File");
+  return c.json({ ok: true });
+});
+
+// GET /usage/org - Admin: org-wide storage usage
+fileRoutes.get("/usage/org", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  const totalBytes = await fileService.getOrgStorageUsage(orgId);
+
+  // Load quotas
+  const quotaSettings = await db
+    .select()
+    .from(orgSettings)
+    .where(and(eq(orgSettings.orgId, orgId), eq(orgSettings.key, "storage_quotas")));
+
+  const quotas = quotaSettings[0] ? JSON.parse(quotaSettings[0].value) : {};
+
+  return c.json({
+    totalBytes,
+    totalMb: Math.round(totalBytes / 1024 / 1024),
+    totalGb: (totalBytes / 1024 / 1024 / 1024).toFixed(2),
+    quotas,
+  });
+});
+
+// PATCH /quotas - Admin: set storage quotas
+const storageQuotaSchema = z.object({
+  perUserBytes: z.number().int().positive().optional(),
+  orgTotalBytes: z.number().int().positive().optional(),
+});
+
+fileRoutes.patch("/quotas", requireRole("org-admin"), zValidator("json", storageQuotaSchema), async (c) => {
+  const orgId = c.get("orgId");
+  const data = c.req.valid("json");
+
+  const configValue = JSON.stringify(data);
+  await db
+    .insert(orgSettings)
+    .values({ orgId, key: "storage_quotas", value: configValue })
+    .onConflictDoUpdate({
+      target: [orgSettings.orgId, orgSettings.key],
+      set: { value: configValue, updatedAt: new Date() },
+    });
+
   return c.json({ ok: true });
 });
 

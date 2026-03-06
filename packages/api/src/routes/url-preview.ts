@@ -204,4 +204,105 @@ urlPreviewRoutes.post(
   },
 );
 
+// --- YouTube Summarization (Story #72) ---
+
+const summarizeSchema = z.object({
+  url: z.string().url(),
+});
+
+urlPreviewRoutes.post(
+  "/summarize",
+  zValidator("json", summarizeSchema),
+  async (c) => {
+    const { url } = c.req.valid("json");
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw AppError.badRequest("Invalid URL");
+    }
+
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw AppError.badRequest("Only HTTP and HTTPS URLs are supported");
+    }
+
+    if (isPrivateHost(parsed.hostname)) {
+      throw AppError.badRequest("URL points to a private or reserved address");
+    }
+
+    const youtubeId = extractYouTubeId(url);
+
+    try {
+      // Fetch the page content
+      const response = await fetch(url, {
+        method: "GET",
+        signal: AbortSignal.timeout(15000),
+        headers: {
+          "User-Agent": "NovaBot/1.0 (Content Summarizer)",
+          Accept: "text/html, application/xhtml+xml, text/plain",
+        },
+        redirect: "follow",
+      });
+
+      if (!response.ok) {
+        return c.json({ error: "Failed to fetch URL" }, 502);
+      }
+
+      const contentType = response.headers.get("content-type") ?? "";
+      let textContent = "";
+
+      if (contentType.includes("text/html") || contentType.includes("xhtml")) {
+        const html = await response.text();
+        // Extract title
+        const title = extractMetaContent(html, "og:title") ?? extractTitle(html) ?? "";
+        // Extract article text - strip tags, keep text
+        const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+        const bodyHtml = bodyMatch?.[1] ?? html;
+        // Remove script/style tags first
+        const cleaned = bodyHtml
+          .replace(/<script[\s\S]*?<\/script>/gi, "")
+          .replace(/<style[\s\S]*?<\/style>/gi, "")
+          .replace(/<nav[\s\S]*?<\/nav>/gi, "")
+          .replace(/<footer[\s\S]*?<\/footer>/gi, "")
+          .replace(/<header[\s\S]*?<\/header>/gi, "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        textContent = `Title: ${title}\n\n${cleaned.slice(0, 8000)}`;
+      } else {
+        textContent = (await response.text()).slice(0, 8000);
+      }
+
+      // Use LLM to summarize
+      const { chatCompletion } = await import("../lib/litellm");
+      const prompt = youtubeId
+        ? `Summarize this YouTube video page content. Provide a concise summary with key points and takeaways:\n\n${textContent}`
+        : `Provide a TL;DR summary of this article. Include the main points, key arguments, and conclusions:\n\n${textContent}`;
+
+      const result = await chatCompletion({
+        model: "default",
+        messages: [
+          { role: "system", content: "You are a concise content summarizer. Provide structured summaries with key takeaways." },
+          { role: "user", content: prompt },
+        ],
+        stream: false,
+        max_tokens: 1000,
+      });
+
+      return c.json({
+        url,
+        youtubeVideoId: youtubeId,
+        summary: result.choices?.[0]?.message?.content ?? "Unable to generate summary",
+        model: result.model,
+        usage: result.usage,
+      });
+    } catch (err: any) {
+      if (err.name === "TimeoutError" || err.name === "AbortError") {
+        return c.json({ error: "timeout", message: "URL fetch timed out" }, 504);
+      }
+      return c.json({ error: "failed", message: err.message ?? "Summarization failed" }, 500);
+    }
+  },
+);
+
 export { urlPreviewRoutes };

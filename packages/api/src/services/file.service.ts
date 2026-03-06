@@ -82,3 +82,11 @@ export async function getStorageUsage(orgId: string, userId: string) {
     .where(and(eq(files.orgId, orgId), eq(files.userId, userId), isNull(files.deletedAt)));
   return Number(result[0]?.totalBytes ?? 0);
 }
+
+export async function getOrgStorageUsage(orgId: string) {
+  const result = await db
+    .select({ totalBytes: sql<number>`COALESCE(SUM(${files.sizeBytes}), 0)::bigint` })
+    .from(files)
+    .where(and(eq(files.orgId, orgId), isNull(files.deletedAt)));
+  return Number(result[0]?.totalBytes ?? 0);
+}
