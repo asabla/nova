@@ -84,6 +84,7 @@ export function MessageInput({ onSend, onStop, isStreaming, disabled, onFileUplo
                 return prev + separator + text;
               });
             }}
+            onAudioFile={onFileUpload}
             disabled={disabled || isStreaming}
           />
 

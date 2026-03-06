@@ -38,7 +38,7 @@ import { contentFilter } from "./middleware/content-filter";
 import { importRoutes } from "./routes/import";
 import { groupRoutes } from "./routes/groups";
 import { folderRoutes } from "./routes/conversation-folders";
-import { ssoRoutes } from "./routes/sso";
+import { ssoRoutes, ssoOAuthRoutes } from "./routes/sso";
 import { gdprRoutes } from "./routes/gdpr";
 import { memoryRoutes } from "./routes/memory";
 import { agentToolRoutes } from "./routes/agent-tools";
@@ -74,6 +74,7 @@ app.use("*", logger());
 // 6. Public routes
 app.route("/api/auth", authRoutes);
 app.route("/health", healthRoutes);
+app.route("/api/sso/oauth", ssoOAuthRoutes);
 
 // 7. Rate limiting (on API routes)
 app.use("/api/*", rateLimiter());
