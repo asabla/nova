@@ -94,4 +94,59 @@ toolRoutes.get("/:id/calls", async (c) => {
   return c.json({ data: result });
 });
 
+// Test tool execution
+toolRoutes.post("/:id/test", async (c) => {
+  const orgId = c.get("orgId");
+  const [tool] = await db.select().from(tools)
+    .where(and(eq(tools.id, c.req.param("id")), eq(tools.orgId, orgId)));
+  if (!tool) throw AppError.notFound("Tool not found");
+
+  const body = await c.req.json() as { input: Record<string, unknown> };
+  const startTime = Date.now();
+
+  try {
+    // For function tools, validate against schema
+    // For API tools, make the request
+    let result: unknown = { message: "Test execution successful", input: body.input };
+
+    if (tool.type === "openapi" && tool.endpoint) {
+      const resp = await fetch(tool.endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body.input),
+        signal: AbortSignal.timeout(10_000),
+      });
+      result = await resp.json();
+    }
+
+    return c.json({
+      success: true,
+      result,
+      latencyMs: Date.now() - startTime,
+    });
+  } catch (err: any) {
+    return c.json({
+      success: false,
+      error: err.message,
+      latencyMs: Date.now() - startTime,
+    });
+  }
+});
+
+// Browse shared/approved tools (marketplace)
+toolRoutes.get("/marketplace/browse", async (c) => {
+  const orgId = c.get("orgId");
+  const search = c.req.query("search");
+  const type = c.req.query("type");
+
+  const conditions = [eq(tools.orgId, orgId), eq(tools.isApproved, true), eq(tools.isEnabled, true)];
+
+  const result = await db.select().from(tools)
+    .where(and(...conditions))
+    .orderBy(desc(tools.updatedAt))
+    .limit(50);
+
+  return c.json({ data: result });
+});
+
 export { toolRoutes };

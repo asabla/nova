@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { clsx } from "clsx";
-import { MessageSquarePlus, Search, Archive, Pin, Trash2, MoreHorizontal, ChevronLeft, Bot, BookOpen, FolderKanban, Settings, Sparkles, FileText, ShieldCheck, BarChart3, Code2, Microscope } from "lucide-react";
+import { MessageSquarePlus, Search, Archive, Pin, Trash2, MoreHorizontal, ChevronLeft, Bot, BookOpen, FolderKanban, Settings, Sparkles, FileText, ShieldCheck, BarChart3, Code2, Microscope, Wrench, Compass, HelpCircle, GitCompare } from "lucide-react";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { useUIStore } from "../../stores/ui.store";
@@ -101,13 +101,17 @@ export function Sidebar() {
       <div className="border-t border-border px-2 py-2 space-y-0.5">
         <SidebarLink icon={Bot} label="Agents" to="/agents" />
         <SidebarLink icon={BookOpen} label="Knowledge" to="/knowledge" />
+        <SidebarLink icon={Wrench} label="Tools" to="/tools" />
         <SidebarLink icon={FolderKanban} label="Workspaces" to="/workspaces" />
         <SidebarLink icon={FileText} label="Prompts" to="/prompts" />
         <SidebarLink icon={Microscope} label="Research" to="/research" />
         <SidebarLink icon={Code2} label="Playground" to="/playground" />
+        <SidebarLink icon={GitCompare} label="Compare" to="/model-compare" />
+        <SidebarLink icon={Compass} label="Explore" to="/explore" />
         <SidebarLink icon={BarChart3} label="Usage" to="/usage" />
         <SidebarLink icon={ShieldCheck} label="Admin" to="/admin" />
         <SidebarLink icon={Settings} label="Settings" to="/settings" />
+        <SidebarLink icon={HelpCircle} label="Help" to="/help" />
       </div>
     </aside>
   );
