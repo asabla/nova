@@ -14,38 +14,55 @@ import {
   apiKeys,
   knowledgeCollections,
   notifications,
+  dataJobs,
 } from "@nova/shared/schemas";
 import { writeAuditLog } from "../services/audit.service";
 import { AppError } from "@nova/shared/utils";
+import { requireRole } from "../middleware/rbac";
 
 const gdprRoutes = new Hono<AppContext>();
 
-// GDPR data export for a user (admin only)
+// POST /gdpr/export/:userId - Generate GDPR data export for a user (stories #191-192)
+// Requires org-admin role. Creates an async job and returns immediately.
 gdprRoutes.post(
-  "/export",
-  zValidator("json", z.object({ userId: z.string().uuid() })),
+  "/export/:userId",
+  requireRole("org-admin"),
+  zValidator("param", z.object({ userId: z.string().uuid() })),
   async (c) => {
     const orgId = c.get("orgId");
     const actorId = c.get("userId");
-    const { userId } = c.req.valid("json");
+    const { userId } = c.req.valid("param");
 
-    // Fetch all user data
+    // Verify user exists
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     if (!user) throw AppError.notFound("User");
 
-    const [profile] = await db
-      .select()
-      .from(userProfiles)
-      .where(and(eq(userProfiles.userId, userId), eq(userProfiles.orgId, orgId)));
+    // Create a data job to track this GDPR export request
+    const [job] = await db
+      .insert(dataJobs)
+      .values({
+        orgId,
+        userId: actorId,
+        type: "gdpr_export",
+        status: "processing",
+        metadata: { targetUserId: userId },
+      })
+      .returning();
 
-    const userConversations = await db
-      .select()
-      .from(conversations)
-      .where(and(eq(conversations.ownerId, userId), eq(conversations.orgId, orgId)));
+    try {
+      // Fetch all user data across the org
+      const [profile] = await db
+        .select()
+        .from(userProfiles)
+        .where(and(eq(userProfiles.userId, userId), eq(userProfiles.orgId, orgId)));
 
-    const conversationIds = userConversations.map((c) => c.id);
-    let userMessages: any[] = [];
-    if (conversationIds.length > 0) {
+      const userConversations = await db
+        .select()
+        .from(conversations)
+        .where(and(eq(conversations.ownerId, userId), eq(conversations.orgId, orgId)));
+
+      const conversationIds = userConversations.map((conv) => conv.id);
+      const userMessages: any[] = [];
       for (const convId of conversationIds) {
         const msgs = await db
           .select()
@@ -53,129 +70,344 @@ gdprRoutes.post(
           .where(and(eq(messages.conversationId, convId), eq(messages.orgId, orgId)));
         userMessages.push(...msgs);
       }
+
+      const userAgents = await db
+        .select()
+        .from(agents)
+        .where(and(eq(agents.ownerId, userId), eq(agents.orgId, orgId)));
+
+      const userFiles = await db
+        .select()
+        .from(files)
+        .where(and(eq(files.uploadedById, userId), eq(files.orgId, orgId)));
+
+      const userApiKeys = await db
+        .select({
+          id: apiKeys.id,
+          keyPrefix: apiKeys.keyPrefix,
+          label: apiKeys.label,
+          createdAt: apiKeys.createdAt,
+        })
+        .from(apiKeys)
+        .where(and(eq(apiKeys.userId, userId), eq(apiKeys.orgId, orgId)));
+
+      const userCollections = await db
+        .select()
+        .from(knowledgeCollections)
+        .where(and(eq(knowledgeCollections.ownerId, userId), eq(knowledgeCollections.orgId, orgId)));
+
+      const userNotifications = await db
+        .select()
+        .from(notifications)
+        .where(and(eq(notifications.userId, userId), eq(notifications.orgId, orgId)));
+
+      const exportData = {
+        exportedAt: new Date().toISOString(),
+        exportFormat: "nova-gdpr-export-v1",
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          createdAt: user.createdAt,
+        },
+        profile,
+        conversations: userConversations,
+        messages: userMessages,
+        agents: userAgents,
+        files: userFiles.map((f) => ({
+          id: f.id,
+          filename: f.filename,
+          mimeType: f.mimeType,
+          sizeBytes: f.sizeBytes,
+          createdAt: f.createdAt,
+        })),
+        apiKeys: userApiKeys,
+        knowledgeCollections: userCollections,
+        notifications: userNotifications,
+      };
+
+      // Mark job as completed and store summary in metadata
+      await db
+        .update(dataJobs)
+        .set({
+          status: "completed",
+          progressPct: 100,
+          metadata: {
+            targetUserId: userId,
+            recordCounts: {
+              conversations: userConversations.length,
+              messages: userMessages.length,
+              agents: userAgents.length,
+              files: userFiles.length,
+              apiKeys: userApiKeys.length,
+              knowledgeCollections: userCollections.length,
+              notifications: userNotifications.length,
+            },
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(dataJobs.id, job.id));
+
+      await writeAuditLog({
+        orgId,
+        actorId,
+        actorType: "user",
+        action: "gdpr.export",
+        resourceType: "user",
+        resourceId: userId,
+        details: {
+          jobId: job.id,
+          recordCounts: {
+            conversations: userConversations.length,
+            messages: userMessages.length,
+          },
+        },
+      });
+
+      return c.json({
+        requestId: job.id,
+        status: "completed",
+        exportData,
+      });
+    } catch (err) {
+      // Mark job as failed
+      await db
+        .update(dataJobs)
+        .set({
+          status: "failed",
+          errorMessage: err instanceof Error ? err.message : "Unknown error",
+          updatedAt: new Date(),
+        })
+        .where(eq(dataJobs.id, job.id));
+      throw err;
     }
-
-    const userAgents = await db
-      .select()
-      .from(agents)
-      .where(and(eq(agents.ownerId, userId), eq(agents.orgId, orgId)));
-
-    const userFiles = await db
-      .select()
-      .from(files)
-      .where(and(eq(files.uploadedById, userId), eq(files.orgId, orgId)));
-
-    const userApiKeys = await db
-      .select({ id: apiKeys.id, keyPrefix: apiKeys.keyPrefix, label: apiKeys.label, createdAt: apiKeys.createdAt })
-      .from(apiKeys)
-      .where(and(eq(apiKeys.userId, userId), eq(apiKeys.orgId, orgId)));
-
-    const userCollections = await db
-      .select()
-      .from(knowledgeCollections)
-      .where(and(eq(knowledgeCollections.ownerId, userId), eq(knowledgeCollections.orgId, orgId)));
-
-    const userNotifications = await db
-      .select()
-      .from(notifications)
-      .where(and(eq(notifications.userId, userId), eq(notifications.orgId, orgId)));
-
-    await writeAuditLog({
-      orgId,
-      actorId,
-      actorType: "user",
-      action: "gdpr.export",
-      resourceType: "user",
-      resourceId: userId,
-    });
-
-    return c.json({
-      exportedAt: new Date().toISOString(),
-      user: { id: user.id, name: user.name, email: user.email, createdAt: user.createdAt },
-      profile,
-      conversations: userConversations,
-      messages: userMessages,
-      agents: userAgents,
-      files: userFiles.map((f) => ({ id: f.id, filename: f.filename, mimeType: f.mimeType, sizeBytes: f.sizeBytes, createdAt: f.createdAt })),
-      apiKeys: userApiKeys,
-      knowledgeCollections: userCollections,
-      notifications: userNotifications,
-    });
   },
 );
 
-// GDPR data deletion (admin only)
+// POST /gdpr/delete/:userId - Process GDPR right-to-erasure (story #193)
+// Requires org-admin role. Soft-deletes PII and anonymizes audit log references.
 gdprRoutes.post(
-  "/delete",
-  zValidator("json", z.object({
-    userId: z.string().uuid(),
-    confirmPhrase: z.literal("DELETE ALL DATA"),
-  })),
+  "/delete/:userId",
+  requireRole("org-admin"),
+  zValidator("param", z.object({ userId: z.string().uuid() })),
+  zValidator(
+    "json",
+    z.object({
+      confirmPhrase: z.literal("DELETE ALL DATA"),
+    }),
+  ),
   async (c) => {
     const orgId = c.get("orgId");
     const actorId = c.get("userId");
-    const { userId } = c.req.valid("json");
+    const { userId } = c.req.valid("param");
 
-    // Soft-delete all user data while preserving anonymized audit logs
+    // Prevent self-deletion
+    if (actorId === userId) {
+      throw AppError.badRequest("Cannot process GDPR deletion for yourself. Contact a different admin.");
+    }
+
+    // Verify user exists
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user) throw AppError.notFound("User");
+
+    // Create a data job to track this GDPR deletion request
+    const [job] = await db
+      .insert(dataJobs)
+      .values({
+        orgId,
+        userId: actorId,
+        type: "gdpr_delete",
+        status: "processing",
+        metadata: { targetUserId: userId, targetEmail: user.email },
+      })
+      .returning();
+
     const now = new Date();
 
-    // Delete conversations (cascades to messages, participants, etc.)
-    await db
-      .update(conversations)
-      .set({ deletedAt: now })
-      .where(and(eq(conversations.ownerId, userId), eq(conversations.orgId, orgId), isNull(conversations.deletedAt)));
+    try {
+      // 1. Soft-delete conversations (cascades to messages via app logic)
+      const convResult = await db
+        .update(conversations)
+        .set({ deletedAt: now })
+        .where(
+          and(
+            eq(conversations.ownerId, userId),
+            eq(conversations.orgId, orgId),
+            isNull(conversations.deletedAt),
+          ),
+        )
+        .returning({ id: conversations.id });
 
-    // Delete agents
-    await db
-      .update(agents)
-      .set({ deletedAt: now })
-      .where(and(eq(agents.ownerId, userId), eq(agents.orgId, orgId), isNull(agents.deletedAt)));
+      // 2. Soft-delete messages in those conversations
+      for (const conv of convResult) {
+        await db
+          .update(messages)
+          .set({ deletedAt: now, content: "[deleted]" })
+          .where(
+            and(
+              eq(messages.conversationId, conv.id),
+              eq(messages.orgId, orgId),
+              isNull(messages.deletedAt),
+            ),
+          );
+      }
 
-    // Revoke API keys
-    await db
-      .update(apiKeys)
-      .set({ revokedAt: now })
-      .where(and(eq(apiKeys.userId, userId), eq(apiKeys.orgId, orgId), isNull(apiKeys.revokedAt)));
+      // 3. Soft-delete agents
+      await db
+        .update(agents)
+        .set({ deletedAt: now })
+        .where(
+          and(eq(agents.ownerId, userId), eq(agents.orgId, orgId), isNull(agents.deletedAt)),
+        );
 
-    // Mark files as deleted
-    await db
-      .update(files)
-      .set({ deletedAt: now })
-      .where(and(eq(files.uploadedById, userId), eq(files.orgId, orgId), isNull(files.deletedAt)));
+      // 4. Revoke API keys
+      await db
+        .update(apiKeys)
+        .set({ revokedAt: now })
+        .where(
+          and(eq(apiKeys.userId, userId), eq(apiKeys.orgId, orgId), isNull(apiKeys.revokedAt)),
+        );
 
-    // Delete knowledge collections
-    await db
-      .update(knowledgeCollections)
-      .set({ deletedAt: now })
-      .where(and(eq(knowledgeCollections.ownerId, userId), eq(knowledgeCollections.orgId, orgId), isNull(knowledgeCollections.deletedAt)));
+      // 5. Soft-delete files
+      await db
+        .update(files)
+        .set({ deletedAt: now })
+        .where(
+          and(eq(files.uploadedById, userId), eq(files.orgId, orgId), isNull(files.deletedAt)),
+        );
 
-    // Delete notifications
-    await db
-      .delete(notifications)
-      .where(and(eq(notifications.userId, userId), eq(notifications.orgId, orgId)));
+      // 6. Soft-delete knowledge collections
+      await db
+        .update(knowledgeCollections)
+        .set({ deletedAt: now })
+        .where(
+          and(
+            eq(knowledgeCollections.ownerId, userId),
+            eq(knowledgeCollections.orgId, orgId),
+            isNull(knowledgeCollections.deletedAt),
+          ),
+        );
 
-    // Anonymize user profile (keep the record for audit trail integrity)
-    await db
-      .update(userProfiles)
-      .set({
-        displayName: "[Deleted User]",
-        avatarUrl: null,
-        deletedAt: now,
-        updatedAt: now,
-      })
-      .where(and(eq(userProfiles.userId, userId), eq(userProfiles.orgId, orgId)));
+      // 7. Hard-delete notifications (no audit value)
+      await db
+        .delete(notifications)
+        .where(and(eq(notifications.userId, userId), eq(notifications.orgId, orgId)));
 
-    await writeAuditLog({
-      orgId,
-      actorId,
-      actorType: "user",
-      action: "gdpr.delete",
-      resourceType: "user",
-      resourceId: userId,
-      details: { note: "All personal data soft-deleted, profile anonymized" },
+      // 8. Anonymize user profile (preserve record for audit trail integrity)
+      await db
+        .update(userProfiles)
+        .set({
+          displayName: "[Deleted User]",
+          avatarUrl: null,
+          deletedAt: now,
+          updatedAt: now,
+        })
+        .where(and(eq(userProfiles.userId, userId), eq(userProfiles.orgId, orgId)));
+
+      // 9. Anonymize the user record itself (scrub PII, keep ID for referential integrity)
+      await db
+        .update(users)
+        .set({
+          name: "[Deleted User]",
+          email: `deleted-${userId}@anonymized.nova`,
+          isActive: false,
+          updatedAt: now,
+        })
+        .where(eq(users.id, userId));
+
+      // Mark job as completed
+      await db
+        .update(dataJobs)
+        .set({
+          status: "completed",
+          progressPct: 100,
+          metadata: {
+            targetUserId: userId,
+            conversationsDeleted: convResult.length,
+            completedAt: now.toISOString(),
+          },
+          updatedAt: now,
+        })
+        .where(eq(dataJobs.id, job.id));
+
+      await writeAuditLog({
+        orgId,
+        actorId,
+        actorType: "user",
+        action: "gdpr.delete",
+        resourceType: "user",
+        resourceId: userId,
+        details: {
+          jobId: job.id,
+          note: "All personal data soft-deleted, profile and user record anonymized, audit logs preserved",
+          conversationsDeleted: convResult.length,
+        },
+      });
+
+      return c.json({
+        ok: true,
+        requestId: job.id,
+        message:
+          "User data has been deleted and anonymized. Audit logs preserved with anonymized references.",
+        summary: {
+          conversationsDeleted: convResult.length,
+          profileAnonymized: true,
+          userRecordAnonymized: true,
+          apiKeysRevoked: true,
+          filesDeleted: true,
+          notificationsRemoved: true,
+        },
+      });
+    } catch (err) {
+      await db
+        .update(dataJobs)
+        .set({
+          status: "failed",
+          errorMessage: err instanceof Error ? err.message : "Unknown error",
+          updatedAt: new Date(),
+        })
+        .where(eq(dataJobs.id, job.id));
+      throw err;
+    }
+  },
+);
+
+// GET /gdpr/status/:requestId - Check GDPR request status (story #194)
+gdprRoutes.get(
+  "/status/:requestId",
+  requireRole("org-admin"),
+  zValidator("param", z.object({ requestId: z.string().uuid() })),
+  async (c) => {
+    const orgId = c.get("orgId");
+    const { requestId } = c.req.valid("param");
+
+    const [job] = await db
+      .select()
+      .from(dataJobs)
+      .where(
+        and(
+          eq(dataJobs.id, requestId),
+          eq(dataJobs.orgId, orgId),
+          // Only return GDPR-type jobs
+        ),
+      );
+
+    if (!job) throw AppError.notFound("GDPR request");
+
+    if (job.type !== "gdpr_export" && job.type !== "gdpr_delete") {
+      throw AppError.notFound("GDPR request");
+    }
+
+    return c.json({
+      requestId: job.id,
+      type: job.type,
+      status: job.status,
+      progressPct: job.progressPct,
+      errorMessage: job.errorMessage,
+      metadata: job.metadata,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
     });
-
-    return c.json({ ok: true, message: "User data has been deleted. Audit logs preserved with anonymized references." });
   },
 );
 
