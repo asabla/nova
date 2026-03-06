@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, useMatchRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { User, Palette, Bell, Shield, Key } from "lucide-react";
+import { User, Palette, Bell, Shield, Key, Keyboard, Download } from "lucide-react";
 import { clsx } from "clsx";
 
 export const Route = createFileRoute("/_auth/settings")({
@@ -13,6 +13,8 @@ const tabs = [
   { to: "/settings/notifications", icon: Bell, label: "settings.notifications" },
   { to: "/settings/security", icon: Shield, label: "settings.security" },
   { to: "/settings/api-keys", icon: Key, label: "settings.apiKeys" },
+  { to: "/settings/shortcuts", icon: Keyboard, label: "settings.shortcuts" },
+  { to: "/settings/import-export", icon: Download, label: "settings.importExport" },
 ] as const;
 
 function SettingsLayout() {
