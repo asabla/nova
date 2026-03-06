@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql, isNull } from "drizzle-orm";
 import type { AppContext } from "../types/context";
 import { orgService } from "../services/org.service";
 import { writeAuditLog } from "../services/audit.service";
@@ -66,6 +66,100 @@ orgRoutes.put("/settings/bulk", requireRole("org-admin"), async (c) => {
       });
   }
   return c.json({ ok: true, count: Object.keys(settingsMap).length });
+});
+
+// Security policies
+const securityPoliciesSchema = z.object({
+  mfaRequired: z.boolean().optional(),
+  passwordMinLength: z.number().int().min(6).max(128).optional(),
+  passwordRequireUppercase: z.boolean().optional(),
+  passwordRequireNumbers: z.boolean().optional(),
+  passwordRequireSymbols: z.boolean().optional(),
+  passwordExpiryDays: z.number().int().min(1).max(365).nullable().optional(),
+  sessionMaxAge: z.number().int().min(1).max(720).optional(),
+});
+
+const defaultSecurityPolicies = {
+  mfaRequired: false,
+  passwordMinLength: 8,
+  passwordRequireUppercase: false,
+  passwordRequireNumbers: false,
+  passwordRequireSymbols: false,
+  passwordExpiryDays: null as number | null,
+  sessionMaxAge: 24,
+};
+
+orgRoutes.get("/security-policies", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  const [row] = await db.select().from(orgSettings)
+    .where(and(eq(orgSettings.orgId, orgId), eq(orgSettings.key, "security_policies")));
+
+  const policies = row ? { ...defaultSecurityPolicies, ...JSON.parse(row.value) } : defaultSecurityPolicies;
+  return c.json(policies);
+});
+
+orgRoutes.patch("/security-policies", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const body = securityPoliciesSchema.parse(await c.req.json());
+
+  // Merge with existing
+  const [existing] = await db.select().from(orgSettings)
+    .where(and(eq(orgSettings.orgId, orgId), eq(orgSettings.key, "security_policies")));
+
+  const current = existing ? JSON.parse(existing.value) : {};
+  const merged = { ...current, ...body };
+
+  await db.insert(orgSettings).values({
+    orgId,
+    key: "security_policies",
+    value: JSON.stringify(merged),
+  }).onConflictDoUpdate({
+    target: [orgSettings.orgId, orgSettings.key],
+    set: { value: JSON.stringify(merged), updatedAt: new Date() },
+  });
+
+  await writeAuditLog({
+    orgId,
+    actorId: userId,
+    actorType: "user",
+    action: "org.security_policies.update",
+    resourceType: "org",
+    resourceId: orgId,
+    details: body,
+  });
+
+  return c.json({ ...defaultSecurityPolicies, ...merged });
+});
+
+// MFA enrollment status across the org
+orgRoutes.get("/mfa-status", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  const members = await orgService.listMembers(orgId);
+  const totalMembers = members.length;
+
+  // Query mfa_credentials for each member
+  const { mfaCredentials } = await import("@nova/shared/schemas");
+  const memberUserIds = members.map((m: any) => m.user.id ?? m.profile.userId);
+
+  let enrolledCount = 0;
+  if (memberUserIds.length > 0) {
+    const enrolled = await db.select({ userId: mfaCredentials.userId })
+      .from(mfaCredentials)
+      .where(and(
+        sql`${mfaCredentials.userId} = ANY(${memberUserIds})`,
+        isNull(mfaCredentials.deletedAt),
+      ));
+    const enrolledSet = new Set(enrolled.map(e => e.userId));
+    enrolledCount = enrolledSet.size;
+  }
+
+  return c.json({
+    totalMembers,
+    mfaEnrolled: enrolledCount,
+    mfaNotEnrolled: totalMembers - enrolledCount,
+    enrollmentPct: totalMembers > 0 ? Math.round((enrolledCount / totalMembers) * 100) : 0,
+  });
 });
 
 // Billing plan change (placeholder for Stripe integration)

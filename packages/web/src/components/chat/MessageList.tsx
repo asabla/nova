@@ -1,12 +1,14 @@
 import { useRef, useEffect } from "react";
 import { MessageBubble } from "./MessageBubble";
 import { StreamingMessage } from "./StreamingMessage";
+import { TypingIndicator } from "./TypingIndicator";
 
 interface MessageListProps {
   messages: any[];
   streamingContent?: string;
   isStreaming?: boolean;
   userName?: string;
+  conversationId?: string;
   onRate?: (messageId: string, rating: 1 | -1) => void;
   onEdit?: (messageId: string, content: string) => void;
   onEditAndRerun?: (messageId: string, content: string) => void;
@@ -15,7 +17,7 @@ interface MessageListProps {
   onFork?: (messageId: string) => void;
 }
 
-export function MessageList({ messages, streamingContent, isStreaming, userName, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork }: MessageListProps) {
+export function MessageList({ messages, streamingContent, isStreaming, userName, conversationId, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,6 +49,10 @@ export function MessageList({ messages, streamingContent, isStreaming, userName,
 
         {isStreaming && streamingContent !== undefined && (
           <StreamingMessage content={streamingContent} />
+        )}
+
+        {conversationId && (
+          <TypingIndicator conversationId={conversationId} />
         )}
 
         <div ref={bottomRef} />

@@ -1,22 +1,111 @@
 import { db } from "../lib/db";
 import { eq, and, isNull } from "drizzle-orm";
-import { notifications, users, orgSettings } from "@nova/shared/schemas";
+import { notifications, notificationPreferences, users } from "@nova/shared/schemas";
 import { sendToUser } from "../lib/ws";
 import { sendEmail, buildNotificationEmail } from "../lib/email";
 import { env } from "../lib/env";
 
 interface NotificationPrefs {
-  emailOnShare?: boolean;
-  emailOnMention?: boolean;
-  emailOnAgentComplete?: boolean;
+  emailOnShare: boolean;
+  emailOnMention: boolean;
+  emailOnAgentComplete: boolean;
+  inAppEnabled: boolean;
   webhookOnAgentComplete?: boolean;
   webhookUrl?: string;
 }
 
+const DEFAULT_PREFS: NotificationPrefs = {
+  emailOnShare: true,
+  emailOnMention: true,
+  emailOnAgentComplete: false,
+  inAppEnabled: true,
+};
+
+/**
+ * Maps our fine-grained preference keys to (notificationType, channel) pairs
+ * stored in the notificationPreferences table.
+ */
+const PREF_MAPPING: Record<keyof Omit<NotificationPrefs, "webhookOnAgentComplete" | "webhookUrl">, { notificationType: string; channel: string }> = {
+  emailOnShare: { notificationType: "conversation_shared", channel: "email" },
+  emailOnMention: { notificationType: "mention", channel: "email" },
+  emailOnAgentComplete: { notificationType: "agent_complete", channel: "email" },
+  inAppEnabled: { notificationType: "all", channel: "in_app" },
+};
+
 async function getUserPrefs(orgId: string, userId: string): Promise<NotificationPrefs> {
-  const [row] = await db.select().from(orgSettings)
-    .where(and(eq(orgSettings.orgId, orgId), eq(orgSettings.key, `notification_prefs_${userId}`)));
-  return (row?.value as NotificationPrefs) ?? { emailOnShare: true, emailOnMention: true, emailOnAgentComplete: false };
+  const rows = await db
+    .select()
+    .from(notificationPreferences)
+    .where(
+      and(
+        eq(notificationPreferences.userId, userId),
+        eq(notificationPreferences.orgId, orgId),
+        isNull(notificationPreferences.deletedAt),
+      ),
+    );
+
+  // Start from defaults, then overlay any stored preferences
+  const prefs: NotificationPrefs = { ...DEFAULT_PREFS };
+
+  for (const row of rows) {
+    for (const [key, mapping] of Object.entries(PREF_MAPPING)) {
+      if (row.notificationType === mapping.notificationType && row.channel === mapping.channel) {
+        (prefs as any)[key] = row.isEnabled;
+      }
+    }
+    // Webhook preferences
+    if (row.notificationType === "agent_complete" && row.channel === "webhook") {
+      prefs.webhookOnAgentComplete = row.isEnabled;
+    }
+  }
+
+  return prefs;
+}
+
+/**
+ * Upsert a single notification preference for a user.
+ */
+export async function upsertPreference(
+  orgId: string,
+  userId: string,
+  notificationType: string,
+  channel: string,
+  isEnabled: boolean,
+) {
+  const existing = await db
+    .select()
+    .from(notificationPreferences)
+    .where(
+      and(
+        eq(notificationPreferences.userId, userId),
+        eq(notificationPreferences.orgId, orgId),
+        eq(notificationPreferences.notificationType, notificationType),
+        eq(notificationPreferences.channel, channel),
+      ),
+    );
+
+  if (existing.length > 0) {
+    const [updated] = await db
+      .update(notificationPreferences)
+      .set({ isEnabled, updatedAt: new Date(), deletedAt: null })
+      .where(eq(notificationPreferences.id, existing[0].id))
+      .returning();
+    return updated;
+  }
+
+  const [created] = await db
+    .insert(notificationPreferences)
+    .values({ userId, orgId, notificationType, channel, isEnabled })
+    .returning();
+  return created;
+}
+
+/**
+ * Return the current user's structured preferences, suitable for the frontend.
+ */
+export async function getStructuredPrefs(orgId: string, userId: string) {
+  const prefs = await getUserPrefs(orgId, userId);
+  return prefs;
 }
 
 async function getUserEmail(userId: string): Promise<string | null> {
@@ -47,27 +136,36 @@ export const notificationService = {
     resourceType?: string;
     resourceId?: string;
     sendEmail?: boolean;
+    /** When false, skip in-app notification persistence and WebSocket push. Defaults to true. */
+    sendInApp?: boolean;
   }) {
-    const [notification] = await db.insert(notifications).values({
-      orgId: data.orgId,
-      userId: data.userId,
-      type: data.type,
-      title: data.title,
-      body: data.body,
-      resourceType: data.resourceType,
-      resourceId: data.resourceId,
-    }).returning();
+    const shouldSendInApp = data.sendInApp !== false;
 
-    // Send real-time notification via WebSocket
-    sendToUser(data.userId, {
-      type: "notification",
-      notification: {
-        id: notification.id,
+    let notification: typeof notifications.$inferSelect | null = null;
+
+    // Persist in-app notification and push via WebSocket
+    if (shouldSendInApp) {
+      const [created] = await db.insert(notifications).values({
+        orgId: data.orgId,
+        userId: data.userId,
+        type: data.type,
         title: data.title,
         body: data.body,
-        type: data.type,
-      },
-    });
+        resourceType: data.resourceType,
+        resourceId: data.resourceId,
+      }).returning();
+      notification = created;
+
+      sendToUser(data.userId, {
+        type: "notification",
+        notification: {
+          id: notification.id,
+          title: data.title,
+          body: data.body,
+          type: data.type,
+        },
+      });
+    }
 
     // Send email if requested
     if (data.sendEmail) {
@@ -85,6 +183,9 @@ export const notificationService = {
   },
 
   async notifyConversationShare(orgId: string, fromUserId: string, toUserId: string, conversationId: string, conversationTitle: string) {
+    // Don't notify yourself
+    if (fromUserId === toUserId) return null;
+
     const prefs = await getUserPrefs(orgId, toUserId);
     return this.create({
       orgId,
@@ -94,11 +195,15 @@ export const notificationService = {
       body: `"${conversationTitle}" was shared with you`,
       resourceType: "conversation",
       resourceId: conversationId,
+      sendInApp: prefs.inAppEnabled,
       sendEmail: prefs.emailOnShare,
     });
   },
 
   async notifyMention(orgId: string, fromUserId: string, toUserId: string, conversationId: string, messageContent: string) {
+    // Don't notify yourself
+    if (fromUserId === toUserId) return null;
+
     const prefs = await getUserPrefs(orgId, toUserId);
     return this.create({
       orgId,
@@ -108,6 +213,7 @@ export const notificationService = {
       body: messageContent.slice(0, 200),
       resourceType: "conversation",
       resourceId: conversationId,
+      sendInApp: prefs.inAppEnabled,
       sendEmail: prefs.emailOnMention,
     });
   },

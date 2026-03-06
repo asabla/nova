@@ -29,12 +29,21 @@ export function handleWsMessage(ws: ServerWebSocket<WSData>, message: string) {
   try {
     const data = JSON.parse(message);
 
-    if (data.type === "typing") {
-      redisPub.publish(`ws:org:${ws.data.orgId}`, JSON.stringify({
-        type: "typing",
+    if (data.type === "typing.start" || data.type === "typing.stop") {
+      const event = {
+        type: data.type,
         userId: ws.data.userId,
         conversationId: data.conversationId,
-        isTyping: data.isTyping,
+      };
+
+      // Broadcast directly to local connections in the same org (exclude sender)
+      broadcastToOrg(ws.data.orgId, event, ws.data.userId);
+
+      // Publish to Redis for cross-instance delivery
+      redisPub.publish("ws:broadcast", JSON.stringify({
+        orgId: ws.data.orgId,
+        excludeUserId: ws.data.userId,
+        event,
       }));
     }
 

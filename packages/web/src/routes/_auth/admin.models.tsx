@@ -20,6 +20,7 @@ import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Badge } from "../../components/ui/Badge";
+import { ModelCapabilityBadges } from "../../components/ui/ModelCapabilityBadges";
 import { Dialog } from "../../components/ui/Dialog";
 
 export const Route = createFileRoute("/_auth/admin/models")({
@@ -214,15 +215,7 @@ function ModelsPage() {
                 </div>
 
                 {/* Capabilities */}
-                {capabilities.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {capabilities.map((cap: string) => (
-                      <Badge key={cap} variant="default" className="text-[10px]">
-                        {cap}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
+                <ModelCapabilityBadges capabilities={capabilities} className="mb-3" />
 
                 {/* Context window */}
                 {m.contextWindow && (

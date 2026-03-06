@@ -10,6 +10,7 @@ import { useSSEStream } from "../../hooks/useSSE";
 import { useAuthStore } from "../../stores/auth.store";
 import { useDragDrop } from "../../hooks/useDragDrop";
 import { useClipboardPaste } from "../../hooks/useClipboardPaste";
+import { useTypingIndicator } from "../../hooks/useTypingIndicator";
 import { toast } from "../../components/ui/Toast";
 
 export const Route = createFileRoute("/_auth/conversations/$id")({
@@ -22,6 +23,7 @@ function ConversationPage() {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const { tokens, status, startStream, stopStream, pauseStream, resumeStream, resetStream } = useSSEStream();
+  const { onKeystroke, stopTyping } = useTypingIndicator(id);
 
   const { data: conversation } = useQuery(conversationDetailOptions(id));
   const { data: messagesData } = useQuery(messagesOptions(id));
@@ -55,6 +57,8 @@ function ConversationPage() {
   }, [conversation]);
 
   const handleSend = useCallback(async (content: string) => {
+    stopTyping();
+
     await api.post(`/api/conversations/${id}/messages`, {
       content,
       senderType: "user",
@@ -75,7 +79,7 @@ function ConversationPage() {
         { role: "user", content },
       ],
     });
-  }, [id, queryClient, startStream, conversation, messages, getModelParams]);
+  }, [id, queryClient, startStream, conversation, messages, getModelParams, stopTyping]);
 
   const handleRate = useCallback(async (messageId: string, rating: 1 | -1) => {
     await api.post(`/api/conversations/${id}/messages/${messageId}/rate`, { rating });
@@ -159,7 +163,7 @@ function ConversationPage() {
     forkAtMessage.mutate(messageId);
   }, [forkAtMessage]);
 
-  const handleFileUpload = useCallback(async (file: File) => {
+  const uploadSingleFile = useCallback(async (file: File) => {
     const presign = await api.post<{ uploadUrl: string; fileId: string }>(
       "/api/files/presign",
       { fileName: file.name, mimeType: file.type, size: file.size },
@@ -172,14 +176,26 @@ function ConversationPage() {
     });
 
     await api.post("/api/files/confirm", { fileId: presign.fileId });
-    toast("File uploaded", "success");
+    return presign.fileId;
   }, []);
 
+  const handleFileUpload = useCallback(async (files: File[]) => {
+    const results = await Promise.allSettled(files.map(uploadSingleFile));
+    const succeeded = results.filter((r) => r.status === "fulfilled").length;
+    const failed = results.filter((r) => r.status === "rejected").length;
+
+    if (failed === 0) {
+      toast(`${succeeded} file${succeeded !== 1 ? "s" : ""} uploaded`, "success");
+    } else {
+      toast(`${succeeded} uploaded, ${failed} failed`, "error");
+    }
+  }, [uploadSingleFile]);
+
   const { isDragging, dragHandlers } = useDragDrop((files) => {
-    for (const file of files) handleFileUpload(file);
+    handleFileUpload(files);
   });
 
-  useClipboardPaste(handleFileUpload);
+  useClipboardPaste((file) => handleFileUpload([file]));
 
   return (
     <div className="flex flex-col flex-1 min-h-0 relative" {...dragHandlers}>
@@ -194,6 +210,7 @@ function ConversationPage() {
         streamingContent={(status === "streaming" || status === "paused") ? tokens : undefined}
         isStreaming={status === "streaming" || status === "paused"}
         userName={user?.name}
+        conversationId={id}
         onRate={handleRate}
         onEdit={handleEdit}
         onEditAndRerun={handleEditAndRerun}
@@ -209,6 +226,7 @@ function ConversationPage() {
         isStreaming={status === "streaming"}
         isPaused={status === "paused"}
         onFileUpload={handleFileUpload}
+        onTyping={onKeystroke}
       />
     </div>
   );

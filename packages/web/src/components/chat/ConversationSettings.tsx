@@ -6,6 +6,7 @@ import { clsx } from "clsx";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { Button } from "../ui/Button";
+import { ModelCapabilityBadges } from "../ui/ModelCapabilityBadges";
 import { toast } from "../ui/Toast";
 
 interface ConversationSettingsProps {

@@ -3,22 +3,26 @@ import { useTranslation } from "react-i18next";
 import { Send, Square, Paperclip, Pause, Play } from "lucide-react";
 import { clsx } from "clsx";
 import { VoiceInput } from "./VoiceInput";
+import { AttachmentBar } from "./AttachmentBar";
+import { MentionPopup, useMentionTrigger, type MentionCandidate } from "./MentionPopup";
 
 interface MessageInputProps {
-  onSend: (content: string) => void;
+  onSend: (content: string, files?: File[]) => void;
   onStop?: () => void;
   onPause?: () => void;
   onResume?: () => void;
   isStreaming?: boolean;
   isPaused?: boolean;
   disabled?: boolean;
-  onFileUpload?: (file: File) => void;
+  onFileUpload?: (files: File[]) => void;
+  onTyping?: () => void;
 }
 
-export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, isPaused, disabled, onFileUpload }: MessageInputProps) {
+export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, isPaused, disabled, onFileUpload, onTyping }: MessageInputProps) {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   // Auto-save draft on disconnect / page unload (story #202)
   const draftKey = "nova:message-draft";
@@ -38,6 +42,22 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
     }, 500);
   }, []);
 
+  // --- @mention system (stories #45, #46) ---
+  const mention = useMentionTrigger(content, textareaRef);
+
+  const handleMentionSelect = useCallback(
+    (candidate: MentionCandidate) => {
+      const newValue = mention.handleSelect(candidate);
+      setContent(newValue);
+      saveDraft(newValue);
+      // Re-focus the textarea after inserting the mention
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+      });
+    },
+    [mention.handleSelect, saveDraft],
+  );
+
   // Save draft on page unload
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -51,16 +71,34 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
 
   const handleSubmit = useCallback(() => {
     const trimmed = content.trim();
-    if (!trimmed || disabled) return;
-    onSend(trimmed);
+    if ((!trimmed && pendingFiles.length === 0) || disabled) return;
+    onSend(trimmed, pendingFiles.length > 0 ? pendingFiles : undefined);
+    if (pendingFiles.length > 0 && onFileUpload) {
+      onFileUpload(pendingFiles);
+    }
     setContent("");
+    setPendingFiles([]);
     try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-  }, [content, disabled, onSend]);
+  }, [content, disabled, onSend, onFileUpload, pendingFiles]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // When the mention popup is active, let it handle navigation keys.
+    // The MentionPopup registers a capture-phase keydown listener for
+    // ArrowUp/ArrowDown/Enter/Tab/Escape, so we just need to prevent
+    // the textarea from treating Enter as "submit message".
+    if (mention.active) {
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Escape") {
+        return;
+      }
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (isStreaming) return;
@@ -71,6 +109,7 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value);
     saveDraft(e.target.value);
+    onTyping?.();
     const el = e.target;
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 200) + "px";
@@ -81,17 +120,41 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && onFileUpload) {
-      onFileUpload(file);
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      setPendingFiles((prev) => [...prev, ...Array.from(files)]);
     }
     e.target.value = "";
   };
 
+  const addFiles = useCallback((files: File[]) => {
+    setPendingFiles((prev) => [...prev, ...files]);
+  }, []);
+
+  const removeFile = useCallback((index: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
   return (
     <div className="border-t border-border bg-surface px-4 py-3">
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-end gap-2 rounded-2xl border border-border bg-surface-secondary px-3 py-2 focus-within:border-primary/50 transition-colors">
+        <AttachmentBar files={pendingFiles} onRemove={removeFile} />
+        <div
+          className="relative flex items-end gap-2 rounded-2xl border border-border bg-surface-secondary px-3 py-2 focus-within:border-primary/50 transition-colors"
+          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length > 0) addFiles(files);
+          }}
+        >
+          {/* @mention popup - positioned above the input area */}
+          <MentionPopup
+            {...mention.popupProps}
+            onSelect={handleMentionSelect}
+          />
+
           {onFileUpload && (
             <>
               <button
@@ -104,6 +167,7 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
               <input
                 ref={fileInputRef}
                 type="file"
+                multiple
                 onChange={handleFileChange}
                 className="hidden"
               />
@@ -117,7 +181,7 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
                 return prev + separator + text;
               });
             }}
-            onAudioFile={onFileUpload}
+            onAudioFile={(file) => addFiles([file])}
             disabled={disabled || isStreaming}
           />
 
@@ -162,10 +226,10 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
           ) : (
             <button
               onClick={handleSubmit}
-              disabled={!content.trim() || disabled}
+              disabled={(!content.trim() && pendingFiles.length === 0) || disabled}
               className={clsx(
                 "p-2 rounded-xl transition-colors shrink-0 mb-0.5",
-                content.trim() && !disabled
+                (content.trim() || pendingFiles.length > 0) && !disabled
                   ? "bg-primary text-primary-foreground hover:bg-primary-dark"
                   : "bg-surface-tertiary text-text-tertiary",
               )}

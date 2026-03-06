@@ -5,6 +5,9 @@ import type { AppContext } from "../types/context";
 import * as conversationService from "../services/conversation.service";
 import { writeAuditLog } from "../services/audit.service";
 import { AppError } from "@nova/shared/utils";
+import { db } from "../lib/db";
+import { userProfiles, users, agents } from "@nova/shared/schemas";
+import { eq, and, isNull } from "drizzle-orm";
 
 const conversations = new Hono<AppContext>();
 
@@ -268,6 +271,75 @@ conversations.delete("/:id/participants/:userId", async (c) => {
   });
 
   return c.json({ ok: true });
+});
+
+// --- Mentionables (stories #45, #46) ---
+// Returns org members + available agents for the @mention autocomplete popup.
+
+conversations.get("/:id/mentionables", async (c) => {
+  const orgId = c.get("orgId");
+  const conversationId = c.req.param("id");
+
+  // Verify conversation exists
+  const conversation = await conversationService.getConversation(orgId, conversationId);
+  if (!conversation) throw AppError.notFound("Conversation");
+
+  // Fetch org members (user profiles joined with users for email)
+  const orgMembers = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      displayName: userProfiles.displayName,
+      avatarUrl: userProfiles.avatarUrl,
+      role: userProfiles.role,
+    })
+    .from(userProfiles)
+    .innerJoin(users, eq(userProfiles.userId, users.id))
+    .where(
+      and(
+        eq(userProfiles.orgId, orgId),
+        isNull(userProfiles.deletedAt),
+        eq(users.isActive, true),
+      ),
+    );
+
+  // Fetch enabled agents in this org
+  const orgAgents = await db
+    .select({
+      id: agents.id,
+      name: agents.name,
+      description: agents.description,
+      avatarUrl: agents.avatarUrl,
+    })
+    .from(agents)
+    .where(
+      and(
+        eq(agents.orgId, orgId),
+        eq(agents.isEnabled, true),
+        isNull(agents.deletedAt),
+      ),
+    );
+
+  // Build unified mentionables list
+  const mentionableUsers = orgMembers.map((m) => ({
+    id: m.id,
+    name: m.displayName ?? m.email.split("@")[0],
+    username: m.displayName?.toLowerCase().replace(/\s+/g, ".") ?? m.email.split("@")[0],
+    avatarUrl: m.avatarUrl,
+    kind: "user" as const,
+  }));
+
+  const mentionableAgents = orgAgents.map((a) => ({
+    id: a.id,
+    name: a.name,
+    username: a.name.toLowerCase().replace(/\s+/g, "-"),
+    avatarUrl: a.avatarUrl,
+    kind: "agent" as const,
+  }));
+
+  return c.json({
+    data: [...mentionableUsers, ...mentionableAgents],
+  });
 });
 
 export { conversations as conversationRoutes };
