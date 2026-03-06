@@ -1,0 +1,103 @@
+{
+  "app": {
+    "name": "NOVA",
+    "tagline": "The self-hosted AI platform built for teams",
+    "welcome": "Welcome to NOVA",
+    "description": "Your self-hosted AI platform. Start a conversation or explore the features below.",
+    "settings": "Settings"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "signInDescription": "Sign in to your NOVA account",
+    "signUpDescription": "Create your NOVA account",
+    "createAccount": "Create account",
+    "logout": "Log out",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "forgotPassword": "Forgot password?",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?",
+    "magicLink": "Send magic link",
+    "loginFailed": "Invalid email or password",
+    "signupFailed": "Could not create account. Please try again."
+  },
+  "conversations": {
+    "new": "New conversation",
+    "newTitle": "How can I help you?",
+    "newDescription": "Start a conversation with AI. Ask anything or try one of the suggestions below.",
+    "search": "Search conversations...",
+    "empty": "No conversations yet",
+    "startPrompt": "Start a new conversation to get going",
+    "archive": "Archive",
+    "delete": "Delete",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "share": "Share",
+    "fork": "Fork",
+    "rename": "Rename",
+    "export": "Export"
+  },
+  "messages": {
+    "placeholder": "Type a message...",
+    "send": "Send",
+    "stop": "Stop generating",
+    "retry": "Retry",
+    "copy": "Copy",
+    "edit": "Edit",
+    "rate": "Rate this response",
+    "addNote": "Add note",
+    "disclaimer": "AI can make mistakes. Check important information."
+  },
+  "files": {
+    "upload": "Upload files",
+    "dragDrop": "Drag files here or click to browse",
+    "remove": "Remove",
+    "preview": "Preview"
+  },
+  "settings": {
+    "profile": "Profile",
+    "appearance": "Appearance",
+    "theme": "Theme",
+    "language": "Language",
+    "notifications": "Notifications",
+    "security": "Security",
+    "apiKeys": "API Keys",
+    "sessions": "Sessions",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "displayName": "Display Name",
+    "save": "Save changes",
+    "saved": "Saved!",
+    "emailNotifications": "Email Notifications",
+    "mentionNotifications": "Mention Notifications",
+    "conversationUpdates": "Conversation Updates",
+    "changePassword": "Change Password",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "updatePassword": "Update Password",
+    "passwordMismatch": "Passwords do not match",
+    "passwordTooShort": "Password must be at least 8 characters",
+    "passwordChangeFailed": "Failed to change password",
+    "passwordChanged": "Password changed successfully",
+    "activeSessions": "Active Sessions",
+    "createKey": "Create API Key"
+  },
+  "errors": {
+    "generic": "Something went wrong",
+    "notFound": "Not found",
+    "unauthorized": "Please log in to continue",
+    "forbidden": "You don't have permission to do this",
+    "rateLimited": "Too many requests. Please wait.",
+    "connectionLost": "Connection lost. Reconnecting...",
+    "retry": "Retry"
+  },
+  "status": {
+    "connected": "Connected",
+    "reconnecting": "Reconnecting...",
+    "offline": "Offline"
+  }
+}
