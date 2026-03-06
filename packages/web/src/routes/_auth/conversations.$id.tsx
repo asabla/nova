@@ -5,8 +5,11 @@ import { api } from "../../lib/api";
 import { queryKeys, messagesOptions, conversationDetailOptions } from "../../lib/query-keys";
 import { MessageList } from "../../components/chat/MessageList";
 import { MessageInput } from "../../components/chat/MessageInput";
+import { ConversationHeader } from "../../components/chat/ConversationHeader";
 import { useSSEStream } from "../../hooks/useSSE";
 import { useAuthStore } from "../../stores/auth.store";
+import { useDragDrop } from "../../hooks/useDragDrop";
+import { useClipboardPaste } from "../../hooks/useClipboardPaste";
 
 export const Route = createFileRoute("/_auth/conversations/$id")({
   component: ConversationPage,
@@ -63,8 +66,20 @@ function ConversationPage() {
     await api.post("/api/files/confirm", { fileId: presign.fileId });
   }, []);
 
+  const { isDragging, dragHandlers } = useDragDrop((files) => {
+    for (const file of files) handleFileUpload(file);
+  });
+
+  useClipboardPaste(handleFileUpload);
+
   return (
-    <div className="flex flex-col flex-1 min-h-0">
+    <div className="flex flex-col flex-1 min-h-0 relative" {...dragHandlers}>
+      {isDragging && (
+        <div className="absolute inset-0 z-30 bg-primary/10 border-2 border-dashed border-primary rounded-xl flex items-center justify-center">
+          <p className="text-primary font-medium">Drop files here</p>
+        </div>
+      )}
+      <ConversationHeader conversation={conversation} />
       <MessageList
         messages={messages}
         streamingContent={status === "streaming" ? tokens : undefined}
