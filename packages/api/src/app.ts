@@ -27,6 +27,9 @@ import { searchRoutes } from "./routes/search";
 import { analyticsRoutes } from "./routes/analytics";
 import { modelRoutes } from "./routes/models";
 import { auditRoutes } from "./routes/audit";
+import { toolRoutes } from "./routes/tools";
+import { mcpRoutes } from "./routes/mcp";
+import { exportRoutes } from "./routes/export";
 
 const app = new Hono<AppContext>();
 
@@ -77,5 +80,8 @@ app.route("/api/search", searchRoutes);
 app.route("/api/analytics", analyticsRoutes);
 app.route("/api/models", modelRoutes);
 app.route("/api/org", auditRoutes);
+app.route("/api/tools", toolRoutes);
+app.route("/api/mcp", mcpRoutes);
+app.route("/api/export", exportRoutes);
 
 export { app };
