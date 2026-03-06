@@ -49,6 +49,7 @@ import { contentFilterRoutes } from "./routes/content-filter";
 import { shortcutRoutes } from "./routes/shortcuts";
 import { rateLimitRoutes } from "./routes/rate-limits";
 import { domainRoutes } from "./routes/domains";
+import { urlPreviewRoutes } from "./routes/url-preview";
 
 const app = new Hono<AppContext>();
 
@@ -123,5 +124,6 @@ app.route("/api/content", contentFilterRoutes);
 app.route("/api/shortcuts", shortcutRoutes);
 app.route("/api/org", rateLimitRoutes);
 app.route("/api/domains", domainRoutes);
+app.route("/api/url", urlPreviewRoutes);
 
 export { app };
