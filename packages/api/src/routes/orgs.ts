@@ -51,6 +51,34 @@ orgRoutes.put("/settings", requireRole("org-admin"), async (c) => {
   return c.json({ ok: true });
 });
 
+// Bulk settings update
+orgRoutes.put("/settings/bulk", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  const { settings: settingsMap } = z.object({
+    settings: z.record(z.string()),
+  }).parse(await c.req.json());
+
+  for (const [key, value] of Object.entries(settingsMap)) {
+    await db.insert(orgSettings).values({ orgId, key, value: String(value) })
+      .onConflictDoUpdate({
+        target: [orgSettings.orgId, orgSettings.key],
+        set: { value: String(value), updatedAt: new Date() },
+      });
+  }
+  return c.json({ ok: true, count: Object.keys(settingsMap).length });
+});
+
+// Billing plan change (placeholder for Stripe integration)
+orgRoutes.post("/billing/change-plan", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const { plan } = z.object({ plan: z.enum(["free", "team", "enterprise"]) }).parse(await c.req.json());
+
+  const org = await orgService.update(orgId, { billingPlan: plan });
+  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "org.billing.change_plan", resourceType: "org", resourceId: orgId, details: { plan } });
+  return c.json(org);
+});
+
 // Members
 orgRoutes.get("/members", async (c) => {
   const orgId = c.get("orgId");

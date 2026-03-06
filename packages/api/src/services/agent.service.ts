@@ -59,6 +59,32 @@ export const agentService = {
     return agent;
   },
 
+  async listPublished(orgId: string, opts?: { search?: string; category?: string; limit?: number; offset?: number }) {
+    const conditions = [
+      eq(agents.orgId, orgId),
+      isNull(agents.deletedAt),
+      eq(agents.isPublished, true),
+    ];
+    if (opts?.search) {
+      conditions.push(ilike(agents.name, `%${opts.search}%`));
+    }
+
+    const result = await db
+      .select()
+      .from(agents)
+      .where(and(...conditions))
+      .orderBy(desc(agents.updatedAt))
+      .limit(opts?.limit ?? 50)
+      .offset(opts?.offset ?? 0);
+
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(agents)
+      .where(and(...conditions));
+
+    return { data: result, total: count };
+  },
+
   async update(orgId: string, agentId: string, data: Partial<{
     name: string;
     description: string;
@@ -70,6 +96,8 @@ export const agentService = {
     isEnabled: boolean;
     toolApprovalMode: string;
     memoryScope: string;
+    webhookUrl: string | null;
+    cronSchedule: string | null;
   }>) {
     const [agent] = await db
       .update(agents)

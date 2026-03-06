@@ -68,4 +68,82 @@ agentRoutes.delete("/:id", async (c) => {
   return c.body(null, 204);
 });
 
+// Clone agent
+agentRoutes.post("/:id/clone", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const original = await agentService.get(orgId, c.req.param("id"));
+  if (!original) return c.json({ error: "Agent not found" }, 404);
+
+  const clone = await agentService.create(orgId, userId, {
+    name: `${original.name} (Copy)`,
+    description: original.description ?? undefined,
+    systemPrompt: original.systemPrompt ?? undefined,
+    modelId: original.modelId ?? undefined,
+    modelParams: original.modelParams as Record<string, unknown> | undefined,
+  });
+
+  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "agent.clone", resourceType: "agent", resourceId: clone.id, metadata: { sourceAgentId: c.req.param("id") } });
+  return c.json(clone, 201);
+});
+
+// Set webhook URL
+agentRoutes.patch("/:id/webhook", async (c) => {
+  const orgId = c.get("orgId");
+  const { webhookUrl } = z.object({ webhookUrl: z.string().url().nullable() }).parse(await c.req.json());
+  const agent = await agentService.update(orgId, c.req.param("id"), { webhookUrl });
+  return c.json(agent);
+});
+
+// Set cron schedule
+agentRoutes.patch("/:id/schedule", async (c) => {
+  const orgId = c.get("orgId");
+  const { cronSchedule } = z.object({ cronSchedule: z.string().max(100).nullable() }).parse(await c.req.json());
+  const agent = await agentService.update(orgId, c.req.param("id"), { cronSchedule });
+  return c.json(agent);
+});
+
+// Trigger agent execution manually
+agentRoutes.post("/:id/trigger", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const { input } = z.object({ input: z.string().optional() }).parse(await c.req.json());
+
+  const agent = await agentService.get(orgId, c.req.param("id"));
+  if (!agent) return c.json({ error: "Agent not found" }, 404);
+
+  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "agent.trigger", resourceType: "agent", resourceId: agent.id });
+
+  return c.json({
+    status: "triggered",
+    agentId: agent.id,
+    message: "Agent execution queued. Results will appear in a new conversation.",
+  });
+});
+
+// List published agents (marketplace)
+agentRoutes.get("/marketplace/browse", async (c) => {
+  const orgId = c.get("orgId");
+  const search = c.req.query("search");
+  const category = c.req.query("category");
+  const result = await agentService.listPublished(orgId, { search, category });
+  return c.json(result);
+});
+
+// Publish agent to marketplace
+agentRoutes.post("/:id/publish", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const agent = await agentService.update(orgId, c.req.param("id"), { isPublished: true, visibility: "org" });
+  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "agent.publish", resourceType: "agent", resourceId: c.req.param("id") });
+  return c.json(agent);
+});
+
+// Unpublish agent
+agentRoutes.post("/:id/unpublish", async (c) => {
+  const orgId = c.get("orgId");
+  const agent = await agentService.update(orgId, c.req.param("id"), { isPublished: false });
+  return c.json(agent);
+});
+
 export { agentRoutes };
