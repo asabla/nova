@@ -146,4 +146,106 @@ agentRoutes.post("/:id/unpublish", async (c) => {
   return c.json(agent);
 });
 
+// Create a version snapshot
+agentRoutes.post("/:id/version", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const agent = await agentService.get(orgId, c.req.param("id"));
+  if (!agent) return c.json({ error: "Agent not found" }, 404);
+
+  const { description } = z.object({ description: z.string().max(500).optional() }).parse(await c.req.json());
+
+  const version = await agentService.createVersion(orgId, c.req.param("id"), {
+    description,
+    snapshot: {
+      name: agent.name,
+      systemPrompt: agent.systemPrompt,
+      modelId: agent.modelId,
+      modelParams: agent.modelParams,
+      toolApprovalMode: agent.toolApprovalMode,
+      memoryScope: agent.memoryScope,
+    },
+    createdBy: userId,
+  });
+
+  return c.json(version, 201);
+});
+
+// List versions
+agentRoutes.get("/:id/versions", async (c) => {
+  const orgId = c.get("orgId");
+  const versions = await agentService.listVersions(orgId, c.req.param("id"));
+  return c.json({ data: versions });
+});
+
+// Test agent with sample prompt
+agentRoutes.post("/:id/test", async (c) => {
+  const orgId = c.get("orgId");
+  const agent = await agentService.get(orgId, c.req.param("id"));
+  if (!agent) return c.json({ error: "Agent not found" }, 404);
+
+  const { prompt } = z.object({ prompt: z.string().min(1).max(5000) }).parse(await c.req.json());
+
+  // Use litellm to run a test completion with agent's system prompt
+  const { chatCompletion } = await import("../lib/litellm");
+  const messages = [];
+  if (agent.systemPrompt) messages.push({ role: "system" as const, content: agent.systemPrompt });
+  messages.push({ role: "user" as const, content: prompt });
+
+  try {
+    const response = await chatCompletion({
+      model: agent.modelId ?? "default",
+      messages,
+      stream: false,
+      ...(agent.modelParams as Record<string, unknown> ?? {}),
+    });
+    const data = await response.json() as any;
+    return c.json({
+      content: data.choices?.[0]?.message?.content ?? "",
+      model: data.model,
+      usage: data.usage,
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message ?? "Test failed" }, 500);
+  }
+});
+
+// Bulk operations (admin)
+const bulkAgentSchema = z.object({
+  agentIds: z.array(z.string().uuid()).min(1).max(100),
+  action: z.enum(["enable", "disable", "reassign"]),
+  newOwnerId: z.string().uuid().optional(),
+});
+
+agentRoutes.post("/bulk", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const { agentIds, action, newOwnerId } = bulkAgentSchema.parse(await c.req.json());
+
+  const results = await Promise.allSettled(
+    agentIds.map(async (agentId) => {
+      if (action === "enable") {
+        await agentService.update(orgId, agentId, { isEnabled: true });
+      } else if (action === "disable") {
+        await agentService.update(orgId, agentId, { isEnabled: false });
+      } else if (action === "reassign" && newOwnerId) {
+        await agentService.update(orgId, agentId, { ownerId: newOwnerId });
+      }
+      return agentId;
+    }),
+  );
+
+  const succeeded = results.filter((r) => r.status === "fulfilled").length;
+  const failed = results.filter((r) => r.status === "rejected").length;
+
+  await writeAuditLog({
+    orgId, actorId: userId, actorType: "user",
+    action: `agent.bulk.${action}`,
+    resourceType: "agent",
+    details: { agentIds, succeeded, failed },
+  });
+
+  return c.json({ succeeded, failed, total: agentIds.length });
+});
+
 export { agentRoutes };

@@ -1,6 +1,6 @@
 import { eq, and, desc, ilike, sql, isNull } from "drizzle-orm";
 import { db } from "../lib/db";
-import { agents } from "@nova/shared/schemas";
+import { agents, agentVersions } from "@nova/shared/schemas";
 import { AppError } from "@nova/shared/utils";
 
 export const agentService = {
@@ -85,6 +85,37 @@ export const agentService = {
     return { data: result, total: count };
   },
 
+  async createVersion(orgId: string, agentId: string, data: {
+    description?: string;
+    snapshot: Record<string, unknown>;
+    createdBy: string;
+  }) {
+    const agent = await this.get(orgId, agentId);
+    const nextVersion = (agent.currentVersion ?? 1) + 1;
+
+    const [version] = await db.insert(agentVersions).values({
+      agentId,
+      orgId,
+      version: nextVersion,
+      systemPrompt: agent.systemPrompt,
+      modelId: agent.modelId,
+      modelParams: agent.modelParams,
+      configSnapshot: data.snapshot,
+      changelog: data.description,
+    }).returning();
+
+    await db.update(agents).set({ currentVersion: nextVersion, updatedAt: new Date() })
+      .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)));
+
+    return version;
+  },
+
+  async listVersions(orgId: string, agentId: string) {
+    return db.select().from(agentVersions)
+      .where(and(eq(agentVersions.agentId, agentId), eq(agentVersions.orgId, orgId), isNull(agentVersions.deletedAt)))
+      .orderBy(desc(agentVersions.version));
+  },
+
   async update(orgId: string, agentId: string, data: Partial<{
     name: string;
     description: string;
@@ -98,6 +129,7 @@ export const agentService = {
     memoryScope: string;
     webhookUrl: string | null;
     cronSchedule: string | null;
+    ownerId: string;
   }>) {
     const [agent] = await db
       .update(agents)
