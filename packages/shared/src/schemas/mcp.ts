@@ -41,6 +41,20 @@ export const mcpTools = pgTable("mcp_tools", {
   index("idx_mcp_tools_org_id").on(table.orgId),
 ]);
 
+export const mcpServerWhitelist = pgTable("mcp_server_whitelist", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  urlPattern: text("url_pattern").notNull(),
+  description: text("description"),
+  createdById: uuid("created_by_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (table) => [
+  index("idx_mcp_server_whitelist_org_id").on(table.orgId),
+  uniqueIndex("idx_mcp_server_whitelist_org_pattern").on(table.orgId, table.urlPattern),
+]);
+
 export const selectMcpServerSchema = createSelectSchema(mcpServers);
 export const insertMcpServerSchema = createInsertSchema(mcpServers, {
   name: z.string().min(1).max(200),

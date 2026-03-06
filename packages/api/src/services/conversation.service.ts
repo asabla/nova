@@ -1,8 +1,9 @@
 import { db } from "../lib/db";
 import { conversations, conversationParticipants } from "@nova/shared/schemas";
-import { eq, and, isNull, desc, ilike, sql } from "drizzle-orm";
+import { eq, and, isNull, desc, ilike, sql, inArray } from "drizzle-orm";
 import type { Conversation } from "@nova/shared/schemas";
 import { parsePagination, buildPaginatedResponse, type PaginationInput } from "@nova/shared/utils";
+import { AppError } from "@nova/shared/utils";
 
 type UpdateConversationData = Partial<{
   title: string;
@@ -160,4 +161,163 @@ export async function generateShareToken(orgId: string, conversationId: string) 
     .where(and(eq(conversations.id, conversationId), eq(conversations.orgId, orgId)))
     .returning();
   return result[0] ?? null;
+}
+
+export async function updateModelParams(
+  orgId: string,
+  conversationId: string,
+  params: {
+    temperature?: number;
+    topP?: number;
+    maxTokens?: number;
+    frequencyPenalty?: number;
+    presencePenalty?: number;
+  },
+) {
+  const existing = await getConversation(orgId, conversationId);
+  if (!existing) return null;
+
+  const currentParams = (existing.modelParams as Record<string, unknown>) ?? {};
+  const merged = { ...currentParams, ...params };
+
+  return updateConversation(orgId, conversationId, { modelParams: merged });
+}
+
+export async function addParticipant(orgId: string, conversationId: string, userId: string) {
+  const conversation = await getConversation(orgId, conversationId);
+  if (!conversation) return null;
+
+  // Check if participant already exists (including soft-deleted)
+  const existingResult = await db
+    .select()
+    .from(conversationParticipants)
+    .where(
+      and(
+        eq(conversationParticipants.conversationId, conversationId),
+        eq(conversationParticipants.userId, userId),
+      ),
+    );
+
+  const existing = existingResult[0];
+
+  if (existing) {
+    if (existing.deletedAt) {
+      // Re-activate soft-deleted participant
+      const result = await db
+        .update(conversationParticipants)
+        .set({ deletedAt: null, updatedAt: new Date() })
+        .where(eq(conversationParticipants.id, existing.id))
+        .returning();
+      return result[0];
+    }
+    throw AppError.conflict("User is already a participant in this conversation");
+  }
+
+  const result = await db
+    .insert(conversationParticipants)
+    .values({
+      conversationId,
+      userId,
+      orgId,
+      role: "participant",
+    })
+    .returning();
+
+  return result[0];
+}
+
+export async function removeParticipant(orgId: string, conversationId: string, userId: string) {
+  const result = await db
+    .update(conversationParticipants)
+    .set({ deletedAt: new Date(), updatedAt: new Date() })
+    .where(
+      and(
+        eq(conversationParticipants.conversationId, conversationId),
+        eq(conversationParticipants.userId, userId),
+        eq(conversationParticipants.orgId, orgId),
+        isNull(conversationParticipants.deletedAt),
+      ),
+    )
+    .returning();
+
+  return result[0] ?? null;
+}
+
+export async function listParticipants(orgId: string, conversationId: string) {
+  return db
+    .select()
+    .from(conversationParticipants)
+    .where(
+      and(
+        eq(conversationParticipants.conversationId, conversationId),
+        eq(conversationParticipants.orgId, orgId),
+        isNull(conversationParticipants.deletedAt),
+      ),
+    );
+}
+
+export async function bulkAction(
+  orgId: string,
+  userId: string,
+  ids: string[],
+  action: "archive" | "delete" | "move-to-folder",
+  payload?: { folderId?: string },
+) {
+  if (ids.length === 0) {
+    throw AppError.badRequest("No conversation IDs provided");
+  }
+
+  const baseConditions = and(
+    inArray(conversations.id, ids),
+    eq(conversations.orgId, orgId),
+    eq(conversations.ownerId, userId),
+    isNull(conversations.deletedAt),
+  );
+
+  switch (action) {
+    case "archive": {
+      const result = await db
+        .update(conversations)
+        .set({ isArchived: true, updatedAt: new Date() })
+        .where(baseConditions)
+        .returning();
+      return { affected: result.length, action };
+    }
+    case "delete": {
+      const result = await db
+        .update(conversations)
+        .set({ deletedAt: new Date() })
+        .where(baseConditions)
+        .returning();
+      return { affected: result.length, action };
+    }
+    case "move-to-folder": {
+      if (!payload?.folderId) {
+        throw AppError.badRequest("folderId is required for move-to-folder action");
+      }
+      const result = await db
+        .update(conversations)
+        .set({ workspaceId: payload.folderId, updatedAt: new Date() })
+        .where(baseConditions)
+        .returning();
+      return { affected: result.length, action };
+    }
+    default:
+      throw AppError.badRequest(`Unknown bulk action: ${action}`);
+  }
+}
+
+export async function getConversationsByIds(orgId: string, ids: string[]) {
+  if (ids.length === 0) return [];
+
+  return db
+    .select()
+    .from(conversations)
+    .where(
+      and(
+        inArray(conversations.id, ids),
+        eq(conversations.orgId, orgId),
+        isNull(conversations.deletedAt),
+      ),
+    );
 }

@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { clsx } from "clsx";
-import { MessageSquarePlus, Search, Archive, Pin, Trash2, MoreHorizontal, ChevronLeft, Bot, BookOpen, FolderKanban, Settings, Sparkles, FileText, ShieldCheck, BarChart3, Code2, Microscope, Wrench, Compass, HelpCircle, GitCompare } from "lucide-react";
+import { MessageSquarePlus, Search, Archive, Pin, Trash2, MoreHorizontal, ChevronLeft, Bot, BookOpen, FolderKanban, Settings, Sparkles, FileText, ShieldCheck, BarChart3, Code2, Microscope, Wrench, Compass, HelpCircle, GitCompare, Puzzle } from "lucide-react";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { useUIStore } from "../../stores/ui.store";
@@ -102,6 +102,7 @@ export function Sidebar() {
         <SidebarLink icon={Bot} label="Agents" to="/agents" />
         <SidebarLink icon={BookOpen} label="Knowledge" to="/knowledge" />
         <SidebarLink icon={Wrench} label="Tools" to="/tools" />
+        <SidebarLink icon={Puzzle} label="MCP" to="/mcp" />
         <SidebarLink icon={FolderKanban} label="Workspaces" to="/workspaces" />
         <SidebarLink icon={FileText} label="Prompts" to="/prompts" />
         <SidebarLink icon={Microscope} label="Research" to="/research" />

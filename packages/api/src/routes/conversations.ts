@@ -8,6 +8,51 @@ import { AppError } from "@nova/shared/utils";
 
 const conversations = new Hono<AppContext>();
 
+// --- Bulk endpoints (must be defined before /:id to avoid route conflicts) ---
+
+const bulkQuerySchema = z.object({
+  ids: z.string().transform((v) => v.split(",").filter(Boolean)),
+});
+
+conversations.get("/bulk", zValidator("query", bulkQuerySchema), async (c) => {
+  const orgId = c.get("orgId");
+  const { ids } = c.req.valid("query");
+  if (ids.length === 0) return c.json([]);
+  const result = await conversationService.getConversationsByIds(orgId, ids);
+  return c.json(result);
+});
+
+const bulkActionSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(100),
+  action: z.enum(["archive", "delete", "move-to-folder"]),
+  payload: z
+    .object({
+      folderId: z.string().uuid().optional(),
+    })
+    .optional(),
+});
+
+conversations.post("/bulk", zValidator("json", bulkActionSchema), async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const { ids, action, payload } = c.req.valid("json");
+  const result = await conversationService.bulkAction(orgId, userId, ids, action, payload);
+
+  await writeAuditLog({
+    orgId,
+    actorId: userId,
+    actorType: "user",
+    action: `conversation.bulk.${action}`,
+    resourceType: "conversation",
+    resourceId: ids[0],
+    details: { ids, bulkAction: action, affected: result.affected },
+  });
+
+  return c.json(result);
+});
+
+// --- List / query ---
+
 const querySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().positive().max(100).optional(),
@@ -126,6 +171,103 @@ conversations.post("/:id/share", async (c) => {
   const conversation = await conversationService.generateShareToken(orgId, c.req.param("id"));
   if (!conversation) throw AppError.notFound("Conversation");
   return c.json({ shareToken: conversation.publicShareToken });
+});
+
+// --- Model params ---
+
+const modelParamsSchema = z.object({
+  temperature: z.number().min(0).max(2).optional(),
+  topP: z.number().min(0).max(1).optional(),
+  maxTokens: z.number().int().positive().optional(),
+  frequencyPenalty: z.number().min(-2).max(2).optional(),
+  presencePenalty: z.number().min(-2).max(2).optional(),
+});
+
+conversations.patch("/:id/model-params", zValidator("json", modelParamsSchema), async (c) => {
+  const orgId = c.get("orgId");
+  const params = c.req.valid("json");
+  const conversation = await conversationService.updateModelParams(orgId, c.req.param("id"), params);
+  if (!conversation) throw AppError.notFound("Conversation");
+  return c.json(conversation);
+});
+
+// --- System prompt ---
+
+const systemPromptSchema = z.object({
+  systemPrompt: z.string().max(10_000),
+});
+
+conversations.patch("/:id/system-prompt", zValidator("json", systemPromptSchema), async (c) => {
+  const orgId = c.get("orgId");
+  const { systemPrompt } = c.req.valid("json");
+  const conversation = await conversationService.updateConversation(orgId, c.req.param("id"), { systemPrompt });
+  if (!conversation) throw AppError.notFound("Conversation");
+  return c.json(conversation);
+});
+
+// --- Visibility ---
+
+const visibilitySchema = z.object({
+  visibility: z.enum(["private", "team", "public"]),
+});
+
+conversations.patch("/:id/visibility", zValidator("json", visibilitySchema), async (c) => {
+  const orgId = c.get("orgId");
+  const { visibility } = c.req.valid("json");
+  const conversation = await conversationService.updateConversation(orgId, c.req.param("id"), { visibility });
+  if (!conversation) throw AppError.notFound("Conversation");
+  return c.json(conversation);
+});
+
+// --- Participants ---
+
+conversations.get("/:id/participants", async (c) => {
+  const orgId = c.get("orgId");
+  const participants = await conversationService.listParticipants(orgId, c.req.param("id"));
+  return c.json(participants);
+});
+
+const addParticipantSchema = z.object({
+  userId: z.string().uuid(),
+});
+
+conversations.post("/:id/participants", zValidator("json", addParticipantSchema), async (c) => {
+  const orgId = c.get("orgId");
+  const { userId } = c.req.valid("json");
+  const participant = await conversationService.addParticipant(orgId, c.req.param("id"), userId);
+  if (!participant) throw AppError.notFound("Conversation");
+
+  await writeAuditLog({
+    orgId,
+    actorId: c.get("userId"),
+    actorType: "user",
+    action: "conversation.participant.add",
+    resourceType: "conversation",
+    resourceId: c.req.param("id"),
+    details: { addedUserId: userId },
+  });
+
+  return c.json(participant, 201);
+});
+
+conversations.delete("/:id/participants/:userId", async (c) => {
+  const orgId = c.get("orgId");
+  const conversationId = c.req.param("id");
+  const targetUserId = c.req.param("userId");
+  const removed = await conversationService.removeParticipant(orgId, conversationId, targetUserId);
+  if (!removed) throw AppError.notFound("Participant");
+
+  await writeAuditLog({
+    orgId,
+    actorId: c.get("userId"),
+    actorType: "user",
+    action: "conversation.participant.remove",
+    resourceType: "conversation",
+    resourceId: conversationId,
+    details: { removedUserId: targetUserId },
+  });
+
+  return c.json({ ok: true });
 });
 
 export { conversations as conversationRoutes };
