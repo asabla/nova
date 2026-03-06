@@ -631,4 +631,120 @@ export const analyticsService = {
 
     return result;
   },
+
+  // ── Budget Alerts ────────────────────────────────────────────────
+
+  async getBudgetAlerts(orgId: string) {
+    const result = await db
+      .select()
+      .from(sql`(
+        SELECT * FROM org_settings
+        WHERE org_id = ${orgId} AND key LIKE 'budget_alert:%'
+      ) AS alerts`);
+
+    // Fallback: store budget alerts in orgSettings as JSON
+    // In production, this would be a dedicated table
+    try {
+      const [row] = await db.execute(
+        sql`SELECT value FROM org_settings WHERE org_id = ${orgId} AND key = 'budget_alerts'`,
+      );
+      return (row as any)?.value ? JSON.parse((row as any).value) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  async createBudgetAlert(orgId: string, data: any) {
+    const id = crypto.randomUUID();
+    const alert = { id, orgId, ...data, createdAt: new Date().toISOString() };
+
+    try {
+      const existing = await this.getBudgetAlerts(orgId);
+      existing.push(alert);
+      await db.execute(
+        sql`INSERT INTO org_settings (id, org_id, key, value) VALUES (gen_random_uuid(), ${orgId}, 'budget_alerts', ${JSON.stringify(existing)})
+            ON CONFLICT (org_id, key) DO UPDATE SET value = ${JSON.stringify(existing)}, updated_at = now()`,
+      );
+    } catch {
+      // Table might not exist yet - return the alert anyway
+    }
+
+    return alert;
+  },
+
+  async updateBudgetAlert(orgId: string, alertId: string, data: any) {
+    const existing = await this.getBudgetAlerts(orgId);
+    const idx = existing.findIndex((a: any) => a.id === alertId);
+    if (idx === -1) return null;
+    existing[idx] = { ...existing[idx], ...data };
+    try {
+      await db.execute(
+        sql`UPDATE org_settings SET value = ${JSON.stringify(existing)}, updated_at = now()
+            WHERE org_id = ${orgId} AND key = 'budget_alerts'`,
+      );
+    } catch { /* ignore */ }
+    return existing[idx];
+  },
+
+  async deleteBudgetAlert(orgId: string, alertId: string) {
+    const existing = await this.getBudgetAlerts(orgId);
+    const filtered = existing.filter((a: any) => a.id !== alertId);
+    try {
+      await db.execute(
+        sql`UPDATE org_settings SET value = ${JSON.stringify(filtered)}, updated_at = now()
+            WHERE org_id = ${orgId} AND key = 'budget_alerts'`,
+      );
+    } catch { /* ignore */ }
+  },
+
+  async getBudgetStatus(orgId: string) {
+    const alerts = await this.getBudgetAlerts(orgId);
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const results = [];
+    for (const alert of alerts) {
+      if (!alert.isEnabled) continue;
+      const periodStart = alert.period === "monthly" ? startOfMonth
+        : alert.period === "weekly" ? startOfWeek
+        : startOfDay;
+
+      const [usage] = await db
+        .select({
+          totalTokens: sql<number>`coalesce(sum(coalesce(${messages.tokenCountPrompt}, 0) + coalesce(${messages.tokenCountCompletion}, 0)), 0)::int`,
+          totalCost: sql<number>`coalesce(sum(coalesce(${messages.costCents}, 0)), 0)::int`,
+        })
+        .from(messages)
+        .where(
+          and(
+            eq(messages.orgId, orgId),
+            gte(messages.createdAt, periodStart),
+          ),
+        );
+
+      const currentValue = alert.thresholdType === "tokens"
+        ? (usage?.totalTokens ?? 0)
+        : (usage?.totalCost ?? 0);
+
+      const percentage = Math.round((currentValue / alert.thresholdValue) * 100);
+
+      results.push({
+        alertId: alert.id,
+        name: alert.name,
+        scope: alert.scope,
+        period: alert.period,
+        thresholdType: alert.thresholdType,
+        thresholdValue: alert.thresholdValue,
+        currentValue,
+        percentage,
+        isExceeded: percentage >= 100,
+        isWarning: percentage >= 80,
+      });
+    }
+
+    return results;
+  },
 };

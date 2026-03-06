@@ -125,4 +125,52 @@ analyticsRoutes.get("/me", async (c) => {
   return c.json(personal);
 });
 
+// ── Budget Alerts ──────────────────────────────────────────────────
+
+const budgetAlertSchema = z.object({
+  name: z.string().min(1).max(200),
+  scope: z.enum(["org", "group", "user"]),
+  scopeId: z.string().uuid().optional(),
+  thresholdType: z.enum(["cost_cents", "tokens"]),
+  thresholdValue: z.number().positive(),
+  period: z.enum(["daily", "weekly", "monthly"]),
+  notifyEmail: z.boolean().default(true),
+  notifyWebhook: z.boolean().default(false),
+  webhookUrl: z.string().url().optional(),
+  isEnabled: z.boolean().default(true),
+});
+
+analyticsRoutes.get("/budget-alerts", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  const alerts = await analyticsService.getBudgetAlerts(orgId);
+  return c.json({ data: alerts });
+});
+
+analyticsRoutes.post("/budget-alerts", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  const body = budgetAlertSchema.parse(await c.req.json());
+  const alert = await analyticsService.createBudgetAlert(orgId, body);
+  return c.json(alert, 201);
+});
+
+analyticsRoutes.patch("/budget-alerts/:id", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  const body = budgetAlertSchema.partial().parse(await c.req.json());
+  const alert = await analyticsService.updateBudgetAlert(orgId, c.req.param("id"), body);
+  return c.json(alert);
+});
+
+analyticsRoutes.delete("/budget-alerts/:id", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  await analyticsService.deleteBudgetAlert(orgId, c.req.param("id"));
+  return c.body(null, 204);
+});
+
+// GET /api/analytics/budget-status - Check current spend vs budgets
+analyticsRoutes.get("/budget-status", async (c) => {
+  const orgId = c.get("orgId");
+  const status = await analyticsService.getBudgetStatus(orgId);
+  return c.json({ data: status });
+});
+
 export { analyticsRoutes };
