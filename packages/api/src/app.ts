@@ -34,6 +34,7 @@ import { v1ChatRoutes } from "./routes/v1-chat";
 import { sandboxRoutes } from "./routes/sandbox";
 import { researchRoutes } from "./routes/research";
 import { contentFilter } from "./middleware/content-filter";
+import { importRoutes } from "./routes/import";
 
 const app = new Hono<AppContext>();
 
@@ -93,5 +94,6 @@ app.route("/api/export", exportRoutes);
 app.route("/v1/chat", v1ChatRoutes);
 app.route("/api/sandbox", sandboxRoutes);
 app.route("/api/research", researchRoutes);
+app.route("/api/import", importRoutes);
 
 export { app };
