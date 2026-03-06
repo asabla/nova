@@ -240,6 +240,7 @@ export const notificationService = {
       body: "Your agent run has completed.",
       resourceType: "conversation",
       resourceId: conversationId,
+      sendInApp: prefs.inAppEnabled,
       sendEmail: prefs.emailOnAgentComplete,
     });
   },

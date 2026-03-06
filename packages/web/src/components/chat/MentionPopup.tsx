@@ -28,6 +28,8 @@ interface MentionPopupProps {
   onClose: () => void;
   /** Whether the popup is visible */
   visible: boolean;
+  /** Optional conversation ID for the dedicated mentionables endpoint */
+  conversationId?: string;
 }
 
 // ---- Component -------------------------------------------------------------
@@ -38,19 +40,31 @@ export function MentionPopup({
   onSelect,
   onClose,
   visible,
+  conversationId,
 }: MentionPopupProps) {
   const { t } = useTranslation();
   const listRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // Fetch users and agents for mention candidates
+  // If a conversationId is provided, use the dedicated mentionables endpoint.
+  // Otherwise fall back to fetching users + agents separately.
+  const { data: mentionablesData } = useQuery({
+    queryKey: ["mentionables", conversationId],
+    queryFn: () =>
+      api.get<{ data: MentionCandidate[] }>(
+        `/api/conversations/${conversationId}/mentionables`,
+      ),
+    enabled: visible && !!conversationId,
+    staleTime: 60_000,
+  });
+
   const { data: usersData } = useQuery({
     queryKey: ["mention-candidates", "users"],
     queryFn: () =>
       api.get<{ data: Array<{ id: string; name: string; username?: string; image?: string }> }>(
         "/api/users?limit=50",
       ),
-    enabled: visible,
+    enabled: visible && !conversationId,
     staleTime: 60_000,
   });
 
@@ -60,13 +74,19 @@ export function MentionPopup({
       api.get<{ data: Array<{ id: string; name: string; slug?: string; avatarUrl?: string }> }>(
         "/api/agents?limit=50",
       ),
-    enabled: visible,
+    enabled: visible && !conversationId,
     staleTime: 60_000,
   });
 
   // Build unified candidate list
   const allCandidates: MentionCandidate[] = useMemo(() => {
-    const users: MentionCandidate[] = (usersData?.data ?? []).map((u) => ({
+    // Use the dedicated endpoint if available
+    if (conversationId && mentionablesData?.data) {
+      return mentionablesData.data;
+    }
+
+    // Fallback: merge users + agents
+    const usersList: MentionCandidate[] = (usersData?.data ?? []).map((u) => ({
       id: u.id,
       name: u.name,
       username: u.username ?? u.name.toLowerCase().replace(/\s+/g, "."),
@@ -74,7 +94,7 @@ export function MentionPopup({
       kind: "user" as const,
     }));
 
-    const agents: MentionCandidate[] = (agentsData?.data ?? []).map((a) => ({
+    const agentsList: MentionCandidate[] = (agentsData?.data ?? []).map((a) => ({
       id: a.id,
       name: a.name,
       username: a.slug ?? a.name.toLowerCase().replace(/\s+/g, "-"),
@@ -82,8 +102,8 @@ export function MentionPopup({
       kind: "agent" as const,
     }));
 
-    return [...users, ...agents];
-  }, [usersData, agentsData]);
+    return [...usersList, ...agentsList];
+  }, [conversationId, mentionablesData, usersData, agentsData]);
 
   // Filter by query
   const filtered = useMemo(() => {
@@ -103,7 +123,7 @@ export function MentionPopup({
     setActiveIndex(0);
   }, [filtered.length, query]);
 
-  // Keyboard navigation
+  // Keyboard navigation (capture phase so it fires before the textarea handler)
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (!visible || filtered.length === 0) return;
@@ -120,6 +140,7 @@ export function MentionPopup({
         case "Enter":
         case "Tab":
           e.preventDefault();
+          e.stopPropagation();
           onSelect(filtered[activeIndex]);
           break;
         case "Escape":
@@ -151,7 +172,7 @@ export function MentionPopup({
         "absolute z-50 w-64 rounded-xl border border-border bg-surface shadow-lg overflow-hidden",
         "animate-in fade-in zoom-in-95 duration-100",
       )}
-      style={{ top: position.top, left: position.left }}
+      style={{ bottom: "100%", left: position.left, marginBottom: 8 }}
       role="listbox"
       aria-label={t("mentions.popup", { defaultValue: "Mention someone" })}
     >
@@ -240,15 +261,15 @@ export function useMentionTrigger(
     const query = match[2];
     const startIndex = cursor - query.length - 1; // -1 for the @ char
 
-    // Approximate popup position based on textarea layout
-    // Place popup above the textarea
+    // Position the popup. Since the parent container now has `position: relative`,
+    // we use `bottom: 100%` in the popup styles and just pass left offset.
     const rect = textarea.getBoundingClientRect();
     const parentRect = textarea.offsetParent?.getBoundingClientRect() ?? rect;
 
     setTrigger({
       query,
       position: {
-        top: rect.top - parentRect.top - 8, // 8px above for breathing room
+        top: rect.top - parentRect.top - 8, // kept for reference, popup uses bottom: 100%
         left: Math.min(rect.left - parentRect.left + 16, 200),
       },
       startIndex,

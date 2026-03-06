@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AppContext } from "../types/context";
 import * as conversationService from "../services/conversation.service";
 import { writeAuditLog } from "../services/audit.service";
+import { notificationService } from "../services/notification.service";
 import { AppError } from "@nova/shared/utils";
 import { db } from "../lib/db";
 import { userProfiles, users, agents } from "@nova/shared/schemas";
@@ -236,19 +237,29 @@ const addParticipantSchema = z.object({
 
 conversations.post("/:id/participants", zValidator("json", addParticipantSchema), async (c) => {
   const orgId = c.get("orgId");
+  const actorUserId = c.get("userId");
   const { userId } = c.req.valid("json");
-  const participant = await conversationService.addParticipant(orgId, c.req.param("id"), userId);
+  const conversationId = c.req.param("id");
+  const participant = await conversationService.addParticipant(orgId, conversationId, userId);
   if (!participant) throw AppError.notFound("Conversation");
 
   await writeAuditLog({
     orgId,
-    actorId: c.get("userId"),
+    actorId: actorUserId,
     actorType: "user",
     action: "conversation.participant.add",
     resourceType: "conversation",
-    resourceId: c.req.param("id"),
+    resourceId: conversationId,
     details: { addedUserId: userId },
   });
+
+  // Story #161: In-app notification when a conversation is shared with a user
+  const conversation = await conversationService.getConversation(orgId, conversationId);
+  if (conversation) {
+    notificationService
+      .notifyConversationShare(orgId, actorUserId, userId, conversationId, conversation.title ?? "Untitled conversation")
+      .catch((err) => console.error("[NOTIFY] Failed to send share notification:", err));
+  }
 
   return c.json(participant, 201);
 });

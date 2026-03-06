@@ -5,6 +5,7 @@ import { ArrowLeftRight, Send, Clock, Coins, Hash, Diff } from "lucide-react";
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
+import { ModelCapabilityBadges } from "../../components/ui/ModelCapabilityBadges";
 
 export const Route = createFileRoute("/_auth/model-compare")({
   component: ModelComparePage,
@@ -259,6 +260,11 @@ function ModelComparePage() {
               </option>
             ))}
           </select>
+          <ModelCapabilityBadges
+            capabilities={models.find((m: any) => m.modelIdExternal === modelA)?.capabilities ?? []}
+            compact
+            className="mt-1.5"
+          />
         </div>
         <div className="flex-1">
           <label className="block text-xs font-medium text-text-secondary mb-1">Model B</label>
@@ -275,6 +281,11 @@ function ModelComparePage() {
               </option>
             ))}
           </select>
+          <ModelCapabilityBadges
+            capabilities={models.find((m: any) => m.modelIdExternal === modelB)?.capabilities ?? []}
+            compact
+            className="mt-1.5"
+          />
         </div>
         <div className="w-28">
           <label className="block text-xs font-medium text-text-secondary mb-1">Temperature</label>

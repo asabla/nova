@@ -11,7 +11,7 @@ import { DEFAULTS } from "@nova/shared/constants";
 import { notificationService } from "../services/notification.service";
 import { db } from "../lib/db";
 import { userProfiles, users, agents } from "@nova/shared/schemas";
-import { eq, and, isNull, ilike } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 
 // --- Mention helpers (stories #45, #46) ---
 

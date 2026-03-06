@@ -135,6 +135,13 @@ export function ConversationSettings({ conversationId, conversation, open, onClo
               </>
             )}
           </select>
+          {(() => {
+            const selected = models.find((m: any) => m.modelId === model);
+            const caps: string[] = selected?.capabilities ?? [];
+            return caps.length > 0 ? (
+              <ModelCapabilityBadges capabilities={caps} className="mt-1.5" />
+            ) : null;
+          })()}
         </div>
 
         {/* System Prompt */}
