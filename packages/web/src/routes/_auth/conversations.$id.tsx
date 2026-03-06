@@ -21,7 +21,7 @@ function ConversationPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
-  const { tokens, status, startStream, stopStream, resetStream } = useSSEStream();
+  const { tokens, status, startStream, stopStream, pauseStream, resumeStream, resetStream } = useSSEStream();
 
   const { data: conversation } = useQuery(conversationDetailOptions(id));
   const { data: messagesData } = useQuery(messagesOptions(id));
@@ -191,8 +191,8 @@ function ConversationPage() {
       <ConversationHeader conversation={conversation} />
       <MessageList
         messages={messages}
-        streamingContent={status === "streaming" ? tokens : undefined}
-        isStreaming={status === "streaming"}
+        streamingContent={(status === "streaming" || status === "paused") ? tokens : undefined}
+        isStreaming={status === "streaming" || status === "paused"}
         userName={user?.name}
         onRate={handleRate}
         onEdit={handleEdit}
@@ -204,7 +204,10 @@ function ConversationPage() {
       <MessageInput
         onSend={handleSend}
         onStop={stopStream}
+        onPause={pauseStream}
+        onResume={resumeStream}
         isStreaming={status === "streaming"}
+        isPaused={status === "paused"}
         onFileUpload={handleFileUpload}
       />
     </div>

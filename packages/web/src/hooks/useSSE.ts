@@ -1,15 +1,19 @@
 import { useCallback, useRef, useState } from "react";
 
-export type StreamStatus = "idle" | "streaming" | "done" | "error";
+export type StreamStatus = "idle" | "streaming" | "paused" | "done" | "error";
 
 export function useSSEStream() {
   const [tokens, setTokens] = useState("");
   const [status, setStatus] = useState<StreamStatus>("idle");
   const abortRef = useRef<AbortController | null>(null);
+  const pausedRef = useRef(false);
+  const bufferWhilePausedRef = useRef("");
 
   const startStream = useCallback(async (url: string, body: unknown) => {
     setTokens("");
     setStatus("streaming");
+    pausedRef.current = false;
+    bufferWhilePausedRef.current = "";
     abortRef.current = new AbortController();
 
     try {
@@ -40,6 +44,11 @@ export function useSSEStream() {
 
         for (const line of lines) {
           if (line.startsWith("event: done")) {
+            // Flush any paused content
+            if (bufferWhilePausedRef.current) {
+              setTokens((prev) => prev + bufferWhilePausedRef.current);
+              bufferWhilePausedRef.current = "";
+            }
             setStatus("done");
             return;
           }
@@ -52,7 +61,12 @@ export function useSSEStream() {
             try {
               const data = JSON.parse(line.slice(6));
               if (data.content) {
-                setTokens((prev) => prev + data.content);
+                if (pausedRef.current) {
+                  // Buffer content while paused
+                  bufferWhilePausedRef.current += data.content;
+                } else {
+                  setTokens((prev) => prev + data.content);
+                }
               }
             } catch {
               // Skip malformed data
@@ -61,6 +75,11 @@ export function useSSEStream() {
         }
       }
 
+      // Flush remaining paused content
+      if (bufferWhilePausedRef.current) {
+        setTokens((prev) => prev + bufferWhilePausedRef.current);
+        bufferWhilePausedRef.current = "";
+      }
       setStatus("done");
     } catch (err: any) {
       if (err.name !== "AbortError") {
@@ -71,13 +90,34 @@ export function useSSEStream() {
 
   const stopStream = useCallback(() => {
     abortRef.current?.abort();
+    // Flush paused content before stopping
+    if (bufferWhilePausedRef.current) {
+      setTokens((prev) => prev + bufferWhilePausedRef.current);
+      bufferWhilePausedRef.current = "";
+    }
     setStatus("done");
+  }, []);
+
+  const pauseStream = useCallback(() => {
+    pausedRef.current = true;
+    setStatus("paused");
+  }, []);
+
+  const resumeStream = useCallback(() => {
+    pausedRef.current = false;
+    // Flush buffered content
+    if (bufferWhilePausedRef.current) {
+      setTokens((prev) => prev + bufferWhilePausedRef.current);
+      bufferWhilePausedRef.current = "";
+    }
+    setStatus("streaming");
   }, []);
 
   const resetStream = useCallback(() => {
     setTokens("");
     setStatus("idle");
+    bufferWhilePausedRef.current = "";
   }, []);
 
-  return { tokens, status, startStream, stopStream, resetStream };
+  return { tokens, status, startStream, stopStream, pauseStream, resumeStream, resetStream };
 }
