@@ -1,0 +1,23 @@
+{
+  "name": "nova",
+  "private": true,
+  "workspaces": [
+    "packages/shared",
+    "packages/api",
+    "packages/web",
+    "packages/worker"
+  ],
+  "scripts": {
+    "dev": "bun run --filter '*' dev",
+    "dev:api": "bun run --filter @nova/api dev",
+    "dev:web": "bun run --filter @nova/web dev",
+    "dev:worker": "bun run --filter @nova/worker dev",
+    "build": "bun run --filter '*' build",
+    "lint": "bun run --filter '*' lint",
+    "typecheck": "bun run --filter '*' typecheck",
+    "db:generate": "bun run --filter @nova/api db:generate",
+    "db:migrate": "bun run --filter @nova/api db:migrate",
+    "db:push": "bun run --filter @nova/api db:push",
+    "db:studio": "bun run --filter @nova/api db:studio"
+  }
+}

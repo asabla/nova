@@ -1,0 +1,31 @@
+{
+  "name": "@nova/api",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "build": "bun build src/index.ts --target=bun --outdir=dist",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "hono": "^4.7.6",
+    "@hono/zod-validator": "^0.5.0",
+    "drizzle-orm": "^0.39.3",
+    "postgres": "^3.4.5",
+    "better-auth": "^1.2.7",
+    "ioredis": "^5.4.2",
+    "minio": "^8.0.4",
+    "@temporalio/client": "^1.11.7",
+    "zod": "^3.24.4",
+    "@nova/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "drizzle-kit": "^0.30.6",
+    "typescript": "^5.8.3"
+  }
+}
