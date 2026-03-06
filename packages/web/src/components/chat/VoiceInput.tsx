@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Mic, MicOff, Loader2 } from "lucide-react";
+import { Mic, MicOff, Loader2, AudioLines, Send, X } from "lucide-react";
 import { clsx } from "clsx";
 
 // ---------- Types for the Web Speech API ----------
@@ -44,20 +44,95 @@ function getSpeechRecognition(): SpeechRecognitionCtor | null {
   );
 }
 
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+// ---------- Mode ----------
+
+type VoiceMode = "speech-to-text" | "audio-record";
+
 // ---------- Props ----------
 
 interface VoiceInputProps {
   onTranscript: (text: string) => void;
+  /** Called when the user records and sends an audio file */
+  onAudioFile?: (file: File) => void;
   disabled?: boolean;
+}
+
+// ---------- Waveform Visualization ----------
+
+function WaveformVisualizer({ analyser }: { analyser: AnalyserNode | null }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!analyser || !canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+    const draw = () => {
+      analyser.getByteTimeDomainData(dataArray);
+      const { width, height } = canvas;
+      ctx.clearRect(0, 0, width, height);
+
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "var(--color-danger, #ef4444)";
+      ctx.beginPath();
+
+      const sliceWidth = width / dataArray.length;
+      let x = 0;
+
+      for (let i = 0; i < dataArray.length; i++) {
+        const v = dataArray[i] / 128.0;
+        const y = (v * height) / 2;
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+        x += sliceWidth;
+      }
+
+      ctx.lineTo(width, height / 2);
+      ctx.stroke();
+      animRef.current = requestAnimationFrame(draw);
+    };
+    draw();
+
+    return () => {
+      if (animRef.current !== null) {
+        cancelAnimationFrame(animRef.current);
+      }
+    };
+  }, [analyser]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={120}
+      height={32}
+      className="rounded bg-surface-secondary/50"
+    />
+  );
 }
 
 // ---------- Component ----------
 
-export function VoiceInput({ onTranscript, disabled }: VoiceInputProps) {
+export function VoiceInput({ onTranscript, onAudioFile, disabled }: VoiceInputProps) {
   const [supported, setSupported] = useState(true);
+  const [mode, setMode] = useState<VoiceMode>("speech-to-text");
   const [recording, setRecording] = useState(false);
   const [interim, setInterim] = useState("");
   const [audioLevel, setAudioLevel] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -65,29 +140,60 @@ export function VoiceInput({ onTranscript, disabled }: VoiceInputProps) {
   const streamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const finalTranscriptRef = useRef("");
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const sttSupported = !!getSpeechRecognition();
+  const mediaRecorderSupported = typeof MediaRecorder !== "undefined";
 
   // Check browser support on mount
   useEffect(() => {
-    if (!getSpeechRecognition()) {
+    if (!sttSupported && !mediaRecorderSupported) {
       setSupported(false);
     }
-  }, []);
+    // Default to whichever mode is available
+    if (!sttSupported && mediaRecorderSupported) {
+      setMode("audio-record");
+    }
+  }, [sttSupported, mediaRecorderSupported]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopAudioAnalysis();
       recognitionRef.current?.abort();
+      mediaRecorderRef.current?.stop();
+      stopDurationTimer();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ---- Duration timer ----
+
+  const startDurationTimer = useCallback(() => {
+    setDuration(0);
+    durationIntervalRef.current = setInterval(() => {
+      setDuration((d) => d + 1);
+    }, 1000);
+  }, []);
+
+  const stopDurationTimer = useCallback(() => {
+    if (durationIntervalRef.current !== null) {
+      clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = null;
+    }
+  }, []);
+
   // ---- Audio level analysis (visual indicator) ----
 
-  const startAudioAnalysis = useCallback(async () => {
+  const startAudioAnalysis = useCallback(async (existingStream?: MediaStream) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
+      const stream =
+        existingStream ?? (await navigator.mediaDevices.getUserMedia({ audio: true }));
+      if (!existingStream) {
+        streamRef.current = stream;
+      }
 
       const audioCtx = new AudioContext();
       audioCtxRef.current = audioCtx;
@@ -135,9 +241,9 @@ export function VoiceInput({ onTranscript, disabled }: VoiceInputProps) {
     setAudioLevel(0);
   }, []);
 
-  // ---- Recognition lifecycle ----
+  // ---- Speech-to-text recognition lifecycle ----
 
-  const startRecording = useCallback(() => {
+  const startSTT = useCallback(() => {
     const Ctor = getSpeechRecognition();
     if (!Ctor) return;
 
@@ -181,6 +287,7 @@ export function VoiceInput({ onTranscript, disabled }: VoiceInputProps) {
 
     recognition.onend = () => {
       setRecording(false);
+      stopDurationTimer();
       const transcript = (finalTranscriptRef.current + " " + interim).trim();
       // Deliver whatever we collected
       if (transcript) {
@@ -193,19 +300,100 @@ export function VoiceInput({ onTranscript, disabled }: VoiceInputProps) {
     recognitionRef.current = recognition;
     recognition.start();
     startAudioAnalysis();
-  }, [onTranscript, interim, startAudioAnalysis, stopAudioAnalysis]);
+    startDurationTimer();
+  }, [onTranscript, interim, startAudioAnalysis, stopAudioAnalysis, startDurationTimer, stopDurationTimer]);
 
-  const stopRecording = useCallback(() => {
+  const stopSTT = useCallback(() => {
     recognitionRef.current?.stop();
   }, []);
 
+  // ---- Audio recording lifecycle ----
+
+  const startAudioRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : "audio/webm";
+
+      const recorder = new MediaRecorder(stream, { mimeType });
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: mimeType });
+        const ext = mimeType.includes("webm") ? "webm" : "ogg";
+        const file = new File([blob], `voice-recording-${Date.now()}.${ext}`, {
+          type: mimeType,
+        });
+        if (onAudioFile) {
+          onAudioFile(file);
+        }
+        audioChunksRef.current = [];
+        stopAudioAnalysis();
+        stopDurationTimer();
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start(250); // collect data every 250ms
+      setRecording(true);
+      startAudioAnalysis(stream);
+      startDurationTimer();
+    } catch (err) {
+      console.warn("[VoiceInput] Could not start audio recording:", err);
+    }
+  }, [onAudioFile, startAudioAnalysis, stopAudioAnalysis, startDurationTimer, stopDurationTimer]);
+
+  const stopAudioRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    setRecording(false);
+  }, []);
+
+  const cancelAudioRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.ondataavailable = null;
+      mediaRecorderRef.current.onstop = null;
+      mediaRecorderRef.current.stop();
+    }
+    audioChunksRef.current = [];
+    stopAudioAnalysis();
+    stopDurationTimer();
+    setRecording(false);
+    setDuration(0);
+  }, [stopAudioAnalysis, stopDurationTimer]);
+
+  // ---- Unified toggle ----
+
   const toggle = useCallback(() => {
     if (recording) {
-      stopRecording();
+      if (mode === "speech-to-text") {
+        stopSTT();
+      } else {
+        stopAudioRecording();
+      }
     } else {
-      startRecording();
+      if (mode === "speech-to-text") {
+        startSTT();
+      } else {
+        startAudioRecording();
+      }
     }
-  }, [recording, startRecording, stopRecording]);
+  }, [recording, mode, startSTT, stopSTT, startAudioRecording, stopAudioRecording]);
+
+  const cycleMode = useCallback(() => {
+    if (recording) return; // Don't switch while recording
+    if (!sttSupported || !mediaRecorderSupported) return; // Only one mode available
+    setMode((m) => (m === "speech-to-text" ? "audio-record" : "speech-to-text"));
+  }, [recording, sttSupported, mediaRecorderSupported]);
 
   // ---- Render ----
 
@@ -221,45 +409,114 @@ export function VoiceInput({ onTranscript, disabled }: VoiceInputProps) {
     );
   }
 
-  return (
-    <div className="relative shrink-0 mb-0.5">
-      {/* Audio level ring — visible when recording */}
-      {recording && (
-        <span
-          className="absolute inset-0 rounded-lg bg-danger/20 animate-pulse pointer-events-none"
-          style={{
-            transform: `scale(${1 + audioLevel * 0.45})`,
-            opacity: 0.5 + audioLevel * 0.5,
-            transition: "transform 0.1s ease-out, opacity 0.1s ease-out",
-          }}
-        />
-      )}
+  // While recording audio, show an expanded control bar
+  if (recording && mode === "audio-record") {
+    return (
+      <div className="flex items-center gap-2 shrink-0 mb-0.5">
+        {/* Cancel button */}
+        <button
+          onClick={cancelAudioRecording}
+          className="text-text-tertiary hover:text-danger p-1.5 rounded-lg transition-colors"
+          title="Cancel recording"
+        >
+          <X className="h-4 w-4" />
+        </button>
 
-      <button
-        onClick={toggle}
-        disabled={disabled}
-        className={clsx(
-          "relative z-10 p-1.5 rounded-lg transition-colors",
-          recording
-            ? "text-danger hover:text-danger/80 bg-danger/10"
-            : "text-text-tertiary hover:text-text-secondary hover:bg-surface-tertiary",
-          disabled && "opacity-50 cursor-not-allowed",
-        )}
-        title={recording ? "Stop recording" : "Voice input"}
-      >
-        {recording ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Mic className="h-4 w-4" />
-        )}
-      </button>
-
-      {/* Interim transcription bubble */}
-      {recording && interim && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[240px] px-3 py-1.5 rounded-lg bg-surface-secondary border border-border text-xs text-text shadow-md whitespace-pre-wrap">
-          {interim}
+        {/* Pulsing red dot + duration */}
+        <div className="flex items-center gap-1.5 text-xs text-danger font-medium">
+          <span className="h-2 w-2 rounded-full bg-danger animate-pulse" />
+          {formatDuration(duration)}
         </div>
+
+        {/* Waveform */}
+        <WaveformVisualizer analyser={analyserRef.current} />
+
+        {/* Send button */}
+        <button
+          onClick={stopAudioRecording}
+          className="text-primary hover:text-primary/80 p-1.5 rounded-lg bg-primary/10 transition-colors"
+          title="Send audio recording"
+        >
+          <Send className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative shrink-0 mb-0.5 flex items-center gap-0.5">
+      {/* Mode toggle — only show when both modes are available and not recording */}
+      {sttSupported && mediaRecorderSupported && !recording && (
+        <button
+          onClick={cycleMode}
+          disabled={disabled}
+          className={clsx(
+            "p-1 rounded-lg text-text-tertiary hover:text-text-secondary transition-colors",
+            disabled && "opacity-50 cursor-not-allowed",
+          )}
+          title={
+            mode === "speech-to-text"
+              ? "Mode: Speech-to-text (click to switch to audio recording)"
+              : "Mode: Audio recording (click to switch to speech-to-text)"
+          }
+        >
+          <AudioLines className="h-3.5 w-3.5" />
+        </button>
       )}
+
+      <div className="relative">
+        {/* Audio level ring — visible when recording STT */}
+        {recording && mode === "speech-to-text" && (
+          <span
+            className="absolute inset-0 rounded-lg bg-danger/20 animate-pulse pointer-events-none"
+            style={{
+              transform: `scale(${1 + audioLevel * 0.45})`,
+              opacity: 0.5 + audioLevel * 0.5,
+              transition: "transform 0.1s ease-out, opacity 0.1s ease-out",
+            }}
+          />
+        )}
+
+        <button
+          onClick={toggle}
+          disabled={disabled}
+          className={clsx(
+            "relative z-10 p-1.5 rounded-lg transition-colors",
+            recording
+              ? "text-danger hover:text-danger/80 bg-danger/10"
+              : "text-text-tertiary hover:text-text-secondary hover:bg-surface-tertiary",
+            disabled && "opacity-50 cursor-not-allowed",
+          )}
+          title={
+            recording
+              ? "Stop recording"
+              : mode === "speech-to-text"
+                ? "Voice input (speech-to-text)"
+                : "Record audio message"
+          }
+        >
+          {recording ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Mic className="h-4 w-4" />
+          )}
+        </button>
+
+        {/* Recording duration for STT mode */}
+        {recording && mode === "speech-to-text" && (
+          <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] text-danger font-medium whitespace-nowrap flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-danger animate-pulse" />
+            {formatDuration(duration)}
+          </span>
+        )}
+
+        {/* Interim transcription bubble */}
+        {recording && mode === "speech-to-text" && interim && (
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-7 w-max max-w-[240px] px-3 py-1.5 rounded-lg bg-surface-secondary border border-border text-xs text-text shadow-md whitespace-pre-wrap">
+            {interim}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

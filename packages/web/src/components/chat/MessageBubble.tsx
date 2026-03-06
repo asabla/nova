@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { Copy, Check, ThumbsUp, ThumbsDown, Pencil, RotateCcw, History, X, Send, StickyNote, ChevronDown, GitBranch } from "lucide-react";
+import { Copy, Check, ThumbsUp, ThumbsDown, Pencil, RotateCcw, History, X, Send, StickyNote, ChevronDown, GitBranch, Volume2, VolumeX } from "lucide-react";
 import { clsx } from "clsx";
 import { MarkdownRenderer } from "../markdown/MarkdownRenderer";
 import { Avatar } from "../ui/Avatar";
@@ -69,6 +69,51 @@ export function MessageBubble({ message, userName, onRate, onEdit, onEditAndReru
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showModelSelector]);
+
+  // ---- Text-to-speech ----
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const ttsSupported = typeof window !== "undefined" && "speechSynthesis" in window;
+
+  const handleSpeak = useCallback(() => {
+    if (!ttsSupported || !message.content) return;
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    // Strip markdown syntax for cleaner TTS output
+    const plainText = message.content
+      .replace(/```[\s\S]*?```/g, " code block ")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/[#*_~>|-]/g, "")
+      .replace(/\n+/g, ". ")
+      .trim();
+
+    const utterance = new SpeechSynthesisUtterance(plainText);
+    utterance.lang = navigator.language || "en-US";
+    utterance.rate = 1;
+    utterance.pitch = 1;
+
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    utteranceRef.current = utterance;
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  }, [ttsSupported, message.content, isSpeaking]);
+
+  // Cancel TTS on unmount
+  useEffect(() => {
+    return () => {
+      if (isSpeaking) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, [isSpeaking]);
 
   const handleCopy = () => {
     if (message.content) {
@@ -289,6 +334,20 @@ export function MessageBubble({ message, userName, onRate, onEdit, onEditAndReru
                   <ThumbsDown className="h-3.5 w-3.5" />
                 </button>
               </>
+            )}
+            {isAssistant && ttsSupported && message.content && (
+              <button
+                onClick={handleSpeak}
+                className={clsx(
+                  "p-1 rounded transition-colors",
+                  isSpeaking
+                    ? "text-primary hover:text-primary/80"
+                    : "text-text-tertiary hover:text-text-secondary",
+                )}
+                title={isSpeaking ? "Stop listening" : "Listen"}
+              >
+                {isSpeaking ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+              </button>
             )}
             {isAssistant && onRerun && (
               <div className="relative" ref={modelSelectorRef}>
