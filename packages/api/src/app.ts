@@ -30,6 +30,7 @@ import { auditRoutes } from "./routes/audit";
 import { toolRoutes } from "./routes/tools";
 import { mcpRoutes } from "./routes/mcp";
 import { exportRoutes } from "./routes/export";
+import { v1ChatRoutes } from "./routes/v1-chat";
 
 const app = new Hono<AppContext>();
 
@@ -83,5 +84,6 @@ app.route("/api/org", auditRoutes);
 app.route("/api/tools", toolRoutes);
 app.route("/api/mcp", mcpRoutes);
 app.route("/api/export", exportRoutes);
+app.route("/v1/chat", v1ChatRoutes);
 
 export { app };
