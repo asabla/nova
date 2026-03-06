@@ -16,6 +16,13 @@ import {
   Globe,
   Loader2,
   RefreshCw,
+  Power,
+  PowerOff,
+  Code2,
+  Copy,
+  Eye,
+  EyeOff,
+  AlertTriangle,
 } from "lucide-react";
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
@@ -49,7 +56,7 @@ interface McpTool {
   id: string;
   name: string;
   description?: string;
-  inputSchema?: unknown;
+  inputSchema?: Record<string, unknown>;
   isEnabled: boolean;
 }
 
@@ -58,6 +65,14 @@ interface WhitelistEntry {
   urlPattern: string;
   description?: string;
   createdAt: string;
+}
+
+interface TestResult {
+  connected: boolean;
+  status?: number;
+  latencyMs?: number;
+  error?: string;
+  serverInfo?: unknown;
 }
 
 // ---------------------------------------------------------------------------
@@ -71,6 +86,7 @@ function McpPage() {
   const [expandedServer, setExpandedServer] = useState<string | null>(null);
   const [showWhitelist, setShowWhitelist] = useState(false);
   const [showAddWhitelist, setShowAddWhitelist] = useState(false);
+  const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
 
   // Fetch servers
   const { data: serversData, isLoading } = useQuery({
@@ -87,16 +103,28 @@ function McpPage() {
       )
     : servers;
 
+  // Summary stats
+  const connectedCount = servers.filter((s) => s.healthStatus === "connected").length;
+  const errorCount = servers.filter((s) => s.healthStatus === "error").length;
+  const pendingCount = servers.filter(
+    (s) => !s.healthStatus || s.healthStatus === "pending",
+  ).length;
+
   // Register server
   const registerServer = useMutation({
-    mutationFn: (data: { name: string; url: string; description?: string }) =>
-      api.post("/api/mcp/servers", data),
+    mutationFn: (data: {
+      name: string;
+      url: string;
+      description?: string;
+      authType?: string;
+    }) => api.post("/api/mcp/servers", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mcp", "servers"] });
       setShowRegister(false);
       toast("MCP server registered", "success");
     },
-    onError: (err: any) => toast(err.message ?? "Failed to register server", "error"),
+    onError: (err: any) =>
+      toast(err.message ?? "Failed to register server", "error"),
   });
 
   // Delete server
@@ -106,16 +134,31 @@ function McpPage() {
       queryClient.invalidateQueries({ queryKey: ["mcp", "servers"] });
       toast("MCP server removed", "success");
     },
-    onError: (err: any) => toast(err.message ?? "Failed to delete server", "error"),
+    onError: (err: any) =>
+      toast(err.message ?? "Failed to delete server", "error"),
+  });
+
+  // Toggle enable/disable
+  const toggleServer = useMutation({
+    mutationFn: ({ id, isEnabled }: { id: string; isEnabled: boolean }) =>
+      api.patch(`/api/mcp/servers/${id}`, { isEnabled }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["mcp", "servers"] });
+      toast(
+        variables.isEnabled ? "Server enabled" : "Server disabled",
+        "success",
+      );
+    },
+    onError: (err: any) =>
+      toast(err.message ?? "Failed to update server", "error"),
   });
 
   // Test connectivity
   const testServer = useMutation({
     mutationFn: (id: string) =>
-      api.post<{ connected: boolean; status?: number; latencyMs?: number; error?: string }>(
-        `/api/mcp/servers/${id}/test`,
-      ),
+      api.post<TestResult>(`/api/mcp/servers/${id}/test`),
     onSuccess: (data, id) => {
+      setTestResults((prev) => ({ ...prev, [id]: data }));
       queryClient.invalidateQueries({ queryKey: ["mcp", "servers"] });
       if (data.connected) {
         toast(`Connected (${data.latencyMs}ms)`, "success");
@@ -135,14 +178,53 @@ function McpPage() {
             <h1 className="text-xl font-bold text-text">MCP Servers</h1>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setShowWhitelist(true)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowWhitelist(true)}
+            >
               <Shield className="h-3.5 w-3.5" /> Whitelist
             </Button>
-            <Button variant="primary" size="sm" onClick={() => setShowRegister(true)}>
-              <Plus className="h-3.5 w-3.5" /> Register Server
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setShowRegister(true)}
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Server
             </Button>
           </div>
         </div>
+
+        {/* Status Summary */}
+        {servers.length > 0 && (
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-success/5 border border-success/20">
+              <CheckCircle className="h-4 w-4 text-success shrink-0" />
+              <div>
+                <p className="text-lg font-semibold text-text">
+                  {connectedCount}
+                </p>
+                <p className="text-xs text-text-tertiary">Connected</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-danger/5 border border-danger/20">
+              <XCircle className="h-4 w-4 text-danger shrink-0" />
+              <div>
+                <p className="text-lg font-semibold text-text">{errorCount}</p>
+                <p className="text-xs text-text-tertiary">Error</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-warning/5 border border-warning/20">
+              <Clock className="h-4 w-4 text-warning shrink-0" />
+              <div>
+                <p className="text-lg font-semibold text-text">
+                  {pendingCount}
+                </p>
+                <p className="text-xs text-text-tertiary">Pending</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Search */}
         <div className="relative mb-6">
@@ -151,7 +233,7 @@ function McpPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search servers..."
+            placeholder="Search servers by name or URL..."
             className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary focus:outline-primary"
           />
         </div>
@@ -166,10 +248,26 @@ function McpPage() {
           ) : filtered.length === 0 ? (
             <div className="text-center py-16">
               <Puzzle className="h-10 w-10 text-text-tertiary mx-auto mb-3" />
-              <p className="text-sm text-text-secondary">No MCP servers registered</p>
-              <p className="text-xs text-text-tertiary mt-1">
-                Register an MCP server to connect external tools
+              <p className="text-sm text-text-secondary">
+                {search
+                  ? "No servers match your search"
+                  : "No MCP servers registered"}
               </p>
+              <p className="text-xs text-text-tertiary mt-1">
+                {search
+                  ? "Try a different search term"
+                  : "Add an MCP server to connect external tools"}
+              </p>
+              {!search && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="mt-4"
+                  onClick={() => setShowRegister(true)}
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Server
+                </Button>
+              )}
             </div>
           ) : (
             filtered.map((server) => (
@@ -178,11 +276,30 @@ function McpPage() {
                 server={server}
                 isExpanded={expandedServer === server.id}
                 onToggleExpand={() =>
-                  setExpandedServer(expandedServer === server.id ? null : server.id)
+                  setExpandedServer(
+                    expandedServer === server.id ? null : server.id,
+                  )
                 }
                 onTest={() => testServer.mutate(server.id)}
-                onDelete={() => deleteServer.mutate(server.id)}
-                isTesting={testServer.isPending && testServer.variables === server.id}
+                onDelete={() => {
+                  if (
+                    window.confirm(
+                      `Remove "${server.name}"? This cannot be undone.`,
+                    )
+                  ) {
+                    deleteServer.mutate(server.id);
+                  }
+                }}
+                onToggleEnabled={() =>
+                  toggleServer.mutate({
+                    id: server.id,
+                    isEnabled: !server.isEnabled,
+                  })
+                }
+                isTesting={
+                  testServer.isPending && testServer.variables === server.id
+                }
+                testResult={testResults[server.id] ?? null}
               />
             ))
           )}
@@ -223,20 +340,40 @@ function ServerCard({
   onToggleExpand,
   onTest,
   onDelete,
+  onToggleEnabled,
   isTesting,
+  testResult,
 }: {
   server: McpServer;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onTest: () => void;
   onDelete: () => void;
+  onToggleEnabled: () => void;
   isTesting: boolean;
+  testResult: TestResult | null;
 }) {
+  const lastChecked = server.lastHealthCheckAt
+    ? new Date(server.lastHealthCheckAt).toLocaleString()
+    : "Never";
+
   return (
-    <div className="rounded-xl bg-surface-secondary border border-border hover:border-border-strong transition-colors">
+    <div
+      className={`rounded-xl bg-surface-secondary border transition-colors ${
+        server.healthStatus === "connected"
+          ? "border-success/30"
+          : server.healthStatus === "error"
+            ? "border-danger/30"
+            : "border-border"
+      } hover:border-border-strong`}
+    >
+      {/* Main row */}
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <button onClick={onToggleExpand} className="text-text-tertiary hover:text-text">
+          <button
+            onClick={onToggleExpand}
+            className="text-text-tertiary hover:text-text"
+          >
             {isExpanded ? (
               <ChevronDown className="h-4 w-4" />
             ) : (
@@ -245,18 +382,25 @@ function ServerCard({
           </button>
           <StatusIndicator status={server.healthStatus} />
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-text truncate">{server.name}</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-medium text-text truncate">
+                {server.name}
+              </span>
               {server.isApproved && <Badge variant="success">Approved</Badge>}
               {!server.isEnabled && <Badge variant="warning">Disabled</Badge>}
               <Badge variant="default">{server.authType}</Badge>
             </div>
-            <p className="text-xs text-text-tertiary mt-0.5 truncate">{server.url}</p>
+            <p className="text-xs text-text-tertiary mt-0.5 truncate font-mono">
+              {server.url}
+            </p>
             {server.description && (
               <p className="text-xs text-text-tertiary mt-0.5 line-clamp-1">
                 {server.description}
               </p>
             )}
+            <p className="text-xs text-text-tertiary mt-1">
+              Last checked: {lastChecked}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-1 ml-2 shrink-0">
@@ -273,6 +417,21 @@ function ServerCard({
             )}
           </button>
           <button
+            onClick={onToggleEnabled}
+            className={`p-1.5 rounded-lg hover:bg-surface ${
+              server.isEnabled
+                ? "text-success hover:text-warning"
+                : "text-text-tertiary hover:text-success"
+            }`}
+            title={server.isEnabled ? "Disable server" : "Enable server"}
+          >
+            {server.isEnabled ? (
+              <Power className="h-3.5 w-3.5" />
+            ) : (
+              <PowerOff className="h-3.5 w-3.5" />
+            )}
+          </button>
+          <button
             onClick={onDelete}
             className="p-1.5 text-text-tertiary hover:text-danger rounded-lg hover:bg-surface"
             title="Remove server"
@@ -282,6 +441,50 @@ function ServerCard({
         </div>
       </div>
 
+      {/* Inline test result */}
+      {testResult && (
+        <div
+          className={`mx-4 mb-3 p-3 rounded-lg border text-xs ${
+            testResult.connected
+              ? "bg-success/5 border-success/20"
+              : "bg-danger/5 border-danger/20"
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-1">
+            {testResult.connected ? (
+              <CheckCircle className="h-3.5 w-3.5 text-success shrink-0" />
+            ) : (
+              <XCircle className="h-3.5 w-3.5 text-danger shrink-0" />
+            )}
+            <span className="font-medium text-text">
+              {testResult.connected ? "Connected" : "Connection Failed"}
+            </span>
+          </div>
+          <div className="flex items-center gap-4 text-text-tertiary">
+            {testResult.latencyMs != null && (
+              <span>Latency: {testResult.latencyMs}ms</span>
+            )}
+            {testResult.status != null && (
+              <span>HTTP {testResult.status}</span>
+            )}
+            {testResult.error && (
+              <span className="text-danger">{testResult.error}</span>
+            )}
+          </div>
+          {testResult.serverInfo && (
+            <details className="mt-2">
+              <summary className="cursor-pointer text-text-secondary hover:text-text">
+                Server Info
+              </summary>
+              <pre className="mt-1 p-2 rounded bg-surface text-text-secondary overflow-auto max-h-32 font-mono">
+                {JSON.stringify(testResult.serverInfo, null, 2)}
+              </pre>
+            </details>
+          )}
+        </div>
+      )}
+
+      {/* Expanded tools section */}
       {isExpanded && <ServerToolsList serverId={server.id} />}
     </div>
   );
@@ -294,7 +497,12 @@ function ServerCard({
 function StatusIndicator({ status }: { status: string | null }) {
   switch (status) {
     case "connected":
-      return <CheckCircle className="h-4 w-4 text-success shrink-0" />;
+      return (
+        <div className="relative shrink-0">
+          <CheckCircle className="h-4 w-4 text-success" />
+          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-success animate-pulse" />
+        </div>
+      );
     case "error":
       return <XCircle className="h-4 w-4 text-danger shrink-0" />;
     case "pending":
@@ -309,9 +517,12 @@ function StatusIndicator({ status }: { status: string | null }) {
 // ---------------------------------------------------------------------------
 
 function ServerToolsList({ serverId }: { serverId: string }) {
-  const { data, isLoading, refetch } = useQuery({
+  const [expandedTool, setExpandedTool] = useState<string | null>(null);
+
+  const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["mcp", "servers", serverId, "tools"],
-    queryFn: () => api.get<{ data: McpTool[] }>(`/api/mcp/servers/${serverId}/tools`),
+    queryFn: () =>
+      api.get<{ data: McpTool[] }>(`/api/mcp/servers/${serverId}/tools`),
   });
 
   const tools = data?.data ?? [];
@@ -324,43 +535,42 @@ function ServerToolsList({ serverId }: { serverId: string }) {
         </span>
         <button
           onClick={() => refetch()}
-          className="text-text-tertiary hover:text-text p-1 rounded"
-          title="Refresh tools"
+          disabled={isRefetching}
+          className="flex items-center gap-1 text-xs text-text-tertiary hover:text-text p-1 rounded disabled:opacity-50"
+          title="Refresh tools list from server"
         >
-          <RefreshCw className="h-3 w-3" />
+          <RefreshCw
+            className={`h-3 w-3 ${isRefetching ? "animate-spin" : ""}`}
+          />
+          <span>Refresh</span>
         </button>
       </div>
+
       {isLoading ? (
-        <div className="flex items-center gap-2 py-2">
+        <div className="flex items-center gap-2 py-4">
           <Loader2 className="h-3.5 w-3.5 animate-spin text-text-tertiary" />
-          <span className="text-xs text-text-tertiary">Fetching tools...</span>
+          <span className="text-xs text-text-tertiary">
+            Discovering tools...
+          </span>
         </div>
       ) : tools.length === 0 ? (
-        <p className="text-xs text-text-tertiary py-2">
-          No tools discovered. Test connectivity first, then refresh.
-        </p>
+        <div className="text-center py-4">
+          <AlertTriangle className="h-5 w-5 text-warning mx-auto mb-1.5" />
+          <p className="text-xs text-text-tertiary">
+            No tools discovered. Test connectivity first, then refresh.
+          </p>
+        </div>
       ) : (
         <div className="space-y-1">
           {tools.map((tool) => (
-            <div
+            <ToolItem
               key={tool.id}
-              className="flex items-start gap-2 p-2 rounded-lg hover:bg-surface transition-colors"
-            >
-              <Globe className="h-3.5 w-3.5 text-purple-400 mt-0.5 shrink-0" />
-              <div className="min-w-0">
-                <span className="text-xs font-medium text-text">{tool.name}</span>
-                {tool.description && (
-                  <p className="text-xs text-text-tertiary mt-0.5 line-clamp-2">
-                    {tool.description}
-                  </p>
-                )}
-              </div>
-              {!tool.isEnabled && (
-                <Badge variant="warning" className="ml-auto shrink-0">
-                  Disabled
-                </Badge>
-              )}
-            </div>
+              tool={tool}
+              isExpanded={expandedTool === tool.id}
+              onToggle={() =>
+                setExpandedTool(expandedTool === tool.id ? null : tool.id)
+              }
+            />
           ))}
         </div>
       )}
@@ -369,7 +579,116 @@ function ServerToolsList({ serverId }: { serverId: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Register Server Dialog
+// Individual Tool Item (expandable to show schema)
+// ---------------------------------------------------------------------------
+
+function ToolItem({
+  tool,
+  isExpanded,
+  onToggle,
+}: {
+  tool: McpTool;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const hasSchema =
+    tool.inputSchema &&
+    typeof tool.inputSchema === "object" &&
+    Object.keys(tool.inputSchema).length > 0;
+
+  const schemaProperties =
+    hasSchema && (tool.inputSchema as any)?.properties
+      ? Object.entries((tool.inputSchema as any).properties)
+      : [];
+
+  const requiredFields: string[] =
+    hasSchema && Array.isArray((tool.inputSchema as any)?.required)
+      ? (tool.inputSchema as any).required
+      : [];
+
+  return (
+    <div className="rounded-lg border border-transparent hover:border-border hover:bg-surface transition-colors">
+      <button
+        onClick={onToggle}
+        className="flex items-start gap-2 p-2 w-full text-left"
+      >
+        <Globe className="h-3.5 w-3.5 text-purple-400 mt-0.5 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-text font-mono">
+              {tool.name}
+            </span>
+            {!tool.isEnabled && (
+              <Badge variant="warning" className="shrink-0">
+                Disabled
+              </Badge>
+            )}
+            {hasSchema && (
+              <Code2 className="h-3 w-3 text-text-tertiary shrink-0 ml-auto" />
+            )}
+          </div>
+          {tool.description && (
+            <p className="text-xs text-text-tertiary mt-0.5 line-clamp-2">
+              {tool.description}
+            </p>
+          )}
+        </div>
+      </button>
+
+      {/* Expanded schema view */}
+      {isExpanded && hasSchema && (
+        <div className="px-2 pb-2 ml-6">
+          {schemaProperties.length > 0 ? (
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">
+                Parameters
+              </p>
+              {schemaProperties.map(([paramName, paramSchema]: [string, any]) => (
+                <div
+                  key={paramName}
+                  className="flex items-start gap-2 p-2 rounded bg-surface border border-border text-xs"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <code className="font-mono font-medium text-text">
+                        {paramName}
+                      </code>
+                      <span className="text-text-tertiary">
+                        {paramSchema?.type ?? "any"}
+                      </span>
+                      {requiredFields.includes(paramName) && (
+                        <span className="text-danger text-[10px] font-medium">
+                          required
+                        </span>
+                      )}
+                    </div>
+                    {paramSchema?.description && (
+                      <p className="text-text-tertiary mt-0.5">
+                        {paramSchema.description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <details>
+              <summary className="text-xs text-text-secondary cursor-pointer hover:text-text">
+                Raw Schema
+              </summary>
+              <pre className="mt-1 p-2 rounded bg-surface text-xs text-text-tertiary font-mono overflow-auto max-h-40 border border-border">
+                {JSON.stringify(tool.inputSchema, null, 2)}
+              </pre>
+            </details>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Register Server Dialog (#150 - Add MCP server by URL)
 // ---------------------------------------------------------------------------
 
 function RegisterServerDialog({
@@ -380,20 +699,45 @@ function RegisterServerDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  onSubmit: (data: { name: string; url: string; description?: string }) => void;
+  onSubmit: (data: {
+    name: string;
+    url: string;
+    description?: string;
+    authType?: string;
+  }) => void;
   isPending: boolean;
 }) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [description, setDescription] = useState("");
+  const [authType, setAuthType] = useState<"none" | "bearer" | "api_key">(
+    "none",
+  );
+  const [authToken, setAuthToken] = useState("");
+  const [showToken, setShowToken] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ name, url, description: description || undefined });
+    onSubmit({
+      name,
+      url,
+      description: description || undefined,
+      authType,
+    });
+  };
+
+  const handleClose = () => {
+    setName("");
+    setUrl("");
+    setDescription("");
+    setAuthType("none");
+    setAuthToken("");
+    setShowToken(false);
+    onClose();
   };
 
   return (
-    <Dialog open={open} onClose={onClose} title="Register MCP Server">
+    <Dialog open={open} onClose={handleClose} title="Add MCP Server">
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
           label="Name"
@@ -415,17 +759,85 @@ function RegisterServerDialog({
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Optional description of this server..."
-            rows={3}
+            placeholder="Optional description of this server and its capabilities..."
+            rows={2}
             className="p-3 text-sm bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary resize-y focus:outline-primary"
           />
         </div>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={onClose}>
+
+        {/* Auth section */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-text">
+            Authentication
+          </label>
+          <select
+            value={authType}
+            onChange={(e) =>
+              setAuthType(e.target.value as "none" | "bearer" | "api_key")
+            }
+            className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text focus:outline-primary"
+          >
+            <option value="none">None</option>
+            <option value="bearer">Bearer Token</option>
+            <option value="api_key">API Key</option>
+          </select>
+        </div>
+
+        {authType !== "none" && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-text">
+              {authType === "bearer" ? "Bearer Token" : "API Key"}
+            </label>
+            <div className="relative">
+              <input
+                type={showToken ? "text" : "password"}
+                value={authToken}
+                onChange={(e) => setAuthToken(e.target.value)}
+                placeholder={
+                  authType === "bearer"
+                    ? "eyJhbGciOiJIUzI1NiIs..."
+                    : "sk-..."
+                }
+                className="w-full h-9 px-3 pr-20 text-sm bg-surface border border-border rounded-lg text-text font-mono placeholder:text-text-tertiary focus:outline-primary"
+              />
+              <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => setShowToken(!showToken)}
+                  className="p-1 text-text-tertiary hover:text-text rounded"
+                  title={showToken ? "Hide" : "Show"}
+                >
+                  {showToken ? (
+                    <EyeOff className="h-3.5 w-3.5" />
+                  ) : (
+                    <Eye className="h-3.5 w-3.5" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(authToken);
+                    toast("Copied to clipboard", "success");
+                  }}
+                  className="p-1 text-text-tertiary hover:text-text rounded"
+                  title="Copy"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-text-tertiary">
+              The token will be sent with each request to the MCP server.
+            </p>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="ghost" onClick={handleClose}>
             Cancel
           </Button>
           <Button type="submit" variant="primary" loading={isPending}>
-            Register
+            Add Server
           </Button>
         </div>
       </form>
@@ -434,7 +846,7 @@ function RegisterServerDialog({
 }
 
 // ---------------------------------------------------------------------------
-// Whitelist Dialog
+// Whitelist Dialog (#152 - Admin whitelist approved MCP server URLs)
 // ---------------------------------------------------------------------------
 
 function WhitelistDialog({
@@ -450,7 +862,8 @@ function WhitelistDialog({
 
   const { data: whitelistData, isLoading } = useQuery({
     queryKey: ["mcp", "whitelist"],
-    queryFn: () => api.get<{ data: WhitelistEntry[] }>("/api/mcp/whitelist"),
+    queryFn: () =>
+      api.get<{ data: WhitelistEntry[] }>("/api/mcp/whitelist"),
     enabled: open,
   });
 
@@ -460,17 +873,28 @@ function WhitelistDialog({
       queryClient.invalidateQueries({ queryKey: ["mcp", "whitelist"] });
       toast("Whitelist entry removed", "success");
     },
-    onError: (err: any) => toast(err.message ?? "Failed to remove entry", "error"),
+    onError: (err: any) =>
+      toast(err.message ?? "Failed to remove entry", "error"),
   });
 
   const entries = whitelistData?.data ?? [];
 
   return (
-    <Dialog open={open} onClose={onClose} title="URL Whitelist" className="max-w-xl">
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Approved MCP Server URLs"
+      className="max-w-xl"
+    >
       <div className="space-y-4">
-        <p className="text-xs text-text-tertiary">
-          Only servers matching whitelisted URL patterns can be registered by non-admin users.
-        </p>
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
+          <Shield className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+          <p className="text-xs text-text-secondary">
+            Only servers matching whitelisted URL patterns can be registered by
+            non-admin users. Admins can always register any server. Patterns
+            support wildcards (e.g., <code>https://*.example.com/*</code>).
+          </p>
+        </div>
 
         <div className="flex justify-end">
           <Button variant="primary" size="sm" onClick={onShowAdd}>
@@ -485,7 +909,12 @@ function WhitelistDialog({
         ) : entries.length === 0 ? (
           <div className="text-center py-6">
             <Shield className="h-8 w-8 text-text-tertiary mx-auto mb-2" />
-            <p className="text-xs text-text-tertiary">No whitelist entries</p>
+            <p className="text-sm text-text-secondary">
+              No whitelist entries yet
+            </p>
+            <p className="text-xs text-text-tertiary mt-1">
+              All servers are currently blocked for non-admin users
+            </p>
           </div>
         ) : (
           <div className="space-y-1 max-h-64 overflow-y-auto">
@@ -495,14 +924,30 @@ function WhitelistDialog({
                 className="flex items-center justify-between p-3 rounded-lg bg-surface border border-border"
               >
                 <div className="min-w-0 flex-1">
-                  <code className="text-xs font-mono text-text">{entry.urlPattern}</code>
+                  <code className="text-xs font-mono text-text">
+                    {entry.urlPattern}
+                  </code>
                   {entry.description && (
-                    <p className="text-xs text-text-tertiary mt-0.5">{entry.description}</p>
+                    <p className="text-xs text-text-tertiary mt-0.5">
+                      {entry.description}
+                    </p>
                   )}
+                  <p className="text-xs text-text-tertiary mt-0.5">
+                    Added {new Date(entry.createdAt).toLocaleDateString()}
+                  </p>
                 </div>
                 <button
-                  onClick={() => deleteEntry.mutate(entry.id)}
-                  className="p-1 text-text-tertiary hover:text-danger rounded ml-2 shrink-0"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Remove this whitelist entry? Non-admin users will no longer be able to register servers matching this pattern.",
+                      )
+                    ) {
+                      deleteEntry.mutate(entry.id);
+                    }
+                  }}
+                  disabled={deleteEntry.isPending}
+                  className="p-1 text-text-tertiary hover:text-danger rounded ml-2 shrink-0 disabled:opacity-50"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -540,27 +985,37 @@ function AddWhitelistDialog({
       onClose();
       toast("Whitelist entry added", "success");
     },
-    onError: (err: any) => toast(err.message ?? "Failed to add entry", "error"),
+    onError: (err: any) =>
+      toast(err.message ?? "Failed to add entry", "error"),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    addEntry.mutate({ urlPattern, description: description || undefined });
+    addEntry.mutate({
+      urlPattern,
+      description: description || undefined,
+    });
   };
 
   return (
     <Dialog open={open} onClose={onClose} title="Add Whitelist Pattern">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          label="URL Pattern"
-          placeholder="https://*.example.com/*"
-          value={urlPattern}
-          onChange={(e) => setUrlPattern(e.target.value)}
-          required
-        />
+        <div>
+          <Input
+            label="URL Pattern"
+            placeholder="https://*.example.com/*"
+            value={urlPattern}
+            onChange={(e) => setUrlPattern(e.target.value)}
+            required
+          />
+          <p className="text-xs text-text-tertiary mt-1">
+            Use <code>*</code> as wildcard. Example:{" "}
+            <code>https://*.company.com/mcp/*</code>
+          </p>
+        </div>
         <Input
           label="Description"
-          placeholder="Allow all example.com subdomains"
+          placeholder="Allow all company.com MCP servers"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
@@ -569,7 +1024,7 @@ function AddWhitelistDialog({
             Cancel
           </Button>
           <Button type="submit" variant="primary" loading={addEntry.isPending}>
-            Add
+            Add Pattern
           </Button>
         </div>
       </form>
