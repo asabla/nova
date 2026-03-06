@@ -17,6 +17,15 @@ import { messageRoutes } from "./routes/messages";
 import { fileRoutes } from "./routes/files";
 import { userRoutes } from "./routes/users";
 import { notificationRoutes } from "./routes/notifications";
+import { agentRoutes } from "./routes/agents";
+import { knowledgeRoutes } from "./routes/knowledge";
+import { workspaceRoutes } from "./routes/workspaces";
+import { orgRoutes } from "./routes/orgs";
+import { promptRoutes } from "./routes/prompts";
+import { apiKeyRoutes } from "./routes/api-keys";
+import { searchRoutes } from "./routes/search";
+import { analyticsRoutes } from "./routes/analytics";
+import { modelRoutes } from "./routes/models";
 
 const app = new Hono<AppContext>();
 
@@ -57,5 +66,14 @@ app.route("/api/conversations", messageRoutes);
 app.route("/api/files", fileRoutes);
 app.route("/api/users", userRoutes);
 app.route("/api/notifications", notificationRoutes);
+app.route("/api/agents", agentRoutes);
+app.route("/api/knowledge", knowledgeRoutes);
+app.route("/api/workspaces", workspaceRoutes);
+app.route("/api/org", orgRoutes);
+app.route("/api/prompts", promptRoutes);
+app.route("/api/api-keys", apiKeyRoutes);
+app.route("/api/search", searchRoutes);
+app.route("/api/analytics", analyticsRoutes);
+app.route("/api/models", modelRoutes);
 
 export { app };
