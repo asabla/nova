@@ -1,0 +1,94 @@
+graph TB
+    subgraph "packages/api (Bun + Hono)"
+        subgraph "Router Layer"
+            HonoRouter["Hono Router"]
+            AuthRoutes["/auth/*\nBetter Auth routes"]
+            ConvRoutes["/conversations/*"]
+            AgentRoutes["/agents/*"]
+            KnowledgeRoutes["/knowledge/*"]
+            FileRoutes["/files/*"]
+            AdminRoutes["/admin/*"]
+            SSERoutes["/conversations/:id/messages\n(SSE streaming)"]
+            WSEndpoint["/ws\n(WebSocket upgrade)"]
+        end
+
+        subgraph "Middleware Stack"
+            CORSMiddleware["CORS Middleware"]
+            AuthMiddleware["Auth Middleware\n(Better Auth)\nSession + JWT validation"]
+            RateLimitMiddleware["Rate Limiter\n(Token bucket via Redis)"]
+            TenantMiddleware["Tenant Resolver\nOrg context injection"]
+            AuditMiddleware["Audit Logger"]
+            ZodValidator["Zod Validator\n(@hono/zod-openapi)"]
+        end
+
+        subgraph "Domain Services"
+            ConversationService["ConversationService\nCRUD, branching, sharing"]
+            AgentService["AgentService\nAgent config, tool binding"]
+            KnowledgeService["KnowledgeService\nCollections, documents, RAG"]
+            MessageService["MessageService\nCreate, stream, edit history"]
+            UserService["UserService\nProfile, preferences"]
+            OrgService["OrgService\nTenancy, roles, invitations"]
+            FileService["FileService\nUpload, presigned URLs"]
+            SearchService["SearchService\nSemantic + text hybrid search"]
+            MCPGateway["MCPGateway\nServer registry, tool discovery"]
+        end
+
+        subgraph "Infrastructure Clients"
+            LiteLLMClient["LiteLLM Client\nOpenAI-compat HTTP\nStreaming SSE"]
+            TemporalClient["Temporal Client\n@temporalio/client\ngRPC to Temporal Server"]
+            MinIOClient["MinIO Client\nS3-compat SDK\nPresigned URL generation"]
+            RedisClient["Redis Client\nioredis\nPub/Sub + Cache"]
+            DrizzleDB["Drizzle DB Client\nPostgreSQL driver\npgvector + pg_trgm"]
+        end
+    end
+
+    subgraph "External Dependencies"
+        PostgreSQL[("PostgreSQL 16\nNOVA DB")]
+        Redis_Ext[("Redis 7.2+")]
+        MinIO_Ext[("MinIO")]
+        LiteLLM_Ext["LiteLLM Gateway"]
+        Temporal_Ext["Temporal Server"]
+    end
+
+    HonoRouter --> AuthRoutes
+    HonoRouter --> ConvRoutes
+    HonoRouter --> AgentRoutes
+    HonoRouter --> KnowledgeRoutes
+    HonoRouter --> FileRoutes
+    HonoRouter --> AdminRoutes
+    HonoRouter --> SSERoutes
+    HonoRouter --> WSEndpoint
+
+    HonoRouter --> CORSMiddleware
+    CORSMiddleware --> AuthMiddleware
+    AuthMiddleware --> RateLimitMiddleware
+    RateLimitMiddleware --> TenantMiddleware
+    TenantMiddleware --> AuditMiddleware
+    AuditMiddleware --> ZodValidator
+
+    ConvRoutes --> ConversationService
+    AgentRoutes --> AgentService
+    KnowledgeRoutes --> KnowledgeService
+    SSERoutes --> MessageService
+    FileRoutes --> FileService
+    AdminRoutes --> OrgService
+
+    ConversationService --> DrizzleDB
+    ConversationService --> RedisClient
+    AgentService --> DrizzleDB
+    AgentService --> TemporalClient
+    KnowledgeService --> DrizzleDB
+    KnowledgeService --> TemporalClient
+    MessageService --> DrizzleDB
+    MessageService --> LiteLLMClient
+    MessageService --> RedisClient
+    FileService --> MinIOClient
+    FileService --> DrizzleDB
+    SearchService --> DrizzleDB
+    MCPGateway --> RedisClient
+
+    DrizzleDB --> PostgreSQL
+    RedisClient --> Redis_Ext
+    MinIOClient --> MinIO_Ext
+    LiteLLMClient --> LiteLLM_Ext
+    TemporalClient --> Temporal_Ext

@@ -1,0 +1,70 @@
+flowchart TB
+    subgraph "Client Request"
+        Request["POST /execute\n{ code, language, timeout }"]
+    end
+
+    subgraph "API Server (Hono)"
+        Validate["Validate request\n(Zod schema)"]
+        AuthCheck["Auth + rate limit check"]
+        StartWorkflow["Start Temporal workflow\n'CodeExecutionWorkflow'"]
+    end
+
+    subgraph "Temporal"
+        Workflow["CodeExecutionWorkflow"]
+        Activity["executeSandboxActivity"]
+    end
+
+    subgraph "SandboxBackend Interface"
+        Interface["SandboxBackend.execute()\n- code: string\n- language: python | javascript | bash\n- timeoutMs: 30000\n- memoryMB: 256\n- cpuCores: 0.5\n- diskMB: 100\n- networkEnabled: false"]
+
+        subgraph "Phase 1-3: nsjail"
+            Nsjail["NsjailBackend\nLinux namespaces\n+ cgroups + seccomp\nNo KVM required"]
+        end
+
+        subgraph "Phase 3+: gVisor"
+            GVisor["GVisorBackend\nUser-space kernel\n(runsc runtime)\nNo KVM required"]
+        end
+
+        subgraph "Phase 4+: Firecracker"
+            Firecracker["FirecrackerBackend\nmicroVM (KVM)\n~125ms boot\n~5MB memory overhead"]
+        end
+    end
+
+    subgraph "Sandbox Execution"
+        PrepFS["Prepare filesystem\n(tmpfs / rootfs image)"]
+        InjectCode["Inject user code\n+ language runtime"]
+        Execute["Execute with limits\n(timeout, memory, CPU, disk)"]
+        Collect["Collect output\n- stdout\n- stderr\n- exit code\n- artifacts (files)\n- execution time\n- peak memory"]
+    end
+
+    subgraph "Result"
+        Response["Return ExecutionResult\n{\n  stdout, stderr,\n  exitCode,\n  artifacts[],\n  executionMs,\n  peakMemoryMB\n}"]
+    end
+
+    Request --> Validate
+    Validate --> AuthCheck
+    AuthCheck --> StartWorkflow
+    StartWorkflow --> Workflow
+    Workflow --> Activity
+    Activity --> Interface
+
+    Interface -.-> Nsjail
+    Interface -.-> GVisor
+    Interface -.-> Firecracker
+
+    Nsjail --> PrepFS
+    GVisor --> PrepFS
+    Firecracker --> PrepFS
+
+    PrepFS --> InjectCode
+    InjectCode --> Execute
+    Execute --> Collect
+    Collect --> Response
+
+    Response --> Activity
+    Activity --> Workflow
+
+    style Interface fill:#f9f,stroke:#333,stroke-width:2px
+    style Nsjail fill:#90EE90,stroke:#333
+    style GVisor fill:#FFD700,stroke:#333
+    style Firecracker fill:#FF6347,stroke:#333

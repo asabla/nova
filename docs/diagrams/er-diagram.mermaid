@@ -1,0 +1,1131 @@
+erDiagram
+    %% ============================================================
+    %% NOVA Platform -- Entity Relationship Diagram
+    %% Generated: 2026-03-06
+    %% 59 entities covering all 234 user stories
+    %% ============================================================
+
+    %% --- 1. Organisation & Settings ---
+
+    organisations {
+        uuid id PK
+        text name
+        text slug UK
+        text domain
+        text logo_url
+        text favicon_url
+        text primary_color
+        text custom_css
+        text billing_plan
+        text billing_customer_id
+        boolean is_saas
+        timestamptz setup_completed_at
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    org_settings {
+        uuid id PK
+        uuid org_id FK
+        text key
+        jsonb value
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ org_settings : "has"
+
+    %% --- 2. Users & Identity ---
+
+    users {
+        uuid id PK
+        text email UK
+        timestamptz email_verified_at
+        text password_hash
+        timestamptz password_changed_at
+        boolean is_super_admin
+        boolean is_active
+        timestamptz last_login_at
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    user_profiles {
+        uuid id PK
+        uuid user_id FK
+        uuid org_id FK
+        text display_name
+        text avatar_url
+        text timezone
+        text locale
+        text theme
+        text font_size
+        text role
+        timestamptz onboarding_completed_at
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    users ||--o{ user_profiles : "has profiles in"
+    organisations ||--o{ user_profiles : "scopes"
+
+    sessions {
+        uuid id PK
+        uuid user_id FK
+        text token_hash
+        inet ip_address
+        text user_agent
+        timestamptz expires_at
+        timestamptz revoked_at
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    users ||--o{ sessions : "has"
+
+    mfa_credentials {
+        uuid id PK
+        uuid user_id FK
+        text type
+        text secret_encrypted
+        text label
+        timestamptz last_used_at
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    users ||--o{ mfa_credentials : "has"
+
+    %% --- 3. Groups ---
+
+    groups {
+        uuid id PK
+        uuid org_id FK
+        text name
+        text description
+        text sso_group_id
+        jsonb model_access
+        bigint monthly_token_limit
+        integer monthly_cost_limit_cents
+        integer storage_quota_mb
+        integer data_retention_days
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ groups : "has"
+
+    group_memberships {
+        uuid id PK
+        uuid group_id FK
+        uuid user_id FK
+        uuid org_id FK
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    groups ||--o{ group_memberships : "has"
+    users ||--o{ group_memberships : "belongs to"
+
+    %% --- 4. SSO ---
+
+    sso_providers {
+        uuid id PK
+        uuid org_id FK
+        text type
+        text provider_name
+        text client_id
+        text client_secret_encrypted
+        text issuer_url
+        boolean is_enabled
+        boolean auto_provision_users
+        text default_role
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ sso_providers : "configures"
+
+    sso_sessions {
+        uuid id PK
+        uuid session_id FK
+        uuid sso_provider_id FK
+        text external_user_id
+        text access_token_encrypted
+        text refresh_token_encrypted
+        timestamptz token_expires_at
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    sessions ||--o| sso_sessions : "linked to"
+    sso_providers ||--o{ sso_sessions : "authenticates"
+
+    %% --- 5. API Keys ---
+
+    api_keys {
+        uuid id PK
+        uuid org_id FK
+        uuid user_id FK
+        text name
+        text key_prefix
+        text key_hash UK
+        jsonb scopes
+        timestamptz last_used_at
+        timestamptz expires_at
+        timestamptz revoked_at
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ api_keys : "has"
+    users ||--o{ api_keys : "owns"
+
+    %% --- 6. Workspaces ---
+
+    workspaces {
+        uuid id PK
+        uuid org_id FK
+        uuid owner_id FK
+        text name
+        text description
+        uuid default_agent_id FK
+        uuid default_model_id FK
+        text default_system_prompt
+        boolean is_archived
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ workspaces : "contains"
+    users ||--o{ workspaces : "owns"
+
+    workspace_memberships {
+        uuid id PK
+        uuid workspace_id FK
+        uuid user_id FK
+        uuid group_id FK
+        uuid org_id FK
+        text role
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    workspaces ||--o{ workspace_memberships : "has"
+    users ||--o{ workspace_memberships : "member of"
+    groups ||--o{ workspace_memberships : "grants access"
+
+    %% --- 7. Conversations ---
+
+    conversations {
+        uuid id PK
+        uuid org_id FK
+        uuid workspace_id FK
+        uuid owner_id FK
+        text title
+        text visibility
+        uuid model_id FK
+        text system_prompt
+        jsonb model_params
+        boolean is_pinned
+        boolean is_archived
+        uuid forked_from_message_id FK
+        text public_share_token
+        bigint total_tokens
+        integer estimated_cost_cents
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ conversations : "scopes"
+    workspaces ||--o{ conversations : "contains"
+    users ||--o{ conversations : "owns"
+
+    conversation_participants {
+        uuid id PK
+        uuid conversation_id FK
+        uuid user_id FK
+        uuid org_id FK
+        text role
+        timestamptz last_read_at
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    conversations ||--o{ conversation_participants : "has"
+    users ||--o{ conversation_participants : "participates in"
+
+    messages {
+        uuid id PK
+        uuid conversation_id FK
+        uuid org_id FK
+        uuid parent_message_id FK
+        text sender_type
+        uuid sender_user_id FK
+        uuid agent_id FK
+        uuid model_id FK
+        text content
+        text content_type
+        jsonb metadata
+        integer token_count_prompt
+        integer token_count_completion
+        integer cost_cents
+        boolean is_edited
+        jsonb edit_history
+        text status
+        text error_message
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    conversations ||--o{ messages : "contains"
+    users ||--o{ messages : "sends"
+    messages ||--o{ messages : "branches from"
+
+    message_attachments {
+        uuid id PK
+        uuid message_id FK
+        uuid org_id FK
+        uuid file_id FK
+        text url
+        text url_title
+        jsonb url_preview
+        text attachment_type
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    messages ||--o{ message_attachments : "has"
+
+    message_ratings {
+        uuid id PK
+        uuid message_id FK
+        uuid user_id FK
+        uuid org_id FK
+        smallint rating
+        text feedback
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    messages ||--o{ message_ratings : "rated by"
+    users ||--o{ message_ratings : "rates"
+
+    message_notes {
+        uuid id PK
+        uuid message_id FK
+        uuid user_id FK
+        uuid org_id FK
+        text content
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    messages ||--o{ message_notes : "annotated with"
+    users ||--o{ message_notes : "writes"
+
+    %% --- 8. Conversation Organisation ---
+
+    conversation_folders {
+        uuid id PK
+        uuid org_id FK
+        uuid user_id FK
+        text name
+        uuid parent_folder_id FK
+        integer sort_order
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ conversation_folders : "scopes"
+    users ||--o{ conversation_folders : "creates"
+    conversation_folders ||--o{ conversation_folders : "nests in"
+
+    conversation_tags {
+        uuid id PK
+        uuid org_id FK
+        uuid user_id FK
+        text name
+        text color
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ conversation_tags : "scopes"
+    users ||--o{ conversation_tags : "creates"
+
+    conversation_tag_assignments {
+        uuid id PK
+        uuid conversation_id FK
+        uuid conversation_tag_id FK
+        uuid conversation_folder_id FK
+        uuid org_id FK
+        timestamptz created_at
+        timestamptz deleted_at
+    }
+
+    conversations ||--o{ conversation_tag_assignments : "organised by"
+    conversation_tags ||--o{ conversation_tag_assignments : "applied via"
+    conversation_folders ||--o{ conversation_tag_assignments : "contains via"
+
+    %% --- 9. Files ---
+
+    files {
+        uuid id PK
+        uuid org_id FK
+        uuid user_id FK
+        uuid workspace_id FK
+        text filename
+        text content_type
+        bigint size_bytes
+        text storage_path
+        text storage_bucket
+        text checksum_sha256
+        boolean is_public
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ files : "scopes"
+    users ||--o{ files : "uploads"
+    workspaces ||--o{ files : "contains"
+    message_attachments }o--o| files : "references"
+
+    file_chunks {
+        uuid id PK
+        uuid file_id FK
+        uuid org_id FK
+        integer chunk_index
+        text content
+        vector embedding
+        integer token_count
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    files ||--o{ file_chunks : "chunked into"
+
+    %% --- 10. Knowledge Collections ---
+
+    knowledge_collections {
+        uuid id PK
+        uuid org_id FK
+        uuid owner_id FK
+        text name
+        text description
+        text visibility
+        uuid embedding_model_id FK
+        integer chunk_size
+        integer chunk_overlap
+        integer version
+        timestamptz last_indexed_at
+        text status
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ knowledge_collections : "scopes"
+    users ||--o{ knowledge_collections : "owns"
+
+    knowledge_documents {
+        uuid id PK
+        uuid knowledge_collection_id FK
+        uuid org_id FK
+        uuid file_id FK
+        text source_url
+        text title
+        text status
+        text error_message
+        integer token_count
+        integer chunk_count
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    knowledge_collections ||--o{ knowledge_documents : "contains"
+    files ||--o{ knowledge_documents : "sourced from"
+
+    knowledge_chunks {
+        uuid id PK
+        uuid knowledge_document_id FK
+        uuid knowledge_collection_id FK
+        uuid org_id FK
+        integer chunk_index
+        text content
+        vector embedding
+        integer token_count
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    knowledge_documents ||--o{ knowledge_chunks : "chunked into"
+
+    %% --- 11. Agents ---
+
+    agents {
+        uuid id PK
+        uuid org_id FK
+        uuid owner_id FK
+        text name
+        text description
+        text avatar_url
+        text system_prompt
+        uuid model_id FK
+        jsonb model_params
+        text visibility
+        boolean is_published
+        text tool_approval_mode
+        text memory_scope
+        integer max_steps
+        integer timeout_seconds
+        text webhook_url
+        text cron_schedule
+        boolean is_enabled
+        uuid cloned_from_agent_id FK
+        integer current_version
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ agents : "scopes"
+    users ||--o{ agents : "owns"
+    agents ||--o{ agents : "cloned from"
+    messages }o--o| agents : "produced by"
+
+    agent_versions {
+        uuid id PK
+        uuid agent_id FK
+        uuid org_id FK
+        integer version
+        text system_prompt
+        uuid model_id FK
+        jsonb model_params
+        jsonb config_snapshot
+        text changelog
+        timestamptz published_at
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    agents ||--o{ agent_versions : "versioned as"
+
+    agent_skills {
+        uuid id PK
+        uuid agent_id FK
+        uuid org_id FK
+        text skill_name
+        jsonb config
+        boolean is_enabled
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    agents ||--o{ agent_skills : "has"
+
+    agent_tools {
+        uuid id PK
+        uuid agent_id FK
+        uuid tool_id FK
+        uuid org_id FK
+        jsonb config_overrides
+        boolean is_enabled
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    agents ||--o{ agent_tools : "uses"
+
+    agent_mcp_servers {
+        uuid id PK
+        uuid agent_id FK
+        uuid mcp_server_id FK
+        uuid org_id FK
+        boolean is_enabled
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    agents ||--o{ agent_mcp_servers : "connects to"
+
+    agent_memory_entries {
+        uuid id PK
+        uuid agent_id FK
+        uuid org_id FK
+        uuid user_id FK
+        uuid conversation_id FK
+        text scope
+        text key
+        jsonb value
+        vector embedding
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    agents ||--o{ agent_memory_entries : "remembers"
+    users ||--o{ agent_memory_entries : "scoped to"
+    conversations ||--o{ agent_memory_entries : "scoped to"
+
+    agent_knowledge_collections {
+        uuid id PK
+        uuid agent_id FK
+        uuid knowledge_collection_id FK
+        uuid org_id FK
+        timestamptz created_at
+        timestamptz deleted_at
+    }
+
+    agents ||--o{ agent_knowledge_collections : "retrieves from"
+    knowledge_collections ||--o{ agent_knowledge_collections : "attached to"
+
+    %% --- 12. MCP Servers ---
+
+    mcp_servers {
+        uuid id PK
+        uuid org_id FK
+        text name
+        text description
+        text url
+        text auth_type
+        text auth_token_encrypted
+        boolean is_approved
+        boolean is_enabled
+        text health_status
+        timestamptz last_health_check_at
+        uuid registered_by_id FK
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ mcp_servers : "registers"
+    users ||--o{ mcp_servers : "registers"
+    agent_mcp_servers }o--|| mcp_servers : "references"
+
+    mcp_tools {
+        uuid id PK
+        uuid mcp_server_id FK
+        uuid org_id FK
+        text name
+        text description
+        jsonb input_schema
+        boolean is_enabled
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    mcp_servers ||--o{ mcp_tools : "exposes"
+
+    %% --- 13. Tools ---
+
+    tools {
+        uuid id PK
+        uuid org_id FK
+        text name
+        text description
+        text type
+        jsonb openapi_spec
+        jsonb function_schema
+        boolean is_approved
+        boolean is_enabled
+        uuid registered_by_id FK
+        integer current_version
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ tools : "registers"
+    users ||--o{ tools : "registers"
+    agent_tools }o--|| tools : "references"
+
+    tool_versions {
+        uuid id PK
+        uuid tool_id FK
+        uuid org_id FK
+        integer version
+        jsonb function_schema
+        jsonb openapi_spec
+        text changelog
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    tools ||--o{ tool_versions : "versioned as"
+
+    tool_calls {
+        uuid id PK
+        uuid message_id FK
+        uuid conversation_id FK
+        uuid org_id FK
+        uuid tool_id FK
+        uuid mcp_tool_id FK
+        text tool_name
+        jsonb input
+        jsonb output
+        text status
+        uuid approved_by_id FK
+        timestamptz approved_at
+        integer duration_ms
+        text error_message
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    messages ||--o{ tool_calls : "invokes"
+    tools ||--o{ tool_calls : "called via"
+    mcp_tools ||--o{ tool_calls : "called via"
+
+    %% --- 14. Artifacts ---
+
+    artifacts {
+        uuid id PK
+        uuid message_id FK
+        uuid conversation_id FK
+        uuid org_id FK
+        text type
+        text title
+        text content
+        uuid file_id FK
+        text language
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    messages ||--o{ artifacts : "produces"
+    files ||--o{ artifacts : "stored as"
+
+    %% --- 15. Workflows ---
+
+    workflows {
+        uuid id PK
+        uuid org_id FK
+        text temporal_workflow_id
+        text temporal_run_id
+        text type
+        text status
+        uuid conversation_id FK
+        uuid agent_id FK
+        uuid initiated_by_id FK
+        jsonb input
+        jsonb output
+        text error_message
+        jsonb progress
+        timestamptz started_at
+        timestamptz completed_at
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ workflows : "scopes"
+    conversations ||--o{ workflows : "triggers"
+    agents ||--o{ workflows : "runs via"
+    users ||--o{ workflows : "initiates"
+
+    %% --- 16. Audit Logs ---
+
+    audit_logs {
+        uuid id PK
+        uuid org_id FK
+        uuid actor_id FK
+        text actor_type
+        uuid impersonator_id FK
+        text action
+        text resource_type
+        uuid resource_id
+        jsonb details
+        inet ip_address
+        text user_agent
+        timestamptz created_at
+    }
+
+    organisations ||--o{ audit_logs : "records"
+    users ||--o{ audit_logs : "performs"
+
+    %% --- 17. Notifications ---
+
+    notifications {
+        uuid id PK
+        uuid org_id FK
+        uuid user_id FK
+        text type
+        text title
+        text body
+        text resource_type
+        uuid resource_id
+        text channel
+        boolean is_read
+        timestamptz read_at
+        timestamptz sent_at
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ notifications : "scopes"
+    users ||--o{ notifications : "receives"
+
+    notification_preferences {
+        uuid id PK
+        uuid user_id FK
+        uuid org_id FK
+        text notification_type
+        text channel
+        boolean is_enabled
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    users ||--o{ notification_preferences : "configures"
+
+    %% --- 18. Usage Stats ---
+
+    usage_stats {
+        uuid id PK
+        uuid org_id FK
+        uuid user_id FK
+        uuid group_id FK
+        uuid model_id FK
+        text period
+        timestamptz period_start
+        bigint prompt_tokens
+        bigint completion_tokens
+        bigint total_tokens
+        integer cost_cents
+        integer request_count
+        integer error_count
+        integer avg_latency_ms
+        bigint storage_bytes
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ usage_stats : "tracks"
+    users ||--o{ usage_stats : "tracked for"
+    groups ||--o{ usage_stats : "tracked for"
+
+    %% --- 19. Models & Providers ---
+
+    model_providers {
+        uuid id PK
+        uuid org_id FK
+        text name
+        text type
+        text api_base_url
+        text api_key_encrypted
+        jsonb litellm_params
+        boolean is_enabled
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ model_providers : "configures"
+
+    models {
+        uuid id PK
+        uuid org_id FK
+        uuid model_provider_id FK
+        text name
+        text model_id_external
+        jsonb capabilities
+        integer context_window
+        numeric cost_per_prompt_token_cents
+        numeric cost_per_completion_token_cents
+        boolean is_default
+        boolean is_fallback
+        integer fallback_order
+        boolean is_enabled
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    model_providers ||--o{ models : "provides"
+    conversations }o--o| models : "uses"
+    agents }o--o| models : "configured with"
+    knowledge_collections }o--o| models : "embeds with"
+    usage_stats }o--o| models : "tracked for"
+    workspaces }o--o| models : "defaults to"
+
+    %% --- 20. Content Moderation & DLP ---
+
+    content_filters {
+        uuid id PK
+        uuid org_id FK
+        text name
+        text type
+        text pattern
+        text action
+        text severity
+        boolean is_enabled
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ content_filters : "enforces"
+
+    dlp_rules {
+        uuid id PK
+        uuid org_id FK
+        text name
+        text description
+        text detector_type
+        text pattern
+        jsonb keywords
+        text action
+        text applies_to
+        boolean is_enabled
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ dlp_rules : "enforces"
+
+    %% --- 21. Prompt Templates ---
+
+    prompt_templates {
+        uuid id PK
+        uuid org_id FK
+        uuid owner_id FK
+        text name
+        text description
+        text content
+        jsonb variables
+        text system_prompt
+        text first_message
+        text category
+        jsonb tags
+        text visibility
+        boolean is_approved
+        integer current_version
+        uuid forked_from_template_id FK
+        integer usage_count
+        numeric avg_rating
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ prompt_templates : "scopes"
+    users ||--o{ prompt_templates : "creates"
+    prompt_templates ||--o{ prompt_templates : "forked from"
+
+    prompt_template_versions {
+        uuid id PK
+        uuid prompt_template_id FK
+        uuid org_id FK
+        integer version
+        text content
+        jsonb variables
+        text system_prompt
+        text changelog
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    prompt_templates ||--o{ prompt_template_versions : "versioned as"
+
+    %% --- 22. Integrations ---
+
+    integrations {
+        uuid id PK
+        uuid org_id FK
+        text type
+        text name
+        jsonb config
+        text credentials_encrypted
+        boolean is_enabled
+        text status
+        timestamptz last_sync_at
+        uuid configured_by_id FK
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ integrations : "connects"
+    users ||--o{ integrations : "configures"
+
+    %% --- 23. Keyboard Shortcuts ---
+
+    user_keyboard_shortcuts {
+        uuid id PK
+        uuid user_id FK
+        uuid org_id FK
+        text action
+        text keybinding
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    users ||--o{ user_keyboard_shortcuts : "customises"
+
+    %% --- 24. System Health ---
+
+    system_health_checks {
+        uuid id PK
+        text service
+        text status
+        integer response_time_ms
+        jsonb details
+        uuid checked_by_id FK
+        timestamptz created_at
+    }
+
+    %% --- 25. Data Jobs ---
+
+    data_jobs {
+        uuid id PK
+        uuid org_id FK
+        uuid user_id FK
+        text type
+        text status
+        uuid source_file_id FK
+        uuid result_file_id FK
+        integer progress_pct
+        text error_message
+        jsonb metadata
+        uuid workflow_id FK
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ data_jobs : "scopes"
+    users ||--o{ data_jobs : "requests"
+    files ||--o{ data_jobs : "source for"
+    workflows ||--o{ data_jobs : "powered by"
+
+    %% --- 26. Invitations ---
+
+    invitations {
+        uuid id PK
+        uuid org_id FK
+        text email
+        text role
+        jsonb group_ids
+        uuid invited_by_id FK
+        text token_hash
+        timestamptz expires_at
+        timestamptz accepted_at
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ invitations : "sends"
+    users ||--o{ invitations : "invites"
+
+    %% --- 27. Rate Limiting ---
+
+    rate_limit_rules {
+        uuid id PK
+        uuid org_id FK
+        text scope
+        uuid target_id
+        integer window_seconds
+        integer max_requests
+        bigint max_tokens
+        boolean is_enabled
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ rate_limit_rules : "configures"
+
+    %% --- 28. Sandbox Executions ---
+
+    sandbox_executions {
+        uuid id PK
+        uuid org_id FK
+        uuid tool_call_id FK
+        uuid message_id FK
+        text language
+        text code
+        text stdout
+        text stderr
+        integer exit_code
+        integer duration_ms
+        bigint memory_used_bytes
+        text sandbox_backend
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ sandbox_executions : "scopes"
+    tool_calls ||--o| sandbox_executions : "executes in"
+    messages ||--o{ sandbox_executions : "triggers"
+
+    %% --- 29. Research Reports ---
+
+    research_reports {
+        uuid id PK
+        uuid org_id FK
+        uuid conversation_id FK
+        uuid workflow_id FK
+        uuid user_id FK
+        text query
+        jsonb config
+        text report_content
+        jsonb sources
+        text status
+        uuid file_id FK
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    organisations ||--o{ research_reports : "scopes"
+    conversations ||--o{ research_reports : "produces"
+    workflows ||--o| research_reports : "powered by"
+    users ||--o{ research_reports : "requests"
+    files ||--o{ research_reports : "exported as"

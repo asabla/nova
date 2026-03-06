@@ -1,0 +1,76 @@
+graph TB
+    subgraph External Users
+        Browser["Browser\n(React 19 / Vite SPA)"]
+    end
+
+    subgraph External Systems
+        AzureEntra["Azure Entra ID\n(OIDC Provider)"]
+        LiteLLM["LiteLLM\n(Model Gateway)\nPython / FastAPI"]
+        EmailProvider["Email Provider\n(Resend / Postmark / SES)"]
+        MCPServers["External MCP Servers\n(Tool Providers)"]
+    end
+
+    subgraph NOVA System Boundary
+        subgraph API Layer
+            APIServer["API Server\n(Bun + Hono)\nSSE / WS / REST"]
+        end
+
+        subgraph Worker Layer
+            TemporalWorker["Temporal Worker\n(Node.js)\nWorkflow Activities"]
+        end
+
+        subgraph Workflow Orchestration
+            TemporalServer["Temporal Server\n(Go binary)\nPort 7233"]
+            TemporalUI["Temporal UI\nPort 8233"]
+        end
+
+        subgraph Data Stores
+            NovaDB["PostgreSQL 16\n(NOVA DB)\npgvector + pg_trgm"]
+            TemporalDB["PostgreSQL 16\n(Temporal DB)\nInternal state"]
+            Redis["Redis 7.2+\nSessions / Pub-Sub\nRate Limiting"]
+            MinIO["MinIO\n(S3-compatible)\nFile Storage"]
+        end
+
+        subgraph Observability
+            LangFuse["LangFuse v3\n(LLM Tracing)\nOTEL-native"]
+            Prometheus["Prometheus\n(Metrics)"]
+            Grafana["Grafana\n(Dashboards)"]
+            OTELCollector["OTEL Collector"]
+        end
+
+        subgraph Sandbox
+            CodeSandbox["Code Sandbox\nnsjail / gVisor /\nFirecracker"]
+        end
+    end
+
+    Browser -- "HTTPS\nSSE / WebSocket / REST" --> APIServer
+    Browser -- "OIDC Redirect" --> AzureEntra
+    AzureEntra -- "Callback + ID Token" --> APIServer
+
+    APIServer -- "OpenAI-compat API\nStreaming SSE" --> LiteLLM
+    APIServer -- "SMTP / API" --> EmailProvider
+    APIServer -- "MCP Protocol\nstdio / HTTP" --> MCPServers
+    APIServer -- "SQL + pgvector" --> NovaDB
+    APIServer -- "Pub/Sub + Sessions" --> Redis
+    APIServer -- "S3 API\nPresigned URLs" --> MinIO
+    APIServer -- "gRPC\n@temporalio/client" --> TemporalServer
+
+    TemporalServer -- "Internal state" --> TemporalDB
+    TemporalUI -- "gRPC" --> TemporalServer
+
+    TemporalWorker -- "gRPC\n@temporalio/worker" --> TemporalServer
+    TemporalWorker -- "SQL + pgvector" --> NovaDB
+    TemporalWorker -- "S3 API" --> MinIO
+    TemporalWorker -- "Pub/Sub" --> Redis
+    TemporalWorker -- "OpenAI-compat API" --> LiteLLM
+    TemporalWorker -- "Execute code" --> CodeSandbox
+
+    LiteLLM -- "Spend tracking\n(litellm_ tables)" --> NovaDB
+
+    APIServer -- "OTLP traces" --> OTELCollector
+    TemporalWorker -- "OTLP traces" --> OTELCollector
+    LiteLLM -- "OTLP traces" --> OTELCollector
+    OTELCollector -- "LLM traces" --> LangFuse
+    OTELCollector -- "Metrics" --> Prometheus
+    Prometheus -- "Data source" --> Grafana
+    LangFuse -- "Trace storage" --> NovaDB

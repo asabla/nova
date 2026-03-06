@@ -1,0 +1,61 @@
+sequenceDiagram
+    participant Client as Browser (EventSource)
+    participant API as API Server (Hono + Bun)
+    participant DB as PostgreSQL
+    participant LiteLLM as LiteLLM (Model Gateway)
+    participant Redis as Redis (Pub/Sub)
+    participant Client2 as Other Clients (same conversation)
+
+    Note over Client, Client2: SSE Token Streaming Flow
+
+    Client->>API: POST /conversations/{id}/messages { content: "..." }
+
+    API->>DB: INSERT message (role: user, status: created)
+    DB-->>API: messageId
+
+    API->>DB: INSERT message (role: assistant, status: streaming)
+    DB-->>API: assistantMessageId
+
+    API-->>Client: 200 OK SSE stream opens (Content-Type: text/event-stream)
+
+    API->>LiteLLM: POST /chat/completions (stream: true)
+
+    loop Token-by-token streaming
+        LiteLLM-->>API: data: {"choices":[{"delta":{"content":"token"}}]}
+
+        API->>Redis: PUBLISH conv:{id} { type: "token", data: "token" }
+
+        API-->>Client: event: token, data: {"content":"token","messageId":"..."}
+
+        Redis-->>Client2: SSE push via other API pod (fan-out)
+    end
+
+    LiteLLM-->>API: data: [DONE]
+
+    API->>DB: UPDATE message SET content=full_text, status=completed, token_count=N, finished_at=NOW()
+
+    API->>Redis: PUBLISH conv:{id} { type: "stream.done", messageId: "..." }
+
+    API-->>Client: event: stream.done, data: {"messageId":"...","tokenCount":N}
+
+    Note over Client, Client2: Heartbeat (keeps SSE alive, idleTimeout=0)
+
+    loop Every 15 seconds while SSE open
+        API-->>Client: : heartbeat (SSE comment)
+    end
+
+    Note over Client, Client2: Error Recovery
+
+    alt LiteLLM error mid-stream
+        LiteLLM-->>API: HTTP 500 or connection drop
+        API->>DB: UPDATE message SET status=failed, error="..."
+        API->>Redis: PUBLISH conv:{id} { type: "stream.error" }
+        API-->>Client: event: stream.error, data: {"error":"Model unavailable"}
+    end
+
+    alt Client reconnects (EventSource auto-retry)
+        Client->>API: GET /conversations/{id}/events (Last-Event-ID: 42)
+        API->>DB: SELECT tokens WHERE message_id AND seq > 42
+        DB-->>API: Missed tokens
+        API-->>Client: Replay missed events + resume stream
+    end

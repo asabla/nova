@@ -1,0 +1,194 @@
+sequenceDiagram
+    participant Client
+    participant API as API Server
+    participant Temporal as Temporal Server
+    participant Worker as Temporal Worker
+    participant LiteLLM
+    participant Tools as Tool / MCP Server
+    participant Search as Search Tools
+    participant MinIO
+    participant DB as PostgreSQL
+    participant Redis
+    participant Email as Email Provider
+
+    rect rgb(240, 248, 255)
+        Note over Client, DB: 1. AgentRunWorkflow -- LLM call with tool use and human approval
+        Client->>API: POST /conversations/{id}/messages
+        API->>DB: Insert user Message row
+        API->>Temporal: startWorkflow("AgentRunWorkflow", input)
+        API-->>Client: 202 Accepted (workflowId)
+
+        loop Agent Loop (until no more tool calls)
+            Temporal->>Worker: Execute runLLMActivity
+            Worker->>LiteLLM: chat.completions.create (streaming)
+            LiteLLM-->>Worker: Token stream + tool_calls[]
+            Worker->>DB: Upsert assistant Message (streamed tokens)
+            Worker-->>Temporal: Return tool_calls[] or final response
+
+            alt Tool calls present
+                alt Tool requires human approval
+                    Temporal->>API: Signal: approval_requested
+                    API-->>Client: SSE event: approval_requested
+                    Client->>API: POST /workflows/{id}/approve
+                    API->>Temporal: Signal: approval_granted
+                end
+
+                Temporal->>Worker: Execute toolCallActivity
+                Worker->>Tools: Invoke tool / MCP server
+                Tools-->>Worker: Tool result
+                Worker->>DB: Insert tool result Message
+                Worker-->>Temporal: Tool results (feed back to LLM)
+            end
+        end
+
+        Temporal->>Worker: Execute finalizeActivity
+        Worker->>DB: Update Message status = completed
+        Worker->>API: Signal: workflow_complete
+        API-->>Client: SSE event: stream.done
+    end
+
+    rect rgb(255, 248, 240)
+        Note over Client, DB: 2. DeepResearchWorkflow -- Parallel search, synthesis, citations
+        Client->>API: POST /research (query, depth)
+        API->>Temporal: startWorkflow("DeepResearchWorkflow", query)
+        API-->>Client: 202 Accepted (workflowId)
+
+        Temporal->>Worker: Execute planSearchActivity
+        Worker->>LiteLLM: Generate search sub-queries
+        LiteLLM-->>Worker: sub-queries[]
+        Worker-->>Temporal: SearchPlan
+
+        par Parallel Search Execution
+            Temporal->>Worker: Execute searchActivity(query_1)
+            Worker->>Search: Web search / knowledge base
+            Search-->>Worker: Results batch 1
+        and
+            Temporal->>Worker: Execute searchActivity(query_2)
+            Worker->>Search: Web search / knowledge base
+            Search-->>Worker: Results batch 2
+        and
+            Temporal->>Worker: Execute searchActivity(query_N)
+            Worker->>Search: Web search / knowledge base
+            Search-->>Worker: Results batch N
+        end
+
+        Temporal->>Worker: Execute synthesisActivity
+        Worker->>LiteLLM: Synthesize all results into report
+        LiteLLM-->>Worker: Draft report with inline refs
+        Worker-->>Temporal: DraftReport
+
+        Temporal->>Worker: Execute citationActivity
+        Worker->>LiteLLM: Extract and format citations
+        LiteLLM-->>Worker: Verified citations[]
+        Worker-->>Temporal: CitedReport
+
+        Temporal->>Worker: Execute finalizeReportActivity
+        Worker->>DB: Store report + citations + sources
+        Worker-->>Temporal: Complete
+
+        API-->>Client: SSE event: research.done (reportId)
+    end
+
+    rect rgb(240, 255, 240)
+        Note over Client, DB: 3. FileIngestionWorkflow -- Extract, chunk, embed, upsert
+        Client->>API: POST /knowledge/{collectionId}/documents (file)
+        API->>MinIO: Upload raw file
+        API->>DB: Insert Document row (status: processing)
+        API->>Temporal: startWorkflow("FileIngestionWorkflow", docId)
+        API-->>Client: 202 Accepted (documentId)
+
+        Temporal->>Worker: Execute extractTextActivity
+        Worker->>MinIO: Download raw file
+        Worker->>Worker: Parse PDF / DOCX / MD / TXT / HTML
+        Worker-->>Temporal: ExtractedText
+
+        Temporal->>Worker: Execute chunkActivity
+        Worker->>Worker: Split into chunks (token-aware, overlap)
+        Worker-->>Temporal: Chunk[]
+
+        Temporal->>Worker: Execute embedActivity
+        Worker->>LiteLLM: POST /embeddings (batch)
+        LiteLLM-->>Worker: vector[]
+        Worker-->>Temporal: EmbeddedChunk[]
+
+        Temporal->>Worker: Execute upsertActivity
+        Worker->>DB: Bulk INSERT chunks + vectors (pgvector)
+        Worker->>DB: Update Document status = ready
+        Worker-->>Temporal: Complete
+
+        API-->>Client: SSE event: document.ready
+    end
+
+    rect rgb(255, 240, 255)
+        Note over Client, DB: 4. KnowledgeReindexWorkflow -- Re-embed all documents in collection
+        Client->>API: POST /knowledge/{collectionId}/reindex
+        API->>Temporal: startWorkflow("KnowledgeReindexWorkflow", collectionId)
+        API-->>Client: 202 Accepted (workflowId)
+
+        Temporal->>Worker: Execute listDocumentsActivity
+        Worker->>DB: SELECT documents WHERE collection_id = X
+        Worker-->>Temporal: documentIds[]
+
+        loop For each document (batched)
+            Temporal->>Worker: Execute reindexDocumentActivity(docId)
+            Worker->>DB: Load existing chunks for document
+            Worker->>LiteLLM: POST /embeddings (re-embed chunks)
+            LiteLLM-->>Worker: New vectors
+            Worker->>DB: UPDATE chunk vectors (pgvector)
+            Worker-->>Temporal: Progress update
+        end
+
+        Temporal->>Worker: Execute rebuildIndexActivity
+        Worker->>DB: REINDEX HNSW index on collection partition
+        Worker->>DB: Update collection metadata (last_reindexed_at)
+        Worker-->>Temporal: Complete
+
+        API-->>Client: SSE event: reindex.complete
+    end
+
+    rect rgb(255, 255, 230)
+        Note over Client, Email: 5. ScheduledAgentWorkflow -- Cron-triggered agent run
+        Note right of Temporal: Triggered by Temporal cron schedule
+        Temporal->>Worker: Execute loadScheduleActivity
+        Worker->>DB: Load agent config + schedule context
+        Worker-->>Temporal: AgentConfig + last run context
+
+        Temporal->>Worker: Execute runScheduledAgentActivity
+        Worker->>LiteLLM: chat.completions.create (with system prompt)
+        LiteLLM-->>Worker: Agent response
+        Worker-->>Temporal: AgentResult
+
+        Temporal->>Worker: Execute persistResultActivity
+        Worker->>DB: Insert Conversation + Messages
+        Worker->>DB: Update schedule (last_run_at, next_run_at)
+        Worker-->>Temporal: Stored
+
+        alt Agent produced actionable output
+            Temporal->>Temporal: Start child NotificationWorkflow
+        end
+    end
+
+    rect rgb(230, 245, 255)
+        Note over Client, Email: 6. NotificationWorkflow -- Multi-channel notification delivery
+        Note right of Temporal: Started by parent workflow or API
+
+        Temporal->>Worker: Execute resolveRecipientsActivity
+        Worker->>DB: Load user preferences + notification settings
+        Worker-->>Temporal: Recipients with preferred channels
+
+        par Parallel channel delivery
+            Temporal->>Worker: Execute inAppNotifyActivity
+            Worker->>DB: INSERT notification row
+            Worker->>Redis: PUBLISH notification channel
+            Note right of Redis: SSE push to connected clients
+        and
+            Temporal->>Worker: Execute emailNotifyActivity
+            Worker->>Email: Send transactional email
+            Email-->>Worker: Delivery status
+            Worker->>DB: Update notification (email_sent_at)
+        end
+
+        Temporal->>Worker: Execute markDeliveredActivity
+        Worker->>DB: Update notification status = delivered
+        Worker-->>Temporal: Complete
+    end

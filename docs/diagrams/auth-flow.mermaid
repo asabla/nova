@@ -1,0 +1,66 @@
+sequenceDiagram
+    participant Browser
+    participant API as API Server (Hono + Better Auth)
+    participant Entra as Azure Entra ID (OIDC)
+    participant DB as PostgreSQL (NOVA DB)
+    participant Redis
+
+    Note over Browser, Redis: Azure Entra ID OIDC Login Flow
+
+    Browser->>API: GET /auth/sso/entra
+    API->>API: Generate state + PKCE code_verifier
+    API->>Redis: Store state + code_verifier (TTL 10 min)
+    API-->>Browser: 302 Redirect to Entra /authorize
+
+    Browser->>Entra: GET /authorize (client_id, redirect_uri, response_type=code, scope=openid profile email, state, code_challenge)
+    Entra-->>Browser: Login page (credentials / MFA)
+
+    Browser->>Entra: Submit credentials
+    Entra-->>Browser: 302 Redirect to /auth/callback/entra?code=X&state=Y
+
+    Browser->>API: GET /auth/callback/entra?code=X&state=Y
+
+    API->>Redis: Retrieve + validate state + code_verifier
+    Redis-->>API: Stored state + code_verifier
+
+    API->>Entra: POST /token (code, code_verifier, client_secret)
+    Entra-->>API: id_token + access_token + refresh_token
+
+    API->>API: Validate id_token signature via JWKS
+    API->>API: Extract claims (sub, email, name, oid)
+
+    alt User exists in DB
+        API->>DB: SELECT user WHERE entra_oid = claims.sub
+        DB-->>API: Existing user record
+    else New user (first login)
+        API->>DB: INSERT user (email, name, entra_oid)
+        API->>DB: INSERT org_member (default org, role: member)
+        DB-->>API: New user record
+    end
+
+    API->>DB: INSERT session (user_id, expires_at)
+    DB-->>API: Session record
+
+    API->>Redis: Cache session (TTL matches expiry)
+
+    API-->>Browser: 302 Redirect to /app + Set-Cookie: session_token (HttpOnly, Secure, SameSite=Lax)
+
+    Note over Browser, Redis: Subsequent API Requests
+
+    Browser->>API: GET /api/conversations (Cookie: session_token)
+    API->>Redis: Lookup session (cache hit)
+    Redis-->>API: Session + user context
+    API->>API: Inject tenant context (org_id, role)
+    API-->>Browser: 200 OK (data)
+
+    Note over Browser, Redis: Session Refresh
+
+    Browser->>API: GET /auth/session
+    API->>API: Check session expiry
+    alt Session near expiry
+        API->>DB: UPDATE session (extend expires_at)
+        API->>Redis: Update cached session
+        API-->>Browser: 200 OK (refreshed session)
+    else Session valid
+        API-->>Browser: 200 OK (current session)
+    end
