@@ -31,6 +31,9 @@ import { toolRoutes } from "./routes/tools";
 import { mcpRoutes } from "./routes/mcp";
 import { exportRoutes } from "./routes/export";
 import { v1ChatRoutes } from "./routes/v1-chat";
+import { sandboxRoutes } from "./routes/sandbox";
+import { researchRoutes } from "./routes/research";
+import { contentFilter } from "./middleware/content-filter";
 
 const app = new Hono<AppContext>();
 
@@ -65,6 +68,9 @@ app.use("/api/*", authMiddleware());
 // 9. Org scoping
 app.use("/api/*", orgScope());
 
+// 10. Content filtering
+app.use("/api/*", contentFilter());
+
 // 10. Authenticated routes
 app.route("/api/conversations", conversationRoutes);
 app.route("/api/conversations", messageRoutes);
@@ -85,5 +91,7 @@ app.route("/api/tools", toolRoutes);
 app.route("/api/mcp", mcpRoutes);
 app.route("/api/export", exportRoutes);
 app.route("/v1/chat", v1ChatRoutes);
+app.route("/api/sandbox", sandboxRoutes);
+app.route("/api/research", researchRoutes);
 
 export { app };
