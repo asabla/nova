@@ -29,6 +29,8 @@ const envSchema = z.object({
   LANGFUSE_PUBLIC_KEY: z.string().optional(),
   LANGFUSE_SECRET_KEY: z.string().optional(),
   LANGFUSE_HOST: z.string().optional(),
+
+  APP_VERSION: z.string().default("0.1.0"),
 });
 
 export type Env = z.infer<typeof envSchema>;

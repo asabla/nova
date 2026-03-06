@@ -35,6 +35,13 @@ import { sandboxRoutes } from "./routes/sandbox";
 import { researchRoutes } from "./routes/research";
 import { contentFilter } from "./middleware/content-filter";
 import { importRoutes } from "./routes/import";
+import { groupRoutes } from "./routes/groups";
+import { folderRoutes } from "./routes/conversation-folders";
+import { ssoRoutes } from "./routes/sso";
+import { gdprRoutes } from "./routes/gdpr";
+import { memoryRoutes } from "./routes/memory";
+import { agentToolRoutes } from "./routes/agent-tools";
+import { batchRoutes } from "./routes/batch";
 
 const app = new Hono<AppContext>();
 
@@ -95,5 +102,12 @@ app.route("/v1/chat", v1ChatRoutes);
 app.route("/api/sandbox", sandboxRoutes);
 app.route("/api/research", researchRoutes);
 app.route("/api/import", importRoutes);
+app.route("/api/groups", groupRoutes);
+app.route("/api/conversations", folderRoutes);
+app.route("/api/sso", ssoRoutes);
+app.route("/api/gdpr", gdprRoutes);
+app.route("/api/agents", memoryRoutes);
+app.route("/api/agents", agentToolRoutes);
+app.route("/api/batch", batchRoutes);
 
 export { app };
