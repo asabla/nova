@@ -19,6 +19,8 @@
     "rehype-katex": "^7.0.1",
     "remark-math": "^6.0.0",
     "remark-gfm": "^4.0.0",
+    "mermaid": "^11.4.1",
+    "katex": "^0.16.21",
     "dompurify": "^3.2.6",
     "react-dropzone": "^14.3.8",
     "reconnecting-websocket": "^4.4.0",
