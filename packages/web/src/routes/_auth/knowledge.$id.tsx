@@ -18,10 +18,12 @@ import {
   Clock,
   AlertCircle,
   ChevronDown,
+  ChevronRight,
   FileUp,
   Globe,
   Layers,
   Zap,
+  Type,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "../../components/ui/Button";
@@ -38,16 +40,25 @@ type TabId = "documents" | "settings" | "test" | "activity";
 
 interface KnowledgeDocument {
   id: string;
-  name: string;
-  type: "file" | "url";
-  url?: string;
-  mimeType?: string;
-  size?: number;
-  chunkCount: number;
+  title: string;
+  sourceUrl?: string;
+  fileId?: string;
   status: "pending" | "indexing" | "ready" | "error";
-  error?: string;
+  errorMessage?: string;
+  tokenCount?: number;
+  chunkCount?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+interface KnowledgeChunk {
+  id: string;
+  knowledgeDocumentId: string;
+  chunkIndex: number;
+  content: string;
+  tokenCount?: number;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
 }
 
 interface IndexingJob {
@@ -68,6 +79,7 @@ interface RetrievedChunk {
   documentName: string;
   content: string;
   score: number;
+  chunkIndex: number;
   metadata?: Record<string, unknown>;
 }
 
@@ -76,19 +88,13 @@ interface KnowledgeCollection {
   name: string;
   description?: string;
   status: string;
-  embeddingModel: string;
+  embeddingModelId?: string;
   chunkSize: number;
   chunkOverlap: number;
-  documentCount: number;
-  chunkCount: number;
+  version: number;
+  lastIndexedAt?: string;
   createdAt: string;
   updatedAt: string;
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function formatRelativeTime(dateStr: string): string {
@@ -113,10 +119,14 @@ function KnowledgeDetailPage() {
 
   const [activeTab, setActiveTab] = useState<TabId>("documents");
   const [showUrlInput, setShowUrlInput] = useState(false);
+  const [showContentInput, setShowContentInput] = useState(false);
   const [urlValue, setUrlValue] = useState("");
+  const [contentTitle, setContentTitle] = useState("");
+  const [contentValue, setContentValue] = useState("");
   const [testQuery, setTestQuery] = useState("");
   const [testResults, setTestResults] = useState<RetrievedChunk[] | null>(null);
   const [testLoading, setTestLoading] = useState(false);
+  const [expandedDocId, setExpandedDocId] = useState<string | null>(null);
 
   const { data: collection, isLoading } = useQuery({
     queryKey: queryKeys.knowledge.detail(id),
@@ -134,8 +144,16 @@ function KnowledgeDetailPage() {
     enabled: activeTab === "activity",
   });
 
+  // Chunks for expanded document
+  const { data: chunksData } = useQuery({
+    queryKey: [...queryKeys.knowledge.detail(id), "chunks", expandedDocId],
+    queryFn: () => api.get<{ data: KnowledgeChunk[] }>(`/api/knowledge/${id}/documents/${expandedDocId}/chunks`),
+    enabled: !!expandedDocId,
+  });
+
   const documents: KnowledgeDocument[] = (documentsData as any)?.data ?? [];
   const jobs: IndexingJob[] = (activityData as any)?.data ?? [];
+  const chunks: KnowledgeChunk[] = (chunksData as any)?.data ?? [];
 
   const [form, setForm] = useState({
     name: "",
@@ -151,15 +169,29 @@ function KnowledgeDetailPage() {
       setForm({
         name: col.name ?? "",
         description: col.description ?? "",
-        embeddingModel: col.embeddingModel ?? "text-embedding-3-small",
+        embeddingModel: col.embeddingModelId ?? "text-embedding-3-small",
         chunkSize: col.chunkSize ?? 512,
         chunkOverlap: col.chunkOverlap ?? 50,
       });
     }
   }, [collection]);
 
+  // Mutations
   const updateMutation = useMutation({
-    mutationFn: (data: typeof form) => api.patch(`/api/knowledge/${id}`, data),
+    mutationFn: (data: typeof form) => {
+      // Update name/description via PATCH /:id
+      const nameDescPromise = api.patch(`/api/knowledge/${id}`, {
+        name: data.name,
+        description: data.description,
+      });
+      // Update embedding config via PATCH /:id/config
+      const configPromise = api.patch(`/api/knowledge/${id}/config`, {
+        embeddingModel: data.embeddingModel,
+        chunkSize: data.chunkSize,
+        chunkOverlap: data.chunkOverlap,
+      });
+      return Promise.all([nameDescPromise, configPromise]);
+    },
     onSuccess: () => {
       toast("Collection updated", "success");
       queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.detail(id) });
@@ -204,7 +236,7 @@ function KnowledgeDetailPage() {
 
   const addUrlMutation = useMutation({
     mutationFn: (url: string) =>
-      api.post(`/api/knowledge/${id}/documents`, { type: "url", url }),
+      api.post(`/api/knowledge/${id}/documents`, { title: url, sourceUrl: url }),
     onSuccess: () => {
       toast("URL added successfully", "success");
       setUrlValue("");
@@ -215,10 +247,25 @@ function KnowledgeDetailPage() {
     onError: (err: any) => toast(err.message ?? "Failed to add URL", "error"),
   });
 
+  const addContentMutation = useMutation({
+    mutationFn: (data: { title: string; content: string }) =>
+      api.post(`/api/knowledge/${id}/documents`, { title: data.title }),
+    onSuccess: () => {
+      toast("Document added successfully", "success");
+      setContentTitle("");
+      setContentValue("");
+      setShowContentInput(false);
+      queryClient.invalidateQueries({ queryKey: [...queryKeys.knowledge.detail(id), "documents"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.detail(id) });
+    },
+    onError: (err: any) => toast(err.message ?? "Failed to add document", "error"),
+  });
+
   const deleteDocMutation = useMutation({
     mutationFn: (docId: string) => api.delete(`/api/knowledge/${id}/documents/${docId}`),
     onSuccess: () => {
       toast("Document removed", "success");
+      setExpandedDocId(null);
       queryClient.invalidateQueries({ queryKey: [...queryKeys.knowledge.detail(id), "documents"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.detail(id) });
     },
@@ -275,6 +322,16 @@ function KnowledgeDetailPage() {
     addUrlMutation.mutate(trimmed);
   };
 
+  const handleContentSubmit = () => {
+    const title = contentTitle.trim();
+    const content = contentValue.trim();
+    if (!title || !content) {
+      toast("Title and content are required", "error");
+      return;
+    }
+    addContentMutation.mutate({ title, content });
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -285,12 +342,13 @@ function KnowledgeDetailPage() {
 
   const tabs = [
     { id: "documents" as const, label: "Documents", icon: FileText },
+    { id: "test" as const, label: "Query Test", icon: TestTube },
     { id: "settings" as const, label: "Settings", icon: Settings2 },
-    { id: "test" as const, label: "Test", icon: TestTube },
     { id: "activity" as const, label: "Activity", icon: Activity },
   ];
 
   const col = collection as KnowledgeCollection | undefined;
+  const totalChunks = documents.reduce((sum, d) => sum + (d.chunkCount ?? 0), 0);
 
   return (
     <div className="flex flex-col h-full">
@@ -309,11 +367,11 @@ function KnowledgeDetailPage() {
           <div>
             <h1 className="text-lg font-semibold text-text">{col?.name ?? "Collection"}</h1>
             <p className="text-sm text-text-secondary">
-              {col?.documentCount ?? 0} documents, {col?.chunkCount ?? 0} chunks
+              {documents.length} documents, {totalChunks} chunks
             </p>
           </div>
           {col?.status && (
-            <Badge variant={col.status === "ready" ? "success" : col.status === "indexing" ? "warning" : "default"}>
+            <Badge variant={col.status === "active" || col.status === "ready" ? "success" : col.status === "indexing" ? "warning" : "default"}>
               {col.status}
             </Badge>
           )}
@@ -380,9 +438,13 @@ function KnowledgeDetailPage() {
                 <FileUp className="h-3.5 w-3.5" />
                 {uploadMutation.isPending ? "Uploading..." : "Upload Files"}
               </Button>
-              <Button variant="secondary" size="sm" onClick={() => setShowUrlInput(!showUrlInput)}>
+              <Button variant="secondary" size="sm" onClick={() => { setShowUrlInput(!showUrlInput); setShowContentInput(false); }}>
                 <Globe className="h-3.5 w-3.5" />
                 Add URL
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => { setShowContentInput(!showContentInput); setShowUrlInput(false); }}>
+                <Type className="h-3.5 w-3.5" />
+                Paste Content
               </Button>
             </div>
 
@@ -399,32 +461,51 @@ function KnowledgeDetailPage() {
                     className="flex-1 bg-transparent text-text text-sm outline-none placeholder:text-text-tertiary"
                     onKeyDown={(e) => {
                       if (e.key === "Enter") handleUrlSubmit();
-                      if (e.key === "Escape") {
-                        setShowUrlInput(false);
-                        setUrlValue("");
-                      }
+                      if (e.key === "Escape") { setShowUrlInput(false); setUrlValue(""); }
                     }}
                     autoFocus
                   />
                 </div>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleUrlSubmit}
-                  disabled={addUrlMutation.isPending || !urlValue.trim()}
-                >
+                <Button variant="primary" size="sm" onClick={handleUrlSubmit} disabled={addUrlMutation.isPending || !urlValue.trim()}>
                   {addUrlMutation.isPending ? "Adding..." : "Add"}
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setShowUrlInput(false);
-                    setUrlValue("");
-                  }}
-                >
+                <Button variant="ghost" size="sm" onClick={() => { setShowUrlInput(false); setUrlValue(""); }}>
                   <X className="h-3.5 w-3.5" />
                 </Button>
+              </div>
+            )}
+
+            {/* Content paste input */}
+            {showContentInput && (
+              <div className="space-y-2 p-4 rounded-lg border border-border bg-surface">
+                <input
+                  type="text"
+                  value={contentTitle}
+                  onChange={(e) => setContentTitle(e.target.value)}
+                  placeholder="Document title"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm outline-none placeholder:text-text-tertiary"
+                  autoFocus
+                />
+                <textarea
+                  value={contentValue}
+                  onChange={(e) => setContentValue(e.target.value)}
+                  placeholder="Paste document content here..."
+                  rows={6}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm outline-none placeholder:text-text-tertiary resize-y"
+                />
+                <div className="flex items-center justify-end gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => { setShowContentInput(false); setContentTitle(""); setContentValue(""); }}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleContentSubmit}
+                    disabled={addContentMutation.isPending || !contentTitle.trim() || !contentValue.trim()}
+                  >
+                    {addContentMutation.isPending ? "Adding..." : "Add Document"}
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -436,63 +517,202 @@ function KnowledgeDetailPage() {
                 </div>
                 <h3 className="text-base font-medium text-text mb-1">No documents yet</h3>
                 <p className="text-sm text-text-secondary max-w-sm">
-                  Upload files or add URLs to build this knowledge collection.
+                  Upload files, add URLs, or paste content to build this knowledge collection.
                 </p>
               </div>
             ) : (
               <div className="space-y-1">
-                {documents.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="flex items-center justify-between px-4 py-3 rounded-lg border border-border bg-surface hover:bg-surface-secondary transition-colors group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-8 w-8 rounded-lg bg-surface-secondary flex items-center justify-center shrink-0">
-                        {doc.type === "url" ? (
-                          <Globe className="h-4 w-4 text-text-tertiary" />
-                        ) : (
-                          <FileText className="h-4 w-4 text-text-tertiary" />
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-text truncate">{doc.name}</p>
-                        <div className="flex items-center gap-2 text-xs text-text-tertiary">
-                          {doc.type === "url" && doc.url && (
-                            <span className="truncate max-w-[200px]">{doc.url}</span>
-                          )}
-                          {doc.size != null && <span>{formatFileSize(doc.size)}</span>}
-                          <span>{doc.chunkCount} chunks</span>
-                          <span>{formatRelativeTime(doc.createdAt)}</span>
+                {documents.map((doc) => {
+                  const isExpanded = expandedDocId === doc.id;
+                  return (
+                    <div key={doc.id} className="rounded-lg border border-border bg-surface overflow-hidden">
+                      <div
+                        className="flex items-center justify-between px-4 py-3 hover:bg-surface-secondary transition-colors group cursor-pointer"
+                        onClick={() => setExpandedDocId(isExpanded ? null : doc.id)}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <button className="shrink-0 p-0.5">
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4 text-text-tertiary" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-text-tertiary" />
+                            )}
+                          </button>
+                          <div className="h-8 w-8 rounded-lg bg-surface-secondary flex items-center justify-center shrink-0">
+                            {doc.sourceUrl ? (
+                              <Globe className="h-4 w-4 text-text-tertiary" />
+                            ) : (
+                              <FileText className="h-4 w-4 text-text-tertiary" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-text truncate">{doc.title ?? "Untitled"}</p>
+                            <div className="flex items-center gap-2 text-xs text-text-tertiary">
+                              {doc.sourceUrl && (
+                                <span className="truncate max-w-[200px]">{doc.sourceUrl}</span>
+                              )}
+                              <span>{doc.chunkCount ?? 0} chunks</span>
+                              {doc.tokenCount != null && <span>{doc.tokenCount} tokens</span>}
+                              <span>{formatRelativeTime(doc.createdAt)}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={
+                              doc.status === "ready"
+                                ? "success"
+                                : doc.status === "indexing"
+                                  ? "warning"
+                                  : doc.status === "error"
+                                    ? "danger"
+                                    : "default"
+                            }
+                          >
+                            {doc.status}
+                          </Badge>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Remove "${doc.title}" from this collection?`)) {
+                                deleteDocMutation.mutate(doc.id);
+                              }
+                            }}
+                            className="p-1.5 rounded hover:bg-surface-tertiary text-text-tertiary hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </div>
+
+                      {/* Expanded: show chunks */}
+                      {isExpanded && (
+                        <div className="border-t border-border px-4 py-3 bg-surface-secondary/50">
+                          {doc.errorMessage && (
+                            <div className="mb-3 px-3 py-2 rounded bg-danger/5 text-xs text-danger">
+                              {doc.errorMessage}
+                            </div>
+                          )}
+                          {chunks.length === 0 ? (
+                            <p className="text-sm text-text-tertiary py-4 text-center">
+                              {doc.status === "pending" ? "Document is pending indexing." : "No chunks found."}
+                            </p>
+                          ) : (
+                            <div className="space-y-2 max-h-80 overflow-auto">
+                              {chunks.map((chunk) => (
+                                <div key={chunk.id} className="rounded border border-border bg-surface px-3 py-2">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs font-mono text-text-tertiary">
+                                      Chunk #{chunk.chunkIndex}
+                                    </span>
+                                    {chunk.tokenCount != null && (
+                                      <span className="text-xs text-text-tertiary">{chunk.tokenCount} tokens</span>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-text whitespace-pre-wrap line-clamp-4">
+                                    {chunk.content}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant={
-                          doc.status === "ready"
-                            ? "success"
-                            : doc.status === "indexing"
-                              ? "warning"
-                              : doc.status === "error"
-                                ? "danger"
-                                : "default"
-                        }
-                      >
-                        {doc.status}
-                      </Badge>
-                      <button
-                        onClick={() => {
-                          if (confirm(`Remove "${doc.name}" from this collection?`)) {
-                            deleteDocMutation.mutate(doc.id);
-                          }
-                        }}
-                        className="p-1.5 rounded hover:bg-surface-tertiary text-text-tertiary hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Query Test Tab */}
+        {activeTab === "test" && (
+          <div className="max-w-3xl space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-text mb-1.5">
+                Test Query
+              </label>
+              <p className="text-xs text-text-secondary mb-3">
+                Enter a natural language query to test retrieval against this collection. Results show the most relevant chunks with similarity scores.
+              </p>
+              <div className="flex gap-2">
+                <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-surface">
+                  <Search className="h-4 w-4 text-text-tertiary shrink-0" />
+                  <input
+                    type="text"
+                    value={testQuery}
+                    onChange={(e) => setTestQuery(e.target.value)}
+                    placeholder="What is the refund policy?"
+                    className="flex-1 bg-transparent text-text text-sm outline-none placeholder:text-text-tertiary"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleTest();
+                    }}
+                  />
+                </div>
+                <Button variant="primary" onClick={handleTest} disabled={testLoading || !testQuery.trim()}>
+                  <TestTube className="h-4 w-4" />
+                  {testLoading ? "Searching..." : "Search"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Results */}
+            {testResults !== null && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-text">
+                    Retrieved Chunks ({testResults.length})
+                  </h3>
+                  {testResults.length > 0 && (
+                    <span className="text-xs text-text-tertiary">Sorted by relevance</span>
+                  )}
+                </div>
+
+                {testResults.length === 0 ? (
+                  <div className="px-4 py-8 rounded-lg border border-border bg-surface text-center">
+                    <Search className="h-8 w-8 text-text-tertiary mx-auto mb-2" />
+                    <p className="text-sm text-text-secondary">No relevant chunks found for this query.</p>
+                    <p className="text-xs text-text-tertiary mt-1">
+                      Try a different query, or make sure documents have been indexed.
+                    </p>
                   </div>
-                ))}
+                ) : (
+                  testResults.map((chunk, idx) => (
+                    <div
+                      key={chunk.id}
+                      className="rounded-lg border border-border bg-surface overflow-hidden"
+                    >
+                      <div className="flex items-center justify-between px-4 py-2 bg-surface-secondary border-b border-border">
+                        <div className="flex items-center gap-2 text-xs text-text-secondary">
+                          <span className="font-mono text-text-tertiary">#{idx + 1}</span>
+                          <FileText className="h-3 w-3" />
+                          <span className="font-medium truncate max-w-[300px]">{chunk.documentName}</span>
+                          <span className="text-text-tertiary">chunk {chunk.chunkIndex}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Zap className="h-3 w-3 text-warning" />
+                          <span
+                            className={`text-xs font-mono font-semibold ${
+                              chunk.score >= 0.8
+                                ? "text-success"
+                                : chunk.score >= 0.5
+                                  ? "text-warning"
+                                  : "text-text-tertiary"
+                            }`}
+                          >
+                            {(chunk.score * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="px-4 py-3">
+                        <p className="text-sm text-text whitespace-pre-wrap leading-relaxed">
+                          {chunk.content}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             )}
           </div>
@@ -586,6 +806,8 @@ function KnowledgeDetailPage() {
                   <>
                     <p>Created: {new Date(col.createdAt).toLocaleDateString()}</p>
                     <p>Updated: {new Date(col.updatedAt).toLocaleDateString()}</p>
+                    {col.lastIndexedAt && <p>Last indexed: {new Date(col.lastIndexedAt).toLocaleDateString()}</p>}
+                    <p>Version: {col.version}</p>
                   </>
                 )}
               </div>
@@ -601,100 +823,66 @@ function KnowledgeDetailPage() {
           </div>
         )}
 
-        {/* Test Tab */}
-        {activeTab === "test" && (
-          <div className="max-w-3xl space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-text mb-1.5">
-                Test Query
-              </label>
-              <p className="text-xs text-text-secondary mb-3">
-                Enter a natural language query to test retrieval against this collection. Results show the most relevant chunks with similarity scores.
-              </p>
-              <div className="flex gap-2">
-                <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-surface">
-                  <Search className="h-4 w-4 text-text-tertiary shrink-0" />
-                  <input
-                    type="text"
-                    value={testQuery}
-                    onChange={(e) => setTestQuery(e.target.value)}
-                    placeholder="What is the refund policy?"
-                    className="flex-1 bg-transparent text-text text-sm outline-none placeholder:text-text-tertiary"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleTest();
-                    }}
-                  />
-                </div>
-                <Button variant="primary" onClick={handleTest} disabled={testLoading || !testQuery.trim()}>
-                  <TestTube className="h-4 w-4" />
-                  {testLoading ? "Searching..." : "Search"}
-                </Button>
-              </div>
-            </div>
-
-            {/* Results */}
-            {testResults !== null && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-text">
-                    Retrieved Chunks ({testResults.length})
-                  </h3>
-                  {testResults.length > 0 && (
-                    <span className="text-xs text-text-tertiary">Sorted by relevance</span>
-                  )}
-                </div>
-
-                {testResults.length === 0 ? (
-                  <div className="px-4 py-8 rounded-lg border border-border bg-surface text-center">
-                    <Search className="h-8 w-8 text-text-tertiary mx-auto mb-2" />
-                    <p className="text-sm text-text-secondary">No relevant chunks found for this query.</p>
-                    <p className="text-xs text-text-tertiary mt-1">
-                      Try a different query, or make sure documents have been indexed.
-                    </p>
-                  </div>
-                ) : (
-                  testResults.map((chunk, idx) => (
-                    <div
-                      key={chunk.id}
-                      className="rounded-lg border border-border bg-surface overflow-hidden"
-                    >
-                      <div className="flex items-center justify-between px-4 py-2 bg-surface-secondary border-b border-border">
-                        <div className="flex items-center gap-2 text-xs text-text-secondary">
-                          <span className="font-mono text-text-tertiary">#{idx + 1}</span>
-                          <FileText className="h-3 w-3" />
-                          <span className="font-medium truncate max-w-[300px]">{chunk.documentName}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Zap className="h-3 w-3 text-warning" />
-                          <span
-                            className={`text-xs font-mono font-semibold ${
-                              chunk.score >= 0.8
-                                ? "text-success"
-                                : chunk.score >= 0.5
-                                  ? "text-warning"
-                                  : "text-text-tertiary"
-                            }`}
-                          >
-                            {(chunk.score * 100).toFixed(1)}%
-                          </span>
-                        </div>
-                      </div>
-                      <div className="px-4 py-3">
-                        <p className="text-sm text-text whitespace-pre-wrap leading-relaxed">
-                          {chunk.content}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Activity Tab */}
         {activeTab === "activity" && (
           <div className="max-w-3xl space-y-4">
+            {/* Stats summary */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="rounded-lg border border-border bg-surface p-4">
+                <p className="text-xs text-text-tertiary mb-1">Documents</p>
+                <p className="text-2xl font-semibold text-text">{documents.length}</p>
+              </div>
+              <div className="rounded-lg border border-border bg-surface p-4">
+                <p className="text-xs text-text-tertiary mb-1">Total Chunks</p>
+                <p className="text-2xl font-semibold text-text">{totalChunks}</p>
+              </div>
+              <div className="rounded-lg border border-border bg-surface p-4">
+                <p className="text-xs text-text-tertiary mb-1">Status</p>
+                <p className="text-2xl font-semibold text-text capitalize">{col?.status ?? "unknown"}</p>
+              </div>
+            </div>
+
+            {/* Indexing status per document */}
+            <div>
+              <h3 className="text-sm font-medium text-text mb-3">Document Indexing Status</h3>
+              {documents.length === 0 ? (
+                <p className="text-sm text-text-tertiary">No documents to index.</p>
+              ) : (
+                <div className="space-y-1">
+                  {documents.map((doc) => (
+                    <div key={doc.id} className="flex items-center justify-between px-3 py-2 rounded border border-border bg-surface">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {doc.status === "ready" ? (
+                          <CheckCircle className="h-4 w-4 text-success shrink-0" />
+                        ) : doc.status === "indexing" ? (
+                          <RefreshCw className="h-4 w-4 text-primary animate-spin shrink-0" />
+                        ) : doc.status === "error" ? (
+                          <AlertCircle className="h-4 w-4 text-danger shrink-0" />
+                        ) : (
+                          <Clock className="h-4 w-4 text-text-tertiary shrink-0" />
+                        )}
+                        <span className="text-sm text-text truncate">{doc.title ?? "Untitled"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-text-tertiary">{doc.chunkCount ?? 0} chunks</span>
+                        <Badge
+                          variant={
+                            doc.status === "ready" ? "success"
+                              : doc.status === "indexing" ? "warning"
+                                : doc.status === "error" ? "danger"
+                                  : "default"
+                          }
+                        >
+                          {doc.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Indexing jobs */}
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium text-text">Indexing Jobs</h3>
               <Button

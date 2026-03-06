@@ -32,6 +32,10 @@ export const queryKeys = {
     list: () => [...queryKeys.notifications.all, "list"] as const,
     unreadCount: () => [...queryKeys.notifications.all, "unread"] as const,
   },
+  domains: {
+    all: ["domains"] as const,
+    list: () => [...queryKeys.domains.all, "list"] as const,
+  },
   user: {
     profile: () => ["user", "profile"] as const,
     sessions: () => ["user", "sessions"] as const,
