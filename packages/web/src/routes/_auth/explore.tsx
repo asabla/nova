@@ -1,123 +1,401 @@
+import { useState, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Compass, MessageSquare, Code2, Microscope, Palette, BarChart3, Bot } from "lucide-react";
+import {
+  Compass,
+  MessageSquare,
+  Code2,
+  Search,
+  Lightbulb,
+  Palette,
+  BarChart3,
+  ArrowRight,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "../../components/ui/Button";
-import { api } from "../../lib/api";
-import { toast } from "../../components/ui/Toast";
 
 export const Route = createFileRoute("/_auth/explore")({
   component: ExplorePage,
 });
 
-const SAMPLE_CONVERSATIONS = [
+// ---------------------------------------------------------------------------
+// Data
+// ---------------------------------------------------------------------------
+
+type Category = "all" | "general" | "code" | "research" | "creative" | "analysis";
+
+interface SampleConversation {
+  id: string;
+  title: string;
+  description: string;
+  category: Exclude<Category, "all">;
+  tags: string[];
+  starterMessage: string;
+  icon: React.ElementType;
+  color: string;
+  bgColor: string;
+}
+
+const categories: { id: Category; label: string; icon: React.ElementType }[] = [
+  { id: "all", label: "All", icon: Compass },
+  { id: "general", label: "General", icon: MessageSquare },
+  { id: "code", label: "Code", icon: Code2 },
+  { id: "research", label: "Research", icon: Search },
+  { id: "creative", label: "Creative", icon: Palette },
+  { id: "analysis", label: "Analysis", icon: BarChart3 },
+];
+
+const sampleConversations: SampleConversation[] = [
+  // General
   {
-    category: "General",
+    id: "explain-concept",
+    title: "Explain a Complex Topic",
+    description:
+      "Get a clear, layered explanation of any topic -- from quantum mechanics to economics.",
+    category: "general",
+    tags: ["learning", "explanation"],
+    starterMessage:
+      "Explain how neural networks learn, starting from the basics and building up to backpropagation. Use analogies to make it intuitive.",
+    icon: Lightbulb,
+    color: "text-warning",
+    bgColor: "bg-warning/10",
+  },
+  {
+    id: "brainstorm-ideas",
+    title: "Brainstorm Ideas",
+    description:
+      "Generate creative ideas for projects, products, or solutions to problems.",
+    category: "general",
+    tags: ["brainstorm", "ideas"],
+    starterMessage:
+      "I'm building a productivity app for remote teams. Brainstorm 10 unique features that would differentiate it from Slack and Notion.",
+    icon: Sparkles,
+    color: "text-primary",
+    bgColor: "bg-primary/10",
+  },
+  {
+    id: "summarize-text",
+    title: "Summarize Long Content",
+    description:
+      "Condense articles, papers, or meeting notes into key takeaways.",
+    category: "general",
+    tags: ["summary", "writing"],
+    starterMessage:
+      "Summarize the key arguments and findings from the following text, highlighting any actionable insights:\n\n[Paste your content here]",
     icon: MessageSquare,
-    color: "text-blue-400",
-    bg: "bg-blue-500/10",
-    items: [
-      { title: "Explain quantum computing", prompt: "Explain quantum computing in simple terms. What makes it different from classical computing, and what are the most promising applications?" },
-      { title: "Plan a healthy meal", prompt: "Help me plan a balanced, healthy dinner for 4 people. Include a main course, side dish, and dessert. Consider dietary variety and nutrition." },
-      { title: "Write a travel itinerary", prompt: "Create a 5-day travel itinerary for Tokyo, Japan. Include must-see attractions, local food recommendations, and transportation tips." },
-    ],
+    color: "text-success",
+    bgColor: "bg-success/10",
   },
+
+  // Code
   {
-    category: "Code & Development",
+    id: "code-review",
+    title: "Code Review",
+    description:
+      "Get feedback on code quality, potential bugs, and improvement suggestions.",
+    category: "code",
+    tags: ["review", "quality"],
+    starterMessage:
+      "Review this TypeScript function for bugs, performance issues, and best practices. Suggest improvements:\n\n```typescript\n// Paste your code here\n```",
     icon: Code2,
-    color: "text-green-400",
-    bg: "bg-green-500/10",
-    items: [
-      { title: "Debug a React component", prompt: "I have a React component that re-renders too often. Help me identify common causes of unnecessary re-renders and how to optimize with useMemo, useCallback, and React.memo." },
-      { title: "Design a REST API", prompt: "Help me design a REST API for a blog platform. I need endpoints for posts, comments, users, and tags. Include proper HTTP methods, status codes, and pagination." },
-      { title: "Write unit tests", prompt: "Show me how to write comprehensive unit tests for a TypeScript function that validates email addresses. Use best practices for test structure and edge cases." },
-    ],
+    color: "text-success",
+    bgColor: "bg-success/10",
   },
   {
-    category: "Research & Analysis",
-    icon: Microscope,
-    color: "text-purple-400",
-    bg: "bg-purple-500/10",
-    items: [
-      { title: "Compare AI frameworks", prompt: "Compare PyTorch, TensorFlow, and JAX for machine learning research. Consider ease of use, performance, ecosystem, and best use cases for each." },
-      { title: "Analyze market trends", prompt: "Analyze the current trends in the SaaS industry for 2026. What are the key growth areas, challenges, and opportunities for new startups?" },
-      { title: "Literature review helper", prompt: "Help me structure a literature review on the topic of 'Large Language Models in Education'. What are the key themes, methodologies, and findings I should cover?" },
-    ],
+    id: "debug-help",
+    title: "Debug an Issue",
+    description:
+      "Describe a bug and get step-by-step debugging guidance and potential fixes.",
+    category: "code",
+    tags: ["debug", "troubleshoot"],
+    starterMessage:
+      "I'm getting an unexpected error in my React app. The component re-renders infinitely when I add a useEffect hook. Here's the code:\n\n```tsx\n// Paste your component here\n```",
+    icon: Code2,
+    color: "text-danger",
+    bgColor: "bg-danger/10",
   },
   {
-    category: "Creative Writing",
+    id: "api-design",
+    title: "Design a REST API",
+    description:
+      "Get help designing API endpoints, schemas, and authentication flows.",
+    category: "code",
+    tags: ["api", "architecture"],
+    starterMessage:
+      "Help me design a REST API for a task management system. I need endpoints for projects, tasks, users, and comments. Include authentication, pagination, and error handling patterns.",
+    icon: Code2,
+    color: "text-primary",
+    bgColor: "bg-primary/10",
+  },
+
+  // Research
+  {
+    id: "literature-review",
+    title: "Literature Review",
+    description:
+      "Explore research topics and get structured overviews of existing work.",
+    category: "research",
+    tags: ["academic", "review"],
+    starterMessage:
+      "Give me a structured overview of the current state of research on Retrieval-Augmented Generation (RAG). Cover key papers, approaches, limitations, and open problems.",
+    icon: Search,
+    color: "text-primary",
+    bgColor: "bg-primary/10",
+  },
+  {
+    id: "compare-options",
+    title: "Compare Technologies",
+    description:
+      "Get a balanced comparison of tools, frameworks, or approaches for decision-making.",
+    category: "research",
+    tags: ["comparison", "decision"],
+    starterMessage:
+      "Compare PostgreSQL vs. MongoDB for a multi-tenant SaaS application. Consider scalability, schema flexibility, query performance, operational complexity, and cost. Present as a structured comparison.",
+    icon: Search,
+    color: "text-warning",
+    bgColor: "bg-warning/10",
+  },
+
+  // Creative
+  {
+    id: "write-story",
+    title: "Write a Short Story",
+    description:
+      "Collaborate on creative writing with AI as your co-author.",
+    category: "creative",
+    tags: ["writing", "fiction"],
+    starterMessage:
+      "Write the opening scene of a sci-fi short story set in 2150 where AI and humans coexist. The main character discovers something unexpected about their AI companion. Make it atmospheric and character-driven.",
     icon: Palette,
-    color: "text-orange-400",
-    bg: "bg-orange-500/10",
-    items: [
-      { title: "Write a short story", prompt: "Write a short science fiction story (500 words) about a world where AI and humans have developed a symbiotic relationship. Focus on the emotional aspects." },
-      { title: "Draft a blog post", prompt: "Help me draft a blog post about 'The Future of Remote Work'. Include an engaging introduction, 3-4 key points, and a conclusion with a call to action." },
-      { title: "Create a poem", prompt: "Write a poem about the changing of seasons, using vivid imagery and metaphors. Style it as a modern take on traditional nature poetry." },
-    ],
+    color: "text-warning",
+    bgColor: "bg-warning/10",
   },
   {
-    category: "Data & Analysis",
+    id: "marketing-copy",
+    title: "Draft Marketing Copy",
+    description:
+      "Create compelling copy for landing pages, emails, or social media.",
+    category: "creative",
+    tags: ["marketing", "copywriting"],
+    starterMessage:
+      "Write landing page copy for NOVA -- a self-hosted AI platform for teams. Highlight: multi-model support, privacy, custom agents, and knowledge bases. Tone: professional but approachable. Include a headline, subheading, 3 feature sections, and a CTA.",
+    icon: Palette,
+    color: "text-primary",
+    bgColor: "bg-primary/10",
+  },
+
+  // Analysis
+  {
+    id: "data-analysis",
+    title: "Analyze Data Patterns",
+    description:
+      "Upload data and get insights, trends, and visualization suggestions.",
+    category: "analysis",
+    tags: ["data", "insights"],
+    starterMessage:
+      "I have the following CSV data showing monthly user signups and churn for the past year. Identify trends, seasonality, and suggest what might be causing the churn spikes:\n\n```csv\nmonth,signups,churned\n// Paste your data here\n```",
     icon: BarChart3,
-    color: "text-cyan-400",
-    bg: "bg-cyan-500/10",
-    items: [
-      { title: "Explain statistical concepts", prompt: "Explain the difference between correlation and causation with real-world examples. Include common pitfalls in data interpretation." },
-      { title: "SQL query optimization", prompt: "I have a slow SQL query that joins 5 tables and aggregates data. Show me techniques to optimize it: indexing strategies, query restructuring, and CTEs." },
-    ],
+    color: "text-success",
+    bgColor: "bg-success/10",
+  },
+  {
+    id: "business-analysis",
+    title: "SWOT Analysis",
+    description:
+      "Get a structured strengths, weaknesses, opportunities, threats analysis.",
+    category: "analysis",
+    tags: ["business", "strategy"],
+    starterMessage:
+      "Perform a SWOT analysis for a startup entering the self-hosted AI tools market in 2026. Consider the competitive landscape (OpenAI, Anthropic, open-source alternatives), market trends, and enterprise needs.",
+    icon: BarChart3,
+    color: "text-warning",
+    bgColor: "bg-warning/10",
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Components
+// ---------------------------------------------------------------------------
+
+function ConversationCard({
+  conversation,
+  onStart,
+}: {
+  conversation: SampleConversation;
+  onStart: (starterMessage: string) => void;
+}) {
+  const Icon = conversation.icon;
+
+  return (
+    <div className="flex flex-col p-4 rounded-xl bg-surface-secondary border border-border hover:border-border-strong transition-colors group">
+      <div className="flex items-start justify-between mb-3">
+        <div
+          className={`h-10 w-10 rounded-xl ${conversation.bgColor} flex items-center justify-center`}
+        >
+          <Icon className={`h-5 w-5 ${conversation.color}`} />
+        </div>
+        <div className="flex gap-1">
+          {conversation.tags.map((tag) => (
+            <span
+              key={tag}
+              className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface border border-border text-text-tertiary"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <h3 className="text-sm font-semibold text-text mb-1">
+        {conversation.title}
+      </h3>
+      <p className="text-xs text-text-tertiary leading-relaxed mb-4 flex-1">
+        {conversation.description}
+      </p>
+
+      <button
+        onClick={() => onStart(conversation.starterMessage)}
+        className="flex items-center gap-2 text-xs font-medium text-primary hover:text-primary-dark transition-colors group-hover:gap-3"
+      >
+        Try this conversation
+        <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
 function ExplorePage() {
   const navigate = useNavigate();
+  const [activeCategory, setActiveCategory] = useState<Category>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const handleStartConversation = async (title: string, prompt: string) => {
-    try {
-      const conv = await api.post<any>("/api/conversations", { title });
-      await api.post(`/api/conversations/${conv.id}/messages`, {
-        content: prompt,
-        senderType: "user",
-      });
-      navigate({ to: `/conversations/${conv.id}` });
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to create conversation");
+  const filteredConversations = useMemo(() => {
+    let result = sampleConversations;
+
+    if (activeCategory !== "all") {
+      result = result.filter((c) => c.category === activeCategory);
     }
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (c) =>
+          c.title.toLowerCase().includes(q) ||
+          c.description.toLowerCase().includes(q) ||
+          c.tags.some((t) => t.toLowerCase().includes(q)),
+      );
+    }
+
+    return result;
+  }, [activeCategory, searchQuery]);
+
+  const handleStartConversation = (starterMessage: string) => {
+    // Store the starter message so the new conversation page can pick it up
+    try {
+      sessionStorage.setItem("nova:starter-message", starterMessage);
+    } catch {
+      // sessionStorage unavailable
+    }
+    navigate({ to: "/conversations/new" });
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-8">
-      <div className="text-center">
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <Compass className="h-6 w-6 text-primary" />
-          <h1 className="text-xl font-semibold text-text">Explore</h1>
-        </div>
-        <p className="text-sm text-text-secondary">
-          Discover what NOVA can do. Click any example to start a conversation.
-        </p>
-      </div>
-
-      {SAMPLE_CONVERSATIONS.map((category) => (
-        <div key={category.category}>
-          <div className="flex items-center gap-2 mb-3">
-            <category.icon className={`h-4 w-4 ${category.color}`} />
-            <h2 className="text-sm font-medium text-text">{category.category}</h2>
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-5xl mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex justify-center mb-4">
+            <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <Compass className="h-7 w-7 text-primary" />
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {category.items.map((item) => (
+          <h1 className="text-2xl font-bold text-text mb-2">Explore</h1>
+          <p className="text-sm text-text-secondary max-w-md mx-auto">
+            Discover what NOVA can do. Browse sample conversations and start one
+            with a single click.
+          </p>
+        </div>
+
+        {/* Search */}
+        <div className="relative max-w-md mx-auto mb-6">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search conversations..."
+            className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary focus:outline-2 focus:outline-offset-0 focus:outline-primary focus:border-primary transition-colors"
+          />
+        </div>
+
+        {/* Category filters */}
+        <div className="flex items-center justify-center gap-2 mb-8 flex-wrap">
+          {categories.map((cat) => {
+            const CatIcon = cat.icon;
+            const isActive = activeCategory === cat.id;
+            return (
               <button
-                key={item.title}
-                onClick={() => handleStartConversation(item.title, item.prompt)}
-                className="text-left p-4 rounded-xl border border-border bg-surface-secondary hover:bg-surface-secondary/80 hover:border-primary/30 transition-all group"
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-surface-secondary border border-border text-text-secondary hover:text-text hover:border-border-strong"
+                }`}
               >
-                <div className={`inline-flex items-center justify-center h-8 w-8 rounded-lg ${category.bg} mb-2`}>
-                  <category.icon className={`h-4 w-4 ${category.color}`} />
-                </div>
-                <p className="text-sm font-medium text-text mb-1 group-hover:text-primary transition-colors">
-                  {item.title}
-                </p>
-                <p className="text-xs text-text-tertiary line-clamp-2">{item.prompt}</p>
+                <CatIcon className="h-3.5 w-3.5" />
+                {cat.label}
               </button>
+            );
+          })}
+        </div>
+
+        {/* Grid */}
+        {filteredConversations.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredConversations.map((conv) => (
+              <ConversationCard
+                key={conv.id}
+                conversation={conv}
+                onStart={handleStartConversation}
+              />
             ))}
           </div>
+        ) : (
+          <div className="text-center py-16">
+            <Search className="h-8 w-8 text-text-tertiary mx-auto mb-3" />
+            <p className="text-sm text-text-secondary">
+              No conversations matching your search
+            </p>
+            <button
+              onClick={() => {
+                setSearchQuery("");
+                setActiveCategory("all");
+              }}
+              className="text-xs text-primary hover:text-primary-dark mt-2 underline"
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
+
+        {/* CTA */}
+        <div className="mt-12 text-center">
+          <p className="text-sm text-text-tertiary mb-3">
+            Don't see what you're looking for?
+          </p>
+          <Button
+            variant="primary"
+            onClick={() => navigate({ to: "/conversations/new" })}
+          >
+            <MessageSquare className="h-4 w-4" />
+            Start a blank conversation
+          </Button>
         </div>
-      ))}
+      </div>
     </div>
   );
 }

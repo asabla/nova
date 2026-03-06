@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Send, Square, Paperclip } from "lucide-react";
 import { clsx } from "clsx";
+import { VoiceInput } from "./VoiceInput";
 
 interface MessageInputProps {
   onSend: (content: string) => void;
@@ -75,6 +76,16 @@ export function MessageInput({ onSend, onStop, isStreaming, disabled, onFileUplo
               />
             </>
           )}
+
+          <VoiceInput
+            onTranscript={(text) => {
+              setContent((prev) => {
+                const separator = prev.trim() ? " " : "";
+                return prev + separator + text;
+              });
+            }}
+            disabled={disabled || isStreaming}
+          />
 
           <textarea
             ref={textareaRef}
