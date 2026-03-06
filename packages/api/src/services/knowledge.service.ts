@@ -1,6 +1,7 @@
 import { eq, and, desc, isNull, ilike, sql } from "drizzle-orm";
 import { db } from "../lib/db";
 import { knowledgeCollections, knowledgeDocuments, knowledgeChunks } from "@nova/shared/schemas";
+import { auditLogs } from "@nova/shared/schema";
 import { AppError } from "@nova/shared/utils";
 
 export const knowledgeService = {
@@ -262,5 +263,47 @@ export const knowledgeService = {
 
     if (!collection) throw AppError.notFound("Collection not found");
     return collection;
+  },
+
+  async getCollectionHistory(orgId: string, collectionId: string, opts?: { limit?: number; offset?: number }) {
+    // Verify collection exists and belongs to org
+    await this.getCollection(orgId, collectionId);
+
+    const limit = opts?.limit ?? 50;
+    const offset = opts?.offset ?? 0;
+
+    const entries = await db
+      .select({
+        id: auditLogs.id,
+        action: auditLogs.action,
+        actorId: auditLogs.actorId,
+        actorType: auditLogs.actorType,
+        details: auditLogs.details,
+        createdAt: auditLogs.createdAt,
+      })
+      .from(auditLogs)
+      .where(
+        and(
+          eq(auditLogs.orgId, orgId),
+          eq(auditLogs.resourceId, collectionId),
+          eq(auditLogs.resourceType, "knowledge_collection"),
+        ),
+      )
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(auditLogs)
+      .where(
+        and(
+          eq(auditLogs.orgId, orgId),
+          eq(auditLogs.resourceId, collectionId),
+          eq(auditLogs.resourceType, "knowledge_collection"),
+        ),
+      );
+
+    return { data: entries, total: count };
   },
 };

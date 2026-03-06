@@ -21,6 +21,13 @@ knowledgeRoutes.get("/:id", async (c) => {
   return c.json(collection);
 });
 
+knowledgeRoutes.get("/:id/history", async (c) => {
+  const orgId = c.get("orgId");
+  const { limit, offset } = parsePagination(c.req.query());
+  const result = await knowledgeService.getCollectionHistory(orgId, c.req.param("id"), { limit, offset });
+  return c.json(result);
+});
+
 const createCollectionSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
@@ -38,11 +45,21 @@ knowledgeRoutes.post("/", async (c) => {
 
 knowledgeRoutes.patch("/:id", async (c) => {
   const orgId = c.get("orgId");
+  const userId = c.get("userId");
   const body = z.object({
     name: z.string().min(1).max(200).optional(),
     description: z.string().max(2000).optional(),
   }).parse(await c.req.json());
   const collection = await knowledgeService.updateCollection(orgId, c.req.param("id"), body);
+  await writeAuditLog({
+    orgId,
+    actorId: userId,
+    actorType: "user",
+    action: "knowledge.collection.update",
+    resourceType: "knowledge_collection",
+    resourceId: c.req.param("id"),
+    details: { changes: body },
+  });
   return c.json(collection);
 });
 
@@ -69,8 +86,18 @@ const addDocumentSchema = z.object({
 
 knowledgeRoutes.post("/:id/documents", async (c) => {
   const orgId = c.get("orgId");
+  const userId = c.get("userId");
   const body = addDocumentSchema.parse(await c.req.json());
   const doc = await knowledgeService.addDocument(orgId, c.req.param("id"), body);
+  await writeAuditLog({
+    orgId,
+    actorId: userId,
+    actorType: "user",
+    action: "knowledge.collection.document_add",
+    resourceType: "knowledge_collection",
+    resourceId: c.req.param("id"),
+    details: { documentId: doc.id, title: body.title },
+  });
   return c.json(doc, 201);
 });
 
@@ -79,6 +106,15 @@ knowledgeRoutes.delete("/:collectionId/documents/:docId", async (c) => {
   const userId = c.get("userId");
   await knowledgeService.removeDocument(orgId, c.req.param("docId"));
   await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "knowledge.document.delete", resourceType: "knowledge_document", resourceId: c.req.param("docId") });
+  await writeAuditLog({
+    orgId,
+    actorId: userId,
+    actorType: "user",
+    action: "knowledge.collection.document_remove",
+    resourceType: "knowledge_collection",
+    resourceId: c.req.param("collectionId"),
+    details: { documentId: c.req.param("docId") },
+  });
   return c.body(null, 204);
 });
 
