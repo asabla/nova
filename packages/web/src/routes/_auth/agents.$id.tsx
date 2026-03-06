@@ -4,7 +4,7 @@ import { Bot, ArrowLeft, Save, Trash2, Copy, Share2, History, TestTube, Settings
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "../../components/ui/Button";
 import { toast } from "../../components/ui/Toast";
-import { api } from "../../lib/api-client";
+import { api } from "../../lib/api";
 
 export const Route = createFileRoute("/_auth/agents/$id")({
   component: AgentDetailPage,
@@ -275,30 +275,279 @@ function AgentDetailPage() {
           </div>
         )}
 
-        {activeTab === "tools" && (
-          <div className="max-w-2xl text-center py-12">
-            <Wrench className="h-12 w-12 text-text-tertiary mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-text mb-1">Attach Tools</h3>
-            <p className="text-sm text-text-secondary">Enable tools for this agent.</p>
-          </div>
-        )}
+        {activeTab === "tools" && <AgentToolsTab agentId={id} />}
+        {activeTab === "knowledge" && <AgentKnowledgeTab agentId={id} />}
+        {activeTab === "memory" && <AgentMemoryTab agentId={id} />}
+      </div>
+    </div>
+  );
+}
 
-        {activeTab === "knowledge" && (
-          <div className="max-w-2xl text-center py-12">
-            <BookOpen className="h-12 w-12 text-text-tertiary mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-text mb-1">Knowledge Collections</h3>
-            <p className="text-sm text-text-secondary">Connect knowledge bases for RAG.</p>
-          </div>
-        )}
+function AgentToolsTab({ agentId }: { agentId: string }) {
+  const queryClient = useQueryClient();
+  const { data: agentTools } = useQuery({
+    queryKey: ["agents", agentId, "tools"],
+    queryFn: () => api.get<any>(`/api/agents/${agentId}/tools`),
+  });
 
-        {activeTab === "memory" && (
-          <div className="max-w-2xl text-center py-12">
-            <Brain className="h-12 w-12 text-text-tertiary mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-text mb-1">Agent Memory</h3>
-            <p className="text-sm text-text-secondary">Memory entries will appear here.</p>
+  const { data: allTools } = useQuery({
+    queryKey: ["tools"],
+    queryFn: () => api.get<any>("/api/tools"),
+  });
+
+  const attachTool = useMutation({
+    mutationFn: (toolId: string) => api.post(`/api/agents/${agentId}/tools`, { toolId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agents", agentId, "tools"] });
+      toast.success("Tool attached");
+    },
+  });
+
+  const detachTool = useMutation({
+    mutationFn: (toolId: string) => api.delete(`/api/agents/${agentId}/tools/${toolId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agents", agentId, "tools"] });
+      toast.success("Tool removed");
+    },
+  });
+
+  const attached = (agentTools as any)?.data ?? [];
+  const available = ((allTools as any)?.data ?? []).filter(
+    (t: any) => !attached.some((at: any) => at.toolId === t.id),
+  );
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <div>
+        <h3 className="text-sm font-semibold text-text mb-3">Attached Tools ({attached.length})</h3>
+        {attached.length === 0 ? (
+          <p className="text-sm text-text-tertiary py-4">No tools attached yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {attached.map((t: any) => (
+              <div key={t.id} className="flex items-center justify-between p-3 rounded-lg bg-surface-secondary border border-border">
+                <div className="flex items-center gap-2">
+                  <Wrench className="h-4 w-4 text-primary" />
+                  <span className="text-sm text-text font-medium">{t.name ?? t.toolId}</span>
+                </div>
+                <button
+                  onClick={() => detachTool.mutate(t.toolId ?? t.id)}
+                  className="text-xs text-danger hover:underline"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>
+
+      {available.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-text mb-3">Available Tools</h3>
+          <div className="space-y-2">
+            {available.map((t: any) => (
+              <div key={t.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
+                <div>
+                  <span className="text-sm text-text font-medium">{t.name}</span>
+                  {t.description && <p className="text-xs text-text-tertiary">{t.description}</p>}
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => attachTool.mutate(t.id)}>
+                  Attach
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AgentKnowledgeTab({ agentId }: { agentId: string }) {
+  const queryClient = useQueryClient();
+  const { data: collections } = useQuery({
+    queryKey: ["knowledge"],
+    queryFn: () => api.get<any>("/api/knowledge"),
+  });
+
+  const { data: agentKnowledge } = useQuery({
+    queryKey: ["agents", agentId, "knowledge"],
+    queryFn: () => api.get<any>(`/api/agents/${agentId}/knowledge`),
+  });
+
+  const attachKnowledge = useMutation({
+    mutationFn: (collectionId: string) =>
+      api.post(`/api/agents/${agentId}/knowledge`, { collectionId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agents", agentId, "knowledge"] });
+      toast.success("Knowledge collection connected");
+    },
+  });
+
+  const detachKnowledge = useMutation({
+    mutationFn: (collectionId: string) =>
+      api.delete(`/api/agents/${agentId}/knowledge/${collectionId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agents", agentId, "knowledge"] });
+      toast.success("Knowledge collection disconnected");
+    },
+  });
+
+  const attached = (agentKnowledge as any)?.data ?? [];
+  const allCollections = (collections as any)?.data ?? [];
+  const available = allCollections.filter(
+    (c: any) => !attached.some((ac: any) => ac.collectionId === c.id),
+  );
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <div>
+        <h3 className="text-sm font-semibold text-text mb-3">Connected Collections ({attached.length})</h3>
+        {attached.length === 0 ? (
+          <p className="text-sm text-text-tertiary py-4">No knowledge collections connected.</p>
+        ) : (
+          <div className="space-y-2">
+            {attached.map((c: any) => (
+              <div key={c.id} className="flex items-center justify-between p-3 rounded-lg bg-surface-secondary border border-border">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-green-400" />
+                  <span className="text-sm text-text font-medium">{c.name ?? c.collectionId}</span>
+                </div>
+                <button
+                  onClick={() => detachKnowledge.mutate(c.collectionId ?? c.id)}
+                  className="text-xs text-danger hover:underline"
+                >
+                  Disconnect
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {available.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-text mb-3">Available Collections</h3>
+          <div className="space-y-2">
+            {available.map((c: any) => (
+              <div key={c.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
+                <div>
+                  <span className="text-sm text-text font-medium">{c.name}</span>
+                  {c.description && <p className="text-xs text-text-tertiary">{c.description}</p>}
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => attachKnowledge.mutate(c.id)}>
+                  Connect
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AgentMemoryTab({ agentId }: { agentId: string }) {
+  const queryClient = useQueryClient();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+
+  const { data: memoryData } = useQuery({
+    queryKey: ["agents", agentId, "memory"],
+    queryFn: () => api.get<any>(`/api/agents/${agentId}/memory`),
+  });
+
+  const deleteMemory = useMutation({
+    mutationFn: (memoryId: string) => api.delete(`/api/agents/${agentId}/memory/${memoryId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agents", agentId, "memory"] });
+      toast.success("Memory entry deleted");
+    },
+  });
+
+  const updateMemory = useMutation({
+    mutationFn: ({ memoryId, content }: { memoryId: string; content: string }) =>
+      api.patch(`/api/agents/${agentId}/memory/${memoryId}`, { content }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["agents", agentId, "memory"] });
+      setEditingId(null);
+      toast.success("Memory entry updated");
+    },
+  });
+
+  const exportMemory = () => {
+    window.open(`${import.meta.env.VITE_API_URL ?? ""}/api/agents/${agentId}/memory/export`, "_blank");
+  };
+
+  const entries = (memoryData as any)?.data ?? [];
+
+  return (
+    <div className="max-w-2xl space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-text">Memory Entries ({entries.length})</h3>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={exportMemory}>
+            Export JSON
+          </Button>
+        </div>
+      </div>
+
+      {entries.length === 0 ? (
+        <div className="text-center py-12">
+          <Brain className="h-12 w-12 text-text-tertiary mx-auto mb-3" />
+          <h3 className="text-lg font-medium text-text mb-1">No memories yet</h3>
+          <p className="text-sm text-text-secondary">This agent hasn't stored any memories.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {entries.map((entry: any) => (
+            <div key={entry.id} className="p-3 rounded-lg bg-surface-secondary border border-border">
+              {editingId === entry.id ? (
+                <div className="space-y-2">
+                  <textarea
+                    autoFocus
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    className="w-full px-2 py-1 text-sm bg-surface border border-border rounded text-text resize-y"
+                    rows={3}
+                  />
+                  <div className="flex gap-2">
+                    <Button variant="primary" size="sm" onClick={() => updateMemory.mutate({ memoryId: entry.id, content: editContent })}>
+                      Save
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-text whitespace-pre-wrap">{entry.content}</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-[10px] text-text-tertiary">
+                      {entry.scope && `${entry.scope} | `}
+                      {entry.createdAt && new Date(entry.createdAt).toLocaleDateString()}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setEditingId(entry.id); setEditContent(entry.content); }}
+                        className="text-xs text-text-tertiary hover:text-text"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => deleteMemory.mutate(entry.id)}
+                        className="text-xs text-text-tertiary hover:text-danger"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
