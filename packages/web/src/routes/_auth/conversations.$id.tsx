@@ -10,6 +10,7 @@ import { useSSEStream } from "../../hooks/useSSE";
 import { useAuthStore } from "../../stores/auth.store";
 import { useDragDrop } from "../../hooks/useDragDrop";
 import { useClipboardPaste } from "../../hooks/useClipboardPaste";
+import { toast } from "../../components/ui/Toast";
 
 export const Route = createFileRoute("/_auth/conversations/$id")({
   component: ConversationPage,
@@ -29,9 +30,19 @@ function ConversationPage() {
   useEffect(() => {
     if (status === "done" && tokens) {
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(id) });
       resetStream();
     }
   }, [status, tokens, id, queryClient, resetStream]);
+
+  const editMessage = useMutation({
+    mutationFn: ({ messageId, content }: { messageId: string; content: string }) =>
+      api.patch(`/api/conversations/${id}/messages/${messageId}`, { content }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
+      toast("Message updated", "success");
+    },
+  });
 
   const handleSend = useCallback(async (content: string) => {
     await api.post(`/api/conversations/${id}/messages`, {
@@ -41,15 +52,47 @@ function ConversationPage() {
 
     queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
 
+    const model = conversation?.modelId;
     const apiUrl = import.meta.env.VITE_API_URL ?? "";
     startStream(`${apiUrl}/api/conversations/${id}/messages/stream`, {
       content,
+      model: model ?? "default",
+      messages: [
+        ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
+        ...messages.map((m: any) => ({ role: m.senderType === "user" ? "user" : "assistant", content: m.content })),
+        { role: "user", content },
+      ],
     });
-  }, [id, queryClient, startStream]);
+  }, [id, queryClient, startStream, conversation, messages]);
 
   const handleRate = useCallback(async (messageId: string, rating: 1 | -1) => {
     await api.post(`/api/conversations/${id}/messages/${messageId}/rate`, { rating });
+    toast(rating === 1 ? "Upvoted" : "Downvoted", "success");
   }, [id]);
+
+  const handleEdit = useCallback((messageId: string, content: string) => {
+    editMessage.mutate({ messageId, content });
+  }, [editMessage]);
+
+  const handleRerun = useCallback(async (messageId: string) => {
+    const msg = messages.find((m: any) => m.id === messageId);
+    if (!msg) return;
+
+    const idx = messages.indexOf(msg);
+    const previousMessages = messages.slice(0, idx + 1);
+
+    const apiUrl = import.meta.env.VITE_API_URL ?? "";
+    startStream(`${apiUrl}/api/conversations/${id}/messages/stream`, {
+      model: conversation?.modelId ?? "default",
+      messages: [
+        ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
+        ...previousMessages.map((m: any) => ({
+          role: m.senderType === "user" ? "user" : "assistant",
+          content: m.content,
+        })),
+      ],
+    });
+  }, [id, messages, conversation, startStream]);
 
   const handleFileUpload = useCallback(async (file: File) => {
     const presign = await api.post<{ uploadUrl: string; fileId: string }>(
@@ -64,6 +107,7 @@ function ConversationPage() {
     });
 
     await api.post("/api/files/confirm", { fileId: presign.fileId });
+    toast("File uploaded", "success");
   }, []);
 
   const { isDragging, dragHandlers } = useDragDrop((files) => {
@@ -86,6 +130,8 @@ function ConversationPage() {
         isStreaming={status === "streaming"}
         userName={user?.name}
         onRate={handleRate}
+        onEdit={handleEdit}
+        onRerun={handleRerun}
       />
       <MessageInput
         onSend={handleSend}

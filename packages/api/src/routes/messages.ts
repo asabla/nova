@@ -90,6 +90,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
     }, DEFAULTS.SSE_HEARTBEAT_INTERVAL_MS);
 
     try {
+      const startTime = Date.now();
       const response = await chatCompletion({
         model: body.model,
         messages: body.messages,
@@ -100,9 +101,10 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
       });
 
       if (!response.ok) {
+        const errBody = await response.text().catch(() => "Unknown error");
         await stream.writeSSE({
           event: "error",
-          data: JSON.stringify({ message: "Model API error", code: `${response.status}` }),
+          data: JSON.stringify({ message: "Model API error", code: `${response.status}`, detail: errBody }),
         });
         return;
       }
@@ -110,6 +112,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
       const reader = response.body!.getReader();
       const decoder = new TextDecoder();
       let fullContent = "";
+      let usageData: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -128,6 +131,9 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
                   data: JSON.stringify({ content: token }),
                 });
               }
+              if (data.usage) {
+                usageData = data.usage;
+              }
             } catch {
               // Skip malformed JSON lines
             }
@@ -135,14 +141,29 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         }
       }
 
-      await messageService.createMessage(orgId, {
+      const latencyMs = Date.now() - startTime;
+      const promptTokens = usageData?.prompt_tokens ?? Math.ceil(JSON.stringify(body.messages).length / 4);
+      const completionTokens = usageData?.completion_tokens ?? Math.ceil(fullContent.length / 4);
+
+      const assistantMessage = await messageService.createMessage(orgId, {
         conversationId,
         senderType: "assistant",
         content: fullContent,
         modelId: conversation.modelId ?? undefined,
+        tokenCountPrompt: promptTokens,
+        tokenCountCompletion: completionTokens,
+        metadata: { latencyMs, model: body.model },
       });
 
-      await stream.writeSSE({ event: "done", data: "" });
+      await stream.writeSSE({
+        event: "done",
+        data: JSON.stringify({
+          messageId: assistantMessage.id,
+          tokenCountPrompt: promptTokens,
+          tokenCountCompletion: completionTokens,
+          latencyMs,
+        }),
+      });
     } catch (err) {
       await stream.writeSSE({
         event: "error",
@@ -195,6 +216,28 @@ messagesRouter.post("/:conversationId/messages/:messageId/notes", zValidator("js
   const { content } = c.req.valid("json");
   const note = await messageService.addNote(orgId, c.req.param("messageId"), userId, content);
   return c.json(note, 201);
+});
+
+// Get message edit history
+messagesRouter.get("/:conversationId/messages/:messageId/history", async (c) => {
+  const orgId = c.get("orgId");
+  const message = await messageService.getMessage(orgId, c.req.param("messageId"));
+  if (!message) throw AppError.notFound("Message");
+
+  const history = (message.editHistory as any[]) ?? [];
+  return c.json({
+    messageId: message.id,
+    currentContent: message.content,
+    isEdited: message.isEdited,
+    history,
+  });
+});
+
+// Get message attachments
+messagesRouter.get("/:conversationId/messages/:messageId/attachments", async (c) => {
+  const orgId = c.get("orgId");
+  const attachments = await messageService.getAttachments(orgId, c.req.param("messageId"));
+  return c.json(attachments);
 });
 
 export { messagesRouter as messageRoutes };

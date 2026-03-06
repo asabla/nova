@@ -8,10 +8,11 @@ interface MessageListProps {
   isStreaming?: boolean;
   userName?: string;
   onRate?: (messageId: string, rating: 1 | -1) => void;
-  onEdit?: (messageId: string) => void;
+  onEdit?: (messageId: string, content: string) => void;
+  onRerun?: (messageId: string) => void;
 }
 
-export function MessageList({ messages, streamingContent, isStreaming, userName, onRate, onEdit }: MessageListProps) {
+export function MessageList({ messages, streamingContent, isStreaming, userName, onRate, onEdit, onRerun }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -21,6 +22,12 @@ export function MessageList({ messages, streamingContent, isStreaming, userName,
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-3xl mx-auto py-4">
+        {messages.length === 0 && !isStreaming && (
+          <div className="text-center py-16 text-sm text-text-tertiary">
+            No messages yet. Start the conversation below.
+          </div>
+        )}
+
         {messages.map((msg: any) => (
           <MessageBubble
             key={msg.id}
@@ -28,6 +35,7 @@ export function MessageList({ messages, streamingContent, isStreaming, userName,
             userName={userName}
             onRate={onRate}
             onEdit={onEdit}
+            onRerun={onRerun}
           />
         ))}
 

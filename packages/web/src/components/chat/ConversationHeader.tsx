@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings, Share, GitBranch, Archive, Download, Trash2, MoreHorizontal, Pencil, Pin, PinOff } from "lucide-react";
+import { Settings, Share, GitBranch, Archive, Download, Trash2, MoreHorizontal, Pencil, Pin, PinOff, FileJson, FileText, FileSpreadsheet, Globe } from "lucide-react";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { Dropdown, DropdownItem } from "../ui/Dropdown";
@@ -70,12 +70,22 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
     updateConv.mutate({ isPinned: !conversation?.isPinned });
   };
 
+  const apiBase = import.meta.env.VITE_API_URL ?? "";
+
   const handleExportJson = () => {
-    window.open(`/api/export/conversations/${conversation.id}/json`, "_blank");
+    window.open(`${apiBase}/api/export/conversations/${conversation.id}/json`, "_blank");
   };
 
   const handleExportMd = () => {
-    window.open(`/api/export/conversations/${conversation.id}/markdown`, "_blank");
+    window.open(`${apiBase}/api/export/conversations/${conversation.id}/markdown`, "_blank");
+  };
+
+  const handleExportCsv = () => {
+    window.open(`${apiBase}/api/export/conversations/${conversation.id}/csv`, "_blank");
+  };
+
+  const handleExportHtml = () => {
+    window.open(`${apiBase}/api/export/conversations/${conversation.id}/html`, "_blank");
   };
 
   if (!conversation) return null;
@@ -147,10 +157,16 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
               <GitBranch className="h-3.5 w-3.5" /> Fork
             </DropdownItem>
             <DropdownItem onClick={handleExportJson}>
-              <Download className="h-3.5 w-3.5" /> Export JSON
+              <FileJson className="h-3.5 w-3.5" /> Export JSON
             </DropdownItem>
             <DropdownItem onClick={handleExportMd}>
-              <Download className="h-3.5 w-3.5" /> Export Markdown
+              <FileText className="h-3.5 w-3.5" /> Export Markdown
+            </DropdownItem>
+            <DropdownItem onClick={handleExportCsv}>
+              <FileSpreadsheet className="h-3.5 w-3.5" /> Export CSV
+            </DropdownItem>
+            <DropdownItem onClick={handleExportHtml}>
+              <Globe className="h-3.5 w-3.5" /> Export HTML
             </DropdownItem>
             <DropdownItem onClick={() => archiveConv.mutate()}>
               <Archive className="h-3.5 w-3.5" /> Archive
