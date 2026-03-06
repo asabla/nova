@@ -67,7 +67,17 @@ modelRoutes.patch("/:id", requireRole("org-admin"), async (c) => {
   const body = z.object({
     name: z.string().optional(),
     isEnabled: z.boolean().optional(),
+    isDefault: z.boolean().optional(),
+    isFallback: z.boolean().optional(),
+    fallbackOrder: z.number().int().nullable().optional(),
   }).parse(await c.req.json());
+
+  // If setting as default, clear existing default first
+  if (body.isDefault === true) {
+    await db.update(models)
+      .set({ isDefault: false, updatedAt: new Date() })
+      .where(and(eq(models.orgId, orgId), eq(models.isDefault, true)));
+  }
 
   const [model] = await db.update(models)
     .set({ ...body, updatedAt: new Date() })
@@ -75,6 +85,42 @@ modelRoutes.patch("/:id", requireRole("org-admin"), async (c) => {
     .returning();
 
   return c.json(model);
+});
+
+// Bulk update fallback order
+const fallbackOrderSchema = z.object({
+  order: z.array(z.object({
+    id: z.string().uuid(),
+    fallbackOrder: z.number().int().min(0),
+    isFallback: z.boolean(),
+  })),
+});
+
+modelRoutes.put("/fallback-order", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  const body = fallbackOrderSchema.parse(await c.req.json());
+
+  // First clear all fallback flags for this org
+  await db.update(models)
+    .set({ isFallback: false, fallbackOrder: null, updatedAt: new Date() })
+    .where(eq(models.orgId, orgId));
+
+  // Set the new order
+  for (const item of body.order) {
+    await db.update(models)
+      .set({ isFallback: item.isFallback, fallbackOrder: item.fallbackOrder, updatedAt: new Date() })
+      .where(and(eq(models.id, item.id), eq(models.orgId, orgId)));
+  }
+
+  const result = await db.select().from(models).where(eq(models.orgId, orgId));
+  return c.json({ data: result });
+});
+
+// Get all models including disabled ones (admin view)
+modelRoutes.get("/all", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  const result = await db.select().from(models).where(eq(models.orgId, orgId));
+  return c.json({ data: result });
 });
 
 export { modelRoutes };
