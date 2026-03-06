@@ -155,7 +155,7 @@ conversations.post("/:id/pin", zValidator("json", z.object({ isPinned: z.boolean
 
 conversations.post(
   "/:id/fork",
-  zValidator("json", z.object({ messageId: z.string().uuid() })),
+  zValidator("json", z.object({ messageId: z.string().uuid().optional() })),
   async (c) => {
     const orgId = c.get("orgId");
     const userId = c.get("userId");

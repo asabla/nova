@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
 import { api } from "../../lib/api";
@@ -18,6 +18,7 @@ export const Route = createFileRoute("/_auth/conversations/$id")({
 
 function ConversationPage() {
   const { id } = Route.useParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const { tokens, status, startStream, stopStream, resetStream } = useSSEStream();
@@ -90,12 +91,17 @@ function ConversationPage() {
     editMessage.mutate({ messageId, content });
   }, [editMessage]);
 
-  const handleRerun = useCallback(async (messageId: string) => {
+  const handleEditAndRerun = useCallback(async (messageId: string, content: string) => {
+    // First, save the edit (storing old content in history)
+    await api.patch(`/api/conversations/${id}/messages/${messageId}`, { content });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
+
+    // Then trigger a re-run using all messages up to and including the edited one
     const msg = messages.find((m: any) => m.id === messageId);
     if (!msg) return;
 
     const idx = messages.indexOf(msg);
-    const previousMessages = messages.slice(0, idx + 1);
+    const previousMessages = messages.slice(0, idx);
     const modelParams = getModelParams();
 
     const apiUrl = import.meta.env.VITE_API_URL ?? "";
@@ -108,9 +114,50 @@ function ConversationPage() {
           role: m.senderType === "user" ? "user" : "assistant",
           content: m.content,
         })),
+        { role: "user", content },
+      ],
+    });
+
+    toast("Message updated — re-running...", "info");
+  }, [id, messages, conversation, startStream, getModelParams, queryClient]);
+
+  const handleRerun = useCallback(async (messageId: string, modelId?: string) => {
+    const msg = messages.find((m: any) => m.id === messageId);
+    if (!msg) return;
+
+    const idx = messages.indexOf(msg);
+    const previousMessages = messages.slice(0, idx + 1);
+    const modelParams = getModelParams();
+
+    const apiUrl = import.meta.env.VITE_API_URL ?? "";
+    startStream(`${apiUrl}/api/conversations/${id}/messages/stream`, {
+      model: modelId ?? conversation?.modelId ?? "default",
+      ...modelParams,
+      messages: [
+        ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
+        ...previousMessages.map((m: any) => ({
+          role: m.senderType === "user" ? "user" : "assistant",
+          content: m.content,
+        })),
       ],
     });
   }, [id, messages, conversation, startStream, getModelParams]);
+
+  const forkAtMessage = useMutation({
+    mutationFn: (messageId: string) =>
+      api.post<{ id: string }>(`/api/conversations/${id}/fork`, { messageId }),
+    onSuccess: (data) => {
+      toast("Conversation forked from message", "success");
+      navigate({ to: `/conversations/${data.id}` });
+    },
+    onError: () => {
+      toast("Failed to fork conversation", "error");
+    },
+  });
+
+  const handleFork = useCallback((messageId: string) => {
+    forkAtMessage.mutate(messageId);
+  }, [forkAtMessage]);
 
   const handleFileUpload = useCallback(async (file: File) => {
     const presign = await api.post<{ uploadUrl: string; fileId: string }>(
@@ -149,8 +196,10 @@ function ConversationPage() {
         userName={user?.name}
         onRate={handleRate}
         onEdit={handleEdit}
+        onEditAndRerun={handleEditAndRerun}
         onRerun={handleRerun}
         onNote={handleNote}
+        onFork={handleFork}
       />
       <MessageInput
         onSend={handleSend}

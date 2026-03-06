@@ -28,7 +28,7 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
   });
 
   const forkConv = useMutation({
-    mutationFn: () => api.post<{ id: string }>(`/api/conversations/${conversation.id}/fork`),
+    mutationFn: () => api.post<{ id: string }>(`/api/conversations/${conversation.id}/fork`, {}),
     onSuccess: (data) => {
       toast("Conversation forked", "success");
       navigate({ to: `/conversations/${data.id}` });

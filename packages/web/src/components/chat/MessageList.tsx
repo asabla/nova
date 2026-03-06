@@ -9,11 +9,13 @@ interface MessageListProps {
   userName?: string;
   onRate?: (messageId: string, rating: 1 | -1) => void;
   onEdit?: (messageId: string, content: string) => void;
-  onRerun?: (messageId: string) => void;
+  onEditAndRerun?: (messageId: string, content: string) => void;
+  onRerun?: (messageId: string, modelId?: string) => void;
   onNote?: (messageId: string, content: string) => void;
+  onFork?: (messageId: string) => void;
 }
 
-export function MessageList({ messages, streamingContent, isStreaming, userName, onRate, onEdit, onRerun, onNote }: MessageListProps) {
+export function MessageList({ messages, streamingContent, isStreaming, userName, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,8 +38,10 @@ export function MessageList({ messages, streamingContent, isStreaming, userName,
             userName={userName}
             onRate={onRate}
             onEdit={onEdit}
+            onEditAndRerun={onEditAndRerun}
             onRerun={onRerun}
             onNote={onNote}
+            onFork={onFork}
           />
         ))}
 

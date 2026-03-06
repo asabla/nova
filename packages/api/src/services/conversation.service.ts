@@ -1,6 +1,6 @@
 import { db } from "../lib/db";
-import { conversations, conversationParticipants } from "@nova/shared/schemas";
-import { eq, and, isNull, desc, ilike, sql, inArray } from "drizzle-orm";
+import { conversations, conversationParticipants, messages } from "@nova/shared/schemas";
+import { eq, and, isNull, desc, ilike, sql, inArray, asc, lte } from "drizzle-orm";
 import type { Conversation } from "@nova/shared/schemas";
 import { parsePagination, buildPaginatedResponse, type PaginationInput } from "@nova/shared/utils";
 import { AppError } from "@nova/shared/utils";
@@ -139,11 +139,30 @@ export async function pinConversation(orgId: string, conversationId: string, isP
   return updateConversation(orgId, conversationId, { isPinned });
 }
 
-export async function forkConversation(orgId: string, userId: string, conversationId: string, messageId: string) {
+export async function forkConversation(orgId: string, userId: string, conversationId: string, messageId?: string) {
   const original = await getConversation(orgId, conversationId);
   if (!original) return null;
 
-  return createConversation(orgId, userId, {
+  // Determine the fork point: if messageId is provided, find that message's createdAt
+  // and copy messages up to and including it. Otherwise copy all messages.
+  let cutoffMessage: { createdAt: Date } | null = null;
+  if (messageId) {
+    const msgResult = await db
+      .select({ createdAt: messages.createdAt })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.id, messageId),
+          eq(messages.conversationId, conversationId),
+          eq(messages.orgId, orgId),
+          isNull(messages.deletedAt),
+        ),
+      );
+    cutoffMessage = msgResult[0] ?? null;
+    if (!cutoffMessage) return null;
+  }
+
+  const forked = await createConversation(orgId, userId, {
     title: original.title ? `Fork of ${original.title}` : "Forked conversation",
     systemPrompt: original.systemPrompt ?? undefined,
     modelId: original.modelId ?? undefined,
@@ -151,6 +170,54 @@ export async function forkConversation(orgId: string, userId: string, conversati
     workspaceId: original.workspaceId ?? undefined,
     forkedFromMessageId: messageId,
   });
+
+  // Copy messages from the original conversation up to the fork point
+  const conditions = [
+    eq(messages.conversationId, conversationId),
+    eq(messages.orgId, orgId),
+    isNull(messages.deletedAt),
+  ];
+  if (cutoffMessage) {
+    conditions.push(lte(messages.createdAt, cutoffMessage.createdAt));
+  }
+
+  const originalMessages = await db
+    .select()
+    .from(messages)
+    .where(and(...conditions))
+    .orderBy(asc(messages.createdAt));
+
+  if (originalMessages.length > 0) {
+    let totalTokens = 0;
+    await db.insert(messages).values(
+      originalMessages.map((m) => {
+        totalTokens += (m.tokenCountPrompt ?? 0) + (m.tokenCountCompletion ?? 0);
+        return {
+          orgId,
+          conversationId: forked.id,
+          senderType: m.senderType,
+          senderUserId: m.senderUserId,
+          agentId: m.agentId,
+          content: m.content,
+          contentType: m.contentType,
+          modelId: m.modelId,
+          tokenCountPrompt: m.tokenCountPrompt,
+          tokenCountCompletion: m.tokenCountCompletion,
+          costCents: m.costCents,
+          metadata: m.metadata,
+        };
+      }),
+    );
+
+    if (totalTokens > 0) {
+      await db
+        .update(conversations)
+        .set({ totalTokens, updatedAt: new Date() })
+        .where(eq(conversations.id, forked.id));
+    }
+  }
+
+  return forked;
 }
 
 export async function generateShareToken(orgId: string, conversationId: string) {

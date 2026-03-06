@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Copy, Check, ThumbsUp, ThumbsDown, Pencil, RotateCcw, History, X, Send, StickyNote } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Copy, Check, ThumbsUp, ThumbsDown, Pencil, RotateCcw, History, X, Send, StickyNote, ChevronDown, GitBranch } from "lucide-react";
 import { clsx } from "clsx";
 import { MarkdownRenderer } from "../markdown/MarkdownRenderer";
 import { Avatar } from "../ui/Avatar";
+import { api } from "../../lib/api";
 import { formatDistanceToNow } from "date-fns";
 
 interface EditHistoryEntry {
@@ -14,6 +16,7 @@ interface EditHistoryEntry {
 interface MessageBubbleProps {
   message: {
     id: string;
+    conversationId: string;
     senderType: string;
     senderUserId?: string | null;
     content?: string | null;
@@ -29,11 +32,13 @@ interface MessageBubbleProps {
   userName?: string;
   onRate?: (messageId: string, rating: 1 | -1) => void;
   onEdit?: (messageId: string, content: string) => void;
-  onRerun?: (messageId: string) => void;
+  onEditAndRerun?: (messageId: string, content: string) => void;
+  onRerun?: (messageId: string, modelId?: string) => void;
   onNote?: (messageId: string, content: string) => void;
+  onFork?: (messageId: string) => void;
 }
 
-export function MessageBubble({ message, userName, onRate, onEdit, onRerun, onNote }: MessageBubbleProps) {
+export function MessageBubble({ message, userName, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork }: MessageBubbleProps) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -41,8 +46,29 @@ export function MessageBubble({ message, userName, onRate, onEdit, onRerun, onNo
   const [showHistory, setShowHistory] = useState(false);
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [noteContent, setNoteContent] = useState("");
+  const [showModelSelector, setShowModelSelector] = useState(false);
+  const modelSelectorRef = useRef<HTMLDivElement>(null);
   const isUser = message.senderType === "user";
   const isAssistant = message.senderType === "assistant";
+
+  const { data: modelsData } = useQuery({
+    queryKey: ["models"],
+    queryFn: () => api.get<any>("/api/models"),
+    enabled: showModelSelector,
+  });
+  const availableModels: any[] = (modelsData as any)?.data ?? [];
+
+  // Close model selector on outside click
+  useEffect(() => {
+    if (!showModelSelector) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (modelSelectorRef.current && !modelSelectorRef.current.contains(e.target as Node)) {
+        setShowModelSelector(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showModelSelector]);
 
   const handleCopy = () => {
     if (message.content) {
@@ -52,9 +78,19 @@ export function MessageBubble({ message, userName, onRate, onEdit, onRerun, onNo
     }
   };
 
+  const [fetchedHistory, setFetchedHistory] = useState<EditHistoryEntry[] | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   const handleEditSubmit = () => {
     if (editContent.trim() && editContent !== message.content && onEdit) {
       onEdit(message.id, editContent.trim());
+    }
+    setIsEditing(false);
+  };
+
+  const handleEditAndRerunSubmit = () => {
+    if (editContent.trim() && onEditAndRerun) {
+      onEditAndRerun(message.id, editContent.trim());
     }
     setIsEditing(false);
   };
@@ -64,7 +100,27 @@ export function MessageBubble({ message, userName, onRate, onEdit, onRerun, onNo
     setIsEditing(false);
   };
 
-  const editHistory = (message.editHistory as EditHistoryEntry[]) ?? [];
+  // Fetch full history from API when panel is opened
+  const handleToggleHistory = async () => {
+    const nextShow = !showHistory;
+    setShowHistory(nextShow);
+    if (nextShow && !fetchedHistory) {
+      setHistoryLoading(true);
+      try {
+        const data = await api.get<{ history: EditHistoryEntry[] }>(
+          `/api/conversations/${message.conversationId}/messages/${message.id}/history`,
+        );
+        setFetchedHistory((data as any).history ?? []);
+      } catch {
+        // Fall back to local edit history if API call fails
+        setFetchedHistory((message.editHistory as EditHistoryEntry[]) ?? []);
+      } finally {
+        setHistoryLoading(false);
+      }
+    }
+  };
+
+  const editHistory = fetchedHistory ?? (message.editHistory as EditHistoryEntry[]) ?? [];
   const totalTokens = (message.tokenCountPrompt ?? 0) + (message.tokenCountCompletion ?? 0);
 
   return (
@@ -104,6 +160,14 @@ export function MessageBubble({ message, userName, onRate, onEdit, onRerun, onNo
               >
                 <Send className="h-3 w-3" /> Save
               </button>
+              {onEditAndRerun && (
+                <button
+                  onClick={handleEditAndRerunSubmit}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-primary/80 text-primary-foreground text-xs font-medium rounded-lg hover:opacity-90"
+                >
+                  <RotateCcw className="h-3 w-3" /> Save &amp; Re-run
+                </button>
+              )}
               <button
                 onClick={handleEditCancel}
                 className="flex items-center gap-1 px-3 py-1.5 text-xs text-text-secondary hover:text-text"
@@ -142,11 +206,11 @@ export function MessageBubble({ message, userName, onRate, onEdit, onRerun, onNo
         <div className="flex items-center gap-2 mt-0.5 px-1">
           {message.isEdited && (
             <button
-              onClick={() => setShowHistory(!showHistory)}
+              onClick={handleToggleHistory}
               className="text-[10px] text-text-tertiary hover:text-text-secondary flex items-center gap-0.5"
             >
               (edited)
-              {editHistory.length > 0 && <History className="h-2.5 w-2.5" />}
+              <History className="h-2.5 w-2.5" />
             </button>
           )}
           {isAssistant && totalTokens > 0 && (
@@ -158,24 +222,51 @@ export function MessageBubble({ message, userName, onRate, onEdit, onRerun, onNo
         </div>
 
         {/* Edit history panel */}
-        {showHistory && editHistory.length > 0 && (
-          <div className="mt-2 p-3 rounded-xl bg-surface border border-border max-w-full">
+        {showHistory && (
+          <div className="mt-2 p-3 rounded-xl bg-surface border border-border max-w-full min-w-[280px]">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-text">Edit History</span>
+              <span className="text-xs font-medium text-text">
+                Edit History
+                {editHistory.length > 0 && (
+                  <span className="ml-1 text-text-tertiary font-normal">
+                    ({editHistory.length} {editHistory.length === 1 ? "revision" : "revisions"})
+                  </span>
+                )}
+              </span>
               <button onClick={() => setShowHistory(false)} className="text-text-tertiary hover:text-text">
                 <X className="h-3 w-3" />
               </button>
             </div>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {editHistory.map((entry, i) => (
-                <div key={i} className="p-2 rounded-lg bg-surface-secondary text-xs">
-                  <p className="text-text-secondary whitespace-pre-wrap line-clamp-3">{entry.content}</p>
-                  <span className="text-[10px] text-text-tertiary mt-1 block">
-                    {formatDistanceToNow(new Date(entry.editedAt), { addSuffix: true })}
-                  </span>
+            {historyLoading ? (
+              <div className="py-3 text-center text-xs text-text-tertiary">Loading history...</div>
+            ) : editHistory.length === 0 ? (
+              <div className="py-3 text-center text-xs text-text-tertiary">No previous versions found.</div>
+            ) : (
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {/* Current version */}
+                <div className="p-2 rounded-lg bg-primary/5 border border-primary/20 text-xs">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-semibold text-primary">Current version</span>
+                  </div>
+                  <p className="text-text whitespace-pre-wrap line-clamp-4">{message.content}</p>
                 </div>
-              ))}
-            </div>
+                {/* Previous versions, newest first */}
+                {[...editHistory].reverse().map((entry, i) => {
+                  const versionNum = editHistory.length - i;
+                  return (
+                    <div key={i} className="p-2 rounded-lg bg-surface-secondary text-xs">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-semibold text-text-tertiary">Version {versionNum}</span>
+                        <span className="text-[10px] text-text-tertiary">
+                          {formatDistanceToNow(new Date(entry.editedAt), { addSuffix: true })}
+                        </span>
+                      </div>
+                      <p className="text-text-secondary whitespace-pre-wrap line-clamp-4">{entry.content}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -200,9 +291,48 @@ export function MessageBubble({ message, userName, onRate, onEdit, onRerun, onNo
               </>
             )}
             {isAssistant && onRerun && (
-              <button onClick={() => onRerun(message.id)} className="text-text-tertiary hover:text-text-secondary p-1 rounded" title="Re-run with different model">
-                <RotateCcw className="h-3.5 w-3.5" />
-              </button>
+              <div className="relative" ref={modelSelectorRef}>
+                <button onClick={() => onRerun(message.id)} className="text-text-tertiary hover:text-text-secondary p-1 rounded" title="Re-run">
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => setShowModelSelector(!showModelSelector)}
+                  className="text-text-tertiary hover:text-text-secondary p-1 rounded"
+                  title="Replay with different model"
+                >
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+                {showModelSelector && (
+                  <div className="absolute bottom-full left-0 mb-1 w-56 py-1 bg-surface border border-border rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
+                    <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">
+                      Replay with model
+                    </div>
+                    {availableModels.length === 0 && (
+                      <div className="px-3 py-2 text-xs text-text-tertiary">Loading models...</div>
+                    )}
+                    {availableModels.map((m: any) => (
+                      <button
+                        key={m.id}
+                        onClick={() => {
+                          onRerun(message.id, m.modelIdExternal);
+                          setShowModelSelector(false);
+                        }}
+                        className={clsx(
+                          "w-full text-left px-3 py-1.5 text-xs hover:bg-surface-secondary transition-colors",
+                          m.modelIdExternal === message.modelId
+                            ? "text-primary font-medium"
+                            : "text-text",
+                        )}
+                      >
+                        {m.name}
+                        {m.modelIdExternal === message.modelId && (
+                          <span className="ml-1 text-[10px] text-text-tertiary">(current)</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
             {isUser && onEdit && (
               <button
@@ -220,6 +350,15 @@ export function MessageBubble({ message, userName, onRate, onEdit, onRerun, onNo
                 title="Add note"
               >
                 <StickyNote className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {onFork && (
+              <button
+                onClick={() => onFork(message.id)}
+                className="text-text-tertiary hover:text-text-secondary p-1 rounded"
+                title="Fork from here"
+              >
+                <GitBranch className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
