@@ -3,10 +3,10 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
-import { notifications, notificationPreferences } from "@nova/shared/schemas";
+import { notifications } from "@nova/shared/schemas";
 import { eq, and, isNull, desc, sql } from "drizzle-orm";
 import { parsePagination, buildPaginatedResponse } from "@nova/shared/utils";
-import { notificationService } from "../services/notification.service";
+import { notificationService, upsertPreference, getStructuredPrefs } from "../services/notification.service";
 
 const notificationsRouter = new Hono<AppContext>();
 
@@ -78,16 +78,65 @@ notificationsRouter.post("/read-all", async (c) => {
 
 // --- Preferences ---
 
+// GET /preferences - returns structured preferences with defaults applied (story #163)
 notificationsRouter.get("/preferences", async (c) => {
   const userId = c.get("userId");
   const orgId = c.get("orgId");
-  const prefs = await db
-    .select()
-    .from(notificationPreferences)
-    .where(and(eq(notificationPreferences.userId, userId), eq(notificationPreferences.orgId, orgId)));
+
+  const prefs = await getStructuredPrefs(orgId, userId);
   return c.json({ data: prefs });
 });
 
+// Fine-grained preference update schema matching the four preference keys
+const patchPrefsSchema = z.object({
+  emailOnShare: z.boolean().optional(),
+  emailOnMention: z.boolean().optional(),
+  emailOnAgentComplete: z.boolean().optional(),
+  inAppEnabled: z.boolean().optional(),
+}).refine((data) => Object.keys(data).length > 0, {
+  message: "At least one preference must be provided",
+});
+
+/**
+ * Maps fine-grained preference keys to (notificationType, channel) pairs
+ * stored in the notificationPreferences table.
+ */
+const PREF_KEY_MAP: Record<string, { notificationType: string; channel: string }> = {
+  emailOnShare: { notificationType: "conversation_shared", channel: "email" },
+  emailOnMention: { notificationType: "mention", channel: "email" },
+  emailOnAgentComplete: { notificationType: "agent_complete", channel: "email" },
+  inAppEnabled: { notificationType: "all", channel: "in_app" },
+};
+
+// PATCH /preferences - update one or more preferences (story #163)
+notificationsRouter.patch("/preferences", zValidator("json", patchPrefsSchema), async (c) => {
+  const userId = c.get("userId");
+  const orgId = c.get("orgId");
+  const body = c.req.valid("json");
+
+  const results = [];
+
+  for (const [key, value] of Object.entries(body)) {
+    if (value === undefined) continue;
+    const mapping = PREF_KEY_MAP[key];
+    if (!mapping) continue;
+
+    const result = await upsertPreference(
+      orgId,
+      userId,
+      mapping.notificationType,
+      mapping.channel,
+      value as boolean,
+    );
+    results.push({ key, ...result });
+  }
+
+  // Return the full structured preferences after the update
+  const updated = await getStructuredPrefs(orgId, userId);
+  return c.json({ data: updated, changed: results });
+});
+
+// PUT /preferences - set a single (notificationType, channel) preference (legacy/granular)
 const prefSchema = z.object({
   notificationType: z.string(),
   channel: z.enum(["in_app", "email", "webhook", "slack"]),
@@ -99,73 +148,14 @@ notificationsRouter.put("/preferences", zValidator("json", prefSchema), async (c
   const orgId = c.get("orgId");
   const data = c.req.valid("json");
 
-  const existing = await db
-    .select()
-    .from(notificationPreferences)
-    .where(and(
-      eq(notificationPreferences.userId, userId),
-      eq(notificationPreferences.orgId, orgId),
-      eq(notificationPreferences.notificationType, data.notificationType),
-      eq(notificationPreferences.channel, data.channel),
-    ));
-
-  if (existing.length > 0) {
-    const result = await db
-      .update(notificationPreferences)
-      .set({ isEnabled: data.isEnabled, updatedAt: new Date() })
-      .where(eq(notificationPreferences.id, existing[0].id))
-      .returning();
-    return c.json(result[0]);
-  }
-
-  const result = await db.insert(notificationPreferences).values({
-    userId,
+  const result = await upsertPreference(
     orgId,
-    ...data,
-  }).returning();
-  return c.json(result[0], 201);
-});
-
-const batchPrefSchema = z.object({
-  preferences: z.array(prefSchema).min(1).max(50),
-});
-
-notificationsRouter.patch("/preferences", zValidator("json", batchPrefSchema), async (c) => {
-  const userId = c.get("userId");
-  const orgId = c.get("orgId");
-  const { preferences } = c.req.valid("json");
-
-  const results = [];
-
-  for (const pref of preferences) {
-    const existing = await db
-      .select()
-      .from(notificationPreferences)
-      .where(and(
-        eq(notificationPreferences.userId, userId),
-        eq(notificationPreferences.orgId, orgId),
-        eq(notificationPreferences.notificationType, pref.notificationType),
-        eq(notificationPreferences.channel, pref.channel),
-      ));
-
-    if (existing.length > 0) {
-      const [updated] = await db
-        .update(notificationPreferences)
-        .set({ isEnabled: pref.isEnabled, updatedAt: new Date() })
-        .where(eq(notificationPreferences.id, existing[0].id))
-        .returning();
-      results.push(updated);
-    } else {
-      const [created] = await db.insert(notificationPreferences).values({
-        userId,
-        orgId,
-        ...pref,
-      }).returning();
-      results.push(created);
-    }
-  }
-
-  return c.json({ data: results });
+    userId,
+    data.notificationType,
+    data.channel,
+    data.isEnabled,
+  );
+  return c.json(result);
 });
 
 // --- Send email notification (stub) ---

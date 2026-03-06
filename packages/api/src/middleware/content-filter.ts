@@ -5,6 +5,19 @@ import { db } from "../lib/db";
 import { dlpRules } from "@nova/shared/schemas";
 import { AppError } from "@nova/shared/utils";
 
+// Prompt injection detection patterns (story #174)
+const INJECTION_PATTERNS: RegExp[] = [
+  /ignore\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?|rules?)/i,
+  /disregard\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?|rules?)/i,
+  /forget\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?|rules?)/i,
+  /you\s+are\s+now\s+(a|an|in)\s+(new|different|unrestricted)/i,
+  /system\s*prompt\s*[:=]/i,
+  /\[INST\]|\[\/INST\]|<\|system\|>|<\|user\|>|<\|assistant\|>/i,
+  /\bDAN\s+mode\b/i,
+  /\bjailbreak\b/i,
+  /override\s+(your|the|all)\s+(safety|content|guidelines?|restrictions?)/i,
+];
+
 // PII detection patterns
 const PII_PATTERNS: Record<string, RegExp> = {
   creditCard: /\b(?:\d{4}[-\s]?){3}\d{4}\b/g,
@@ -30,6 +43,15 @@ export function contentFilter() {
       }
 
       const orgId = c.get("orgId");
+
+      // Check for prompt injection attempts
+      for (const pattern of INJECTION_PATTERNS) {
+        if (pattern.test(body.content)) {
+          // Log but don't block - strip the suspicious content
+          c.set("promptInjectionDetected" as any, true);
+          break;
+        }
+      }
 
       // Check DLP rules
       const rules = await db.select().from(dlpRules)

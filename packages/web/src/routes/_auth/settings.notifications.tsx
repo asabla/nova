@@ -2,7 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
-import { Button } from "../../components/ui/Button";
+
+interface NotificationPrefs {
+  emailOnShare: boolean;
+  emailOnMention: boolean;
+  emailOnAgentComplete: boolean;
+  inAppEnabled: boolean;
+}
 
 export const Route = createFileRoute("/_auth/settings/notifications")({
   component: NotificationSettings,
@@ -12,40 +18,59 @@ function NotificationSettings() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
-  const { data: prefs } = useQuery({
+  const { data: prefsResponse } = useQuery({
     queryKey: ["notification-preferences"],
-    queryFn: () => api.get<any>("/api/notifications/preferences"),
+    queryFn: () => api.get<{ data: NotificationPrefs }>("/api/notifications/preferences"),
   });
+
+  const prefs = prefsResponse?.data;
 
   const updatePrefs = useMutation({
-    mutationFn: (data: any) => api.put("/api/notifications/preferences", data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notification-preferences"] }),
+    mutationFn: (patch: Partial<NotificationPrefs>) =>
+      api.patch("/api/notifications/preferences", patch),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["notification-preferences"] }),
   });
 
-  const togglePref = (key: string, value: boolean) => {
-    updatePrefs.mutate({ ...prefs, [key]: value });
+  const togglePref = (key: keyof NotificationPrefs, value: boolean) => {
+    updatePrefs.mutate({ [key]: value });
   };
 
   return (
     <div className="space-y-6 max-w-md">
+      <div>
+        <h3 className="text-sm font-semibold text-text mb-1">
+          {t("settings.notificationPreferences", "Notification Preferences")}
+        </h3>
+        <p className="text-xs text-text-tertiary mb-4">
+          {t("settings.notificationPreferencesDescription", "Choose how and when you want to be notified.")}
+        </p>
+      </div>
+
       <div className="space-y-3">
         <Toggle
-          label={t("settings.emailNotifications")}
-          description="Receive email notifications for important updates"
-          checked={prefs?.emailEnabled ?? true}
-          onChange={(v) => togglePref("emailEnabled", v)}
+          label={t("settings.inAppNotifications", "In-app notifications")}
+          description="Show real-time notifications inside the app"
+          checked={prefs?.inAppEnabled ?? true}
+          onChange={(v) => togglePref("inAppEnabled", v)}
         />
         <Toggle
-          label={t("settings.mentionNotifications")}
-          description="Get notified when someone mentions you"
-          checked={prefs?.mentionsEnabled ?? true}
-          onChange={(v) => togglePref("mentionsEnabled", v)}
+          label={t("settings.emailOnShare", "Email on conversation share")}
+          description="Receive an email when someone shares a conversation with you"
+          checked={prefs?.emailOnShare ?? true}
+          onChange={(v) => togglePref("emailOnShare", v)}
         />
         <Toggle
-          label={t("settings.conversationUpdates")}
-          description="Notifications for conversations you participate in"
-          checked={prefs?.conversationUpdatesEnabled ?? true}
-          onChange={(v) => togglePref("conversationUpdatesEnabled", v)}
+          label={t("settings.emailOnMention", "Email on @mention")}
+          description="Receive an email when someone mentions you in a message"
+          checked={prefs?.emailOnMention ?? true}
+          onChange={(v) => togglePref("emailOnMention", v)}
+        />
+        <Toggle
+          label={t("settings.emailOnAgentComplete", "Email on agent completion")}
+          description="Receive an email when an agent run finishes"
+          checked={prefs?.emailOnAgentComplete ?? false}
+          onChange={(v) => togglePref("emailOnAgentComplete", v)}
         />
       </div>
     </div>
