@@ -39,16 +39,16 @@ export const knowledgeService = {
   async createCollection(orgId: string, userId: string, data: {
     name: string;
     description?: string;
-    embeddingModel?: string;
+    embeddingModelId?: string;
   }) {
     const [collection] = await db
       .insert(knowledgeCollections)
       .values({
         orgId,
-        createdBy: userId,
+        ownerId: userId,
         name: data.name,
         description: data.description,
-        embeddingModel: data.embeddingModel ?? "text-embedding-3-small",
+        embeddingModelId: data.embeddingModelId,
         status: "active",
       })
       .returning();
@@ -72,7 +72,7 @@ export const knowledgeService = {
 
   async deleteCollection(orgId: string, collectionId: string) {
     await db.delete(knowledgeDocuments)
-      .where(and(eq(knowledgeDocuments.collectionId, collectionId), eq(knowledgeDocuments.orgId, orgId)));
+      .where(and(eq(knowledgeDocuments.knowledgeCollectionId, collectionId), eq(knowledgeDocuments.orgId, orgId)));
 
     const [collection] = await db
       .delete(knowledgeCollections)
@@ -87,26 +87,23 @@ export const knowledgeService = {
     return db
       .select()
       .from(knowledgeDocuments)
-      .where(and(eq(knowledgeDocuments.collectionId, collectionId), eq(knowledgeDocuments.orgId, orgId)))
+      .where(and(eq(knowledgeDocuments.knowledgeCollectionId, collectionId), eq(knowledgeDocuments.orgId, orgId)))
       .orderBy(desc(knowledgeDocuments.createdAt));
   },
 
-  async addDocument(orgId: string, collectionId: string, userId: string, data: {
+  async addDocument(orgId: string, collectionId: string, data: {
     title: string;
     sourceUrl?: string;
     fileId?: string;
-    content?: string;
   }) {
     const [doc] = await db
       .insert(knowledgeDocuments)
       .values({
         orgId,
-        collectionId,
-        uploadedBy: userId,
+        knowledgeCollectionId: collectionId,
         title: data.title,
         sourceUrl: data.sourceUrl,
         fileId: data.fileId,
-        rawContent: data.content,
         status: "pending",
       })
       .returning();
@@ -115,7 +112,7 @@ export const knowledgeService = {
   },
 
   async deleteDocument(orgId: string, docId: string) {
-    await db.delete(knowledgeChunks).where(eq(knowledgeChunks.documentId, docId));
+    await db.delete(knowledgeChunks).where(eq(knowledgeChunks.knowledgeDocumentId, docId));
     const [doc] = await db
       .delete(knowledgeDocuments)
       .where(and(eq(knowledgeDocuments.id, docId), eq(knowledgeDocuments.orgId, orgId)))

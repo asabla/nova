@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppContext } from "../types/context";
 import { chatCompletion, streamChatCompletion } from "../lib/litellm";
-import { auditService } from "../services/audit.service";
+import { writeAuditLog } from "../services/audit.service";
 
 const v1ChatRoutes = new Hono<AppContext>();
 
@@ -26,13 +26,13 @@ v1ChatRoutes.post("/completions", async (c) => {
   const userId = c.get("userId");
   const body = chatCompletionSchema.parse(await c.req.json());
 
-  await auditService.writeAuditLog({
+  await writeAuditLog({
     orgId,
-    userId,
+    actorId: userId,
+    actorType: "user",
     action: "api.chat_completion",
     resourceType: "model",
-    resourceId: body.model,
-    metadata: { messageCount: body.messages.length, stream: !!body.stream },
+    details: { model: body.model, messageCount: body.messages.length, stream: !!body.stream },
   });
 
   if (body.stream) {
@@ -42,8 +42,6 @@ v1ChatRoutes.post("/completions", async (c) => {
       temperature: body.temperature,
       max_tokens: body.max_tokens,
       top_p: body.top_p,
-      frequency_penalty: body.frequency_penalty,
-      presence_penalty: body.presence_penalty,
     });
   }
 
@@ -60,10 +58,11 @@ v1ChatRoutes.post("/completions", async (c) => {
 // List available models (OpenAI-compatible)
 v1ChatRoutes.get("/../models", async (c) => {
   const { listModels } = await import("../lib/litellm");
-  const models = await listModels();
+  const result = await listModels() as any;
+  const modelList = Array.isArray(result?.data) ? result.data : Array.isArray(result) ? result : [];
   return c.json({
     object: "list",
-    data: models.map((m: any) => ({
+    data: modelList.map((m: any) => ({
       id: m.id ?? m.model_name,
       object: "model",
       created: Date.now(),

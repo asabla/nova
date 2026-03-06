@@ -1,11 +1,11 @@
-import { eq, and, desc, ilike, sql } from "drizzle-orm";
+import { eq, and, desc, ilike, sql, isNull } from "drizzle-orm";
 import { db } from "../lib/db";
-import { agents, agentVersions, agentSkills, agentTools, agentMcpServers } from "@nova/shared/schemas";
+import { agents } from "@nova/shared/schemas";
 import { AppError } from "@nova/shared/utils";
 
 export const agentService = {
   async list(orgId: string, opts?: { search?: string; limit?: number; offset?: number }) {
-    const conditions = [eq(agents.orgId, orgId), eq(agents.isDeleted, false)];
+    const conditions = [eq(agents.orgId, orgId), isNull(agents.deletedAt)];
     if (opts?.search) {
       conditions.push(ilike(agents.name, `%${opts.search}%`));
     }
@@ -30,7 +30,7 @@ export const agentService = {
     const [agent] = await db
       .select()
       .from(agents)
-      .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId), eq(agents.isDeleted, false)));
+      .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId), isNull(agents.deletedAt)));
 
     if (!agent) throw AppError.notFound("Agent not found");
     return agent;
@@ -40,22 +40,19 @@ export const agentService = {
     name: string;
     description?: string;
     systemPrompt?: string;
-    model?: string;
-    temperature?: number;
-    maxTokens?: number;
+    modelId?: string;
+    modelParams?: Record<string, unknown>;
   }) {
     const [agent] = await db
       .insert(agents)
       .values({
         orgId,
-        createdBy: userId,
+        ownerId: userId,
         name: data.name,
         description: data.description,
         systemPrompt: data.systemPrompt,
-        model: data.model ?? "gpt-4o",
-        temperature: data.temperature ? String(data.temperature) : "0.7",
-        maxTokens: data.maxTokens ?? 4096,
-        status: "active",
+        modelId: data.modelId,
+        modelParams: data.modelParams,
       })
       .returning();
 
@@ -66,23 +63,17 @@ export const agentService = {
     name: string;
     description: string;
     systemPrompt: string;
-    model: string;
-    temperature: number;
-    maxTokens: number;
-    status: string;
+    modelId: string;
+    modelParams: Record<string, unknown>;
+    visibility: string;
+    isPublished: boolean;
+    isEnabled: boolean;
+    toolApprovalMode: string;
+    memoryScope: string;
   }>) {
-    const updateData: Record<string, unknown> = { updatedAt: new Date() };
-    if (data.name !== undefined) updateData.name = data.name;
-    if (data.description !== undefined) updateData.description = data.description;
-    if (data.systemPrompt !== undefined) updateData.systemPrompt = data.systemPrompt;
-    if (data.model !== undefined) updateData.model = data.model;
-    if (data.temperature !== undefined) updateData.temperature = String(data.temperature);
-    if (data.maxTokens !== undefined) updateData.maxTokens = data.maxTokens;
-    if (data.status !== undefined) updateData.status = data.status;
-
     const [agent] = await db
       .update(agents)
-      .set(updateData)
+      .set({ ...data, updatedAt: new Date() })
       .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
       .returning();
 
@@ -93,7 +84,7 @@ export const agentService = {
   async delete(orgId: string, agentId: string) {
     const [agent] = await db
       .update(agents)
-      .set({ isDeleted: true, deletedAt: new Date(), updatedAt: new Date() })
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId)))
       .returning();
 

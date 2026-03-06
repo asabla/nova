@@ -1,7 +1,8 @@
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { db } from "../lib/db";
-import { organisations, orgSettings, users, groups, groupMemberships, invitations } from "@nova/shared/schemas";
+import { organisations, userProfiles, users, groups, groupMemberships, invitations } from "@nova/shared/schemas";
 import { AppError } from "@nova/shared/utils";
+import { randomBytes, createHash } from "crypto";
 
 export const orgService = {
   async get(orgId: string) {
@@ -20,77 +21,64 @@ export const orgService = {
     return org;
   },
 
-  async getSettings(orgId: string) {
-    const [settings] = await db.select().from(orgSettings).where(eq(orgSettings.orgId, orgId));
-    return settings ?? {};
-  },
-
-  async updateSettings(orgId: string, data: Record<string, unknown>) {
-    const [existing] = await db.select().from(orgSettings).where(eq(orgSettings.orgId, orgId));
-    if (existing) {
-      const [settings] = await db
-        .update(orgSettings)
-        .set({ ...data, updatedAt: new Date() })
-        .where(eq(orgSettings.orgId, orgId))
-        .returning();
-      return settings;
-    }
-    const [settings] = await db
-      .insert(orgSettings)
-      .values({ orgId, ...data })
-      .returning();
-    return settings;
-  },
-
   async listMembers(orgId: string) {
-    return db.select().from(users).where(eq(users.orgId, orgId));
+    return db.select({
+      profile: userProfiles,
+      user: users,
+    })
+      .from(userProfiles)
+      .innerJoin(users, eq(users.id, userProfiles.userId))
+      .where(and(eq(userProfiles.orgId, orgId), isNull(userProfiles.deletedAt)));
   },
 
   async updateMemberRole(orgId: string, userId: string, role: string) {
-    const [user] = await db
-      .update(users)
+    const [profile] = await db
+      .update(userProfiles)
       .set({ role, updatedAt: new Date() })
-      .where(and(eq(users.id, userId), eq(users.orgId, orgId)))
+      .where(and(eq(userProfiles.userId, userId), eq(userProfiles.orgId, orgId)))
       .returning();
-    if (!user) throw AppError.notFound("User not found");
-    return user;
+    if (!profile) throw AppError.notFound("User not found in this organization");
+    return profile;
   },
 
   async removeMember(orgId: string, userId: string) {
-    const [user] = await db
-      .update(users)
-      .set({ orgId: null, updatedAt: new Date() })
-      .where(and(eq(users.id, userId), eq(users.orgId, orgId)))
+    const [profile] = await db
+      .update(userProfiles)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(userProfiles.userId, userId), eq(userProfiles.orgId, orgId)))
       .returning();
-    if (!user) throw AppError.notFound("User not found");
-    return user;
+    if (!profile) throw AppError.notFound("User not found in this organization");
+    return profile;
   },
 
-  async createInvitation(orgId: string, invitedBy: string, data: { email: string; role?: string }) {
+  async createInvitation(orgId: string, invitedById: string, data: { email: string; role?: string }) {
+    const token = randomBytes(32).toString("hex");
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+
     const [invitation] = await db
       .insert(invitations)
       .values({
         orgId,
-        invitedBy,
+        invitedById,
         email: data.email,
         role: data.role ?? "member",
-        status: "pending",
+        tokenHash,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       })
       .returning();
-    return invitation;
+    return { ...invitation, token };
   },
 
   async listInvitations(orgId: string) {
     return db.select().from(invitations)
-      .where(and(eq(invitations.orgId, orgId), eq(invitations.status, "pending")))
+      .where(and(eq(invitations.orgId, orgId), isNull(invitations.acceptedAt), isNull(invitations.deletedAt)))
       .orderBy(desc(invitations.createdAt));
   },
 
   async revokeInvitation(orgId: string, invitationId: string) {
     const [invitation] = await db
       .update(invitations)
-      .set({ status: "revoked", updatedAt: new Date() })
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(invitations.id, invitationId), eq(invitations.orgId, orgId)))
       .returning();
     if (!invitation) throw AppError.notFound("Invitation not found");

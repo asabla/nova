@@ -29,8 +29,7 @@ const addServerSchema = z.object({
   name: z.string().min(1).max(200),
   url: z.string().url(),
   description: z.string().max(2000).optional(),
-  authType: z.enum(["none", "api_key", "oauth"]).optional(),
-  authConfig: z.record(z.unknown()).optional(),
+  authType: z.enum(["none", "bearer", "api_key"]).optional(),
 });
 
 mcpRoutes.post("/servers", requireRole("power-user"), async (c) => {
@@ -40,13 +39,12 @@ mcpRoutes.post("/servers", requireRole("power-user"), async (c) => {
 
   const [server] = await db.insert(mcpServers).values({
     orgId,
-    addedBy: userId,
+    registeredById: userId,
     name: body.name,
     url: body.url,
     description: body.description,
     authType: body.authType ?? "none",
-    authConfig: body.authConfig,
-    status: "pending",
+    healthStatus: "pending",
   }).returning();
 
   return c.json(server, 201);
@@ -59,7 +57,6 @@ mcpRoutes.patch("/servers/:id", requireRole("org-admin"), async (c) => {
     url: z.string().url().optional(),
     isEnabled: z.boolean().optional(),
     isApproved: z.boolean().optional(),
-    status: z.string().optional(),
   }).parse(await c.req.json());
 
   const [server] = await db.update(mcpServers)
@@ -73,7 +70,7 @@ mcpRoutes.patch("/servers/:id", requireRole("org-admin"), async (c) => {
 
 mcpRoutes.delete("/servers/:id", requireRole("org-admin"), async (c) => {
   const orgId = c.get("orgId");
-  await db.delete(mcpTools).where(eq(mcpTools.serverId, c.req.param("id")));
+  await db.delete(mcpTools).where(eq(mcpTools.mcpServerId, c.req.param("id")));
   await db.delete(mcpServers).where(and(eq(mcpServers.id, c.req.param("id")), eq(mcpServers.orgId, orgId)));
   return c.body(null, 204);
 });
@@ -96,13 +93,13 @@ mcpRoutes.post("/servers/:id/test", async (c) => {
 
     const isOk = resp.ok;
     await db.update(mcpServers)
-      .set({ status: isOk ? "connected" : "error", lastTestedAt: new Date(), updatedAt: new Date() })
+      .set({ healthStatus: isOk ? "connected" : "error", lastHealthCheckAt: new Date(), updatedAt: new Date() })
       .where(eq(mcpServers.id, server.id));
 
     return c.json({ connected: isOk, status: resp.status });
   } catch {
     await db.update(mcpServers)
-      .set({ status: "error", lastTestedAt: new Date(), updatedAt: new Date() })
+      .set({ healthStatus: "error", lastHealthCheckAt: new Date(), updatedAt: new Date() })
       .where(eq(mcpServers.id, server.id));
 
     return c.json({ connected: false, error: "Connection failed" });
@@ -112,7 +109,7 @@ mcpRoutes.post("/servers/:id/test", async (c) => {
 // List tools for an MCP server
 mcpRoutes.get("/servers/:id/tools", async (c) => {
   const result = await db.select().from(mcpTools)
-    .where(eq(mcpTools.serverId, c.req.param("id")))
+    .where(eq(mcpTools.mcpServerId, c.req.param("id")))
     .orderBy(mcpTools.name);
   return c.json({ data: result });
 });

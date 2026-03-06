@@ -1,4 +1,4 @@
-import { eq, and, or, ilike, desc, sql } from "drizzle-orm";
+import { eq, and, or, ilike, isNull, sql } from "drizzle-orm";
 import { db } from "../lib/db";
 import { conversations, messages, agents, knowledgeCollections } from "@nova/shared/schemas";
 
@@ -12,7 +12,7 @@ export const searchService = {
         .from(conversations)
         .where(and(
           eq(conversations.orgId, orgId),
-          eq(conversations.isDeleted, false),
+          isNull(conversations.deletedAt),
           ilike(conversations.title, pattern),
         ))
         .limit(limit),
@@ -21,6 +21,7 @@ export const searchService = {
         .from(messages)
         .where(and(
           eq(messages.orgId, orgId),
+          isNull(messages.deletedAt),
           ilike(messages.content, pattern),
         ))
         .limit(limit),
@@ -29,7 +30,7 @@ export const searchService = {
         .from(agents)
         .where(and(
           eq(agents.orgId, orgId),
-          eq(agents.isDeleted, false),
+          isNull(agents.deletedAt),
           or(ilike(agents.name, pattern), ilike(agents.description, pattern)),
         ))
         .limit(limit),
@@ -38,6 +39,7 @@ export const searchService = {
         .from(knowledgeCollections)
         .where(and(
           eq(knowledgeCollections.orgId, orgId),
+          isNull(knowledgeCollections.deletedAt),
           ilike(knowledgeCollections.name, pattern),
         ))
         .limit(limit),

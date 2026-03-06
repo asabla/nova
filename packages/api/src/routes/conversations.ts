@@ -1,10 +1,9 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { insertConversationSchema, updateConversationSchema } from "@nova/shared/schema";
 import type { AppContext } from "../types/context";
 import * as conversationService from "../services/conversation.service";
-import * as auditService from "../services/audit.service";
+import { writeAuditLog } from "../services/audit.service";
 import { AppError } from "@nova/shared/utils";
 
 const conversations = new Hono<AppContext>();
@@ -33,13 +32,21 @@ conversations.get("/:id", async (c) => {
   return c.json(conversation);
 });
 
-conversations.post("/", zValidator("json", insertConversationSchema), async (c) => {
+const createSchema = z.object({
+  title: z.string().min(1).max(500).optional(),
+  systemPrompt: z.string().max(10_000).optional(),
+  modelId: z.string().uuid().optional(),
+  visibility: z.enum(["private", "team", "public"]).optional(),
+  workspaceId: z.string().uuid().optional(),
+});
+
+conversations.post("/", zValidator("json", createSchema), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const data = c.req.valid("json");
   const conversation = await conversationService.createConversation(orgId, userId, data);
 
-  await auditService.writeAuditLog({
+  await writeAuditLog({
     orgId,
     actorId: userId,
     actorType: "user",
@@ -51,7 +58,16 @@ conversations.post("/", zValidator("json", insertConversationSchema), async (c) 
   return c.json(conversation, 201);
 });
 
-conversations.patch("/:id", zValidator("json", updateConversationSchema), async (c) => {
+const updateSchema = z.object({
+  title: z.string().min(1).max(500).optional(),
+  systemPrompt: z.string().max(10_000).optional(),
+  modelId: z.string().uuid().optional(),
+  visibility: z.enum(["private", "team", "public"]).optional(),
+  isPinned: z.boolean().optional(),
+  isArchived: z.boolean().optional(),
+});
+
+conversations.patch("/:id", zValidator("json", updateSchema), async (c) => {
   const orgId = c.get("orgId");
   const data = c.req.valid("json");
   const conversation = await conversationService.updateConversation(orgId, c.req.param("id"), data);
@@ -65,7 +81,7 @@ conversations.delete("/:id", async (c) => {
   const conversation = await conversationService.deleteConversation(orgId, c.req.param("id"));
   if (!conversation) throw AppError.notFound("Conversation");
 
-  await auditService.writeAuditLog({
+  await writeAuditLog({
     orgId,
     actorId: userId,
     actorType: "user",

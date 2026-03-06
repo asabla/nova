@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { eq, and, asc } from "drizzle-orm";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
-import { conversations, messages, messageAttachments } from "@nova/shared/schemas";
+import { conversations, messages } from "@nova/shared/schemas";
 import { AppError } from "@nova/shared/utils";
 
 const exportRoutes = new Hono<AppContext>();
@@ -27,8 +27,9 @@ exportRoutes.get("/conversations/:id/json", async (c) => {
       id: m.id,
       role: m.senderType,
       content: m.content,
-      model: m.model,
-      tokenCount: m.tokenCount,
+      modelId: m.modelId,
+      tokenCountPrompt: m.tokenCountPrompt,
+      tokenCountCompletion: m.tokenCountCompletion,
       createdAt: m.createdAt,
     })),
   };
@@ -55,8 +56,7 @@ exportRoutes.get("/conversations/:id/markdown", async (c) => {
 
   for (const msg of msgs) {
     const role = msg.senderType === "user" ? "User" : "Assistant";
-    const model = msg.model ? ` (${msg.model})` : "";
-    md += `## ${role}${model}\n\n${msg.content ?? ""}\n\n---\n\n`;
+    md += `## ${role}\n\n${msg.content ?? ""}\n\n---\n\n`;
   }
 
   c.header("Content-Type", "text/markdown");
@@ -70,7 +70,7 @@ exportRoutes.get("/user-data", async (c) => {
   const userId = c.get("userId");
 
   const userConversations = await db.select().from(conversations)
-    .where(and(eq(conversations.orgId, orgId), eq(conversations.createdBy, userId)));
+    .where(and(eq(conversations.orgId, orgId), eq(conversations.ownerId, userId)));
 
   const allMessages = [];
   for (const conv of userConversations) {

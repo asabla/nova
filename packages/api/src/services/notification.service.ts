@@ -1,6 +1,5 @@
-import { eq, and, desc, sql } from "drizzle-orm";
 import { db } from "../lib/db";
-import { notifications, notificationPreferences } from "@nova/shared/schemas";
+import { notifications } from "@nova/shared/schemas";
 import { sendToUser } from "../lib/ws";
 
 export const notificationService = {
@@ -12,7 +11,6 @@ export const notificationService = {
     body?: string;
     resourceType?: string;
     resourceId?: string;
-    metadata?: Record<string, unknown>;
   }) {
     const [notification] = await db.insert(notifications).values({
       orgId: data.orgId,
@@ -22,7 +20,6 @@ export const notificationService = {
       body: data.body,
       resourceType: data.resourceType,
       resourceId: data.resourceId,
-      metadata: data.metadata,
     }).returning();
 
     // Send real-time notification via WebSocket
@@ -48,7 +45,6 @@ export const notificationService = {
       body: `"${conversationTitle}" was shared with you`,
       resourceType: "conversation",
       resourceId: conversationId,
-      metadata: { fromUserId },
     });
   },
 
@@ -61,7 +57,6 @@ export const notificationService = {
       body: messageContent.slice(0, 200),
       resourceType: "conversation",
       resourceId: conversationId,
-      metadata: { fromUserId },
     });
   },
 

@@ -1,8 +1,21 @@
 import { db } from "../lib/db";
-import { conversations, conversationParticipants } from "@nova/shared/schema";
-import { eq, and, isNull, desc, ilike, or, sql } from "drizzle-orm";
-import type { InsertConversation, UpdateConversation } from "@nova/shared/schema";
+import { conversations, conversationParticipants } from "@nova/shared/schemas";
+import { eq, and, isNull, desc, ilike, sql } from "drizzle-orm";
+import type { Conversation } from "@nova/shared/schemas";
 import { parsePagination, buildPaginatedResponse, type PaginationInput } from "@nova/shared/utils";
+
+type UpdateConversationData = Partial<{
+  title: string;
+  systemPrompt: string;
+  modelId: string;
+  modelParams: unknown;
+  visibility: string;
+  isPinned: boolean;
+  isArchived: boolean;
+  workspaceId: string;
+  forkedFromMessageId: string;
+  publicShareToken: string;
+}>;
 
 export async function listConversations(
   orgId: string,
@@ -66,11 +79,25 @@ export async function getConversationByShareToken(shareToken: string) {
   return result[0] ?? null;
 }
 
-export async function createConversation(orgId: string, userId: string, data: InsertConversation) {
+export async function createConversation(orgId: string, userId: string, data: {
+  title?: string;
+  systemPrompt?: string;
+  modelId?: string;
+  modelParams?: unknown;
+  visibility?: string;
+  workspaceId?: string;
+  forkedFromMessageId?: string;
+}) {
   const result = await db.insert(conversations).values({
-    ...data,
     orgId,
     ownerId: userId,
+    title: data.title,
+    systemPrompt: data.systemPrompt,
+    modelId: data.modelId,
+    modelParams: data.modelParams,
+    visibility: data.visibility ?? "private",
+    workspaceId: data.workspaceId,
+    forkedFromMessageId: data.forkedFromMessageId,
   }).returning();
 
   const conversation = result[0];
@@ -85,7 +112,7 @@ export async function createConversation(orgId: string, userId: string, data: In
   return conversation;
 }
 
-export async function updateConversation(orgId: string, conversationId: string, data: UpdateConversation) {
+export async function updateConversation(orgId: string, conversationId: string, data: UpdateConversationData) {
   const result = await db
     .update(conversations)
     .set({ ...data, updatedAt: new Date() })
@@ -117,10 +144,10 @@ export async function forkConversation(orgId: string, userId: string, conversati
 
   return createConversation(orgId, userId, {
     title: original.title ? `Fork of ${original.title}` : "Forked conversation",
-    systemPrompt: original.systemPrompt,
-    modelId: original.modelId,
+    systemPrompt: original.systemPrompt ?? undefined,
+    modelId: original.modelId ?? undefined,
     modelParams: original.modelParams,
-    workspaceId: original.workspaceId,
+    workspaceId: original.workspaceId ?? undefined,
     forkedFromMessageId: messageId,
   });
 }

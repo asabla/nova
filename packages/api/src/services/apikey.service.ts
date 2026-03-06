@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, isNull } from "drizzle-orm";
 import { db } from "../lib/db";
 import { apiKeys } from "@nova/shared/schemas";
 import { AppError } from "@nova/shared/utils";
@@ -25,20 +25,20 @@ export const apikeyService = {
       .select({
         id: apiKeys.id,
         name: apiKeys.name,
-        prefix: apiKeys.prefix,
+        keyPrefix: apiKeys.keyPrefix,
         lastUsedAt: apiKeys.lastUsedAt,
         createdAt: apiKeys.createdAt,
         expiresAt: apiKeys.expiresAt,
       })
       .from(apiKeys)
-      .where(and(eq(apiKeys.orgId, orgId), eq(apiKeys.userId, userId), eq(apiKeys.isRevoked, false)))
+      .where(and(eq(apiKeys.orgId, orgId), eq(apiKeys.userId, userId), isNull(apiKeys.revokedAt)))
       .orderBy(desc(apiKeys.createdAt));
   },
 
   async create(orgId: string, userId: string, name: string) {
     const key = generateKey();
     const keyHash = await hashKey(key);
-    const prefix = key.slice(0, 8);
+    const keyPrefix = key.slice(0, 8);
 
     const [apiKey] = await db
       .insert(apiKeys)
@@ -47,7 +47,7 @@ export const apikeyService = {
         userId,
         name,
         keyHash,
-        prefix,
+        keyPrefix,
       })
       .returning();
 
@@ -57,7 +57,7 @@ export const apikeyService = {
   async revoke(orgId: string, userId: string, keyId: string) {
     const [apiKey] = await db
       .update(apiKeys)
-      .set({ isRevoked: true, updatedAt: new Date() })
+      .set({ revokedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(apiKeys.id, keyId), eq(apiKeys.orgId, orgId), eq(apiKeys.userId, userId)))
       .returning();
 
@@ -70,7 +70,7 @@ export const apikeyService = {
     const [apiKey] = await db
       .select()
       .from(apiKeys)
-      .where(and(eq(apiKeys.keyHash, keyHash), eq(apiKeys.isRevoked, false)));
+      .where(and(eq(apiKeys.keyHash, keyHash), isNull(apiKeys.revokedAt)));
 
     if (!apiKey) return null;
 

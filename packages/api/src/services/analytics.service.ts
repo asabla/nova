@@ -1,6 +1,6 @@
-import { eq, and, sql, gte, lte } from "drizzle-orm";
+import { eq, and, sql, gte, lte, isNull } from "drizzle-orm";
 import { db } from "../lib/db";
-import { usageStats, conversations, messages, users } from "@nova/shared/schemas";
+import { conversations, messages, userProfiles } from "@nova/shared/schemas";
 
 export const analyticsService = {
   async getOrgStats(orgId: string, from?: Date, to?: Date) {
@@ -20,17 +20,16 @@ export const analyticsService = {
         totalMessages: sql<number>`count(*)::int`,
         userMessages: sql<number>`count(*) filter (where ${messages.senderType} = 'user')::int`,
         assistantMessages: sql<number>`count(*) filter (where ${messages.senderType} = 'assistant')::int`,
-        totalTokens: sql<number>`coalesce(sum(${messages.tokenCount}), 0)::int`,
+        totalTokens: sql<number>`coalesce(sum(coalesce(${messages.tokenCountPrompt}, 0) + coalesce(${messages.tokenCountCompletion}, 0)), 0)::int`,
       })
         .from(messages)
         .where(eq(messages.orgId, orgId)),
 
       db.select({
         totalUsers: sql<number>`count(*)::int`,
-        activeUsers: sql<number>`count(*) filter (where ${users.lastActiveAt} > now() - interval '7 days')::int`,
       })
-        .from(users)
-        .where(eq(users.orgId, orgId)),
+        .from(userProfiles)
+        .where(and(eq(userProfiles.orgId, orgId), isNull(userProfiles.deletedAt))),
     ]);
 
     return {
@@ -46,7 +45,7 @@ export const analyticsService = {
     const result = await db.select({
       date: sql<string>`date_trunc(${period}, ${messages.createdAt})::date`,
       messageCount: sql<number>`count(*)::int`,
-      tokenCount: sql<number>`coalesce(sum(${messages.tokenCount}), 0)::int`,
+      tokenCount: sql<number>`coalesce(sum(coalesce(${messages.tokenCountPrompt}, 0) + coalesce(${messages.tokenCountCompletion}, 0)), 0)::int`,
     })
       .from(messages)
       .where(and(eq(messages.orgId, orgId), gte(messages.createdAt, since)))
@@ -58,13 +57,13 @@ export const analyticsService = {
 
   async getTopModels(orgId: string, limit: number = 10) {
     const result = await db.select({
-      model: messages.model,
+      modelId: messages.modelId,
       count: sql<number>`count(*)::int`,
-      tokens: sql<number>`coalesce(sum(${messages.tokenCount}), 0)::int`,
+      tokens: sql<number>`coalesce(sum(coalesce(${messages.tokenCountPrompt}, 0) + coalesce(${messages.tokenCountCompletion}, 0)), 0)::int`,
     })
       .from(messages)
-      .where(and(eq(messages.orgId, orgId), sql`${messages.model} is not null`))
-      .groupBy(messages.model)
+      .where(and(eq(messages.orgId, orgId), sql`${messages.modelId} is not null`))
+      .groupBy(messages.modelId)
       .orderBy(sql`count(*) desc`)
       .limit(limit);
 

@@ -1,20 +1,12 @@
 import { Hono } from "hono";
-import { z } from "zod";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
 import { conversations, messages } from "@nova/shared/schemas";
-import { auditService } from "../services/audit.service";
+import { writeAuditLog } from "../services/audit.service";
 
 const importRoutes = new Hono<AppContext>();
 
 // Import from ChatGPT export (conversations.json)
-const chatgptMessageSchema = z.object({
-  id: z.string(),
-  author: z.object({ role: z.string() }),
-  content: z.object({ parts: z.array(z.any()).optional() }).optional(),
-  create_time: z.number().nullable().optional(),
-});
-
 importRoutes.post("/chatgpt", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
@@ -33,11 +25,8 @@ importRoutes.post("/chatgpt", async (c) => {
 
       const [newConv] = await db.insert(conversations).values({
         orgId,
-        createdBy: userId,
+        ownerId: userId,
         title,
-        model: conv.default_model_slug ?? "gpt-4",
-        importSource: "chatgpt",
-        importedAt: new Date(),
       }).returning();
 
       // Extract messages from ChatGPT's mapping format
@@ -60,8 +49,6 @@ importRoutes.post("/chatgpt", async (c) => {
           conversationId: newConv.id,
           senderType,
           content,
-          model: msg.metadata?.model_slug,
-          createdAt: msg.create_time ? new Date(msg.create_time * 1000) : new Date(),
         });
       }
 
@@ -71,12 +58,13 @@ importRoutes.post("/chatgpt", async (c) => {
     }
   }
 
-  await auditService.writeAuditLog({
+  await writeAuditLog({
     orgId,
-    userId,
+    actorId: userId,
+    actorType: "user",
     action: "import.chatgpt",
     resourceType: "conversation",
-    metadata: { imported, skipped, total: body.length },
+    details: { imported, skipped, total: body.length },
   });
 
   return c.json({ imported, skipped, total: body.length });
@@ -99,11 +87,8 @@ importRoutes.post("/claude", async (c) => {
     try {
       const [newConv] = await db.insert(conversations).values({
         orgId,
-        createdBy: userId,
+        ownerId: userId,
         title: conv.name ?? "Imported from Claude",
-        model: conv.model ?? "claude-sonnet-4-20250514",
-        importSource: "claude",
-        importedAt: new Date(),
       }).returning();
 
       for (const msg of conv.chat_messages ?? []) {
@@ -112,7 +97,6 @@ importRoutes.post("/claude", async (c) => {
           conversationId: newConv.id,
           senderType: msg.sender === "human" ? "user" : "assistant",
           content: typeof msg.text === "string" ? msg.text : JSON.stringify(msg.text),
-          createdAt: msg.created_at ? new Date(msg.created_at) : new Date(),
         });
       }
 
@@ -122,12 +106,13 @@ importRoutes.post("/claude", async (c) => {
     }
   }
 
-  await auditService.writeAuditLog({
+  await writeAuditLog({
     orgId,
-    userId,
+    actorId: userId,
+    actorType: "user",
     action: "import.claude",
     resourceType: "conversation",
-    metadata: { imported, skipped, total: body.length },
+    details: { imported, skipped, total: body.length },
   });
 
   return c.json({ imported, skipped, total: body.length });

@@ -11,7 +11,7 @@ interface ChatCompletionRequest {
   tool_choice?: string | object;
 }
 
-export async function chatCompletion(request: ChatCompletionRequest) {
+export async function chatCompletion(request: ChatCompletionRequest): Promise<any> {
   const response = await fetch(`${env.LITELLM_API_URL}/chat/completions`, {
     method: "POST",
     headers: {
@@ -20,6 +20,10 @@ export async function chatCompletion(request: ChatCompletionRequest) {
     },
     body: JSON.stringify(request),
   });
+
+  // For streaming requests, return the raw Response so callers can read the body
+  if (request.stream) return response;
+
   return response.json();
 }
 

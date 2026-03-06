@@ -21,15 +21,18 @@ export function useWebSocket() {
 
     const unsubscribe = onWsMessage((event: ServerWSEvent) => {
       switch (event.type) {
-        case "typing":
-          setTyping(event.conversationId, event.userId, event.isTyping);
+        case "typing.start":
+          setTyping(event.conversationId, event.userId, true);
           break;
-        case "message_created":
+        case "typing.stop":
+          setTyping(event.conversationId, event.userId, false);
+          break;
+        case "message.new":
           queryClient.invalidateQueries({
             queryKey: queryKeys.conversations.messages(event.conversationId),
           });
           break;
-        case "conversation_updated":
+        case "conversation.updated":
           queryClient.invalidateQueries({
             queryKey: queryKeys.conversations.detail(event.conversationId),
           });
@@ -37,7 +40,7 @@ export function useWebSocket() {
             queryKey: queryKeys.conversations.all,
           });
           break;
-        case "notification":
+        case "notification.new":
           queryClient.invalidateQueries({
             queryKey: queryKeys.notifications.all,
           });
@@ -53,7 +56,7 @@ export function useWebSocket() {
   }, [user, setStatus, setTyping, queryClient]);
 
   const sendTyping = useCallback((conversationId: string, isTyping: boolean) => {
-    sendWsMessage("typing", { conversationId, isTyping });
+    sendWsMessage(isTyping ? "typing.start" : "typing.stop", { conversationId });
   }, []);
 
   return { sendTyping };

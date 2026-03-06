@@ -1,7 +1,7 @@
 import type { ServerWebSocket } from "bun";
 import { redisSub, redisPub } from "./redis";
 
-interface WSData {
+export interface WSData {
   userId: string;
   orgId: string;
 }

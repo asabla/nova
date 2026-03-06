@@ -46,7 +46,7 @@ export const promptService = {
       .insert(promptTemplates)
       .values({
         orgId,
-        createdBy: userId,
+        ownerId: userId,
         name: data.name,
         description: data.description,
         content: data.content,

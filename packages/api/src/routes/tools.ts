@@ -46,12 +46,11 @@ toolRoutes.post("/", requireRole("power-user"), async (c) => {
 
   const [tool] = await db.insert(tools).values({
     orgId,
-    createdBy: userId,
+    registeredById: userId,
     name: body.name,
     description: body.description,
     type: body.type,
-    schema: body.schema,
-    endpoint: body.endpoint,
+    functionSchema: body.schema ?? {},
     isEnabled: true,
   }).returning();
 

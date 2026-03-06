@@ -23,9 +23,8 @@ modelRoutes.get("/providers", async (c) => {
 const createProviderSchema = z.object({
   name: z.string().min(1).max(100),
   type: z.string().min(1).max(50),
-  baseUrl: z.string().url().optional(),
+  apiBaseUrl: z.string().url().optional(),
   apiKey: z.string().optional(),
-  config: z.record(z.unknown()).optional(),
 });
 
 modelRoutes.post("/providers", requireRole("org-admin"), async (c) => {
@@ -35,21 +34,18 @@ modelRoutes.post("/providers", requireRole("org-admin"), async (c) => {
     orgId,
     name: body.name,
     type: body.type,
-    baseUrl: body.baseUrl,
+    apiBaseUrl: body.apiBaseUrl,
     apiKeyEncrypted: body.apiKey,
-    config: body.config,
   }).returning();
   return c.json(provider, 201);
 });
 
 const createModelSchema = z.object({
-  providerId: z.string().uuid(),
+  modelProviderId: z.string().uuid(),
   name: z.string().min(1).max(200),
-  modelId: z.string().min(1),
+  modelIdExternal: z.string().min(1),
   contextWindow: z.number().int().optional(),
-  maxOutputTokens: z.number().int().optional(),
-  inputCostPer1k: z.string().optional(),
-  outputCostPer1k: z.string().optional(),
+  capabilities: z.array(z.string()).optional(),
 });
 
 modelRoutes.post("/", requireRole("org-admin"), async (c) => {
@@ -57,13 +53,11 @@ modelRoutes.post("/", requireRole("org-admin"), async (c) => {
   const body = createModelSchema.parse(await c.req.json());
   const [model] = await db.insert(models).values({
     orgId,
-    providerId: body.providerId,
+    modelProviderId: body.modelProviderId,
     name: body.name,
-    modelId: body.modelId,
+    modelIdExternal: body.modelIdExternal,
     contextWindow: body.contextWindow,
-    maxOutputTokens: body.maxOutputTokens,
-    inputCostPer1k: body.inputCostPer1k,
-    outputCostPer1k: body.outputCostPer1k,
+    capabilities: body.capabilities ?? [],
   }).returning();
   return c.json(model, 201);
 });

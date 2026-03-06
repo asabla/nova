@@ -1,7 +1,6 @@
 import { db } from "../lib/db";
-import { messages, messageAttachments, messageRatings, messageNotes, conversations } from "@nova/shared/schema";
+import { messages, messageAttachments, messageRatings, messageNotes, conversations } from "@nova/shared/schemas";
 import { eq, and, isNull, asc, sql } from "drizzle-orm";
-import type { InsertMessage } from "@nova/shared/schema";
 import { parsePagination, buildPaginatedResponse, type PaginationInput } from "@nova/shared/utils";
 
 export async function listMessages(orgId: string, conversationId: string, pagination: PaginationInput) {
@@ -38,10 +37,32 @@ export async function getMessage(orgId: string, messageId: string) {
   return result[0] ?? null;
 }
 
-export async function createMessage(orgId: string, data: InsertMessage) {
+export async function createMessage(orgId: string, data: {
+  conversationId: string;
+  senderType: string;
+  content?: string;
+  senderUserId?: string;
+  agentId?: string;
+  modelId?: string;
+  contentType?: string;
+  metadata?: unknown;
+  tokenCountPrompt?: number;
+  tokenCountCompletion?: number;
+  costCents?: number;
+}) {
   const result = await db.insert(messages).values({
-    ...data,
     orgId,
+    conversationId: data.conversationId,
+    senderType: data.senderType,
+    content: data.content,
+    senderUserId: data.senderUserId,
+    agentId: data.agentId,
+    modelId: data.modelId,
+    contentType: data.contentType ?? "text",
+    metadata: data.metadata,
+    tokenCountPrompt: data.tokenCountPrompt,
+    tokenCountCompletion: data.tokenCountCompletion,
+    costCents: data.costCents,
   }).returning();
 
   const message = result[0];

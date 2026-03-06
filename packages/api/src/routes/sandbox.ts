@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
 import { sandboxExecutions } from "@nova/shared/schemas";
-import { auditService } from "../services/audit.service";
-import { requireRole } from "../middleware/rbac";
+import { writeAuditLog } from "../services/audit.service";
 
 const sandboxRoutes = new Hono<AppContext>();
 
@@ -20,39 +20,33 @@ sandboxRoutes.post("/execute", async (c) => {
   const userId = c.get("userId");
   const body = executeSchema.parse(await c.req.json());
 
-  // Create execution record
   const [execution] = await db.insert(sandboxExecutions).values({
     orgId,
-    userId,
     language: body.language,
     code: body.code,
-    status: "running",
-    timeoutSeconds: body.timeout,
-    memoryLimitMb: body.memoryMb,
+    sandboxBackend: "process",
   }).returning();
 
-  await auditService.writeAuditLog({
+  await writeAuditLog({
     orgId,
-    userId,
+    actorId: userId,
+    actorType: "user",
     action: "sandbox.execute",
     resourceType: "sandbox_execution",
     resourceId: execution.id,
-    metadata: { language: body.language },
+    details: { language: body.language },
   });
 
-  // In production, this would call nsjail/gVisor/Firecracker
-  // For MVP, execute in a subprocess with timeout
   try {
     const result = await executeInSandbox(body.language, body.code, body.timeout);
 
     await db.update(sandboxExecutions).set({
-      status: "completed",
-      output: result.stdout,
-      error: result.stderr,
+      stdout: result.stdout,
+      stderr: result.stderr,
       exitCode: result.exitCode,
-      executionTimeMs: result.durationMs,
+      durationMs: result.durationMs,
       updatedAt: new Date(),
-    }).where(({ id: col }) => col.equals(execution.id));
+    }).where(eq(sandboxExecutions.id, execution.id));
 
     return c.json({
       id: execution.id,
@@ -64,10 +58,10 @@ sandboxRoutes.post("/execute", async (c) => {
     });
   } catch (err: any) {
     await db.update(sandboxExecutions).set({
-      status: "failed",
-      error: err.message,
+      stderr: err.message,
+      exitCode: 1,
       updatedAt: new Date(),
-    }).where(({ id: col }) => col.equals(execution.id));
+    }).where(eq(sandboxExecutions.id, execution.id));
 
     return c.json({
       id: execution.id,
@@ -79,7 +73,7 @@ sandboxRoutes.post("/execute", async (c) => {
 
 sandboxRoutes.get("/:id", async (c) => {
   const [execution] = await db.select().from(sandboxExecutions)
-    .where(({ id: col }) => col.equals(c.req.param("id")));
+    .where(eq(sandboxExecutions.id, c.req.param("id")));
 
   if (!execution) return c.json({ error: "Execution not found" }, 404);
   return c.json(execution);

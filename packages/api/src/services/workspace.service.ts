@@ -1,4 +1,4 @@
-import { eq, and, desc, ilike, sql } from "drizzle-orm";
+import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { db } from "../lib/db";
 import { workspaces, workspaceMemberships } from "@nova/shared/schemas";
 import { AppError } from "@nova/shared/utils";
@@ -14,7 +14,8 @@ export const workspaceService = {
       ))
       .where(and(
         eq(workspaces.orgId, orgId),
-        eq(workspaces.isDeleted, false),
+        eq(workspaces.isArchived, false),
+        isNull(workspaces.deletedAt),
       ))
       .orderBy(desc(workspaces.updatedAt))
       .limit(opts?.limit ?? 50)
@@ -23,7 +24,7 @@ export const workspaceService = {
     const [{ count }] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(workspaces)
-      .where(and(eq(workspaces.orgId, orgId), eq(workspaces.isDeleted, false)));
+      .where(and(eq(workspaces.orgId, orgId), eq(workspaces.isArchived, false), isNull(workspaces.deletedAt)));
 
     return { data: result.map((r) => r.workspace), total: count };
   },
@@ -32,7 +33,7 @@ export const workspaceService = {
     const [workspace] = await db
       .select()
       .from(workspaces)
-      .where(and(eq(workspaces.id, workspaceId), eq(workspaces.orgId, orgId), eq(workspaces.isDeleted, false)));
+      .where(and(eq(workspaces.id, workspaceId), eq(workspaces.orgId, orgId), isNull(workspaces.deletedAt)));
 
     if (!workspace) throw AppError.notFound("Workspace not found");
     return workspace;
@@ -41,21 +42,19 @@ export const workspaceService = {
   async create(orgId: string, userId: string, data: {
     name: string;
     description?: string;
-    visibility?: string;
   }) {
     const [workspace] = await db
       .insert(workspaces)
       .values({
         orgId,
-        createdBy: userId,
+        ownerId: userId,
         name: data.name,
-        slug: data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
         description: data.description,
-        visibility: data.visibility ?? "private",
       })
       .returning();
 
     await db.insert(workspaceMemberships).values({
+      orgId,
       workspaceId: workspace.id,
       userId,
       role: "admin",
@@ -67,7 +66,6 @@ export const workspaceService = {
   async update(orgId: string, workspaceId: string, data: Partial<{
     name: string;
     description: string;
-    visibility: string;
   }>) {
     const [workspace] = await db
       .update(workspaces)
@@ -82,7 +80,7 @@ export const workspaceService = {
   async delete(orgId: string, workspaceId: string) {
     const [workspace] = await db
       .update(workspaces)
-      .set({ isDeleted: true, deletedAt: new Date(), updatedAt: new Date() })
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(workspaces.id, workspaceId), eq(workspaces.orgId, orgId)))
       .returning();
 
@@ -90,14 +88,21 @@ export const workspaceService = {
     return workspace;
   },
 
-  async addMember(workspaceId: string, userId: string, role: string = "member") {
+  async archive(orgId: string, workspaceId: string) {
+    const [workspace] = await db
+      .update(workspaces)
+      .set({ isArchived: true, updatedAt: new Date() })
+      .where(and(eq(workspaces.id, workspaceId), eq(workspaces.orgId, orgId)))
+      .returning();
+
+    if (!workspace) throw AppError.notFound("Workspace not found");
+    return workspace;
+  },
+
+  async addMember(orgId: string, workspaceId: string, userId: string, role: string = "member") {
     const [membership] = await db
       .insert(workspaceMemberships)
-      .values({ workspaceId, userId, role })
-      .onConflictDoUpdate({
-        target: [workspaceMemberships.workspaceId, workspaceMemberships.userId],
-        set: { role },
-      })
+      .values({ orgId, workspaceId, userId, role })
       .returning();
 
     return membership;

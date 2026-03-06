@@ -1,12 +1,12 @@
 import { app } from "./app";
 import { env } from "./lib/env";
 import { ensureBucket } from "./lib/minio";
-import { handleWsUpgrade, handleWsClose, handleWsMessage, initWsPubSub } from "./lib/ws";
+import { handleWsUpgrade, handleWsClose, handleWsMessage, initWsPubSub, type WSData } from "./lib/ws";
 
 await ensureBucket();
 initWsPubSub();
 
-Bun.serve({
+Bun.serve<WSData>({
   fetch(req, server) {
     const url = new URL(req.url);
 

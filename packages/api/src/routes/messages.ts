@@ -53,7 +53,6 @@ messagesRouter.post("/:conversationId/messages", zValidator("json", sendMessageS
     senderType: "user",
     senderUserId: userId,
     content: data.content,
-    parentMessageId: data.parentMessageId,
   });
 
   if (data.attachments) {
@@ -140,8 +139,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         conversationId,
         senderType: "assistant",
         content: fullContent,
-        modelId: conversation.modelId,
-        status: "completed",
+        modelId: conversation.modelId ?? undefined,
       });
 
       await stream.writeSSE({ event: "done", data: "" });

@@ -40,14 +40,15 @@ researchRoutes.post("/", async (c) => {
   const userId = c.get("userId");
   const body = startResearchSchema.parse(await c.req.json());
 
+  const workflowId = crypto.randomUUID();
   const [report] = await db.insert(researchReports).values({
     orgId,
     conversationId: body.conversationId ?? crypto.randomUUID(),
-    createdBy: userId,
+    userId,
+    workflowId,
     query: body.query,
     status: "pending",
-    maxSources: body.maxSources,
-    maxIterations: body.maxIterations,
+    config: { maxSources: body.maxSources, maxIterations: body.maxIterations },
   }).returning();
 
   // Start Temporal workflow

@@ -1,9 +1,12 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { eq, and } from "drizzle-orm";
 import type { AppContext } from "../types/context";
 import { orgService } from "../services/org.service";
-import { auditService } from "../services/audit.service";
+import { writeAuditLog } from "../services/audit.service";
 import { requireRole } from "../middleware/rbac";
+import { db } from "../lib/db";
+import { orgSettings } from "@nova/shared/schemas";
 
 const orgRoutes = new Hono<AppContext>();
 
@@ -27,15 +30,25 @@ orgRoutes.patch("/", requireRole("org-admin"), async (c) => {
 
 orgRoutes.get("/settings", async (c) => {
   const orgId = c.get("orgId");
-  const settings = await orgService.getSettings(orgId);
-  return c.json(settings);
+  const settings = await db.select().from(orgSettings).where(eq(orgSettings.orgId, orgId));
+  const result: Record<string, string> = {};
+  for (const s of settings) {
+    result[s.key] = s.value;
+  }
+  return c.json(result);
 });
 
 orgRoutes.put("/settings", requireRole("org-admin"), async (c) => {
   const orgId = c.get("orgId");
-  const body = await c.req.json();
-  const settings = await orgService.updateSettings(orgId, body);
-  return c.json(settings);
+  const body = await c.req.json() as Record<string, string>;
+  for (const [key, value] of Object.entries(body)) {
+    await db.insert(orgSettings).values({ orgId, key, value: String(value) })
+      .onConflictDoUpdate({
+        target: [orgSettings.orgId, orgSettings.key],
+        set: { value: String(value), updatedAt: new Date() },
+      });
+  }
+  return c.json({ ok: true });
 });
 
 // Members
@@ -50,7 +63,7 @@ orgRoutes.patch("/members/:userId/role", requireRole("org-admin"), async (c) => 
   const userId = c.get("userId");
   const { role } = z.object({ role: z.string() }).parse(await c.req.json());
   const member = await orgService.updateMemberRole(orgId, c.req.param("userId"), role);
-  await auditService.writeAuditLog({ orgId, userId, action: "org.member.role_change", resourceType: "user", resourceId: c.req.param("userId"), metadata: { role } });
+  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "org.member.role_change", resourceType: "user", resourceId: c.req.param("userId"), details: { role } });
   return c.json(member);
 });
 
@@ -58,7 +71,7 @@ orgRoutes.delete("/members/:userId", requireRole("org-admin"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   await orgService.removeMember(orgId, c.req.param("userId"));
-  await auditService.writeAuditLog({ orgId, userId, action: "org.member.remove", resourceType: "user", resourceId: c.req.param("userId") });
+  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "org.member.remove", resourceType: "user", resourceId: c.req.param("userId") });
   return c.body(null, 204);
 });
 
@@ -78,7 +91,7 @@ orgRoutes.post("/invitations", requireRole("org-admin"), async (c) => {
   }).parse(await c.req.json());
 
   const invitation = await orgService.createInvitation(orgId, userId, body);
-  await auditService.writeAuditLog({ orgId, userId, action: "org.invitation.create", resourceType: "invitation", resourceId: invitation.id });
+  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "org.invitation.create", resourceType: "invitation", resourceId: invitation.id });
   return c.json(invitation, 201);
 });
 
