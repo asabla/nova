@@ -1,0 +1,61 @@
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { secureHeaders } from "hono/secure-headers";
+import { requestId } from "./middleware/request-id";
+import { logger } from "./middleware/logger";
+import { errorHandler } from "./middleware/error-handler";
+import { rateLimiter } from "./middleware/rate-limit";
+import { authMiddleware } from "./middleware/auth";
+import { orgScope } from "./middleware/org-scope";
+import type { AppContext } from "./types/context";
+import { env } from "./lib/env";
+
+import { authRoutes } from "./routes/auth";
+import { healthRoutes } from "./routes/health";
+import { conversationRoutes } from "./routes/conversations";
+import { messageRoutes } from "./routes/messages";
+import { fileRoutes } from "./routes/files";
+import { userRoutes } from "./routes/users";
+import { notificationRoutes } from "./routes/notifications";
+
+const app = new Hono<AppContext>();
+
+// 1. Error handler
+app.onError(errorHandler);
+
+// 2. Security headers
+app.use("*", secureHeaders());
+
+// 3. CORS
+app.use("*", cors({
+  origin: env.CORS_ORIGINS.split(","),
+  credentials: true,
+}));
+
+// 4. Request ID
+app.use("*", requestId());
+
+// 5. Logger
+app.use("*", logger());
+
+// 6. Public routes
+app.route("/api/auth", authRoutes);
+app.route("/health", healthRoutes);
+
+// 7. Rate limiting (on API routes)
+app.use("/api/*", rateLimiter());
+
+// 8. Auth middleware (everything below requires valid session)
+app.use("/api/*", authMiddleware());
+
+// 9. Org scoping
+app.use("/api/*", orgScope());
+
+// 10. Authenticated routes
+app.route("/api/conversations", conversationRoutes);
+app.route("/api/conversations", messageRoutes);
+app.route("/api/files", fileRoutes);
+app.route("/api/users", userRoutes);
+app.route("/api/notifications", notificationRoutes);
+
+export { app };
