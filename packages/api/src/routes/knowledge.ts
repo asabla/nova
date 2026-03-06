@@ -76,8 +76,59 @@ knowledgeRoutes.post("/:id/documents", async (c) => {
 
 knowledgeRoutes.delete("/:collectionId/documents/:docId", async (c) => {
   const orgId = c.get("orgId");
-  await knowledgeService.deleteDocument(orgId, c.req.param("docId"));
+  const userId = c.get("userId");
+  await knowledgeService.removeDocument(orgId, c.req.param("docId"));
+  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "knowledge.document.delete", resourceType: "knowledge_document", resourceId: c.req.param("docId") });
   return c.body(null, 204);
+});
+
+// Re-index all documents in a collection
+knowledgeRoutes.post("/:id/reindex", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const collection = await knowledgeService.reindexCollection(orgId, c.req.param("id"));
+  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "knowledge.collection.reindex", resourceType: "knowledge_collection", resourceId: c.req.param("id") });
+  return c.json(collection);
+});
+
+// Semantic search against a collection
+const querySchema = z.object({
+  query: z.string().min(1).max(2000),
+  topK: z.number().int().min(1).max(50).optional(),
+  threshold: z.number().min(0).max(1).optional(),
+});
+
+knowledgeRoutes.post("/:id/query", async (c) => {
+  const orgId = c.get("orgId");
+  const body = querySchema.parse(await c.req.json());
+  const results = await knowledgeService.queryCollection(orgId, c.req.param("id"), body.query, {
+    topK: body.topK,
+    threshold: body.threshold,
+  });
+  return c.json({ data: results });
+});
+
+// Get chunks for a specific document
+knowledgeRoutes.get("/:id/documents/:docId/chunks", async (c) => {
+  const orgId = c.get("orgId");
+  const chunks = await knowledgeService.getChunks(orgId, c.req.param("docId"));
+  return c.json({ data: chunks });
+});
+
+// Update embedding configuration
+const updateConfigSchema = z.object({
+  embeddingModel: z.string().optional(),
+  chunkSize: z.number().int().min(64).max(8192).optional(),
+  chunkOverlap: z.number().int().min(0).optional(),
+});
+
+knowledgeRoutes.patch("/:id/config", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const body = updateConfigSchema.parse(await c.req.json());
+  const collection = await knowledgeService.updateCollectionConfig(orgId, c.req.param("id"), body);
+  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "knowledge.collection.config_update", resourceType: "knowledge_collection", resourceId: c.req.param("id") });
+  return c.json(collection);
 });
 
 export { knowledgeRoutes };

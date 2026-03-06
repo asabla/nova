@@ -1,12 +1,11 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Bell, Menu, Search, Sun, Moon, Monitor } from "lucide-react";
+import { Menu, Search, Sun, Moon, Monitor } from "lucide-react";
 import { authClient } from "../../hooks/useAuth";
 import { useUIStore } from "../../stores/ui.store";
-import { notificationUnreadCountOptions } from "../../lib/query-keys";
 import { Avatar } from "../ui/Avatar";
 import { ConnectionStatus } from "./ConnectionStatus";
+import { NotificationCenter } from "../notifications/NotificationCenter";
 
 export function Header() {
   const { t } = useTranslation();
@@ -17,9 +16,6 @@ export function Header() {
   const toggleCommandPalette = useUIStore((s) => s.toggleCommandPalette);
   const theme = useUIStore((s) => s.theme);
   const setTheme = useUIStore((s) => s.setTheme);
-  const { data: unreadData } = useQuery(notificationUnreadCountOptions());
-  const unreadCount = unreadData?.count ?? 0;
-
   return (
     <header className="h-14 border-b border-border bg-surface flex items-center justify-between px-4 shrink-0">
       <div className="flex items-center gap-3">
@@ -61,17 +57,7 @@ export function Header() {
         </button>
 
         {/* Notifications */}
-        <button
-          onClick={() => navigate({ to: "/settings/notifications" })}
-          className="relative text-text-secondary hover:text-text p-2 rounded-lg hover:bg-surface-secondary"
-        >
-          <Bell className="h-4 w-4" />
-          {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 bg-danger text-white text-[10px] font-bold rounded-full h-4 min-w-4 flex items-center justify-center px-1">
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </span>
-          )}
-        </button>
+        <NotificationCenter />
 
         {/* User avatar */}
         <button

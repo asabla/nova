@@ -1,4 +1,4 @@
-import { eq, and, desc, ilike, sql } from "drizzle-orm";
+import { eq, and, desc, isNull, ilike, sql } from "drizzle-orm";
 import { db } from "../lib/db";
 import { knowledgeCollections, knowledgeDocuments, knowledgeChunks } from "@nova/shared/schemas";
 import { AppError } from "@nova/shared/utils";
@@ -120,5 +120,147 @@ export const knowledgeService = {
 
     if (!doc) throw AppError.notFound("Document not found");
     return doc;
+  },
+
+  async removeDocument(orgId: string, docId: string) {
+    const [doc] = await db
+      .update(knowledgeDocuments)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(knowledgeDocuments.id, docId), eq(knowledgeDocuments.orgId, orgId), isNull(knowledgeDocuments.deletedAt)))
+      .returning();
+
+    if (!doc) throw AppError.notFound("Document not found");
+
+    // Soft-delete associated chunks
+    await db
+      .update(knowledgeChunks)
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(knowledgeChunks.knowledgeDocumentId, docId), eq(knowledgeChunks.orgId, orgId)));
+
+    return doc;
+  },
+
+  async reindexCollection(orgId: string, collectionId: string) {
+    // Verify collection exists
+    const collection = await this.getCollection(orgId, collectionId);
+
+    // Mark all non-deleted documents for re-indexing
+    await db
+      .update(knowledgeDocuments)
+      .set({ status: "pending", updatedAt: new Date() })
+      .where(and(
+        eq(knowledgeDocuments.knowledgeCollectionId, collectionId),
+        eq(knowledgeDocuments.orgId, orgId),
+        isNull(knowledgeDocuments.deletedAt),
+      ));
+
+    // Update collection status
+    const [updated] = await db
+      .update(knowledgeCollections)
+      .set({ status: "indexing", updatedAt: new Date() })
+      .where(and(eq(knowledgeCollections.id, collectionId), eq(knowledgeCollections.orgId, orgId)))
+      .returning();
+
+    return updated;
+  },
+
+  async queryCollection(orgId: string, collectionId: string, query: string, opts?: { topK?: number; threshold?: number }) {
+    const topK = opts?.topK ?? 5;
+    const threshold = opts?.threshold ?? 0.0;
+
+    // Verify collection exists and belongs to org
+    await this.getCollection(orgId, collectionId);
+
+    // Use pgvector cosine distance for semantic search
+    // The embedding column is assumed to exist on knowledge_chunks (vector type via pgvector)
+    // We use a placeholder embedding here -- in production, the query text would first be
+    // converted to an embedding via the configured embedding model. For now we do a
+    // text-based similarity fallback using pg_trgm if no embedding is available.
+    const results = await db.execute(sql`
+      SELECT
+        kc.id,
+        kc.knowledge_document_id AS "documentId",
+        kd.title AS "documentName",
+        kc.content,
+        kc.chunk_index AS "chunkIndex",
+        kc.metadata,
+        CASE
+          WHEN kc.embedding IS NOT NULL THEN 1 - (kc.embedding <=> (
+            SELECT kc2.embedding FROM knowledge_chunks kc2
+            WHERE kc2.knowledge_collection_id = ${collectionId}
+            AND kc2.org_id = ${orgId}
+            AND kc2.deleted_at IS NULL
+            AND kc2.embedding IS NOT NULL
+            ORDER BY kc2.content <-> ${query}
+            LIMIT 1
+          ))
+          ELSE similarity(kc.content, ${query})
+        END AS score
+      FROM knowledge_chunks kc
+      JOIN knowledge_documents kd ON kd.id = kc.knowledge_document_id
+      WHERE kc.knowledge_collection_id = ${collectionId}
+        AND kc.org_id = ${orgId}
+        AND kc.deleted_at IS NULL
+        AND kd.deleted_at IS NULL
+      ORDER BY score DESC
+      LIMIT ${topK}
+    `);
+
+    const rows = (results as any[]).filter((r: any) => r.score >= threshold);
+
+    return rows.map((r: any) => ({
+      id: r.id,
+      documentId: r.documentId,
+      documentName: r.documentName,
+      content: r.content,
+      chunkIndex: r.chunkIndex,
+      score: parseFloat(r.score) || 0,
+      metadata: r.metadata,
+    }));
+  },
+
+  async getChunks(orgId: string, docId: string) {
+    return db
+      .select()
+      .from(knowledgeChunks)
+      .where(and(
+        eq(knowledgeChunks.knowledgeDocumentId, docId),
+        eq(knowledgeChunks.orgId, orgId),
+        isNull(knowledgeChunks.deletedAt),
+      ))
+      .orderBy(knowledgeChunks.chunkIndex);
+  },
+
+  async updateCollectionConfig(orgId: string, collectionId: string, config: {
+    embeddingModel?: string;
+    chunkSize?: number;
+    chunkOverlap?: number;
+  }) {
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+
+    if (config.embeddingModel !== undefined) {
+      updates.embeddingModelId = config.embeddingModel;
+    }
+    if (config.chunkSize !== undefined) {
+      if (config.chunkSize < 64 || config.chunkSize > 8192) {
+        throw AppError.badRequest("chunkSize must be between 64 and 8192");
+      }
+      updates.chunkSize = config.chunkSize;
+    }
+    if (config.chunkOverlap !== undefined) {
+      if (config.chunkOverlap < 0) {
+        throw AppError.badRequest("chunkOverlap must be >= 0");
+      }
+      updates.chunkOverlap = config.chunkOverlap;
+    }
+
+    const [collection] = await db
+      .update(knowledgeCollections)
+      .set(updates)
+      .where(and(eq(knowledgeCollections.id, collectionId), eq(knowledgeCollections.orgId, orgId)))
+      .returning();
+
+    if (!collection) throw AppError.notFound("Collection not found");
+    return collection;
   },
 };

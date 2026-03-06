@@ -55,7 +55,7 @@ export function SystemStatusBanner() {
   const fetchHealth = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/health", {
+      const response = await fetch("/api/health/ready", {
         signal: AbortSignal.timeout(5000),
       });
 

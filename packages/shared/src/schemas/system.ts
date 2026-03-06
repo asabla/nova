@@ -113,6 +113,21 @@ export const rateLimitRules = pgTable("rate_limit_rules", {
   index("idx_rate_limit_rules_org_scope").on(table.orgId, table.scope),
 ]);
 
+export const domainRules = pgTable("domain_rules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  domain: text("domain").notNull(),
+  type: text("type").notNull(), // "allow" | "block"
+  reason: text("reason"),
+  createdById: uuid("created_by_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (table) => [
+  index("idx_domain_rules_org_id").on(table.orgId),
+  index("idx_domain_rules_org_domain").on(table.orgId, table.domain),
+]);
+
 export const researchReports = pgTable("research_reports", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),

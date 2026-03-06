@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Wifi, WifiOff, RefreshCw } from "lucide-react";
 import { clsx } from "clsx";
 import { useWSStore } from "../../stores/ws.store";
+import { useConnectionStatus } from "../../hooks/useConnectionStatus";
 
 const statusConfig = {
   connected: {
@@ -38,11 +39,17 @@ const statusConfig = {
 export function ConnectionStatus() {
   const { t } = useTranslation();
   const status = useWSStore((s) => s.status);
+  const { isOnline, apiReachable, lastChecked } = useConnectionStatus();
   const [showTooltip, setShowTooltip] = useState(false);
 
-  const config = statusConfig[status];
+  // Derive effective status: offline browser overrides everything
+  const effectiveStatus: keyof typeof statusConfig = !isOnline
+    ? "disconnected"
+    : status;
+
+  const config = statusConfig[effectiveStatus];
   const Icon = config.icon;
-  const isAnimating = status === "connecting" || status === "reconnecting";
+  const isAnimating = effectiveStatus === "connecting" || effectiveStatus === "reconnecting";
 
   return (
     <div
@@ -61,7 +68,7 @@ export function ConnectionStatus() {
       >
         <span className="relative flex h-3 w-3">
           {/* Ping animation for non-connected states */}
-          {status !== "connected" && (
+          {effectiveStatus !== "connected" && (
             <span
               className={clsx(
                 "absolute inset-0 rounded-full opacity-75 animate-ping",
@@ -84,7 +91,7 @@ export function ConnectionStatus() {
         <div
           className={clsx(
             "absolute right-0 top-full mt-1 z-50",
-            "w-56 rounded-xl border border-border bg-surface p-3 shadow-lg",
+            "w-64 rounded-xl border border-border bg-surface p-3 shadow-lg",
             "animate-in fade-in zoom-in-95 duration-150",
           )}
         >
@@ -92,9 +99,9 @@ export function ConnectionStatus() {
             <Icon
               className={clsx(
                 "h-4 w-4",
-                status === "connected" && "text-success",
-                (status === "connecting" || status === "reconnecting") && "text-warning",
-                status === "disconnected" && "text-danger",
+                effectiveStatus === "connected" && "text-success",
+                (effectiveStatus === "connecting" || effectiveStatus === "reconnecting") && "text-warning",
+                effectiveStatus === "disconnected" && "text-danger",
                 isAnimating && "animate-spin",
               )}
             />
@@ -105,6 +112,46 @@ export function ConnectionStatus() {
           <p className="text-xs text-text-tertiary leading-relaxed">
             {t(config.descriptionKey)}
           </p>
+
+          {/* Detailed connectivity info */}
+          <div className="mt-2 pt-2 border-t border-border space-y-1">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-text-tertiary">
+                {t("connection.browser", { defaultValue: "Browser" })}
+              </span>
+              <span className={isOnline ? "text-success" : "text-danger"}>
+                {isOnline
+                  ? t("connection.online", { defaultValue: "Online" })
+                  : t("connection.offline", { defaultValue: "Offline" })}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-text-tertiary">
+                {t("connection.websocket", { defaultValue: "WebSocket" })}
+              </span>
+              <span className={effectiveStatus === "connected" ? "text-success" : "text-warning"}>
+                {effectiveStatus === "connected"
+                  ? t("connection.ok", { defaultValue: "OK" })
+                  : t("connection.pending", { defaultValue: "Pending" })}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-text-tertiary">
+                {t("connection.api", { defaultValue: "API" })}
+              </span>
+              <span className={apiReachable ? "text-success" : "text-danger"}>
+                {apiReachable
+                  ? t("connection.reachable", { defaultValue: "Reachable" })
+                  : t("connection.unreachable", { defaultValue: "Unreachable" })}
+              </span>
+            </div>
+            <p className="text-[10px] text-text-tertiary pt-1">
+              {t("connection.lastChecked", {
+                time: lastChecked.toLocaleTimeString(),
+                defaultValue: "Checked at {{time}}",
+              })}
+            </p>
+          </div>
         </div>
       )}
     </div>
