@@ -4,10 +4,9 @@ import { useTranslation } from "react-i18next";
 import { Bell, Menu, Search, Sun, Moon, Monitor } from "lucide-react";
 import { authClient } from "../../hooks/useAuth";
 import { useUIStore } from "../../stores/ui.store";
-import { useWSStore } from "../../stores/ws.store";
 import { notificationUnreadCountOptions } from "../../lib/query-keys";
 import { Avatar } from "../ui/Avatar";
-import { Badge } from "../ui/Badge";
+import { ConnectionStatus } from "./ConnectionStatus";
 
 export function Header() {
   const { t } = useTranslation();
@@ -18,8 +17,6 @@ export function Header() {
   const toggleCommandPalette = useUIStore((s) => s.toggleCommandPalette);
   const theme = useUIStore((s) => s.theme);
   const setTheme = useUIStore((s) => s.setTheme);
-  const wsStatus = useWSStore((s) => s.status);
-
   const { data: unreadData } = useQuery(notificationUnreadCountOptions());
   const unreadCount = unreadData?.count ?? 0;
 
@@ -35,11 +32,7 @@ export function Header() {
 
       <div className="flex items-center gap-2">
         {/* Connection status */}
-        {wsStatus !== "connected" && wsStatus !== "disconnected" && (
-          <Badge variant={wsStatus === "reconnecting" ? "warning" : "danger"}>
-            {t(`status.${wsStatus}`)}
-          </Badge>
-        )}
+        <ConnectionStatus />
 
         {/* Search / Command Palette */}
         <button
