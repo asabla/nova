@@ -42,6 +42,11 @@ import { gdprRoutes } from "./routes/gdpr";
 import { memoryRoutes } from "./routes/memory";
 import { agentToolRoutes } from "./routes/agent-tools";
 import { batchRoutes } from "./routes/batch";
+import { modelCompareRoutes } from "./routes/model-compare";
+import { integrationRoutes } from "./routes/integrations";
+import { contentFilterRoutes } from "./routes/content-filter";
+import { shortcutRoutes } from "./routes/shortcuts";
+import { rateLimitRoutes } from "./routes/rate-limits";
 
 const app = new Hono<AppContext>();
 
@@ -109,5 +114,10 @@ app.route("/api/gdpr", gdprRoutes);
 app.route("/api/agents", memoryRoutes);
 app.route("/api/agents", agentToolRoutes);
 app.route("/api/batch", batchRoutes);
+app.route("/api/model-compare", modelCompareRoutes);
+app.route("/api/integrations", integrationRoutes);
+app.route("/api/content", contentFilterRoutes);
+app.route("/api/shortcuts", shortcutRoutes);
+app.route("/api/org", rateLimitRoutes);
 
 export { app };
