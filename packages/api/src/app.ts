@@ -26,6 +26,7 @@ import { apiKeyRoutes } from "./routes/api-keys";
 import { searchRoutes } from "./routes/search";
 import { analyticsRoutes } from "./routes/analytics";
 import { modelRoutes } from "./routes/models";
+import { auditRoutes } from "./routes/audit";
 
 const app = new Hono<AppContext>();
 
@@ -75,5 +76,6 @@ app.route("/api/api-keys", apiKeyRoutes);
 app.route("/api/search", searchRoutes);
 app.route("/api/analytics", analyticsRoutes);
 app.route("/api/models", modelRoutes);
+app.route("/api/org", auditRoutes);
 
 export { app };
