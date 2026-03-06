@@ -109,9 +109,10 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
             </span>
           )}
 
-          {conversation.tokenCount > 0 && (
-            <span className="text-[10px] text-text-tertiary shrink-0">
-              {conversation.tokenCount.toLocaleString()} tokens
+          {(conversation.totalTokens ?? 0) > 0 && (
+            <span className="text-[10px] text-text-tertiary shrink-0" title={`Estimated cost: $${((conversation.estimatedCostCents ?? 0) / 100).toFixed(4)}`}>
+              {(conversation.totalTokens ?? 0).toLocaleString()} tokens
+              {conversation.estimatedCostCents > 0 && ` ($${(conversation.estimatedCostCents / 100).toFixed(4)})`}
             </span>
           )}
         </div>
