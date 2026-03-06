@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { X, Settings, Sliders } from "lucide-react";
+import { X, Settings, Eye, EyeOff, Globe, Lock, Users } from "lucide-react";
 import { clsx } from "clsx";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { Button } from "../ui/Button";
-import { Input } from "../ui/Input";
+import { toast } from "../ui/Toast";
 
 interface ConversationSettingsProps {
   conversationId: string;
@@ -19,9 +19,27 @@ export function ConversationSettings({ conversationId, conversation, open, onClo
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [systemPrompt, setSystemPrompt] = useState(conversation?.systemPrompt ?? "");
-  const [model, setModel] = useState(conversation?.model ?? "gpt-4o");
-  const [temperature, setTemperature] = useState(conversation?.temperature ?? 0.7);
-  const [maxTokens, setMaxTokens] = useState(conversation?.maxTokens ?? 4096);
+  const [model, setModel] = useState(conversation?.modelId ?? "gpt-4o");
+  const [visibility, setVisibility] = useState(conversation?.visibility ?? "private");
+  const [temperature, setTemperature] = useState(conversation?.modelParams?.temperature ?? 0.7);
+  const [topP, setTopP] = useState(conversation?.modelParams?.topP ?? 1);
+  const [maxTokens, setMaxTokens] = useState(conversation?.modelParams?.maxTokens ?? 4096);
+  const [frequencyPenalty, setFrequencyPenalty] = useState(conversation?.modelParams?.frequencyPenalty ?? 0);
+  const [presencePenalty, setPresencePenalty] = useState(conversation?.modelParams?.presencePenalty ?? 0);
+
+  useEffect(() => {
+    if (conversation) {
+      setSystemPrompt(conversation.systemPrompt ?? "");
+      setModel(conversation.modelId ?? "gpt-4o");
+      setVisibility(conversation.visibility ?? "private");
+      const params = conversation.modelParams ?? {};
+      setTemperature(params.temperature ?? 0.7);
+      setTopP(params.topP ?? 1);
+      setMaxTokens(params.maxTokens ?? 4096);
+      setFrequencyPenalty(params.frequencyPenalty ?? 0);
+      setPresencePenalty(params.presencePenalty ?? 0);
+    }
+  }, [conversation]);
 
   const { data: modelsData } = useQuery({
     queryKey: ["models"],
@@ -33,15 +51,27 @@ export function ConversationSettings({ conversationId, conversation, open, onClo
     mutationFn: (data: any) => api.patch(`/api/conversations/${conversationId}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(conversationId) });
+      toast("Settings saved", "success");
     },
   });
 
   const handleSave = () => {
-    update.mutate({ systemPrompt, model, temperature, maxTokens });
+    update.mutate({
+      systemPrompt,
+      modelId: model,
+      visibility,
+      modelParams: { temperature, topP, maxTokens, frequencyPenalty, presencePenalty },
+    });
     onClose();
   };
 
   const models = (modelsData as any)?.data ?? [];
+
+  const visibilityOptions = [
+    { value: "private", label: "Private", icon: Lock, desc: "Only you" },
+    { value: "team", label: "Team", icon: Users, desc: "Your team members" },
+    { value: "public", label: "Public", icon: Globe, desc: "Anyone with link" },
+  ];
 
   return (
     <div
@@ -61,6 +91,29 @@ export function ConversationSettings({ conversationId, conversation, open, onClo
       </div>
 
       <div className="p-4 space-y-5 overflow-y-auto h-[calc(100%-56px-56px)]">
+        {/* Visibility */}
+        <div>
+          <label className="block text-xs font-medium text-text mb-1.5">Visibility</label>
+          <div className="flex gap-1">
+            {visibilityOptions.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setVisibility(opt.value)}
+                className={clsx(
+                  "flex-1 flex flex-col items-center gap-1 py-2 px-2 rounded-lg border text-xs transition-colors",
+                  visibility === opt.value
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border text-text-tertiary hover:border-border-strong",
+                )}
+              >
+                <opt.icon className="h-3.5 w-3.5" />
+                <span className="font-medium">{opt.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Model */}
         <div>
           <label className="block text-xs font-medium text-text mb-1.5">Model</label>
           <select
@@ -83,6 +136,7 @@ export function ConversationSettings({ conversationId, conversation, open, onClo
           </select>
         </div>
 
+        {/* System Prompt */}
         <div>
           <label className="block text-xs font-medium text-text mb-1.5">System Prompt</label>
           <textarea
@@ -94,6 +148,7 @@ export function ConversationSettings({ conversationId, conversation, open, onClo
           />
         </div>
 
+        {/* Temperature */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label className="text-xs font-medium text-text">Temperature</label>
@@ -114,15 +169,67 @@ export function ConversationSettings({ conversationId, conversation, open, onClo
           </div>
         </div>
 
+        {/* Top P */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-medium text-text">Top P</label>
+            <span className="text-xs text-text-tertiary">{topP}</span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value={topP}
+            onChange={(e) => setTopP(parseFloat(e.target.value))}
+            className="w-full accent-primary"
+          />
+        </div>
+
+        {/* Max Tokens */}
         <div>
           <label className="block text-xs font-medium text-text mb-1.5">Max Tokens</label>
           <input
             type="number"
             value={maxTokens}
-            onChange={(e) => setMaxTokens(parseInt(e.target.value))}
+            onChange={(e) => setMaxTokens(parseInt(e.target.value) || 4096)}
             min={1}
             max={200000}
             className="w-full h-9 px-3 text-sm bg-surface-secondary border border-border rounded-lg text-text"
+          />
+        </div>
+
+        {/* Frequency Penalty */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-medium text-text">Frequency Penalty</label>
+            <span className="text-xs text-text-tertiary">{frequencyPenalty}</span>
+          </div>
+          <input
+            type="range"
+            min="-2"
+            max="2"
+            step="0.1"
+            value={frequencyPenalty}
+            onChange={(e) => setFrequencyPenalty(parseFloat(e.target.value))}
+            className="w-full accent-primary"
+          />
+        </div>
+
+        {/* Presence Penalty */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-medium text-text">Presence Penalty</label>
+            <span className="text-xs text-text-tertiary">{presencePenalty}</span>
+          </div>
+          <input
+            type="range"
+            min="-2"
+            max="2"
+            step="0.1"
+            value={presencePenalty}
+            onChange={(e) => setPresencePenalty(parseFloat(e.target.value))}
+            className="w-full accent-primary"
           />
         </div>
       </div>

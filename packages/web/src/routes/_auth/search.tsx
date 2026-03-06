@@ -10,6 +10,21 @@ export const Route = createFileRoute("/_auth/search")({
   component: SearchPage,
 });
 
+function highlightMatches(text: string, query: string): string {
+  if (!query || query.length < 2) return escapeHtml(text);
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`(${escaped})`, "gi");
+  return escapeHtml(text).replace(regex, "<mark>$1</mark>");
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function SearchPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
@@ -18,6 +33,7 @@ function SearchPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [searchMode, setSearchMode] = useState("keyword");
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), 300);
@@ -25,12 +41,13 @@ function SearchPage() {
   }, [query]);
 
   const { data: results, isLoading } = useQuery({
-    queryKey: ["search", debouncedQuery, type, dateFrom, dateTo],
+    queryKey: ["search", debouncedQuery, type, dateFrom, dateTo, searchMode],
     queryFn: () => {
       const params = new URLSearchParams({ q: debouncedQuery });
       if (type !== "all") params.set("type", type);
       if (dateFrom) params.set("dateFrom", dateFrom);
       if (dateTo) params.set("dateTo", dateTo);
+      if (searchMode === "semantic") params.set("mode", "semantic");
       return api.get<any>(`/api/search?${params}`);
     },
     enabled: debouncedQuery.length >= 2,
@@ -97,7 +114,7 @@ function SearchPage() {
 
       {/* Filters */}
       {showFilters && (
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-surface-secondary border border-border">
+        <div className="flex flex-wrap items-center gap-3 p-3 rounded-xl bg-surface-secondary border border-border">
           <div>
             <label className="block text-xs text-text-tertiary mb-1">Type</label>
             <select
@@ -131,9 +148,20 @@ function SearchPage() {
               className="h-8 px-2 text-xs bg-surface border border-border rounded-lg text-text"
             />
           </div>
-          {(dateFrom || dateTo || type !== "all") && (
+          <div>
+            <label className="block text-xs text-text-tertiary mb-1">Mode</label>
+            <select
+              value={searchMode}
+              onChange={(e) => setSearchMode(e.target.value)}
+              className="h-8 px-2 text-xs bg-surface border border-border rounded-lg text-text"
+            >
+              <option value="keyword">Keyword</option>
+              <option value="semantic">Semantic</option>
+            </select>
+          </div>
+          {(dateFrom || dateTo || type !== "all" || searchMode !== "keyword") && (
             <button
-              onClick={() => { setDateFrom(""); setDateTo(""); setType("all"); }}
+              onClick={() => { setDateFrom(""); setDateTo(""); setType("all"); setSearchMode("keyword"); }}
               className="mt-4 p-1 text-text-tertiary hover:text-text-secondary"
             >
               <X className="h-3.5 w-3.5" />
@@ -176,13 +204,24 @@ function SearchPage() {
                     <Badge variant="default">{result.type}</Badge>
                   </div>
                   {result.snippet && (
-                    <p className="text-xs text-text-secondary mt-0.5 line-clamp-2">{result.snippet}</p>
+                    <p
+                      className="text-xs text-text-secondary mt-0.5 line-clamp-2 [&_mark]:bg-primary/20 [&_mark]:text-primary [&_mark]:rounded-sm [&_mark]:px-0.5"
+                      dangerouslySetInnerHTML={{ __html: highlightMatches(result.snippet, debouncedQuery) }}
+                    />
                   )}
                   {result.description && !result.snippet && (
                     <p className="text-xs text-text-secondary mt-0.5 line-clamp-1">{result.description}</p>
                   )}
                   {result.content && !result.snippet && (
-                    <p className="text-xs text-text-tertiary mt-0.5 line-clamp-1">{result.content.slice(0, 150)}</p>
+                    <p
+                      className="text-xs text-text-tertiary mt-0.5 line-clamp-1 [&_mark]:bg-primary/20 [&_mark]:text-primary [&_mark]:rounded-sm [&_mark]:px-0.5"
+                      dangerouslySetInnerHTML={{ __html: highlightMatches(result.content.slice(0, 150), debouncedQuery) }}
+                    />
+                  )}
+                  {result.score != null && searchMode === "semantic" && (
+                    <span className="text-[10px] text-text-tertiary">
+                      Relevance: {(result.score * 100).toFixed(0)}%
+                    </span>
                   )}
                   <span className="text-[10px] text-text-tertiary">
                     {result.createdAt && formatDistanceToNow(new Date(result.createdAt), { addSuffix: true })}

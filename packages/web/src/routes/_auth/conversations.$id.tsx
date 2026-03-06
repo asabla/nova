@@ -44,6 +44,15 @@ function ConversationPage() {
     },
   });
 
+  const getModelParams = useCallback(() => {
+    const params = conversation?.modelParams ?? {};
+    return {
+      temperature: params.temperature,
+      topP: params.topP,
+      maxTokens: params.maxTokens,
+    };
+  }, [conversation]);
+
   const handleSend = useCallback(async (content: string) => {
     await api.post(`/api/conversations/${id}/messages`, {
       content,
@@ -53,21 +62,28 @@ function ConversationPage() {
     queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
 
     const model = conversation?.modelId;
+    const modelParams = getModelParams();
     const apiUrl = import.meta.env.VITE_API_URL ?? "";
     startStream(`${apiUrl}/api/conversations/${id}/messages/stream`, {
       content,
       model: model ?? "default",
+      ...modelParams,
       messages: [
         ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
         ...messages.map((m: any) => ({ role: m.senderType === "user" ? "user" : "assistant", content: m.content })),
         { role: "user", content },
       ],
     });
-  }, [id, queryClient, startStream, conversation, messages]);
+  }, [id, queryClient, startStream, conversation, messages, getModelParams]);
 
   const handleRate = useCallback(async (messageId: string, rating: 1 | -1) => {
     await api.post(`/api/conversations/${id}/messages/${messageId}/rate`, { rating });
     toast(rating === 1 ? "Upvoted" : "Downvoted", "success");
+  }, [id]);
+
+  const handleNote = useCallback(async (messageId: string, content: string) => {
+    await api.post(`/api/conversations/${id}/messages/${messageId}/notes`, { content });
+    toast("Note added", "success");
   }, [id]);
 
   const handleEdit = useCallback((messageId: string, content: string) => {
@@ -80,10 +96,12 @@ function ConversationPage() {
 
     const idx = messages.indexOf(msg);
     const previousMessages = messages.slice(0, idx + 1);
+    const modelParams = getModelParams();
 
     const apiUrl = import.meta.env.VITE_API_URL ?? "";
     startStream(`${apiUrl}/api/conversations/${id}/messages/stream`, {
       model: conversation?.modelId ?? "default",
+      ...modelParams,
       messages: [
         ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
         ...previousMessages.map((m: any) => ({
@@ -92,7 +110,7 @@ function ConversationPage() {
         })),
       ],
     });
-  }, [id, messages, conversation, startStream]);
+  }, [id, messages, conversation, startStream, getModelParams]);
 
   const handleFileUpload = useCallback(async (file: File) => {
     const presign = await api.post<{ uploadUrl: string; fileId: string }>(
@@ -132,6 +150,7 @@ function ConversationPage() {
         onRate={handleRate}
         onEdit={handleEdit}
         onRerun={handleRerun}
+        onNote={handleNote}
       />
       <MessageInput
         onSend={handleSend}

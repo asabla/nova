@@ -1,12 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Sparkles } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Sparkles, ChevronDown } from "lucide-react";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { MessageInput } from "../../components/chat/MessageInput";
-import { useSSEStream } from "../../hooks/useSSE";
 
 export const Route = createFileRoute("/_auth/conversations/new")({
   component: NewConversationPage,
@@ -16,17 +15,35 @@ function NewConversationPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { tokens, status, startStream, stopStream, resetStream } = useSSEStream();
+  const [selectedModel, setSelectedModel] = useState("");
+  const [selectedWorkspace, setSelectedWorkspace] = useState("");
+
+  const { data: modelsData } = useQuery({
+    queryKey: ["models"],
+    queryFn: () => api.get<any>("/api/models"),
+    staleTime: 60_000,
+  });
+
+  const { data: workspacesData } = useQuery({
+    queryKey: ["workspaces"],
+    queryFn: () => api.get<any>("/api/workspaces"),
+    staleTime: 60_000,
+  });
+
+  const models = (modelsData as any)?.data ?? [];
+  const workspaces = (workspacesData as any)?.data ?? [];
 
   const createAndSend = useCallback(async (content: string) => {
-    const conversation = await api.post<{ id: string }>("/api/conversations", {
-      title: content.slice(0, 100),
-    });
+    const payload: any = { title: content.slice(0, 100) };
+    if (selectedModel) payload.modelId = selectedModel;
+    if (selectedWorkspace) payload.workspaceId = selectedWorkspace;
+
+    const conversation = await api.post<{ id: string }>("/api/conversations", payload);
 
     queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
 
     navigate({ to: `/conversations/${conversation.id}`, replace: true });
-  }, [navigate, queryClient]);
+  }, [navigate, queryClient, selectedModel, selectedWorkspace]);
 
   return (
     <div className="flex flex-col flex-1">
@@ -38,7 +55,47 @@ function NewConversationPage() {
             </div>
           </div>
           <h2 className="text-xl font-semibold text-text mb-2">{t("conversations.newTitle")}</h2>
-          <p className="text-sm text-text-secondary mb-6">{t("conversations.newDescription")}</p>
+          <p className="text-sm text-text-secondary mb-4">{t("conversations.newDescription")}</p>
+
+          {/* Model & Workspace selectors */}
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <div className="relative">
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                className="h-8 pl-3 pr-7 text-xs bg-surface-secondary border border-border rounded-lg text-text appearance-none cursor-pointer"
+              >
+                <option value="">Auto (default model)</option>
+                {models.map((m: any) => (
+                  <option key={m.id} value={m.modelId}>{m.name}</option>
+                ))}
+                {models.length === 0 && (
+                  <>
+                    <option value="gpt-4o">GPT-4o</option>
+                    <option value="gpt-4o-mini">GPT-4o Mini</option>
+                    <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                  </>
+                )}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-text-tertiary pointer-events-none" />
+            </div>
+
+            {workspaces.length > 0 && (
+              <div className="relative">
+                <select
+                  value={selectedWorkspace}
+                  onChange={(e) => setSelectedWorkspace(e.target.value)}
+                  className="h-8 pl-3 pr-7 text-xs bg-surface-secondary border border-border rounded-lg text-text appearance-none cursor-pointer"
+                >
+                  <option value="">No workspace</option>
+                  {workspaces.map((w: any) => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-text-tertiary pointer-events-none" />
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-2">
             {[

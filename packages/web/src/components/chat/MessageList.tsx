@@ -10,9 +10,10 @@ interface MessageListProps {
   onRate?: (messageId: string, rating: 1 | -1) => void;
   onEdit?: (messageId: string, content: string) => void;
   onRerun?: (messageId: string) => void;
+  onNote?: (messageId: string, content: string) => void;
 }
 
-export function MessageList({ messages, streamingContent, isStreaming, userName, onRate, onEdit, onRerun }: MessageListProps) {
+export function MessageList({ messages, streamingContent, isStreaming, userName, onRate, onEdit, onRerun, onNote }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,6 +37,7 @@ export function MessageList({ messages, streamingContent, isStreaming, userName,
             onRate={onRate}
             onEdit={onEdit}
             onRerun={onRerun}
+            onNote={onNote}
           />
         ))}
 

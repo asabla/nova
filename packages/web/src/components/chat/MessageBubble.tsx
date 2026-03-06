@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Copy, Check, ThumbsUp, ThumbsDown, Pencil, RotateCcw, History, X, Send } from "lucide-react";
+import { Copy, Check, ThumbsUp, ThumbsDown, Pencil, RotateCcw, History, X, Send, StickyNote } from "lucide-react";
 import { clsx } from "clsx";
 import { MarkdownRenderer } from "../markdown/MarkdownRenderer";
 import { Avatar } from "../ui/Avatar";
@@ -30,14 +30,17 @@ interface MessageBubbleProps {
   onRate?: (messageId: string, rating: 1 | -1) => void;
   onEdit?: (messageId: string, content: string) => void;
   onRerun?: (messageId: string) => void;
+  onNote?: (messageId: string, content: string) => void;
 }
 
-export function MessageBubble({ message, userName, onRate, onEdit, onRerun }: MessageBubbleProps) {
+export function MessageBubble({ message, userName, onRate, onEdit, onRerun, onNote }: MessageBubbleProps) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content ?? "");
   const [showHistory, setShowHistory] = useState(false);
+  const [showNoteInput, setShowNoteInput] = useState(false);
+  const [noteContent, setNoteContent] = useState("");
   const isUser = message.senderType === "user";
   const isAssistant = message.senderType === "assistant";
 
@@ -210,6 +213,49 @@ export function MessageBubble({ message, userName, onRate, onEdit, onRerun }: Me
                 <Pencil className="h-3.5 w-3.5" />
               </button>
             )}
+            {onNote && (
+              <button
+                onClick={() => setShowNoteInput(!showNoteInput)}
+                className="text-text-tertiary hover:text-text-secondary p-1 rounded"
+                title="Add note"
+              >
+                <StickyNote className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Note input */}
+        {showNoteInput && onNote && (
+          <div className="mt-2 flex items-center gap-2 w-full max-w-[400px]">
+            <input
+              autoFocus
+              type="text"
+              value={noteContent}
+              onChange={(e) => setNoteContent(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && noteContent.trim()) {
+                  onNote(message.id, noteContent.trim());
+                  setNoteContent("");
+                  setShowNoteInput(false);
+                }
+                if (e.key === "Escape") setShowNoteInput(false);
+              }}
+              placeholder="Add a private note..."
+              className="flex-1 h-7 px-2 text-xs bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary"
+            />
+            <button
+              onClick={() => {
+                if (noteContent.trim()) {
+                  onNote(message.id, noteContent.trim());
+                  setNoteContent("");
+                  setShowNoteInput(false);
+                }
+              }}
+              className="text-xs text-primary hover:text-primary-dark font-medium"
+            >
+              Save
+            </button>
           </div>
         )}
       </div>
