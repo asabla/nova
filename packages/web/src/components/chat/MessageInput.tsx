@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Send, Square, Paperclip, Pause, Play } from "lucide-react";
 import { clsx } from "clsx";
@@ -17,15 +17,44 @@ interface MessageInputProps {
 
 export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, isPaused, disabled, onFileUpload }: MessageInputProps) {
   const { t } = useTranslation();
-  const [content, setContent] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-save draft on disconnect / page unload (story #202)
+  const draftKey = "nova:message-draft";
+  const [content, setContent] = useState(() => {
+    try { return localStorage.getItem(draftKey) ?? ""; } catch { return ""; }
+  });
+
+  // Save draft to localStorage on change
+  const saveDraftTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveDraft = useCallback((text: string) => {
+    if (saveDraftTimeout.current) clearTimeout(saveDraftTimeout.current);
+    saveDraftTimeout.current = setTimeout(() => {
+      try {
+        if (text.trim()) localStorage.setItem(draftKey, text);
+        else localStorage.removeItem(draftKey);
+      } catch { /* ignore */ }
+    }, 500);
+  }, []);
+
+  // Save draft on page unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      try {
+        if (content.trim()) localStorage.setItem(draftKey, content);
+      } catch { /* ignore */ }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [content]);
 
   const handleSubmit = useCallback(() => {
     const trimmed = content.trim();
     if (!trimmed || disabled) return;
     onSend(trimmed);
     setContent("");
+    try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
@@ -41,6 +70,7 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setContent(e.target.value);
+    saveDraft(e.target.value);
     const el = e.target;
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 200) + "px";
