@@ -3,6 +3,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { CommandPalette } from "../components/chat/CommandPalette";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { NotFound } from "../components/NotFound";
+import { ToastContainer } from "../components/ui/Toast";
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -18,6 +19,7 @@ function RootLayout() {
     <ErrorBoundary>
       <Outlet />
       <CommandPalette />
+      <ToastContainer />
     </ErrorBoundary>
   );
 }
