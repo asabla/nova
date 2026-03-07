@@ -1,5 +1,17 @@
 import { describe, it, expect } from "bun:test";
-import { app } from "../src/app";
+
+// Set required env vars before importing the app
+process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
+process.env.REDIS_URL = "redis://localhost:6379";
+process.env.MINIO_ENDPOINT = "http://localhost:9000";
+process.env.MINIO_ROOT_USER = "minioadmin";
+process.env.MINIO_ROOT_PASSWORD = "minioadmin";
+process.env.LITELLM_API_URL = "http://localhost:4000";
+process.env.LITELLM_MASTER_KEY = "sk-test";
+process.env.BETTER_AUTH_SECRET = "test-secret-that-is-at-least-32-chars-long";
+process.env.BETTER_AUTH_URL = "http://localhost:3000";
+
+const { app } = await import("../src/app");
 
 describe("Health endpoints", () => {
   it("GET /health returns ok", async () => {
