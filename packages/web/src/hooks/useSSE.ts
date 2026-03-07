@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { getActiveOrgId } from "../lib/api";
 
 export type StreamStatus = "idle" | "streaming" | "paused" | "done" | "error";
 
@@ -17,9 +18,13 @@ export function useSSEStream() {
     abortRef.current = new AbortController();
 
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      const orgId = getActiveOrgId();
+      if (orgId) headers["x-org-id"] = orgId;
+
       const response = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(body),
         signal: abortRef.current.signal,
         credentials: "include",

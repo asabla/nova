@@ -2,6 +2,22 @@ import type { ProblemDetails } from "@nova/shared/types";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
+/** Org ID stored outside React for use in the API client */
+let _activeOrgId: string | null = localStorage.getItem("nova-org-id");
+
+export function setActiveOrgId(orgId: string | null) {
+  _activeOrgId = orgId;
+  if (orgId) {
+    localStorage.setItem("nova-org-id", orgId);
+  } else {
+    localStorage.removeItem("nova-org-id");
+  }
+}
+
+export function getActiveOrgId(): string | null {
+  return _activeOrgId;
+}
+
 class ApiError extends Error {
   constructor(
     public status: number,
@@ -14,13 +30,17 @@ class ApiError extends Error {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const url = `${BASE_URL}${path}`;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
+  };
+  if (_activeOrgId) {
+    headers["x-org-id"] = _activeOrgId;
+  }
   const response = await fetch(url, {
     ...options,
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {
@@ -52,5 +72,17 @@ export const api = {
   delete: <T>(path: string, headers?: Record<string, string>) =>
     request<T>(path, { method: "DELETE", headers }),
 };
+
+/** Returns headers with org ID for raw fetch calls */
+export function apiHeaders(extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...extra,
+  };
+  if (_activeOrgId) {
+    headers["x-org-id"] = _activeOrgId;
+  }
+  return headers;
+}
 
 export { ApiError };

@@ -28,7 +28,7 @@ import { Input } from "../../components/ui/Input";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
 import { toast } from "../../components/ui/Toast";
-import { api } from "../../lib/api";
+import { api, apiHeaders } from "../../lib/api";
 
 export const Route = createFileRoute("/_auth/workspaces/$id")({
   component: WorkspaceDetailPage,
@@ -249,9 +249,12 @@ function FilesTab({ workspaceId }: { workspaceId: string }) {
       Array.from(fileList).forEach((file) => formData.append("files", file));
 
       const BASE_URL = import.meta.env.VITE_API_URL ?? "";
+      const orgHeaders = apiHeaders();
+      delete orgHeaders["Content-Type"]; // Let browser set multipart boundary
       const response = await fetch(`${BASE_URL}/api/workspaces/${workspaceId}/files`, {
         method: "POST",
         credentials: "include",
+        headers: orgHeaders,
         body: formData,
       });
       if (!response.ok) {

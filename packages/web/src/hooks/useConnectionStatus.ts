@@ -51,7 +51,7 @@ export function useConnectionStatus(): ConnectionStatusInfo {
   // API health check
   const checkApi = useCallback(async () => {
     try {
-      const res = await fetch("/api/health", {
+      const res = await fetch("/health", {
         method: "GET",
         signal: AbortSignal.timeout(API_CHECK_TIMEOUT),
       });

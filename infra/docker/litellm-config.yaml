@@ -1,28 +1,39 @@
 model_list:
   - model_name: gpt-4o
     litellm_params:
-      model: openai/gpt-4o
-      api_key: os.environ/OPENAI_API_KEY
+      model: openai/openai/gpt-oss-20b
+      api_base: http://host.docker.internal:1234/v1
+      api_key: "not-needed"
 
   - model_name: gpt-4o-mini
     litellm_params:
-      model: openai/gpt-4o-mini
-      api_key: os.environ/OPENAI_API_KEY
+      model: openai/openai/gpt-oss-20b
+      api_base: http://host.docker.internal:1234/v1
+      api_key: "not-needed"
 
   - model_name: claude-sonnet-4-20250514
     litellm_params:
-      model: anthropic/claude-sonnet-4-20250514
-      api_key: os.environ/ANTHROPIC_API_KEY
+      model: openai/openai/gpt-oss-20b
+      api_base: http://host.docker.internal:1234/v1
+      api_key: "not-needed"
 
   - model_name: claude-haiku-3.5
     litellm_params:
-      model: anthropic/claude-3-5-haiku-20241022
-      api_key: os.environ/ANTHROPIC_API_KEY
+      model: openai/openai/gpt-oss-20b
+      api_base: http://host.docker.internal:1234/v1
+      api_key: "not-needed"
+
+  - model_name: default
+    litellm_params:
+      model: openai/openai/gpt-oss-20b
+      api_base: http://host.docker.internal:1234/v1
+      api_key: "not-needed"
 
   - model_name: text-embedding-3-small
     litellm_params:
-      model: openai/text-embedding-3-small
-      api_key: os.environ/OPENAI_API_KEY
+      model: openai/text-embedding-nomic-embed-text-v1.5
+      api_base: http://host.docker.internal:1234/v1
+      api_key: "not-needed"
 
 litellm_settings:
   drop_params: true

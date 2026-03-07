@@ -65,6 +65,11 @@ function NewConversationPage() {
 
     queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
 
+    // Store the initial message so the conversation page can auto-send it
+    try {
+      sessionStorage.setItem("nova:initial-message", content);
+    } catch { /* sessionStorage unavailable */ }
+
     navigate({ to: `/conversations/${conversation.id}`, replace: true });
   }, [navigate, queryClient, selectedModel, selectedWorkspace]);
 

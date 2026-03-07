@@ -299,11 +299,39 @@
     "fallback": "Trying alternative model...",
     "serverError": "Server error. Please try again later."
   },
+  "connection": {
+    "connected": "Connected",
+    "connectedDesc": "All systems operational",
+    "connecting": "Connecting...",
+    "connectingDesc": "Establishing connection to NOVA services",
+    "reconnecting": "Reconnecting...",
+    "reconnectingDesc": "Attempting to restore connection",
+    "disconnected": "Disconnected",
+    "disconnectedDesc": "Unable to reach NOVA services",
+    "browser": "Browser",
+    "online": "Online",
+    "offline": "Offline",
+    "websocket": "WebSocket",
+    "ok": "OK",
+    "pending": "Pending",
+    "api": "API",
+    "reachable": "Reachable",
+    "unreachable": "Unreachable",
+    "lastChecked": "Checked at {{time}}"
+  },
   "status": {
     "connected": "Connected",
     "reconnecting": "Reconnecting...",
     "offline": "Offline",
     "degraded": "Some services are experiencing issues"
+  },
+  "systemStatus": {
+    "downTitle": "System is currently unavailable",
+    "degradedTitle": "Some services are experiencing issues",
+    "lastChecked": "Last checked at {{time}}",
+    "checking": "Checking...",
+    "refresh": "Refresh status",
+    "unreachable": "System unreachable"
   },
   "common": {
     "save": "Save",
@@ -313,6 +341,7 @@
     "create": "Create",
     "close": "Close",
     "confirm": "Confirm",
+    "dismiss": "Dismiss",
     "loading": "Loading...",
     "noData": "No data",
     "actions": "Actions",

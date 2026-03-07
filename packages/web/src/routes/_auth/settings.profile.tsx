@@ -58,7 +58,9 @@ function ProfileSettings() {
 
   const [name, setName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
-  const [timezone, setTimezone] = useState("UTC");
+  const [timezone, setTimezone] = useState(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
+  );
   const [locale, setLocale] = useState("en");
   const [saved, setSaved] = useState(false);
 
@@ -66,7 +68,7 @@ function ProfileSettings() {
     if (profile) {
       setName(profile.displayName ?? profile.name ?? "");
       setAvatarUrl(profile.avatarUrl ?? "");
-      setTimezone(profile.timezone ?? "UTC");
+      setTimezone(profile.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC");
       setLocale(profile.locale ?? "en");
     }
   }, [profile]);

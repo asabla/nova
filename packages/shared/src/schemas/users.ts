@@ -5,6 +5,7 @@ import { organisations } from "./organisations";
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
+  externalId: text("external_id"),
   email: text("email").notNull(),
   emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
   passwordHash: text("password_hash"),
@@ -17,6 +18,7 @@ export const users = pgTable("users", {
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 }, (table) => [
   uniqueIndex("idx_users_email").on(table.email),
+  uniqueIndex("idx_users_external_id").on(table.externalId),
   index("idx_users_active").on(table.id),
 ]);
 

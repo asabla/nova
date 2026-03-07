@@ -10,9 +10,13 @@ import { useWebSocket } from "../hooks/useWebSocket";
 
 export const Route = createFileRoute("/_auth")({
   beforeLoad: async () => {
-    const session = useAuthStore.getState().session;
+    const { session, activeOrgId, initOrg } = useAuthStore.getState();
     if (!session) {
       throw redirect({ to: "/login" });
+    }
+    // Ensure user has an org set up
+    if (!activeOrgId) {
+      await initOrg();
     }
   },
   component: AuthLayout,

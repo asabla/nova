@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Wifi, WifiOff, RefreshCw } from "lucide-react";
 import { clsx } from "clsx";
-import { useWSStore } from "../../stores/ws.store";
 import { useConnectionStatus } from "../../hooks/useConnectionStatus";
 
 const statusConfig = {
@@ -38,18 +37,22 @@ const statusConfig = {
 
 export function ConnectionStatus() {
   const { t } = useTranslation();
-  const status = useWSStore((s) => s.status);
-  const { isOnline, apiReachable, lastChecked } = useConnectionStatus();
+  const { isOnline, apiReachable, lastChecked, wsConnected } = useConnectionStatus();
   const [showTooltip, setShowTooltip] = useState(false);
 
-  // Derive effective status: offline browser overrides everything
+  // Derive effective status from all signals:
+  // - Browser offline → disconnected
+  // - API reachable (primary transport is HTTP/SSE) → connected
+  // - API unreachable but online → reconnecting
   const effectiveStatus: keyof typeof statusConfig = !isOnline
     ? "disconnected"
-    : status;
+    : apiReachable
+      ? "connected"
+      : "reconnecting";
 
   const config = statusConfig[effectiveStatus];
   const Icon = config.icon;
-  const isAnimating = effectiveStatus === "connecting" || effectiveStatus === "reconnecting";
+  const isAnimating = effectiveStatus === "reconnecting";
 
   return (
     <div
@@ -100,7 +103,7 @@ export function ConnectionStatus() {
               className={clsx(
                 "h-4 w-4",
                 effectiveStatus === "connected" && "text-success",
-                (effectiveStatus === "connecting" || effectiveStatus === "reconnecting") && "text-warning",
+                effectiveStatus === "reconnecting" && "text-warning",
                 effectiveStatus === "disconnected" && "text-danger",
                 isAnimating && "animate-spin",
               )}
@@ -129,8 +132,8 @@ export function ConnectionStatus() {
               <span className="text-text-tertiary">
                 {t("connection.websocket", { defaultValue: "WebSocket" })}
               </span>
-              <span className={effectiveStatus === "connected" ? "text-success" : "text-warning"}>
-                {effectiveStatus === "connected"
+              <span className={wsConnected ? "text-success" : "text-warning"}>
+                {wsConnected
                   ? t("connection.ok", { defaultValue: "OK" })
                   : t("connection.pending", { defaultValue: "Pending" })}
               </span>

@@ -22,7 +22,7 @@ import {
   ToggleRight,
   Square,
 } from "lucide-react";
-import { api } from "../../lib/api";
+import { api, apiHeaders } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { toast } from "../../components/ui/Toast";
@@ -273,7 +273,7 @@ function PlaygroundPage() {
       const response = await fetch(`${baseUrl}/api/v1/chat/completions`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: apiHeaders(),
         body: JSON.stringify(body),
         signal: controller.signal,
       });

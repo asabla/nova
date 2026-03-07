@@ -4,7 +4,7 @@ import { z } from "zod";
 import { auth } from "../lib/auth";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
-import { mfaCredentials, users, magicLinkTokens } from "@nova/shared/schemas";
+import { mfaCredentials, users, magicLinkTokens, userProfiles, organisations } from "@nova/shared/schemas";
 import { orgSettings } from "@nova/shared/schemas";
 import { eq, and, isNull, gt } from "drizzle-orm";
 import { AppError } from "@nova/shared/utils";
@@ -299,6 +299,72 @@ authRoutes.patch("/password-policy", requireRole("org-admin"), zValidator("json"
     });
 
   return c.json(mergedPolicy);
+});
+
+// ─── User Init (auto-create org + profile for new users) ──
+
+authRoutes.post("/init", async (c) => {
+  // Manually validate session since this is in public auth routes
+  const session = await auth.api.getSession({
+    headers: c.req.raw.headers,
+  });
+
+  if (!session?.session || !session?.user) {
+    return c.json({ error: "Not authenticated" }, 401);
+  }
+
+  const externalId = session.user.id;
+  const email = session.user.email;
+
+  // Find or create NOVA user by Better Auth external ID
+  let [novaUser] = await db
+    .select()
+    .from(users)
+    .where(eq(users.externalId, externalId));
+
+  if (!novaUser) {
+    // Create NOVA user linked to Better Auth user
+    [novaUser] = await db
+      .insert(users)
+      .values({
+        externalId,
+        email: email.toLowerCase(),
+        lastLoginAt: new Date(),
+      })
+      .returning();
+  }
+
+  // Check if user already has a profile in any org
+  const existingProfiles = await db
+    .select({ orgId: userProfiles.orgId })
+    .from(userProfiles)
+    .where(and(eq(userProfiles.userId, novaUser.id), isNull(userProfiles.deletedAt)));
+
+  if (existingProfiles.length > 0) {
+    return c.json({ orgId: existingProfiles[0].orgId });
+  }
+
+  // Create a personal org for the user
+  const userName = session.user.name ?? email.split("@")[0] ?? "User";
+  const slug = `${userName.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-").slice(0, 40)}-${Date.now().toString(36)}`;
+
+  const [org] = await db
+    .insert(organisations)
+    .values({
+      name: `${userName}'s Workspace`,
+      slug,
+    })
+    .returning();
+
+  // Create user profile in the new org as admin
+  await db.insert(userProfiles).values({
+    userId: novaUser.id,
+    orgId: org.id,
+    displayName: userName,
+    role: "org-admin",
+  });
+
+  return c.json({ orgId: org.id });
 });
 
 // Better Auth catch-all handler (handles login, register, session, etc.)

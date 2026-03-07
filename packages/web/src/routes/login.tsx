@@ -15,6 +15,7 @@ function LoginPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const setSession = useAuthStore((s) => s.setSession);
+  const initOrg = useAuthStore((s) => s.initOrg);
   const [mode, setMode] = useState<"password" | "magic-link">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -57,6 +58,7 @@ function LoginPage() {
 
       if (data) {
         setSession(data);
+        await initOrg();
         navigate({ to: "/" });
       }
     } catch {

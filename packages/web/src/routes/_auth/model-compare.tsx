@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useRef, useCallback } from "react";
 import { ArrowLeftRight, Send, Clock, Coins, Hash, Diff } from "lucide-react";
-import { api } from "../../lib/api";
+import { api, apiHeaders } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { ModelCapabilityBadges } from "../../components/ui/ModelCapabilityBadges";
@@ -67,7 +67,7 @@ function ModelComparePage() {
       const response = await fetch(`${baseUrl}/api/model-compare`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: apiHeaders(),
         body: JSON.stringify({
           prompt: prompt.trim(),
           models: [modelA, modelB],
@@ -140,7 +140,7 @@ function ModelComparePage() {
       const response = await fetch(`${baseUrl}/api/model-compare`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: apiHeaders(),
         body: JSON.stringify({
           prompt: prompt.trim(),
           models: [modelA, modelB],

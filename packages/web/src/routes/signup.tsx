@@ -15,6 +15,7 @@ function SignupPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const setSession = useAuthStore((s) => s.setSession);
+  const initOrg = useAuthStore((s) => s.initOrg);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,6 +42,7 @@ function SignupPage() {
 
       if (data) {
         setSession(data);
+        await initOrg();
         navigate({ to: "/" });
       }
     } catch {

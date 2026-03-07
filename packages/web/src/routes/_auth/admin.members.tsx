@@ -59,32 +59,40 @@ function MembersPage() {
       </div>
 
       <div className="space-y-2">
-        {members.map((member: any) => (
-          <div key={member.id} className="flex items-center justify-between p-3 rounded-xl bg-surface-secondary border border-border">
-            <div className="flex items-center gap-3">
-              <Avatar name={member.name} size="sm" />
-              <div>
-                <p className="text-sm font-medium text-text">{member.name}</p>
-                <p className="text-xs text-text-tertiary">{member.email}</p>
+        {members.map((member: any) => {
+          const user = member.user ?? member;
+          const profile = member.profile ?? member;
+          const name = user.name ?? user.displayName ?? profile.displayName ?? "Unknown";
+          const email = user.email ?? "";
+          const role = profile.role ?? member.role ?? "member";
+          const userId = user.id ?? profile.userId ?? member.id;
+          return (
+            <div key={userId} className="flex items-center justify-between p-3 rounded-xl bg-surface-secondary border border-border">
+              <div className="flex items-center gap-3">
+                <Avatar name={name} size="sm" />
+                <div>
+                  <p className="text-sm font-medium text-text">{name}</p>
+                  <p className="text-xs text-text-tertiary">{email}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant={role === "org-admin" ? "primary" : "default"}>
+                  {role}
+                </Badge>
+                <select
+                  value={role}
+                  onChange={(e) => updateRole.mutate({ userId, role: e.target.value })}
+                  className="text-xs bg-surface border border-border rounded px-2 py-1 text-text"
+                >
+                  <option value="viewer">Viewer</option>
+                  <option value="member">Member</option>
+                  <option value="power-user">Power User</option>
+                  <option value="org-admin">Admin</option>
+                </select>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge variant={member.role === "org-admin" ? "primary" : "default"}>
-                {member.role}
-              </Badge>
-              <select
-                value={member.role}
-                onChange={(e) => updateRole.mutate({ userId: member.id, role: e.target.value })}
-                className="text-xs bg-surface border border-border rounded px-2 py-1 text-text"
-              >
-                <option value="viewer">Viewer</option>
-                <option value="member">Member</option>
-                <option value="power-user">Power User</option>
-                <option value="org-admin">Admin</option>
-              </select>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {invitations.length > 0 && (

@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect } from "react";
 import { api } from "../../lib/api";
 import { queryKeys, messagesOptions, conversationDetailOptions } from "../../lib/query-keys";
 import { MessageList } from "../../components/chat/MessageList";
@@ -37,6 +37,7 @@ function ConversationPage() {
       resetStream();
     }
   }, [status, tokens, id, queryClient, resetStream]);
+
 
   const editMessage = useMutation({
     mutationFn: ({ messageId, content }: { messageId: string; content: string }) =>
@@ -80,6 +81,20 @@ function ConversationPage() {
       ],
     });
   }, [id, queryClient, startStream, conversation, messages, getModelParams, stopTyping]);
+
+  // Auto-send initial message from new conversation page
+  const initialMessageSent = React.useRef(false);
+  useEffect(() => {
+    if (initialMessageSent.current) return;
+    try {
+      const initial = sessionStorage.getItem("nova:initial-message");
+      if (initial) {
+        sessionStorage.removeItem("nova:initial-message");
+        initialMessageSent.current = true;
+        handleSend(initial);
+      }
+    } catch { /* sessionStorage unavailable */ }
+  }, [handleSend]);
 
   const handleRate = useCallback(async (messageId: string, rating: 1 | -1) => {
     await api.post(`/api/conversations/${id}/messages/${messageId}/rate`, { rating });

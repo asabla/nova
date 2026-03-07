@@ -34,7 +34,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { Badge } from "../../components/ui/Badge";
-import { api } from "../../lib/api";
+import { api, apiHeaders } from "../../lib/api";
 
 export const Route = createFileRoute("/_auth/admin/analytics")({
   component: AdminAnalyticsPage,
@@ -431,7 +431,7 @@ function AdminAnalyticsPage() {
       const res = await fetch(`${baseUrl}/api/analytics/export`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: apiHeaders(),
         body: JSON.stringify({ type, from: dateRange.from, to: dateRange.to }),
       });
       const blob = await res.blob();

@@ -15,10 +15,14 @@ export default defineConfig({
       "@": resolve(__dirname, "src"),
     },
   },
+  json: {
+    namedExports: false,
+  },
   server: {
     port: 5173,
     proxy: {
       "/api": "http://localhost:3000",
+      "/health": "http://localhost:3000",
       "/ws": { target: "ws://localhost:3000", ws: true },
     },
   },
