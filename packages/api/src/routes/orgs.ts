@@ -162,15 +162,40 @@ orgRoutes.get("/mfa-status", requireRole("org-admin"), async (c) => {
   });
 });
 
-// Billing plan change (placeholder for Stripe integration)
+// Billing - Get current billing status
+orgRoutes.get("/billing", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  const { billingService } = await import("../services/billing.service");
+  const status = await billingService.getBillingStatus(orgId);
+  return c.json(status);
+});
+
+// Billing - Change plan (Stripe checkout or direct for self-hosted)
 orgRoutes.post("/billing/change-plan", requireRole("org-admin"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const { plan } = z.object({ plan: z.enum(["free", "team", "enterprise"]) }).parse(await c.req.json());
+  const { billingService } = await import("../services/billing.service");
 
-  const org = await orgService.update(orgId, { billingPlan: plan });
+  const appUrl = process.env.APP_URL ?? "http://localhost:5173";
+  const result = await billingService.createCheckoutSession(
+    orgId,
+    plan,
+    `${appUrl}/admin/billing?success=true`,
+    `${appUrl}/admin/billing?canceled=true`,
+  );
+
   await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "org.billing.change_plan", resourceType: "org", resourceId: orgId, details: { plan } });
-  return c.json(org);
+  return c.json(result);
+});
+
+// Billing - Create portal session for managing subscription
+orgRoutes.post("/billing/portal", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  const { billingService } = await import("../services/billing.service");
+  const appUrl = process.env.APP_URL ?? "http://localhost:5173";
+  const result = await billingService.createBillingPortalSession(orgId, `${appUrl}/admin/billing`);
+  return c.json(result);
 });
 
 // Members

@@ -11,7 +11,7 @@ export const orgService = {
     return org;
   },
 
-  async update(orgId: string, data: Partial<{ name: string; slug: string; logoUrl: string; billingPlan: string }>) {
+  async update(orgId: string, data: Partial<{ name: string; slug: string; logoUrl: string; billingPlan: string; billingCustomerId: string }>) {
     const [org] = await db
       .update(organisations)
       .set({ ...data, updatedAt: new Date() })

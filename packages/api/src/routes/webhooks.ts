@@ -138,4 +138,22 @@ webhookRoutes.post("/email/inbound", async (c) => {
   }
 });
 
+// Stripe webhook handler (Story #16)
+webhookRoutes.post("/stripe", async (c) => {
+  const signature = c.req.header("stripe-signature");
+  if (!signature) {
+    return c.json({ error: "Missing stripe-signature header" }, 400);
+  }
+
+  const body = await c.req.text();
+
+  try {
+    const { billingService } = await import("../services/billing.service");
+    const result = await billingService.handleStripeWebhook(body, signature);
+    return c.json(result);
+  } catch (err: any) {
+    return c.json({ error: err.message ?? "Webhook processing failed" }, 400);
+  }
+});
+
 export { webhookRoutes };
