@@ -150,7 +150,7 @@ function ConversationsTab({ workspaceId }: { workspaceId: string }) {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["workspaces", workspaceId, "conversations"] });
       toast.success("Conversation created");
-      navigate({ to: "/chat/$id", params: { id: data.id } });
+      navigate({ to: "/conversations/$id", params: { id: data.id } });
     },
     onError: (err: any) => toast.error(err.message ?? "Failed to create conversation"),
   });
@@ -204,7 +204,7 @@ function ConversationsTab({ workspaceId }: { workspaceId: string }) {
           {filtered.map((conversation: any) => (
             <button
               key={conversation.id}
-              onClick={() => navigate({ to: "/chat/$id", params: { id: conversation.id } })}
+              onClick={() => navigate({ to: "/conversations/$id", params: { id: conversation.id } })}
               className="w-full flex items-center gap-3 p-3 rounded-lg border border-border bg-surface hover:bg-surface-secondary transition-colors text-left"
             >
               <MessageSquare className="h-5 w-5 text-text-tertiary shrink-0" />

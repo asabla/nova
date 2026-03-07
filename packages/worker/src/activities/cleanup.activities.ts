@@ -57,9 +57,10 @@ export async function cleanupExpiredSessions(): Promise<number> {
 export async function cleanupExpiredInvitations(): Promise<number> {
   const result = await db
     .update(invitations)
-    .set({ status: "expired", updatedAt: new Date() })
+    .set({ deletedAt: new Date(), updatedAt: new Date() })
     .where(and(
-      eq(invitations.status, "pending"),
+      sql`${invitations.acceptedAt} IS NULL`,
+      sql`${invitations.deletedAt} IS NULL`,
       lt(invitations.expiresAt, new Date()),
     ))
     .returning();
@@ -71,7 +72,7 @@ export async function cleanupOrphanedFiles(): Promise<number> {
   const result = await db
     .delete(files)
     .where(and(
-      eq(files.status, "pending"),
+      sql`${files.sizeBytes} = 0`,
       lt(files.createdAt, cutoff),
     ))
     .returning();

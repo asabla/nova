@@ -10,7 +10,7 @@ export async function fetchDocumentContent(input: DocumentIngestionInput): Promi
   }
 
   const [doc] = await db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.id, input.documentId));
-  return doc?.rawContent ?? "";
+  return doc?.sourceUrl ? await (await fetch(doc.sourceUrl)).text() : "";
 }
 
 export async function chunkDocument(documentId: string, content: string): Promise<{ text: string; index: number }[]> {
@@ -48,8 +48,9 @@ export async function storeChunks(
 ): Promise<void> {
   for (const chunk of chunks) {
     await db.insert(knowledgeChunks).values({
-      documentId,
-      collectionId,
+      knowledgeDocumentId: documentId,
+      knowledgeCollectionId: collectionId,
+      orgId: (await db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.id, documentId)))[0]?.orgId ?? "",
       content: chunk.text,
       chunkIndex: chunk.index,
       tokenCount: Math.ceil(chunk.text.length / 4),
@@ -60,7 +61,6 @@ export async function storeChunks(
   await db.update(knowledgeDocuments).set({
     chunkCount: chunks.length,
     status: "ready",
-    processedAt: new Date(),
     updatedAt: new Date(),
   }).where(eq(knowledgeDocuments.id, documentId));
 }

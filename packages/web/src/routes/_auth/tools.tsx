@@ -572,7 +572,7 @@ function CustomToolsTab() {
       description: description.trim() || undefined,
       type: isOpenApi ? "openapi" : "function",
       schema: schema ?? {},
-      endpoint: hasEndpoint ? String(schema?.servers?.[0]?.url ?? schema?.endpoint ?? "") : undefined,
+      endpoint: hasEndpoint ? String((schema as any)?.servers?.[0]?.url ?? (schema as any)?.endpoint ?? "") : undefined,
     });
   }
 
@@ -995,11 +995,11 @@ function ToolDetailModal({ tool, open, onClose }: { tool: Tool; open: boolean; o
                           <span className="text-[10px] text-danger font-medium">required</span>
                         )}
                       </div>
-                      {prop.description && (
+                      {prop.description ? (
                         <p className="text-xs text-text-tertiary mt-0.5">
                           {String(prop.description)}
                         </p>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 );

@@ -77,7 +77,7 @@ export async function generateResearchReport(
   const report = data.choices?.[0]?.message?.content ?? "Report generation failed.";
 
   await db.update(researchReports).set({
-    content: report,
+    reportContent: report,
     sources: sources.map((s) => ({ url: s.url, title: s.title })),
     updatedAt: new Date(),
   }).where(eq(researchReports.id, reportId));
@@ -90,7 +90,7 @@ export async function updateResearchStatus(
 ): Promise<void> {
   await db.update(researchReports).set({
     status,
-    metadata: metadata ?? {},
+    config: metadata ?? {},
     updatedAt: new Date(),
   }).where(eq(researchReports.id, reportId));
 }
