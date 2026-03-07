@@ -172,40 +172,66 @@ export const knowledgeService = {
     // Verify collection exists and belongs to org
     await this.getCollection(orgId, collectionId);
 
-    // Use pgvector cosine distance for semantic search
-    // The embedding column is assumed to exist on knowledge_chunks (vector type via pgvector)
-    // We use a placeholder embedding here -- in production, the query text would first be
-    // converted to an embedding via the configured embedding model. For now we do a
-    // text-based similarity fallback using pg_trgm if no embedding is available.
-    const results = await db.execute(sql`
-      SELECT
-        kc.id,
-        kc.knowledge_document_id AS "documentId",
-        kd.title AS "documentName",
-        kc.content,
-        kc.chunk_index AS "chunkIndex",
-        kc.metadata,
-        CASE
-          WHEN kc.embedding IS NOT NULL THEN 1 - (kc.embedding <=> (
-            SELECT kc2.embedding FROM knowledge_chunks kc2
-            WHERE kc2.knowledge_collection_id = ${collectionId}
-            AND kc2.org_id = ${orgId}
-            AND kc2.deleted_at IS NULL
-            AND kc2.embedding IS NOT NULL
-            ORDER BY kc2.content <-> ${query}
-            LIMIT 1
-          ))
-          ELSE similarity(kc.content, ${query})
-        END AS score
-      FROM knowledge_chunks kc
-      JOIN knowledge_documents kd ON kd.id = kc.knowledge_document_id
-      WHERE kc.knowledge_collection_id = ${collectionId}
-        AND kc.org_id = ${orgId}
-        AND kc.deleted_at IS NULL
-        AND kd.deleted_at IS NULL
-      ORDER BY score DESC
-      LIMIT ${topK}
-    `);
+    // Generate embedding for the query text via LiteLLM
+    let queryEmbedding: number[] | null = null;
+    try {
+      const { env } = await import("../lib/env");
+      const litellmUrl = env.LITELLM_API_URL;
+      const resp = await fetch(`${litellmUrl}/v1/embeddings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "text-embedding-3-small",
+          input: [query],
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json() as { data: { embedding: number[] }[] };
+        queryEmbedding = data.data[0]?.embedding ?? null;
+      }
+    } catch {
+      // Fallback to text similarity if embedding API is unavailable
+    }
+
+    // Use pgvector cosine distance if we have an embedding, otherwise pg_trgm text similarity
+    const results = queryEmbedding
+      ? await db.execute(sql`
+          SELECT
+            kc.id,
+            kc.knowledge_document_id AS "documentId",
+            kd.title AS "documentName",
+            kc.content,
+            kc.chunk_index AS "chunkIndex",
+            kc.metadata,
+            1 - (kc.embedding <=> ${JSON.stringify(queryEmbedding)}::vector) AS score
+          FROM knowledge_chunks kc
+          JOIN knowledge_documents kd ON kd.id = kc.knowledge_document_id
+          WHERE kc.knowledge_collection_id = ${collectionId}
+            AND kc.org_id = ${orgId}
+            AND kc.deleted_at IS NULL
+            AND kd.deleted_at IS NULL
+            AND kc.embedding IS NOT NULL
+          ORDER BY kc.embedding <=> ${JSON.stringify(queryEmbedding)}::vector
+          LIMIT ${topK}
+        `)
+      : await db.execute(sql`
+          SELECT
+            kc.id,
+            kc.knowledge_document_id AS "documentId",
+            kd.title AS "documentName",
+            kc.content,
+            kc.chunk_index AS "chunkIndex",
+            kc.metadata,
+            similarity(kc.content, ${query}) AS score
+          FROM knowledge_chunks kc
+          JOIN knowledge_documents kd ON kd.id = kc.knowledge_document_id
+          WHERE kc.knowledge_collection_id = ${collectionId}
+            AND kc.org_id = ${orgId}
+            AND kc.deleted_at IS NULL
+            AND kd.deleted_at IS NULL
+          ORDER BY score DESC
+          LIMIT ${topK}
+        `);
 
     const rows = (results as any[]).filter((r: any) => r.score >= threshold);
 

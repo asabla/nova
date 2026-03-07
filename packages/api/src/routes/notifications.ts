@@ -173,22 +173,26 @@ notificationsRouter.post("/email", zValidator("json", emailNotificationSchema), 
   const userId = c.get("userId");
   const data = c.req.valid("json");
 
-  // Stub: No email service configured yet. Log the request and return success.
-  console.log(`[email-stub] org=${orgId} from=${userId} to=${data.to} subject="${data.subject}"`);
+  // Send via configured email provider
+  const { sendEmail, buildNotificationEmail } = await import("../lib/email");
+  const emailContent = buildNotificationEmail(data.subject, data.body);
+  const sent = await sendEmail({
+    to: data.to,
+    ...emailContent,
+  });
 
-  // Persist as an in-app notification so there is a record
+  // Also persist as an in-app notification
   const notification = await notificationService.create({
     orgId,
     userId,
-    type: "email_queued",
+    type: sent ? "email_sent" : "email_queued",
     title: `Email to ${data.to}: ${data.subject}`,
     body: data.body.slice(0, 500),
   });
 
   return c.json({
     ok: true,
-    status: "queued",
-    message: "Email service not configured. Notification logged as in-app record.",
+    status: sent ? "sent" : "queued",
     notificationId: notification?.id ?? null,
   }, 202);
 });
