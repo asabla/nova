@@ -3,9 +3,50 @@ import { db } from "../lib/db";
 import { researchReports } from "@nova/shared/schemas";
 
 export async function searchWeb(query: string, iteration: number): Promise<{ url: string; title: string }[]> {
-  // In production, call a search API (e.g., Bing, Google, SearxNG)
-  // For now, return empty - this is the integration point
-  return [];
+  const searxngUrl = process.env.SEARXNG_URL;
+
+  // Try SearxNG first (self-hosted search)
+  if (searxngUrl) {
+    try {
+      const resp = await fetch(
+        `${searxngUrl}/search?q=${encodeURIComponent(query)}&format=json&categories=general&pageno=${iteration}`,
+        { signal: AbortSignal.timeout(10_000) },
+      );
+      if (resp.ok) {
+        const data = await resp.json() as { results: { url: string; title: string }[] };
+        return (data.results ?? []).slice(0, 10).map((r) => ({ url: r.url, title: r.title }));
+      }
+    } catch {
+      // Fall through to DuckDuckGo
+    }
+  }
+
+  // Fallback: DuckDuckGo Instant Answer API + HTML search
+  try {
+    const resp = await fetch(
+      `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
+      {
+        headers: { "User-Agent": "NovaBot/1.0" },
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
+    const html = await resp.text();
+
+    // Parse result links from DDG HTML response
+    const results: { url: string; title: string }[] = [];
+    const linkRegex = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([^<]+)<\/a>/gi;
+    let match: RegExpExecArray | null;
+    while ((match = linkRegex.exec(html)) !== null && results.length < 10) {
+      let url = match[1];
+      // DDG wraps URLs in a redirect
+      const udMatch = url.match(/uddg=([^&]+)/);
+      if (udMatch) url = decodeURIComponent(udMatch[1]);
+      results.push({ url, title: match[2].trim() });
+    }
+    return results;
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchPageContent(url: string): Promise<string> {
