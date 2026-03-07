@@ -246,4 +246,75 @@ orgRoutes.delete("/groups/:id", requireRole("org-admin"), async (c) => {
   return c.body(null, 204);
 });
 
+// Setup wizard status (Story #203) - check if initial setup is complete
+orgRoutes.get("/setup-status", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+
+  const org = await orgService.get(orgId);
+  const members = await orgService.listMembers(orgId);
+  const settings = await db.select().from(orgSettings).where(eq(orgSettings.orgId, orgId));
+  const settingsMap: Record<string, string> = {};
+  for (const s of settings) settingsMap[s.key] = s.value;
+
+  // Check LiteLLM connectivity
+  let litellmConnected = false;
+  try {
+    const litellmUrl = settingsMap["litellm_url"] || process.env.LITELLM_API_URL || "http://localhost:4000";
+    const res = await fetch(`${litellmUrl}/health`, { signal: AbortSignal.timeout(3000) });
+    litellmConnected = res.ok;
+  } catch { /* not connected */ }
+
+  const steps = {
+    orgName: { done: !!org.name && org.name !== "Default Organization", label: "Set organization name" },
+    modelProvider: { done: litellmConnected || !!settingsMap["litellm_url"], label: "Configure model provider (LiteLLM)" },
+    firstUser: { done: members.length >= 1, label: "Create first user" },
+    branding: { done: !!org.logoUrl || !!settingsMap["branding.logo_url"], label: "Add branding (optional)" },
+    inviteMembers: { done: members.length >= 2, label: "Invite team members (optional)" },
+  };
+
+  const requiredSteps = ["orgName", "modelProvider", "firstUser"] as const;
+  const isComplete = requiredSteps.every((key) => steps[key].done);
+
+  return c.json({
+    isComplete,
+    completedCount: Object.values(steps).filter((s) => s.done).length,
+    totalSteps: Object.keys(steps).length,
+    steps,
+  });
+});
+
+// Complete setup wizard
+orgRoutes.post("/setup-complete", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+
+  const body = z.object({
+    orgName: z.string().min(1).max(200).optional(),
+    litellmUrl: z.string().url().optional(),
+    defaultModel: z.string().optional(),
+  }).parse(await c.req.json());
+
+  if (body.orgName) {
+    await orgService.update(orgId, { name: body.orgName });
+  }
+
+  if (body.litellmUrl) {
+    await db.insert(orgSettings).values({ orgId, key: "litellm_url", value: body.litellmUrl })
+      .onConflictDoUpdate({ target: [orgSettings.orgId, orgSettings.key], set: { value: body.litellmUrl, updatedAt: new Date() } });
+  }
+
+  if (body.defaultModel) {
+    await db.insert(orgSettings).values({ orgId, key: "default_model", value: body.defaultModel })
+      .onConflictDoUpdate({ target: [orgSettings.orgId, orgSettings.key], set: { value: body.defaultModel, updatedAt: new Date() } });
+  }
+
+  // Mark setup as complete
+  await db.insert(orgSettings).values({ orgId, key: "setup_complete", value: "true" })
+    .onConflictDoUpdate({ target: [orgSettings.orgId, orgSettings.key], set: { value: "true", updatedAt: new Date() } });
+
+  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "org.setup.complete", resourceType: "org", resourceId: orgId });
+
+  return c.json({ ok: true });
+});
+
 export { orgRoutes };
