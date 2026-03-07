@@ -158,7 +158,7 @@ notificationsRouter.put("/preferences", zValidator("json", prefSchema), async (c
   return c.json(result);
 });
 
-// --- Send email notification (stub) ---
+// --- Send email notification ---
 
 const emailNotificationSchema = z.object({
   to: z.string().email(),
