@@ -9,6 +9,7 @@ import { chatCompletion } from "../lib/litellm";
 import { AppError } from "@nova/shared/utils";
 import { DEFAULTS } from "@nova/shared/constants";
 import { notificationService } from "../services/notification.service";
+import { getTemporalClient } from "../lib/temporal";
 import { db } from "../lib/db";
 import { userProfiles, users, agents } from "@nova/shared/schemas";
 import { eq, and, isNull } from "drizzle-orm";
@@ -340,6 +341,100 @@ messagesRouter.get("/:conversationId/messages/:messageId/attachments", async (c)
   const orgId = c.get("orgId");
   const attachments = await messageService.getAttachments(orgId, c.req.param("messageId"));
   return c.json(attachments);
+});
+
+// Replay a message with a different model (Story #41)
+const replaySchema = z.object({
+  model: z.string().min(1),
+  temperature: z.number().min(0).max(2).optional(),
+  topP: z.number().min(0).max(1).optional(),
+  maxTokens: z.number().int().positive().optional(),
+});
+
+messagesRouter.post("/:conversationId/messages/:messageId/replay", zValidator("json", replaySchema), async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const conversationId = c.req.param("conversationId");
+  const messageId = c.req.param("messageId");
+  const { model, temperature, topP, maxTokens } = c.req.valid("json");
+
+  // Get the original message and all prior messages in the conversation
+  const allMessages = await messageService.listMessages(orgId, conversationId, { page: 1, pageSize: 1000 });
+  const msgList = (allMessages as any).data ?? allMessages;
+
+  // Find the target message index
+  const targetIndex = msgList.findIndex((m: any) => m.id === messageId);
+  if (targetIndex === -1) throw AppError.notFound("Message");
+
+  // Build message history up to (and including) the user message before the target
+  const history: { role: string; content: string }[] = [];
+  for (let i = 0; i <= targetIndex; i++) {
+    const msg = msgList[i];
+    if (msg.senderType === "user") {
+      history.push({ role: "user", content: msg.content });
+    } else if (msg.senderType === "assistant") {
+      history.push({ role: "assistant", content: msg.content });
+    } else if (msg.senderType === "system") {
+      history.push({ role: "system", content: msg.content });
+    }
+  }
+
+  // If the target is an assistant message, remove it and keep messages up to the user message before it
+  if (msgList[targetIndex].senderType === "assistant") {
+    history.pop();
+  }
+
+  // Call the new model
+  const result = await chatCompletion({
+    model,
+    messages: history,
+    temperature,
+    top_p: topP,
+    max_tokens: maxTokens,
+  });
+
+  const data = result as any;
+  const content = data.choices?.[0]?.message?.content ?? "";
+
+  // Save as a new assistant message
+  const replayMessage = await messageService.createMessage(orgId, {
+    conversationId,
+    senderType: "assistant",
+    content,
+    modelId: model,
+    tokenCountPrompt: data.usage?.prompt_tokens,
+    tokenCountCompletion: data.usage?.completion_tokens,
+    metadata: { replayOf: messageId, model },
+  });
+
+  return c.json(replayMessage, 201);
+});
+
+// Stop a running agent execution (Story #52)
+messagesRouter.post("/:conversationId/stop", async (c) => {
+  const orgId = c.get("orgId");
+  const conversationId = c.req.param("conversationId");
+
+  const conversation = await conversationService.getConversation(orgId, conversationId);
+  if (!conversation) throw AppError.notFound("Conversation");
+
+  // Get the agent's workflow ID from conversation metadata
+  const agentMeta = (conversation.modelParams as any);
+  const workflowId = agentMeta?.workflowId;
+
+  if (workflowId) {
+    try {
+      const client = await getTemporalClient();
+      const handle = client.workflow.getHandle(workflowId);
+      await handle.signal("cancel");
+      return c.json({ ok: true, message: "Agent stop signal sent" });
+    } catch (err) {
+      // Workflow may have already completed
+      return c.json({ ok: true, message: "Agent may have already completed" });
+    }
+  }
+
+  return c.json({ ok: true, message: "No active agent run found" });
 });
 
 export { messagesRouter as messageRoutes };
