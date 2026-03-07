@@ -34,13 +34,14 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     return response.ok;
   }
 
-  // SMTP via nodemailer-compatible fetch
+  // SMTP via raw TCP socket (Bun-native, no external dependencies)
   if (provider === "smtp" && env.SMTP_HOST) {
-    // Use Bun's native SMTP or a lightweight fetch-based approach
-    // For production, this would use nodemailer or similar
-    console.log(`[EMAIL/SMTP] Sending to ${options.to} via ${env.SMTP_HOST}`);
-    // Placeholder - in production, connect to SMTP
-    return true;
+    try {
+      return await sendViaSMTP(options);
+    } catch (err) {
+      console.error("[EMAIL/SMTP] Failed to send:", err);
+      return false;
+    }
   }
 
   return false;
@@ -98,6 +99,134 @@ export function buildInviteEmail(orgName: string, inviteUrl: string): { subject:
       </div>
     `,
   };
+}
+
+async function sendViaSMTP(options: EmailOptions): Promise<boolean> {
+  const host = env.SMTP_HOST!;
+  const port = env.SMTP_PORT ?? 587;
+  const user = env.SMTP_USER;
+  const pass = env.SMTP_PASS;
+  const from = env.EMAIL_FROM ?? "NOVA <noreply@nova.app>";
+
+  // Build RFC 2822 compliant email message
+  const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const messageLines = [
+    `From: ${from}`,
+    `To: ${options.to}`,
+    `Subject: ${options.subject}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    `Date: ${new Date().toUTCString()}`,
+    `Message-ID: <${Date.now()}.${Math.random().toString(36).slice(2)}@nova.app>`,
+    "",
+    `--${boundary}`,
+    "Content-Type: text/plain; charset=utf-8",
+    "Content-Transfer-Encoding: quoted-printable",
+    "",
+    options.text ?? options.html.replace(/<[^>]*>/g, ""),
+    "",
+    `--${boundary}`,
+    "Content-Type: text/html; charset=utf-8",
+    "Content-Transfer-Encoding: quoted-printable",
+    "",
+    options.html,
+    "",
+    `--${boundary}--`,
+  ];
+  const message = messageLines.join("\r\n");
+
+  // Use Bun's TCP socket for SMTP
+  return new Promise<boolean>((resolve) => {
+    const steps: string[] = [];
+    let stepIndex = 0;
+    let resolved = false;
+
+    // Build command sequence
+    steps.push(`EHLO nova.app\r\n`);
+    if (port === 587 || port === 25) {
+      steps.push(`STARTTLS\r\n`);
+    }
+    if (user && pass) {
+      const credentials = Buffer.from(`\0${user}\0${pass}`).toString("base64");
+      steps.push(`AUTH PLAIN ${credentials}\r\n`);
+    }
+    // Extract email from "Name <email>" format
+    const fromEmail = from.includes("<") ? from.match(/<(.+)>/)?.[1] ?? from : from;
+    steps.push(`MAIL FROM:<${fromEmail}>\r\n`);
+    steps.push(`RCPT TO:<${options.to}>\r\n`);
+    steps.push(`DATA\r\n`);
+    steps.push(`${message}\r\n.\r\n`);
+    steps.push(`QUIT\r\n`);
+
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        console.error("[EMAIL/SMTP] Connection timeout");
+        resolve(false);
+      }
+    }, 15_000);
+
+    const socket = Bun.connect({
+      hostname: host,
+      port,
+      socket: {
+        data(_socket, data) {
+          const response = data.toString();
+          const code = parseInt(response.slice(0, 3), 10);
+
+          if (code >= 400) {
+            console.error(`[EMAIL/SMTP] Error: ${response.trim()}`);
+            if (!resolved) {
+              resolved = true;
+              clearTimeout(timeout);
+              resolve(false);
+            }
+            return;
+          }
+
+          // Send next command
+          if (stepIndex < steps.length) {
+            _socket.write(steps[stepIndex]);
+            stepIndex++;
+          }
+
+          // Check if QUIT response received
+          if (response.startsWith("221") || stepIndex >= steps.length) {
+            if (!resolved) {
+              resolved = true;
+              clearTimeout(timeout);
+              resolve(true);
+            }
+          }
+        },
+        error(_socket, error) {
+          console.error("[EMAIL/SMTP] Socket error:", error);
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            resolve(false);
+          }
+        },
+        close() {
+          clearTimeout(timeout);
+          if (!resolved) {
+            resolved = true;
+            resolve(true);
+          }
+        },
+        open(_socket) {
+          // Wait for server greeting before sending commands
+        },
+      },
+    }).catch((err) => {
+      console.error("[EMAIL/SMTP] Connect error:", err);
+      clearTimeout(timeout);
+      if (!resolved) {
+        resolved = true;
+        resolve(false);
+      }
+    });
+  });
 }
 
 export function buildBudgetAlertEmail(alertName: string, currentValue: number, threshold: number, unit: string): { subject: string; html: string; text: string } {

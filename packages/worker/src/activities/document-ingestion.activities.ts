@@ -33,12 +33,50 @@ export async function chunkDocument(documentId: string, content: string): Promis
 export async function generateEmbeddings(
   chunks: { text: string; index: number }[],
 ): Promise<{ text: string; index: number; embedding: number[] }[]> {
-  // In production, call the embedding API (e.g., OpenAI, LiteLLM)
-  // For now, return placeholder embeddings
-  return chunks.map((chunk) => ({
-    ...chunk,
-    embedding: new Array(1536).fill(0).map(() => Math.random() * 2 - 1),
-  }));
+  const litellmUrl = process.env.LITELLM_URL ?? "http://localhost:4000";
+  const batchSize = 20;
+  const results: { text: string; index: number; embedding: number[] }[] = [];
+
+  for (let i = 0; i < chunks.length; i += batchSize) {
+    const batch = chunks.slice(i, i + batchSize);
+    const texts = batch.map((c) => c.text);
+
+    try {
+      const resp = await fetch(`${litellmUrl}/v1/embeddings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: process.env.EMBEDDING_MODEL ?? "text-embedding-3-small",
+          input: texts,
+        }),
+      });
+
+      if (!resp.ok) {
+        console.warn(`[EMBED] LiteLLM returned ${resp.status}, falling back to zero vectors`);
+        results.push(...batch.map((c) => ({
+          ...c,
+          embedding: new Array(1536).fill(0),
+        })));
+        continue;
+      }
+
+      const data = await resp.json() as { data: { embedding: number[]; index: number }[] };
+      for (const item of data.data) {
+        results.push({
+          ...batch[item.index],
+          embedding: item.embedding,
+        });
+      }
+    } catch (err) {
+      console.warn(`[EMBED] Failed to call embedding API, using zero vectors:`, err);
+      results.push(...batch.map((c) => ({
+        ...c,
+        embedding: new Array(1536).fill(0),
+      })));
+    }
+  }
+
+  return results;
 }
 
 export async function storeChunks(

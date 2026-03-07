@@ -8,6 +8,7 @@ const {
   executeAgentStep,
   saveAgentMessage,
   createAgentConversation,
+  executeToolCall,
 } = proxyActivities<typeof agentActivities>({
   startToCloseTimeout: "2 minutes",
   retry: { maximumAttempts: 3 },
@@ -110,10 +111,16 @@ export async function agentExecutionWorkflow(input: AgentExecutionInput): Promis
     // Handle tool calls
     if (result.toolCalls.length > 0) {
       for (const toolCall of result.toolCalls) {
-        // In production: execute tool, get result, add to history
+        const toolResult = await executeToolCall(
+          input.orgId,
+          input.agentId,
+          toolCall.id,
+          toolCall.function?.name ?? "unknown",
+          toolCall.function?.arguments ?? "{}",
+        );
         messageHistory.push({
           role: "tool",
-          content: JSON.stringify({ tool: toolCall.function?.name, result: "Tool execution placeholder" }),
+          content: JSON.stringify(toolResult),
         });
       }
       continue; // Re-run the agent with tool results

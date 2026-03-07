@@ -136,6 +136,70 @@ export async function saveAgentMessage(
   return msg;
 }
 
+export async function executeToolCall(
+  orgId: string,
+  agentId: string,
+  toolCallId: string,
+  toolName: string,
+  toolArguments: string,
+): Promise<{ tool_call_id: string; result: unknown; error?: string }> {
+  try {
+    const args = JSON.parse(toolArguments);
+
+    // Built-in tools
+    switch (toolName) {
+      case "web_search": {
+        const query = args.query ?? args.q ?? "";
+        const resp = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`);
+        const data = await resp.json();
+        return { tool_call_id: toolCallId, result: data };
+      }
+      case "fetch_url": {
+        const url = args.url ?? "";
+        const resp = await fetch(url, { headers: { "User-Agent": "NOVA-Agent/1.0" } });
+        const text = await resp.text();
+        return { tool_call_id: toolCallId, result: text.slice(0, 10000) };
+      }
+      case "code_execute": {
+        // Sandbox execution would be handled by the sandbox service
+        return { tool_call_id: toolCallId, result: "Code execution requires sandbox service" };
+      }
+      default: {
+        // Check if it's a registered tool in the database
+        const { tools: toolsTable, agentTools: agentToolsTable } = await import("@nova/shared/schemas");
+        const registeredTools = await db.select({ tool: toolsTable })
+          .from(agentToolsTable)
+          .innerJoin(toolsTable, eq(agentToolsTable.toolId, toolsTable.id))
+          .where(and(
+            eq(agentToolsTable.agentId, agentId),
+            eq(agentToolsTable.isEnabled, true),
+            isNull(agentToolsTable.deletedAt),
+          ));
+
+        const matchedTool = registeredTools.find((t) => t.tool.name === toolName);
+        if (matchedTool) {
+          const spec = matchedTool.tool.openapiSpec as Record<string, unknown> | null;
+          const endpoint = (spec?.endpoint ?? spec?.url) as string | undefined;
+          if (endpoint) {
+            const resp = await fetch(endpoint, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(args),
+            });
+            const result = await resp.json();
+            return { tool_call_id: toolCallId, result };
+          }
+          return { tool_call_id: toolCallId, result: null, error: `Tool ${toolName} has no endpoint configured` };
+        }
+
+        return { tool_call_id: toolCallId, result: null, error: `Unknown tool: ${toolName}` };
+      }
+    }
+  } catch (err) {
+    return { tool_call_id: toolCallId, result: null, error: String(err) };
+  }
+}
+
 export async function createAgentConversation(
   orgId: string,
   userId: string,
