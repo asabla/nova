@@ -16,16 +16,20 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 COPY packages/shared/ packages/shared/
 COPY packages/api/ packages/api/
 
-# Single bundled output — all deps inlined, no node_modules needed at runtime
-RUN bun build packages/api/src/index.ts --target=bun --outdir=dist --minify
+# Production deps only
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --frozen-lockfile --production
 
 # ── Runtime ──────────────────────────────────────
 FROM oven/bun:1-alpine
 
 WORKDIR /app
 
-COPY --from=builder /app/dist/index.js ./index.js
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages/shared ./packages/shared
+COPY --from=builder /app/packages/api ./packages/api
+COPY --from=builder /app/package.json ./
 
 EXPOSE 3000
 
-CMD ["bun", "run", "index.js"]
+CMD ["bun", "run", "packages/api/src/index.ts"]

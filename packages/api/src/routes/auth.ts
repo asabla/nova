@@ -16,9 +16,6 @@ import { env } from "../lib/env";
 
 const authRoutes = new Hono<AppContext>();
 
-// Better Auth catch-all handler (handles login, register, session, etc.)
-authRoutes.all("/better-auth/*", (c) => auth.handler(c.req.raw));
-
 // ─── Magic Link ───────────────────────────────────────────
 
 const magicLinkSchema = z.object({
@@ -302,6 +299,13 @@ authRoutes.patch("/password-policy", requireRole("org-admin"), zValidator("json"
     });
 
   return c.json(mergedPolicy);
+});
+
+// Better Auth catch-all handler (handles login, register, session, etc.)
+// Must be last so specific routes above take priority
+authRoutes.all("/*", async (c) => {
+  // Clone the request to ensure the body is available for Better Auth
+  return auth.handler(c.req.raw.clone());
 });
 
 export { authRoutes };

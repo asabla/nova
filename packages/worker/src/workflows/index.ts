@@ -1,5 +1,5 @@
-export { documentIngestionWorkflow } from "./document-ingestion";
-export { conversationSummaryWorkflow } from "./conversation-summary";
-export { scheduledCleanupWorkflow } from "./scheduled-cleanup";
-export { deepResearchWorkflow } from "./deep-research";
-export { agentExecutionWorkflow } from "./agent-execution";
+export { documentIngestionWorkflow } from "./document-ingestion.js";
+export { conversationSummaryWorkflow } from "./conversation-summary.js";
+export { scheduledCleanupWorkflow } from "./scheduled-cleanup.js";
+export { deepResearchWorkflow } from "./deep-research.js";
+export { agentExecutionWorkflow } from "./agent-execution.js";
