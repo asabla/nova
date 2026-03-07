@@ -1,4 +1,5 @@
 import { env } from "./env";
+import { traceGeneration, getHeliconeHeaders } from "./observability";
 
 interface ChatCompletionRequest {
   model: string;
@@ -23,14 +24,17 @@ export async function chatCompletion(request: ChatCompletionRequest): Promise<an
   const modelsToTry = [req.model, ...(fallbackModels ?? [])];
 
   let lastError: Error | null = null;
+  const traceId = crypto.randomUUID();
 
   for (const model of modelsToTry) {
+    const startTime = new Date().toISOString();
     try {
       const response = await fetch(`${env.LITELLM_API_URL}/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${env.LITELLM_MASTER_KEY}`,
+          ...getHeliconeHeaders(),
         },
         body: JSON.stringify({ ...req, model }),
         signal: AbortSignal.timeout(120_000),
@@ -57,6 +61,20 @@ export async function chatCompletion(request: ChatCompletionRequest): Promise<an
         data._fallbackModel = model;
         data._originalModel = req.model;
       }
+      // Record trace for observability (Story #160)
+      traceGeneration({
+        traceId,
+        model,
+        input: req.messages,
+        output: data.choices?.[0]?.message,
+        usage: {
+          promptTokens: data.usage?.prompt_tokens,
+          completionTokens: data.usage?.completion_tokens,
+          totalTokens: data.usage?.total_tokens,
+        },
+        startTime,
+        endTime: new Date().toISOString(),
+      });
       return data;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));

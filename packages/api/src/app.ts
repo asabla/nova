@@ -52,6 +52,7 @@ import { rateLimitRoutes } from "./routes/rate-limits";
 import { domainRoutes } from "./routes/domains";
 import { urlPreviewRoutes } from "./routes/url-preview";
 import { webhookRoutes } from "./routes/webhooks";
+import { voiceRoutes } from "./routes/voice";
 
 const app = new Hono<AppContext>();
 
@@ -135,5 +136,6 @@ app.route("/api/shortcuts", shortcutRoutes);
 app.route("/api/org", rateLimitRoutes);
 app.route("/api/domains", domainRoutes);
 app.route("/api/url", urlPreviewRoutes);
+app.route("/api/voice", voiceRoutes);
 
 export { app };

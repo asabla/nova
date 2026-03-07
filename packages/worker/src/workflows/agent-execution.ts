@@ -9,6 +9,7 @@ const {
   saveAgentMessage,
   createAgentConversation,
   executeToolCall,
+  notifyAgentCompletion,
 } = proxyActivities<typeof agentActivities>({
   startToCloseTimeout: "2 minutes",
   retry: { maximumAttempts: 3 },
@@ -136,6 +137,15 @@ export async function agentExecutionWorkflow(input: AgentExecutionInput): Promis
     lastConversationId: conversationId,
   };
   await saveAgentMemory(input.agentId, input.orgId, agent.memoryScope, memoryUpdates, input.userId);
+
+  // 7. Send completion notification (Story #164)
+  await notifyAgentCompletion(
+    input.orgId,
+    input.userId,
+    input.agentId,
+    conversationId,
+    { steps: step, totalTokens, messageIds },
+  );
 
   return {
     conversationId,

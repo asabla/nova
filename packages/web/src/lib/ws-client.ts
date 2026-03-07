@@ -40,3 +40,114 @@ export function sendWsMessage(type: string, payload: Record<string, unknown>) {
 export function getWsReadyState(): number {
   return ws?.readyState ?? WebSocket.CLOSED;
 }
+
+// --- Message Draft Preservation (Story #202) ---
+// Saves in-progress drafts to localStorage so they survive disconnects/refreshes.
+
+const DRAFT_KEY = "nova:message-drafts";
+
+interface DraftEntry {
+  conversationId: string;
+  text: string;
+  updatedAt: number;
+}
+
+export function saveDraft(conversationId: string, text: string) {
+  try {
+    const drafts = loadAllDrafts();
+    if (text.trim()) {
+      drafts[conversationId] = { conversationId, text, updatedAt: Date.now() };
+    } else {
+      delete drafts[conversationId];
+    }
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts));
+  } catch {
+    // Storage full or unavailable
+  }
+}
+
+export function loadDraft(conversationId: string): string {
+  try {
+    const drafts = loadAllDrafts();
+    return drafts[conversationId]?.text ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function clearDraft(conversationId: string) {
+  try {
+    const drafts = loadAllDrafts();
+    delete drafts[conversationId];
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts));
+  } catch {
+    // Ignore
+  }
+}
+
+function loadAllDrafts(): Record<string, DraftEntry> {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return {};
+    const drafts = JSON.parse(raw) as Record<string, DraftEntry>;
+    // Clean up entries older than 7 days
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    for (const key of Object.keys(drafts)) {
+      if (drafts[key].updatedAt < cutoff) delete drafts[key];
+    }
+    return drafts;
+  } catch {
+    return {};
+  }
+}
+
+// --- Pending Message Queue (Story #202) ---
+// Queue messages when offline and auto-send on reconnect.
+
+interface PendingMessage {
+  id: string;
+  conversationId: string;
+  content: string;
+  timestamp: number;
+}
+
+const PENDING_KEY = "nova:pending-messages";
+
+export function queuePendingMessage(conversationId: string, content: string): string {
+  const id = crypto.randomUUID();
+  try {
+    const pending = loadPendingMessages();
+    pending.push({ id, conversationId, content, timestamp: Date.now() });
+    localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+  } catch {
+    // Storage unavailable
+  }
+  return id;
+}
+
+export function loadPendingMessages(): PendingMessage[] {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function removePendingMessage(id: string) {
+  try {
+    const pending = loadPendingMessages().filter((m) => m.id !== id);
+    localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+  } catch {
+    // Ignore
+  }
+}
+
+export function clearPendingMessages(conversationId: string) {
+  try {
+    const pending = loadPendingMessages().filter((m) => m.conversationId !== conversationId);
+    localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+  } catch {
+    // Ignore
+  }
+}

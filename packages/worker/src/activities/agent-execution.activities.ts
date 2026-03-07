@@ -200,6 +200,65 @@ export async function executeToolCall(
   }
 }
 
+/**
+ * Send completion notification when an agent run finishes (Story #164).
+ * Notifies via webhook and/or creates an in-app notification.
+ */
+export async function notifyAgentCompletion(
+  orgId: string,
+  userId: string,
+  agentId: string,
+  conversationId: string,
+  result: { steps: number; totalTokens: number; messageIds: string[] },
+) {
+  const { notifications, agents: agentsTable } = await import("@nova/shared/schemas");
+
+  // Get agent name for the notification
+  const [agent] = await db.select({ name: agentsTable.name }).from(agentsTable)
+    .where(and(eq(agentsTable.id, agentId), eq(agentsTable.orgId, orgId)));
+
+  const agentName = agent?.name ?? "Agent";
+
+  // Create in-app notification
+  await db.insert(notifications).values({
+    orgId,
+    userId,
+    type: "agent_run_complete",
+    title: `${agentName} completed`,
+    body: `Agent run finished in ${result.steps} step(s), using ${result.totalTokens.toLocaleString()} tokens.`,
+    resourceType: "conversation",
+    resourceId: conversationId,
+  });
+
+  // Check for webhook URL in agent config
+  const [agentConfig] = await db.select().from(agentsTable)
+    .where(and(eq(agentsTable.id, agentId), eq(agentsTable.orgId, orgId)));
+
+  const webhookUrl = (agentConfig as any)?.webhookUrl;
+  if (webhookUrl) {
+    try {
+      await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event: "agent.run.completed",
+          agentId,
+          agentName,
+          conversationId,
+          orgId,
+          steps: result.steps,
+          totalTokens: result.totalTokens,
+          messageIds: result.messageIds,
+          timestamp: new Date().toISOString(),
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch (err) {
+      console.error(`[agent-webhook] Failed to notify ${webhookUrl}:`, err);
+    }
+  }
+}
+
 export async function createAgentConversation(
   orgId: string,
   userId: string,
