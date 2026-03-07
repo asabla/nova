@@ -181,7 +181,7 @@ function ProfileSettings() {
             aria-label={t("settings.timezone", "Timezone")}
             value={timezone}
             onChange={(e) => setTimezone(e.target.value)}
-            className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-text hover:border-border-strong focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary focus-visible:border-primary transition-colors"
+            className="w-full h-11 rounded-lg border border-border bg-surface px-3 text-sm text-text hover:border-border-strong focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary focus-visible:border-primary transition-colors"
           >
             {timezones.map((tz) => (
               <option key={tz} value={tz}>
@@ -200,7 +200,7 @@ function ProfileSettings() {
             aria-label={t("settings.language", "Language")}
             value={locale}
             onChange={(e) => setLocale(e.target.value)}
-            className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-text hover:border-border-strong focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary focus-visible:border-primary transition-colors"
+            className="w-full h-11 rounded-lg border border-border bg-surface px-3 text-sm text-text hover:border-border-strong focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary focus-visible:border-primary transition-colors"
           >
             {LANGUAGES.map((lang) => (
               <option key={lang.value} value={lang.value}>

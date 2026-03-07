@@ -389,7 +389,22 @@
     "team": "Team",
     "teamDesc": "Your team members",
     "public": "Public",
-    "publicDesc": "Anyone with link"
+    "publicDesc": "Anyone with link",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "lightDescription": "Use a light color scheme",
+    "darkDescription": "Use a dark color scheme",
+    "systemDescription": "Match your operating system",
+    "fontSmall": "Small",
+    "fontMedium": "Medium",
+    "fontLarge": "Large",
+    "colorPrimary": "Primary",
+    "colorSurface": "Surface",
+    "colorText": "Text",
+    "colorBorder": "Border",
+    "colorSuccess": "Success",
+    "colorDanger": "Danger"
   },
   "messages": {
     "send": "Send message",

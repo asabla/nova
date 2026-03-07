@@ -86,7 +86,7 @@ export function Dropdown({ trigger, children, align = "right" }: DropdownProps) 
           ref={menuRef}
           role="menu"
           className={clsx(
-            "absolute top-full mt-1 z-50 min-w-[160px] rounded-xl bg-surface border border-border shadow-lg py-1 animate-in fade-in zoom-in-95",
+            "absolute top-full mt-1 z-50 min-w-[160px] max-w-[min(320px,90vw)] rounded-xl bg-surface border border-border shadow-lg py-1 animate-in fade-in zoom-in-95",
             align === "right" ? "right-0" : "left-0",
           )}
         >

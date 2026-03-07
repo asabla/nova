@@ -597,7 +597,7 @@ function PlaygroundPage() {
                     value={msg.role}
                     onChange={(e) => updateMessage(msg.id, "role", e.target.value)}
                     disabled={running}
-                    className="w-28 shrink-0 px-2 py-2 rounded-lg border border-border bg-surface text-text text-sm"
+                    className="w-32 shrink-0 px-2 py-2 rounded-lg border border-border bg-surface text-text text-sm"
                   >
                     <option value="user">user</option>
                     <option value="assistant">assistant</option>

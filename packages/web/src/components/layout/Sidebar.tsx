@@ -253,7 +253,7 @@ export function Sidebar() {
         </nav>
 
         {/* Bottom Navigation - Grouped */}
-        <div className="border-t border-border px-2 py-2 space-y-1 overflow-y-auto max-h-[45%]">
+        <div className="border-t border-border px-2 py-2 space-y-1 overflow-y-auto flex-1 min-h-[200px]">
           {/* Build section */}
           <NavSection
             label={t("nav.sectionBuild")}

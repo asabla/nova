@@ -168,11 +168,11 @@ function ResearchPage() {
   );
 
   return (
-    <div className="flex h-full">
+    <div className="flex flex-col md:flex-row h-full">
       {/* ------------------------------------------------------------------ */}
       {/* Left panel - History & new research form                            */}
       {/* ------------------------------------------------------------------ */}
-      <div className="w-80 border-r border-border flex flex-col bg-surface">
+      <div className="w-full md:w-80 max-h-[40vh] md:max-h-none border-b md:border-b-0 md:border-r border-border flex flex-col bg-surface">
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-text flex items-center gap-2">

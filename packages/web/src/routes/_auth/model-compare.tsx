@@ -182,8 +182,8 @@ function ModelComparePage() {
       )}
 
       {/* Model selectors */}
-      <div className="flex flex-col md:flex-row gap-4 px-6 py-4 border-b border-border">
-        <div className="flex-1">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-6 py-4 border-b border-border">
+        <div className="min-w-0">
           <label className="block text-xs font-medium text-text-secondary mb-1">{t("modelCompare.modelA", "Model A")}</label>
           <select
             value={modelA}
@@ -204,7 +204,7 @@ function ModelComparePage() {
             className="mt-1.5"
           />
         </div>
-        <div className="flex-1">
+        <div className="min-w-0">
           <label className="block text-xs font-medium text-text-secondary mb-1">{t("modelCompare.modelB", "Model B")}</label>
           <select
             value={modelB}
@@ -225,7 +225,7 @@ function ModelComparePage() {
             className="mt-1.5"
           />
         </div>
-        <div className="w-28">
+        <div>
           <label className="block text-xs font-medium text-text-secondary mb-1">{t("modelCompare.temperature", "Temperature")}</label>
           <input
             type="number"
@@ -238,7 +238,7 @@ function ModelComparePage() {
             disabled={isRunning}
           />
         </div>
-        <div className="w-28">
+        <div>
           <label className="block text-xs font-medium text-text-secondary mb-1">{t("modelCompare.maxTokens", "Max Tokens")}</label>
           <input
             type="number"

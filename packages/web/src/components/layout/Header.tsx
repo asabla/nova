@@ -58,7 +58,7 @@ export function Header() {
         <button
           onClick={() => setTheme(nextTheme)}
           className="text-text-secondary hover:text-text p-2 rounded-lg hover:bg-surface-secondary focus-visible:outline-2 focus-visible:outline-primary"
-          aria-label={t("theme.toggle", { defaultValue: `Theme: ${themeLabel}. Switch to ${nextTheme}` })}
+          aria-label={t("theme.toggle", { current: themeLabel, next: nextTheme })}
         >
           {theme === "light" && <Sun className="h-4 w-4" aria-hidden="true" />}
           {theme === "dark" && <Moon className="h-4 w-4" aria-hidden="true" />}
