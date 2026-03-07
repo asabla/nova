@@ -94,7 +94,7 @@ researchRoutes.get("/:id/export", async (c) => {
     "",
     `*Generated: ${new Date(report.createdAt).toISOString()}*`,
     "",
-    report.report ?? "*No report content available*",
+    report.reportContent ?? "*No report content available*",
     "",
     "## Sources",
     "",

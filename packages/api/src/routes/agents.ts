@@ -83,7 +83,7 @@ agentRoutes.post("/:id/clone", async (c) => {
     modelParams: original.modelParams as Record<string, unknown> | undefined,
   });
 
-  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "agent.clone", resourceType: "agent", resourceId: clone.id, metadata: { sourceAgentId: c.req.param("id") } });
+  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "agent.clone", resourceType: "agent", resourceId: clone.id, details: { sourceAgentId: c.req.param("id") } });
   return c.json(clone, 201);
 });
 

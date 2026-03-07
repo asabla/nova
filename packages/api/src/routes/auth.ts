@@ -95,7 +95,7 @@ authRoutes.post("/totp/setup", async (c) => {
 
   // Generate a random secret (base32-compatible)
   const secretBytes = randomBytes(20);
-  const secret = secretBytes.toString("base32") || secretBytes.toString("hex");
+  const secret = secretBytes.toString("hex");
 
   // Build otpauth URI for QR code scanning
   const issuer = "NOVA";

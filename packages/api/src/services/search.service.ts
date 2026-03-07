@@ -134,7 +134,7 @@ export const searchService = {
                     OFFSET ${offset}
                   `,
                 );
-                return (semanticResults.rows ?? []) as any[];
+                return (Array.isArray(semanticResults) ? semanticResults : []) as any[];
               } catch {
                 // Fall back to keyword search if embedding column doesn't exist
               }
@@ -226,7 +226,7 @@ export const searchService = {
             .select({
               id: files.id,
               filename: files.filename,
-              mimeType: files.mimeType,
+              contentType: files.contentType,
               sizeBytes: files.sizeBytes,
               createdAt: files.createdAt,
               type: sql<string>`'file'`,

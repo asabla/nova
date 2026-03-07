@@ -78,7 +78,7 @@ exportRoutes.post("/all", async (c) => {
           .where(
             and(
               eq(files.orgId, orgId),
-              eq(files.uploadedById, userId),
+              eq(files.userId, userId),
               isNull(files.deletedAt),
             ),
           ),
@@ -118,7 +118,7 @@ exportRoutes.post("/all", async (c) => {
       .select({
         id: apiKeys.id,
         keyPrefix: apiKeys.keyPrefix,
-        label: apiKeys.label,
+        name: apiKeys.name,
         createdAt: apiKeys.createdAt,
       })
       .from(apiKeys)
@@ -558,7 +558,7 @@ exportRoutes.get(
           .where(
             and(
               eq(files.orgId, orgId),
-              eq(files.uploadedById, userId),
+              eq(files.userId, userId),
               isNull(files.deletedAt),
             ),
           ),

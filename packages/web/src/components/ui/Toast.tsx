@@ -28,9 +28,16 @@ export const useToastStore = create<ToastStore>((set) => ({
     })),
 }));
 
-export function toast(message: string, type: ToastItem["type"] = "info") {
+function toastFn(message: string, type: ToastItem["type"] = "info") {
   useToastStore.getState().add({ message, type });
 }
+
+toastFn.success = (message: string) => toastFn(message, "success");
+toastFn.error = (message: string) => toastFn(message, "error");
+toastFn.warning = (message: string) => toastFn(message, "warning");
+toastFn.info = (message: string) => toastFn(message, "info");
+
+export const toast = toastFn;
 
 const icons = {
   success: CheckCircle,

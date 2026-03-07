@@ -55,7 +55,7 @@ webhookRoutes.post("/agents/:webhookId", async (c) => {
       max_tokens: modelParams.maxTokens as number | undefined,
     });
 
-    const data = await result.json() as any;
+    const data = result as any;
 
     await writeAuditLog({
       orgId: agent.orgId,
@@ -116,7 +116,7 @@ webhookRoutes.post("/email/inbound", async (c) => {
       stream: false,
     });
 
-    const data = await result.json() as any;
+    const data = result as any;
 
     await writeAuditLog({
       orgId: agent.orgId,

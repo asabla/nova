@@ -141,7 +141,7 @@ groupRoutes.get("/:id/members", async (c) => {
     .select({
       id: groupMemberships.id,
       userId: groupMemberships.userId,
-      userName: users.name,
+      userName: users.email,
       userEmail: users.email,
       joinedAt: groupMemberships.createdAt,
     })

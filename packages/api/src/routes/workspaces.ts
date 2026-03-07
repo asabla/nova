@@ -275,7 +275,7 @@ workspaceRoutes.get("/:id/members", async (c) => {
       userId: workspaceMemberships.userId,
       groupId: workspaceMemberships.groupId,
       role: workspaceMemberships.role,
-      userName: users.name,
+      userName: users.email,
       userEmail: users.email,
       joinedAt: workspaceMemberships.createdAt,
     })

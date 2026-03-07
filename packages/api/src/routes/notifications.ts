@@ -189,7 +189,7 @@ notificationsRouter.post("/email", zValidator("json", emailNotificationSchema), 
     ok: true,
     status: "queued",
     message: "Email service not configured. Notification logged as in-app record.",
-    notificationId: notification.id,
+    notificationId: notification?.id ?? null,
   }, 202);
 });
 

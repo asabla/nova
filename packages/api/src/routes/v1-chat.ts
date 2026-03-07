@@ -68,7 +68,7 @@ v1ChatRoutes.post("/completions", async (c) => {
   if (body.stream) {
     return streamChatCompletion(c, {
       model: body.model,
-      messages: body.messages,
+      messages: body.messages as Array<{ role: string; content: string }>,
       temperature: body.temperature,
       max_tokens: body.max_tokens,
       top_p: body.top_p,
@@ -81,7 +81,7 @@ v1ChatRoutes.post("/completions", async (c) => {
 
   const result = await chatCompletion({
     model: body.model,
-    messages: body.messages,
+    messages: body.messages as Array<{ role: string; content: string }>,
     temperature: body.temperature,
     max_tokens: body.max_tokens,
     tools: body.tools,

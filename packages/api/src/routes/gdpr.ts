@@ -79,13 +79,13 @@ gdprRoutes.post(
       const userFiles = await db
         .select()
         .from(files)
-        .where(and(eq(files.uploadedById, userId), eq(files.orgId, orgId)));
+        .where(and(eq(files.userId, userId), eq(files.orgId, orgId)));
 
       const userApiKeys = await db
         .select({
           id: apiKeys.id,
           keyPrefix: apiKeys.keyPrefix,
-          label: apiKeys.label,
+          name: apiKeys.name,
           createdAt: apiKeys.createdAt,
         })
         .from(apiKeys)
@@ -106,7 +106,6 @@ gdprRoutes.post(
         exportFormat: "nova-gdpr-export-v1",
         user: {
           id: user.id,
-          name: user.name,
           email: user.email,
           createdAt: user.createdAt,
         },
@@ -117,7 +116,7 @@ gdprRoutes.post(
         files: userFiles.map((f) => ({
           id: f.id,
           filename: f.filename,
-          mimeType: f.mimeType,
+          contentType: f.contentType,
           sizeBytes: f.sizeBytes,
           createdAt: f.createdAt,
         })),
@@ -273,7 +272,7 @@ gdprRoutes.post(
         .update(files)
         .set({ deletedAt: now })
         .where(
-          and(eq(files.uploadedById, userId), eq(files.orgId, orgId), isNull(files.deletedAt)),
+          and(eq(files.userId, userId), eq(files.orgId, orgId), isNull(files.deletedAt)),
         );
 
       // 6. Soft-delete knowledge collections
@@ -308,7 +307,6 @@ gdprRoutes.post(
       await db
         .update(users)
         .set({
-          name: "[Deleted User]",
           email: `deleted-${userId}@anonymized.nova`,
           isActive: false,
           updatedAt: now,

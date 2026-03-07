@@ -2,13 +2,15 @@ import { env } from "./env";
 
 interface ChatCompletionRequest {
   model: string;
-  messages: Array<{ role: string; content: string }>;
+  messages: Array<{ role: string; content: string | null | undefined }>;
   stream?: boolean;
   temperature?: number;
   top_p?: number;
   max_tokens?: number;
   tools?: unknown[];
   tool_choice?: string | object;
+  response_format?: unknown;
+  stop?: string | string[];
 }
 
 export async function chatCompletion(request: ChatCompletionRequest): Promise<any> {

@@ -109,8 +109,9 @@ toolRoutes.post("/:id/test", async (c) => {
     // For API tools, make the request
     let result: unknown = { message: "Test execution successful", input: body.input };
 
-    if (tool.type === "openapi" && tool.endpoint) {
-      const resp = await fetch(tool.endpoint, {
+    const spec = tool.openapiSpec as Record<string, unknown> | null;
+    if (tool.type === "openapi" && spec?.endpoint) {
+      const resp = await fetch(String(spec.endpoint), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body.input),

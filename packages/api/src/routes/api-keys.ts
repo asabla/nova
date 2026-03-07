@@ -54,7 +54,7 @@ apiKeyRoutes.post("/:id/rotate", async (c) => {
     action: "apikey.rotate",
     resourceType: "api_key",
     resourceId: result.id,
-    metadata: { previousKeyId: oldId },
+    details: { previousKeyId: oldId },
   });
 
   return c.json({ id: result.id, key: result.key, keyPrefix: result.keyPrefix }, 201);
