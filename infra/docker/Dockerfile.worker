@@ -7,6 +7,8 @@ RUN npm install -g bun
 COPY package.json bun.lock* ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/worker/package.json packages/worker/
+COPY packages/api/package.json packages/api/
+COPY packages/web/package.json packages/web/
 
 RUN bun install --frozen-lockfile
 
@@ -21,7 +23,8 @@ FROM node:22-alpine
 WORKDIR /app
 
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/packages/shared ./packages/shared
+COPY --from=builder /app/packages/worker ./packages/worker
 COPY --from=builder /app/package.json ./
 
 CMD ["npx", "tsx", "packages/worker/src/index.ts"]

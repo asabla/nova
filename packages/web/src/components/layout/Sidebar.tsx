@@ -213,20 +213,20 @@ export function Sidebar() {
 
       {/* Bottom Navigation */}
       <div className="border-t border-border px-2 py-2 space-y-0.5">
-        <SidebarLink icon={Bot} label="Agents" to="/agents" />
-        <SidebarLink icon={BookOpen} label="Knowledge" to="/knowledge" />
-        <SidebarLink icon={Wrench} label="Tools" to="/tools" />
-        <SidebarLink icon={Puzzle} label="MCP" to="/mcp" />
-        <SidebarLink icon={FolderKanban} label="Workspaces" to="/workspaces" />
-        <SidebarLink icon={FileText} label="Prompts" to="/prompts" />
-        <SidebarLink icon={Microscope} label="Research" to="/research" />
-        <SidebarLink icon={Code2} label="Playground" to="/playground" />
-        <SidebarLink icon={GitCompare} label="Compare" to="/model-compare" />
-        <SidebarLink icon={Compass} label="Explore" to="/explore" />
-        <SidebarLink icon={BarChart3} label="Usage" to="/usage" />
-        <SidebarLink icon={ShieldCheck} label="Admin" to="/admin" />
-        <SidebarLink icon={Settings} label="Settings" to="/settings" />
-        <SidebarLink icon={HelpCircle} label="Help" to="/help" />
+        <SidebarLink icon={Bot} label={t("nav.agents")} to="/agents" />
+        <SidebarLink icon={BookOpen} label={t("nav.knowledge")} to="/knowledge" />
+        <SidebarLink icon={Wrench} label={t("nav.tools")} to="/tools" />
+        <SidebarLink icon={Puzzle} label={t("nav.mcp")} to="/mcp" />
+        <SidebarLink icon={FolderKanban} label={t("nav.workspaces")} to="/workspaces" />
+        <SidebarLink icon={FileText} label={t("nav.prompts")} to="/prompts" />
+        <SidebarLink icon={Microscope} label={t("nav.research")} to="/research" />
+        <SidebarLink icon={Code2} label={t("nav.playground")} to="/playground" />
+        <SidebarLink icon={GitCompare} label={t("nav.compare")} to="/model-compare" />
+        <SidebarLink icon={Compass} label={t("nav.explore")} to="/explore" />
+        <SidebarLink icon={BarChart3} label={t("nav.usage")} to="/usage" />
+        <SidebarLink icon={ShieldCheck} label={t("nav.admin")} to="/admin" />
+        <SidebarLink icon={Settings} label={t("nav.settings")} to="/settings" />
+        <SidebarLink icon={HelpCircle} label={t("nav.help")} to="/help" />
       </div>
     </aside>
   );

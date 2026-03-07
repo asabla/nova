@@ -37,21 +37,21 @@ function HomePage() {
           {t("conversations.new")}
         </Button>
 
-        <div className="grid grid-cols-3 gap-4 mt-12 text-left">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-12 text-left">
           <Feature
             icon={<Zap className="h-5 w-5 text-warning" />}
-            title="Fast"
-            description="Stream responses from multiple AI providers in real-time"
+            title={t("app.featureFast")}
+            description={t("app.featureFastDescription")}
           />
           <Feature
             icon={<Shield className="h-5 w-5 text-success" />}
-            title="Private"
-            description="Self-hosted first. Your data stays on your infrastructure"
+            title={t("app.featurePrivate")}
+            description={t("app.featurePrivateDescription")}
           />
           <Feature
             icon={<Users className="h-5 w-5 text-primary" />}
-            title="Teams"
-            description="Multi-tenant with org-level controls and permissions"
+            title={t("app.featureTeams")}
+            description={t("app.featureTeamsDescription")}
           />
         </div>
       </div>

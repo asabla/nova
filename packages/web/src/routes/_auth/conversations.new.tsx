@@ -148,7 +148,7 @@ function NewConversationPage() {
                 <FileText className="h-3 w-3 inline mr-1" />
                 From your prompt library
               </p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {starters.map((template: any) => (
                   <button
                     key={template.id}
@@ -166,7 +166,7 @@ function NewConversationPage() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {defaultStarters.map((prompt) => (
                 <button
                   key={prompt}

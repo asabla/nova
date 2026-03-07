@@ -8,6 +8,7 @@ import { queryKeys } from "../../lib/query-keys";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { toast } from "../../components/ui/Toast";
+import { QRCode } from "../../components/ui/QRCode";
 import { formatDistanceToNow } from "date-fns";
 
 export const Route = createFileRoute("/_auth/settings/security")({
@@ -24,7 +25,7 @@ function SecuritySettings() {
   const [success, setSuccess] = useState(false);
 
   // TOTP state
-  const [totpSetup, setTotpSetup] = useState<{ secret: string; qrUri: string } | null>(null);
+  const [totpSetup, setTotpSetup] = useState<{ secret: string; otpauthUri: string } | null>(null);
   const [totpCode, setTotpCode] = useState("");
   const [totpError, setTotpError] = useState("");
 
@@ -48,7 +49,7 @@ function SecuritySettings() {
   });
 
   const setupTotp = useMutation({
-    mutationFn: () => api.post<{ secret: string; qrUri: string }>("/api/auth/totp/setup"),
+    mutationFn: () => api.post<{ secret: string; otpauthUri: string }>("/api/auth/totp/setup"),
     onSuccess: (data) => {
       setTotpSetup(data);
     },
@@ -203,11 +204,7 @@ function SecuritySettings() {
             <div>
               <p className="text-sm font-medium text-text mb-2">1. Scan this QR code with your authenticator app</p>
               <div className="flex justify-center p-4 bg-white rounded-lg">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(totpSetup.qrUri)}`}
-                  alt="TOTP QR Code"
-                  className="h-48 w-48"
-                />
+                <QRCode data={totpSetup.otpauthUri} />
               </div>
               <p className="text-xs text-text-tertiary text-center mt-2">
                 Or enter this secret manually: <code className="bg-surface-secondary px-1 py-0.5 rounded text-text">{totpSetup.secret}</code>

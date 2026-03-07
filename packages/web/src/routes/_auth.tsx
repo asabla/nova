@@ -9,6 +9,12 @@ import { useTheme } from "../hooks/useTheme";
 import { useWebSocket } from "../hooks/useWebSocket";
 
 export const Route = createFileRoute("/_auth")({
+  beforeLoad: async () => {
+    const session = useAuthStore.getState().session;
+    if (!session) {
+      throw redirect({ to: "/login" });
+    }
+  },
   component: AuthLayout,
 });
 

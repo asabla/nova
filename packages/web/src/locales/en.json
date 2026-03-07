@@ -1,4 +1,31 @@
 {
+  "app": {
+    "welcome": "Welcome to NOVA",
+    "description": "Your self-hosted AI chat platform for teams.",
+    "settings": "Settings",
+    "featureFast": "Fast",
+    "featureFastDescription": "Stream responses from multiple AI providers in real-time",
+    "featurePrivate": "Private",
+    "featurePrivateDescription": "Self-hosted first. Your data stays on your infrastructure",
+    "featureTeams": "Teams",
+    "featureTeamsDescription": "Multi-tenant with org-level controls and permissions"
+  },
+  "nav": {
+    "agents": "Agents",
+    "knowledge": "Knowledge",
+    "tools": "Tools",
+    "mcp": "MCP",
+    "workspaces": "Workspaces",
+    "prompts": "Prompts",
+    "research": "Research",
+    "playground": "Playground",
+    "compare": "Compare",
+    "explore": "Explore",
+    "usage": "Usage",
+    "admin": "Admin",
+    "settings": "Settings",
+    "help": "Help"
+  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",
@@ -54,6 +81,14 @@
     "resetEmailSent": "Password reset email sent",
     "invalidCredentials": "Invalid email or password",
     "accountLocked": "Account locked. Contact your administrator.",
+    "signIn": "Sign in to NOVA",
+    "signInDescription": "Welcome back. Sign in to continue.",
+    "signUp": "Create an account",
+    "signUpDescription": "Get started with NOVA today.",
+    "createAccount": "Create account",
+    "loginFailed": "Login failed. Please try again.",
+    "signupFailed": "Sign up failed. Please try again.",
+    "name": "Name",
     "ssoLogin": "Log in with SSO",
     "mfaRequired": "Multi-factor authentication required",
     "mfaCode": "Authentication code",
@@ -86,7 +121,9 @@
     "yesterday": "Yesterday",
     "previous7Days": "Previous 7 days",
     "previous30Days": "Previous 30 days",
-    "older": "Older"
+    "older": "Older",
+    "newTitle": "Start a new conversation",
+    "newDescription": "Choose a model and begin chatting"
   },
   "agents": {
     "create": "Create agent",
@@ -219,7 +256,13 @@
     "auditTimestamp": "Timestamp",
     "auditDetails": "Details",
     "rateLimits": "Rate limits",
-    "quotas": "Quotas"
+    "quotas": "Quotas",
+    "contentSafety": "Content Safety",
+    "integrations": "Integrations",
+    "dataRetention": "Retention",
+    "branding": "Branding",
+    "billing": "Billing",
+    "orgSettings": "Organization"
   },
   "settings": {
     "title": "Settings",
@@ -262,10 +305,19 @@
     "apiKeyCopyWarning": "Copy this key now. You won't be able to see it again.",
     "dangerZone": "Danger zone",
     "deleteAccount": "Delete account",
-    "deleteAccountConfirm": "Are you sure you want to delete your account? This action is permanent and cannot be undone."
+    "deleteAccountConfirm": "Are you sure you want to delete your account? This action is permanent and cannot be undone.",
+    "shortcuts": "Keyboard shortcuts",
+    "importExport": "Import / Export",
+    "passwordMismatch": "Passwords do not match",
+    "passwordTooShort": "Password must be at least 8 characters",
+    "passwordChangeFailed": "Failed to change password. Check your current password.",
+    "passwordChanged": "Password changed successfully",
+    "updatePassword": "Update password"
   },
   "messages": {
     "send": "Send message",
+    "placeholder": "Type a message...",
+    "disclaimer": "AI responses may contain inaccuracies. Verify important information.",
     "sendPlaceholder": "Type a message...",
     "edit": "Edit message",
     "edited": "Edited",
@@ -284,6 +336,9 @@
     "attachImage": "Attach image",
     "branchFrom": "Branch from here",
     "viewSource": "View source"
+  },
+  "files": {
+    "upload": "Upload file"
   },
   "errors": {
     "notFound": "Page not found",
