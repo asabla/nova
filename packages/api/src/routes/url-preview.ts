@@ -3,6 +3,7 @@ import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import type { AppContext } from "../types/context";
 import { AppError } from "@nova/shared/utils";
+import { domainService } from "../services/domain.service";
 
 const urlPreviewRoutes = new Hono<AppContext>();
 
@@ -122,6 +123,16 @@ urlPreviewRoutes.post(
       throw AppError.badRequest("URL points to a private or reserved address");
     }
 
+    // Domain whitelist/blacklist check (Story #75)
+    const orgId = c.get("orgId");
+    if (orgId) {
+      const domainCheck = await domainService.checkUrl(orgId, url);
+      if (!domainCheck.allowed) {
+        const reason = domainCheck.matchedRule?.reason ?? "Domain is blocked by organization policy";
+        throw AppError.forbidden(reason);
+      }
+    }
+
     try {
       const response = await fetch(url, {
         method: "GET",
@@ -228,6 +239,16 @@ urlPreviewRoutes.post(
 
     if (isPrivateHost(parsed.hostname)) {
       throw AppError.badRequest("URL points to a private or reserved address");
+    }
+
+    // Domain whitelist/blacklist check (Story #75)
+    const orgId = c.get("orgId");
+    if (orgId) {
+      const domainCheck = await domainService.checkUrl(orgId, url);
+      if (!domainCheck.allowed) {
+        const reason = domainCheck.matchedRule?.reason ?? "Domain is blocked by organization policy";
+        throw AppError.forbidden(reason);
+      }
     }
 
     const youtubeId = extractYouTubeId(url);
