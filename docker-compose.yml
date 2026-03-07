@@ -133,7 +133,7 @@ services:
       LITELLM_MASTER_KEY: sk-nova-litellm-dev
       TEMPORAL_ADDRESS: temporal:7233
       BETTER_AUTH_SECRET: change-me-in-production-use-openssl-rand-base64-32
-      BETTER_AUTH_URL: http://api:3000
+      BETTER_AUTH_URL: http://localhost:5173
       CORS_ORIGINS: http://localhost:5173,http://web:80
       APP_URL: http://localhost:5173
     depends_on:
