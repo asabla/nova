@@ -125,13 +125,17 @@ services:
     environment:
       DATABASE_URL: postgres://nova:nova@postgres:5432/nova
       REDIS_URL: redis://redis:6379
-      MINIO_ENDPOINT: minio
-      MINIO_PORT: "9000"
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      MINIO_USE_SSL: "false"
-      LITELLM_URL: http://litellm:4000
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_BUCKET: nova-files
+      LITELLM_API_URL: http://litellm:4000
+      LITELLM_MASTER_KEY: sk-nova-litellm-dev
       TEMPORAL_ADDRESS: temporal:7233
+      BETTER_AUTH_SECRET: change-me-in-production-use-openssl-rand-base64-32
+      BETTER_AUTH_URL: http://api:3000
+      CORS_ORIGINS: http://localhost:5173,http://web:80
+      APP_URL: http://localhost:5173
     depends_on:
       postgres:
         condition: service_healthy
@@ -153,6 +157,7 @@ services:
       REDIS_URL: redis://redis:6379
       TEMPORAL_ADDRESS: temporal:7233
       LITELLM_URL: http://litellm:4000
+      SEARXNG_URL: ""
     depends_on:
       postgres:
         condition: service_healthy
