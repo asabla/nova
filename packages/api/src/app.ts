@@ -50,6 +50,7 @@ import { shortcutRoutes } from "./routes/shortcuts";
 import { rateLimitRoutes } from "./routes/rate-limits";
 import { domainRoutes } from "./routes/domains";
 import { urlPreviewRoutes } from "./routes/url-preview";
+import { webhookRoutes } from "./routes/webhooks";
 
 const app = new Hono<AppContext>();
 
@@ -75,6 +76,7 @@ app.use("*", logger());
 app.route("/api/auth", authRoutes);
 app.route("/health", healthRoutes);
 app.route("/api/sso/oauth", ssoOAuthRoutes);
+app.route("/api/webhooks", webhookRoutes);
 
 // 7. Rate limiting (on API routes)
 app.use("/api/*", rateLimiter());
