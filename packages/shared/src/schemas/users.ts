@@ -83,6 +83,18 @@ export const insertUserProfileSchema = createInsertSchema(userProfiles, {
   role: z.enum(["org-admin", "power-user", "member", "viewer"]).default("member"),
 }).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 
+export const magicLinkTokens = pgTable("magic_link_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("idx_magic_link_tokens_hash").on(table.tokenHash),
+  index("idx_magic_link_tokens_user_id").on(table.userId),
+]);
+
 export type User = z.infer<typeof selectUserSchema>;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type UserProfile = z.infer<typeof selectUserProfileSchema>;

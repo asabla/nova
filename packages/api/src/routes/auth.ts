@@ -4,12 +4,15 @@ import { z } from "zod";
 import { auth } from "../lib/auth";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
-import { mfaCredentials, users } from "@nova/shared/schemas";
+import { mfaCredentials, users, magicLinkTokens } from "@nova/shared/schemas";
 import { orgSettings } from "@nova/shared/schemas";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, gt } from "drizzle-orm";
 import { AppError } from "@nova/shared/utils";
 import { requireRole } from "../middleware/rbac";
 import { randomBytes, createHash } from "crypto";
+import * as OTPAuth from "otpauth";
+import { sendEmail, buildMagicLinkEmail } from "../lib/email";
+import { env } from "../lib/env";
 
 const authRoutes = new Hono<AppContext>();
 
@@ -22,7 +25,6 @@ const magicLinkSchema = z.object({
   email: z.string().email(),
 });
 
-// POST /magic-link - Send magic link email (stub: generates token and returns it)
 authRoutes.post("/magic-link", zValidator("json", magicLinkSchema), async (c) => {
   const { email } = c.req.valid("json");
 
@@ -42,38 +44,85 @@ authRoutes.post("/magic-link", zValidator("json", magicLinkSchema), async (c) =>
   const tokenHash = createHash("sha256").update(token).digest("hex");
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-  // Stub: In production, store the token hash and send an email.
-  // For now, return the token directly for development/testing.
+  // Store the token hash in the database
+  await db.insert(magicLinkTokens).values({
+    userId: user[0].id,
+    tokenHash,
+    expiresAt,
+  });
+
+  // Build the magic link URL
+  const appUrl = env.APP_URL ?? "http://localhost:5173";
+  const magicLinkUrl = `${appUrl}/login/magic-link?token=${token}`;
+
+  // Send the email
+  const emailContent = buildMagicLinkEmail(magicLinkUrl);
+  await sendEmail({
+    to: email,
+    ...emailContent,
+  });
+
   return c.json({
     ok: true,
     message: "If the email exists, a magic link has been sent.",
-    // DEV ONLY: In production, remove the token from the response and send via email
-    _dev: {
-      token,
-      tokenHash,
-      expiresAt: expiresAt.toISOString(),
-      userId: user[0].id,
-    },
   });
 });
 
-// POST /magic-link/verify - Verify magic link token
+// POST /magic-link/verify - Verify magic link token and create session
 const magicLinkVerifySchema = z.object({
   token: z.string().min(1),
 });
 
 authRoutes.post("/magic-link/verify", zValidator("json", magicLinkVerifySchema), async (c) => {
   const { token } = c.req.valid("json");
-
-  // In production, look up the token hash in the database and verify expiry.
-  // Stub: validate token format and return a placeholder response.
   const tokenHash = createHash("sha256").update(token).digest("hex");
 
-  // Stub: This would verify against stored tokens in a real implementation
+  // Look up the token in the database
+  const tokenRecords = await db
+    .select()
+    .from(magicLinkTokens)
+    .where(
+      and(
+        eq(magicLinkTokens.tokenHash, tokenHash),
+        isNull(magicLinkTokens.usedAt),
+        gt(magicLinkTokens.expiresAt, new Date()),
+      ),
+    );
+
+  if (tokenRecords.length === 0) {
+    throw AppError.unauthorized("Invalid or expired magic link token");
+  }
+
+  const tokenRecord = tokenRecords[0];
+
+  // Mark the token as used
+  await db
+    .update(magicLinkTokens)
+    .set({ usedAt: new Date() })
+    .where(eq(magicLinkTokens.id, tokenRecord.id));
+
+  // Fetch the user
+  const userRecords = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.id, tokenRecord.userId), isNull(users.deletedAt)));
+
+  if (userRecords.length === 0) {
+    throw AppError.unauthorized("User not found");
+  }
+
+  const user = userRecords[0];
+
+  // Update last login timestamp
+  await db
+    .update(users)
+    .set({ lastLoginAt: new Date(), emailVerifiedAt: user.emailVerifiedAt ?? new Date() })
+    .where(eq(users.id, user.id));
+
   return c.json({
     ok: true,
-    message: "Magic link verification stub. Implement token storage to complete.",
-    tokenHash,
+    userId: user.id,
+    email: user.email,
   });
 });
 
@@ -93,19 +142,27 @@ authRoutes.post("/totp/setup", async (c) => {
     throw AppError.conflict("TOTP is already configured. Disable it first to set up a new one.");
   }
 
-  // Generate a random secret (base32-compatible)
-  const secretBytes = randomBytes(20);
-  const secret = secretBytes.toString("hex");
+  // Get user email for the TOTP label
+  const userRecords = await db.select().from(users).where(eq(users.id, userId));
+  const userEmail = userRecords[0]?.email ?? "user";
 
-  // Build otpauth URI for QR code scanning
-  const issuer = "NOVA";
-  const otpauthUri = `otpauth://totp/${issuer}:user?secret=${secret}&issuer=${issuer}&digits=6&period=30`;
+  // Generate TOTP secret using otpauth library
+  const totp = new OTPAuth.TOTP({
+    issuer: "NOVA",
+    label: userEmail,
+    algorithm: "SHA1",
+    digits: 6,
+    period: 30,
+  });
 
-  // Store the secret (encrypted in production)
+  const secret = totp.secret.base32;
+  const otpauthUri = totp.toString();
+
+  // Store the secret
   await db.insert(mfaCredentials).values({
     userId,
     type: "totp",
-    secretEncrypted: secret, // In production, encrypt this
+    secretEncrypted: secret,
     label: "TOTP Authenticator",
   });
 
@@ -134,11 +191,20 @@ authRoutes.post("/totp/verify", zValidator("json", totpVerifySchema), async (c) 
     throw AppError.notFound("TOTP is not configured. Set it up first.");
   }
 
-  // Stub: In production, use a TOTP library (e.g., otpauth) to verify the code
-  // against the stored secret. For now, accept any valid 6-digit code for development.
-  const isValid = code.length === 6;
+  // Verify the TOTP code using otpauth library
+  const totp = new OTPAuth.TOTP({
+    issuer: "NOVA",
+    label: "user",
+    algorithm: "SHA1",
+    digits: 6,
+    period: 30,
+    secret: OTPAuth.Secret.fromBase32(credential[0].secretEncrypted),
+  });
 
-  if (!isValid) {
+  // Allow a window of 1 step (30s before/after) for clock drift
+  const delta = totp.validate({ token: code, window: 1 });
+
+  if (delta === null) {
     throw AppError.unauthorized("Invalid TOTP code");
   }
 
