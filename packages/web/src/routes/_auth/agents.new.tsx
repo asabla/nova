@@ -212,7 +212,7 @@ function AgentBuilderPage() {
               <p className="text-sm text-text-secondary mb-4">
                 Enable tools from the marketplace or connect custom tools via OpenAPI specs.
               </p>
-              <Button variant="primary">Browse Tools</Button>
+              <Button variant="primary" onClick={() => navigate({ to: "/tools" })}>Browse Tools</Button>
             </div>
           </div>
         )}
@@ -225,7 +225,7 @@ function AgentBuilderPage() {
               <p className="text-sm text-text-secondary mb-4">
                 Attach knowledge collections so this agent can search and reference your documents.
               </p>
-              <Button variant="primary">Browse Collections</Button>
+              <Button variant="primary" onClick={() => navigate({ to: "/knowledge" })}>Browse Collections</Button>
             </div>
           </div>
         )}

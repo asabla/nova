@@ -266,7 +266,7 @@ function SecuritySettings() {
               {!session.isCurrent && (
                 <button
                   onClick={() => revokeSession.mutate(session.id)}
-                  className="text-text-tertiary hover:text-danger p-1 rounded transition-colors"
+                  className="text-text-tertiary hover:text-danger p-1 rounded transition-colors cursor-pointer"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>

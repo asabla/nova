@@ -1,12 +1,18 @@
 import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useMatchRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { clsx } from "clsx";
-import { MessageSquarePlus, Search, Archive, Pin, Trash2, MoreHorizontal, ChevronLeft, Bot, BookOpen, FolderKanban, Settings, Sparkles, FileText, ShieldCheck, BarChart3, Code2, Microscope, Wrench, Compass, HelpCircle, GitCompare, Puzzle, Filter, CheckSquare, Square, FolderOpen } from "lucide-react";
+import {
+  MessageSquarePlus, Search, Archive, Pin, Trash2, ChevronLeft, Bot, BookOpen,
+  FolderKanban, Settings, Sparkles, FileText, ShieldCheck, BarChart3, Code2,
+  Microscope, Wrench, Compass, HelpCircle, GitCompare, Puzzle, Filter,
+  CheckSquare, Square, FolderOpen, ChevronDown,
+} from "lucide-react";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { useUIStore } from "../../stores/ui.store";
+import { useAuthStore } from "../../stores/auth.store";
 import { Button } from "../ui/Button";
 import { toast } from "../ui/Toast";
 
@@ -16,11 +22,13 @@ export function Sidebar() {
   const queryClient = useQueryClient();
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const user = useAuthStore((s) => s.user);
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [filterWorkspace, setFilterWorkspace] = useState("");
   const [bulkMode, setBulkMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
   const { data: conversationsData } = useQuery({
     queryKey: queryKeys.conversations.list({ isArchived: false }),
@@ -73,6 +81,17 @@ export function Sidebar() {
       return next;
     });
   };
+
+  const toggleSection = (section: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      return next;
+    });
+  };
+
+  const isAdmin = user?.role === "org-admin" || user?.role === "admin";
 
   return (
     <aside
@@ -211,33 +230,93 @@ export function Sidebar() {
         )}
       </nav>
 
-      {/* Bottom Navigation */}
-      <div className="border-t border-border px-2 py-2 space-y-0.5">
-        <SidebarLink icon={Bot} label={t("nav.agents")} to="/agents" />
-        <SidebarLink icon={BookOpen} label={t("nav.knowledge")} to="/knowledge" />
-        <SidebarLink icon={Wrench} label={t("nav.tools")} to="/tools" />
-        <SidebarLink icon={Puzzle} label={t("nav.mcp")} to="/mcp" />
-        <SidebarLink icon={FolderKanban} label={t("nav.workspaces")} to="/workspaces" />
-        <SidebarLink icon={FileText} label={t("nav.prompts")} to="/prompts" />
-        <SidebarLink icon={Microscope} label={t("nav.research")} to="/research" />
-        <SidebarLink icon={Code2} label={t("nav.playground")} to="/playground" />
-        <SidebarLink icon={GitCompare} label={t("nav.compare")} to="/model-compare" />
-        <SidebarLink icon={Compass} label={t("nav.explore")} to="/explore" />
-        <SidebarLink icon={BarChart3} label={t("nav.usage")} to="/usage" />
-        <SidebarLink icon={ShieldCheck} label={t("nav.admin")} to="/admin" />
-        <SidebarLink icon={Settings} label={t("nav.settings")} to="/settings" />
-        <SidebarLink icon={HelpCircle} label={t("nav.help")} to="/help" />
+      {/* Bottom Navigation - Grouped */}
+      <div className="border-t border-border px-2 py-2 space-y-1 overflow-y-auto max-h-[45%]">
+        {/* Build section */}
+        <NavSection
+          label={t("nav.sectionBuild")}
+          collapsed={collapsedSections.has("build")}
+          onToggle={() => toggleSection("build")}
+        >
+          <SidebarLink icon={Bot} label={t("nav.agents")} to="/agents" />
+          <SidebarLink icon={BookOpen} label={t("nav.knowledge")} to="/knowledge" />
+          <SidebarLink icon={Wrench} label={t("nav.tools")} to="/tools" />
+          <SidebarLink icon={FileText} label={t("nav.prompts")} to="/prompts" />
+          <SidebarLink icon={FolderKanban} label={t("nav.workspaces")} to="/workspaces" />
+        </NavSection>
+
+        {/* Discover section */}
+        <NavSection
+          label={t("nav.sectionDiscover")}
+          collapsed={collapsedSections.has("discover")}
+          onToggle={() => toggleSection("discover")}
+        >
+          <SidebarLink icon={Compass} label={t("nav.explore")} to="/explore" />
+          <SidebarLink icon={Microscope} label={t("nav.research")} to="/research" />
+        </NavSection>
+
+        {/* Developer section */}
+        <NavSection
+          label={t("nav.sectionDeveloper")}
+          collapsed={collapsedSections.has("developer")}
+          onToggle={() => toggleSection("developer")}
+        >
+          <SidebarLink icon={Code2} label={t("nav.playground")} to="/playground" />
+          <SidebarLink icon={GitCompare} label={t("nav.compare")} to="/model-compare" />
+          <SidebarLink icon={Puzzle} label={t("nav.mcp")} to="/mcp" />
+        </NavSection>
+
+        {/* System - always visible, no collapse */}
+        <div className="pt-1 border-t border-border/50 space-y-0.5">
+          <SidebarLink icon={BarChart3} label={t("nav.usage")} to="/usage" />
+          <SidebarLink icon={Settings} label={t("nav.settings")} to="/settings" />
+          {isAdmin && <SidebarLink icon={ShieldCheck} label={t("nav.admin")} to="/admin" />}
+          <SidebarLink icon={HelpCircle} label={t("nav.help")} to="/help" />
+        </div>
       </div>
     </aside>
   );
 }
 
+function NavSection({
+  label,
+  collapsed,
+  onToggle,
+  children,
+}: {
+  label: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary hover:text-text-secondary transition-colors"
+      >
+        {label}
+        <ChevronDown className={clsx("h-3 w-3 transition-transform", collapsed && "-rotate-90")} />
+      </button>
+      {!collapsed && <div className="space-y-0.5">{children}</div>}
+    </div>
+  );
+}
+
 function SidebarLink({ icon: Icon, label, to }: { icon: any; label: string; to: string }) {
   const navigate = useNavigate();
+  const matchRoute = useMatchRoute();
+  const isActive = matchRoute({ to, fuzzy: true });
+
   return (
     <button
       onClick={() => navigate({ to })}
-      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-text-secondary hover:bg-surface-tertiary hover:text-text transition-colors"
+      className={clsx(
+        "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
+        isActive
+          ? "bg-primary/10 text-primary font-medium"
+          : "text-text-secondary hover:bg-surface-tertiary hover:text-text",
+      )}
     >
       <Icon className="h-4 w-4" />
       {label}

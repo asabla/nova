@@ -163,7 +163,7 @@ function BillingPage() {
                   Current Plan
                 </Button>
               ) : plan.id === "enterprise" ? (
-                <Button variant="secondary" size="sm" className="w-full">
+                <Button variant="secondary" size="sm" className="w-full" onClick={() => window.open("mailto:sales@nova.dev", "_blank")}>
                   Contact Sales <ArrowUpRight className="h-3.5 w-3.5" />
                 </Button>
               ) : (
@@ -194,12 +194,12 @@ function BillingPage() {
                 <p className="text-xs text-text-tertiary">Expires 12/2028</p>
               </div>
             </div>
-            <Button variant="ghost" size="sm">Update</Button>
+            <Button variant="ghost" size="sm" onClick={() => toast("Payment method management coming soon", "info")}>Update</Button>
           </div>
         ) : (
           <div className="text-center py-4">
             <p className="text-sm text-text-tertiary">No payment method on file</p>
-            <Button variant="secondary" size="sm" className="mt-2">Add Payment Method</Button>
+            <Button variant="secondary" size="sm" className="mt-2" onClick={() => toast("Payment method management coming soon", "info")}>Add Payment Method</Button>
           </div>
         )}
       </div>

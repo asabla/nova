@@ -249,7 +249,7 @@ function KnowledgeDetailPage() {
 
   const addContentMutation = useMutation({
     mutationFn: (data: { title: string; content: string }) =>
-      api.post(`/api/knowledge/${id}/documents`, { title: data.title }),
+      api.post(`/api/knowledge/${id}/documents`, { title: data.title, content: data.content }),
     onSuccess: () => {
       toast("Document added successfully", "success");
       setContentTitle("");

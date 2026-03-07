@@ -332,7 +332,7 @@ function AgentToolsTab({ agentId }: { agentId: string }) {
                 </div>
                 <button
                   onClick={() => detachTool.mutate(t.toolId ?? t.id)}
-                  className="text-xs text-danger hover:underline"
+                  className="text-xs text-danger hover:underline cursor-pointer"
                 >
                   Remove
                 </button>
@@ -416,7 +416,7 @@ function AgentKnowledgeTab({ agentId }: { agentId: string }) {
                 </div>
                 <button
                   onClick={() => detachKnowledge.mutate(c.collectionId ?? c.id)}
-                  className="text-xs text-danger hover:underline"
+                  className="text-xs text-danger hover:underline cursor-pointer"
                 >
                   Disconnect
                 </button>

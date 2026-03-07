@@ -14,17 +14,20 @@
     "agents": "Agents",
     "knowledge": "Knowledge",
     "tools": "Tools",
-    "mcp": "MCP",
+    "mcp": "MCP Servers",
     "workspaces": "Workspaces",
     "prompts": "Prompts",
     "research": "Research",
     "playground": "Playground",
-    "compare": "Compare",
+    "compare": "Model Compare",
     "explore": "Explore",
     "usage": "Usage",
     "admin": "Admin",
     "settings": "Settings",
-    "help": "Help"
+    "help": "Help",
+    "sectionBuild": "Build",
+    "sectionDiscover": "Discover",
+    "sectionDeveloper": "Developer"
   },
   "common": {
     "save": "Save",

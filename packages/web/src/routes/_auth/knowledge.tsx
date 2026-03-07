@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { BookOpen, Plus, FileText, Upload } from "lucide-react";
@@ -13,6 +13,7 @@ export const Route = createFileRoute("/_auth/knowledge")({
 
 function KnowledgePage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
 
   const { data: collectionsData } = useQuery({
     queryKey: queryKeys.knowledge.list(),
@@ -29,7 +30,7 @@ function KnowledgePage() {
             <h1 className="text-xl font-bold text-text">Knowledge Base</h1>
             <p className="text-sm text-text-secondary mt-1">Upload documents and build collections for RAG-powered conversations</p>
           </div>
-          <Button variant="primary">
+          <Button variant="primary" onClick={() => navigate({ to: "/knowledge", search: { action: "new" } as any })}>
             <Plus className="h-4 w-4" />
             New Collection
           </Button>
@@ -44,7 +45,7 @@ function KnowledgePage() {
             <p className="text-sm text-text-secondary max-w-sm mb-6">
               Upload documents and organize them into collections. Agents can use these for context-aware answers.
             </p>
-            <Button variant="primary">
+            <Button variant="primary" onClick={() => navigate({ to: "/knowledge", search: { action: "new" } as any })}>
               <Upload className="h-4 w-4" />
               Upload Documents
             </Button>
@@ -52,8 +53,12 @@ function KnowledgePage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {collections.map((col: any) => (
-              <div key={col.id} className="flex flex-col p-4 rounded-xl bg-surface-secondary border border-border hover:border-border-strong transition-colors cursor-pointer">
-                <div className="flex items-start justify-between mb-3">
+              <button
+                key={col.id}
+                onClick={() => navigate({ to: `/knowledge/${col.id}` })}
+                className="flex flex-col p-4 rounded-xl bg-surface-secondary border border-border hover:border-border-strong transition-colors cursor-pointer text-left"
+              >
+                <div className="flex items-start justify-between mb-3 w-full">
                   <BookOpen className="h-5 w-5 text-primary" />
                   <Badge variant={col.status === "ready" ? "success" : "warning"}>
                     {col.status}
@@ -68,7 +73,7 @@ function KnowledgePage() {
                   </span>
                   <span>{col.chunkCount ?? 0} chunks</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}

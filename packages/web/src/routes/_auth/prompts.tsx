@@ -263,28 +263,28 @@ function PromptCard({
           <button
             onClick={onSelect}
             title="View details"
-            className="text-text-tertiary hover:text-text-secondary p-1 rounded"
+            className="text-text-tertiary hover:text-text-secondary p-1 rounded cursor-pointer transition-colors"
           >
             <Eye className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => navigator.clipboard.writeText(prompt.content)}
             title="Copy content"
-            className="text-text-tertiary hover:text-text-secondary p-1 rounded"
+            className="text-text-tertiary hover:text-text-secondary p-1 rounded cursor-pointer transition-colors"
           >
             <Copy className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={onFork}
             title="Fork template"
-            className="text-text-tertiary hover:text-text-secondary p-1 rounded"
+            className="text-text-tertiary hover:text-text-secondary p-1 rounded cursor-pointer transition-colors"
           >
             <GitFork className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={onDelete}
             title="Delete"
-            className="text-text-tertiary hover:text-danger p-1 rounded"
+            className="text-text-tertiary hover:text-danger p-1 rounded cursor-pointer transition-colors"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>

@@ -114,13 +114,13 @@ function AgentMarketplacePage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => navigate({ to: `/agents/${agent.id}` })}
-                    className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-dark"
+                    className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-dark cursor-pointer"
                   >
                     View <ArrowRight className="h-3 w-3" />
                   </button>
                   <button
                     onClick={() => cloneAgent.mutate(agent.id)}
-                    className="flex items-center gap-1 text-xs font-medium text-text-secondary hover:text-text ml-auto"
+                    className="flex items-center gap-1 text-xs font-medium text-text-secondary hover:text-text ml-auto cursor-pointer"
                   >
                     <Copy className="h-3 w-3" /> Clone
                   </button>

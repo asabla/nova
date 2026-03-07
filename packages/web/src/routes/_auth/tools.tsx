@@ -95,9 +95,12 @@ function ToolsPage() {
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-5xl mx-auto px-4 py-6">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <Wrench className="h-5 w-5 text-primary" />
-          <h1 className="text-xl font-bold text-text">Tools</h1>
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-1">
+            <Wrench className="h-5 w-5 text-primary" />
+            <h1 className="text-xl font-bold text-text">Tools</h1>
+          </div>
+          <p className="text-sm text-text-secondary ml-8">Manage and configure tools available to your agents and conversations.</p>
         </div>
 
         {/* Tabs */}

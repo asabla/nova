@@ -104,7 +104,6 @@ function ApiKeysSettings() {
           onSubmit={(e) => {
             e.preventDefault();
             if (newKeyName.trim()) createKey.mutate(newKeyName.trim());
-            setShowCreate(false);
           }}
           className="space-y-4"
         >

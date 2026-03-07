@@ -23,31 +23,37 @@ function SettingsLayout() {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="max-w-3xl mx-auto px-4 py-6">
+      <div className="max-w-4xl mx-auto px-4 py-6">
         <h1 className="text-xl font-bold text-text mb-6">{t("app.settings")}</h1>
 
-        <div className="flex gap-1 border-b border-border mb-6 overflow-x-auto">
-          {tabs.map(({ to, icon: Icon, label }) => {
-            const isActive = matchRoute({ to });
-            return (
-              <Link
-                key={to}
-                to={to}
-                className={clsx(
-                  "flex items-center gap-2 px-3 py-2 text-sm border-b-2 whitespace-nowrap transition-colors",
-                  isActive
-                    ? "border-primary text-primary font-medium"
-                    : "border-transparent text-text-secondary hover:text-text",
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {t(label)}
-              </Link>
-            );
-          })}
-        </div>
+        <div className="flex gap-6">
+          {/* Sidebar navigation */}
+          <nav className="w-44 shrink-0 space-y-0.5">
+            {tabs.map(({ to, icon: Icon, label }) => {
+              const isActive = matchRoute({ to });
+              return (
+                <Link
+                  key={to}
+                  to={to}
+                  className={clsx(
+                    "flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
+                    isActive
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-text-secondary hover:bg-surface-secondary hover:text-text",
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {t(label)}
+                </Link>
+              );
+            })}
+          </nav>
 
-        <Outlet />
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <Outlet />
+          </div>
+        </div>
       </div>
     </div>
   );

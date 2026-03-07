@@ -47,7 +47,13 @@
     "settings": "Settings",
     "admin": "Admin",
     "help": "Help",
-    "folders": "Folders"
+    "folders": "Folders",
+    "compare": "Model Compare",
+    "explore": "Explore",
+    "usage": "Usage",
+    "sectionBuild": "Build",
+    "sectionDiscover": "Discover",
+    "sectionDeveloper": "Developer"
   },
   "conversations": {
     "new": "New conversation",

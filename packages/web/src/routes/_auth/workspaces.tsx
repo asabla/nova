@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { FolderKanban, Plus, Users, Lock, Globe } from "lucide-react";
@@ -13,6 +13,7 @@ export const Route = createFileRoute("/_auth/workspaces")({
 
 function WorkspacesPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
 
   const { data: workspacesData } = useQuery({
     queryKey: queryKeys.workspaces.list(),
@@ -29,7 +30,7 @@ function WorkspacesPage() {
             <h1 className="text-xl font-bold text-text">Workspaces</h1>
             <p className="text-sm text-text-secondary mt-1">Organize conversations and collaborate with your team</p>
           </div>
-          <Button variant="primary">
+          <Button variant="primary" onClick={() => navigate({ to: "/workspaces", search: { action: "new" } as any })}>
             <Plus className="h-4 w-4" />
             New Workspace
           </Button>
@@ -44,7 +45,7 @@ function WorkspacesPage() {
             <p className="text-sm text-text-secondary max-w-sm mb-6">
               Workspaces help you organize conversations by project or team. Members can share and collaborate.
             </p>
-            <Button variant="primary">
+            <Button variant="primary" onClick={() => navigate({ to: "/workspaces", search: { action: "new" } as any })}>
               <Plus className="h-4 w-4" />
               Create your first workspace
             </Button>
@@ -52,8 +53,12 @@ function WorkspacesPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {workspaces.map((ws: any) => (
-              <div key={ws.id} className="flex flex-col p-4 rounded-xl bg-surface-secondary border border-border hover:border-border-strong transition-colors cursor-pointer">
-                <div className="flex items-start justify-between mb-3">
+              <button
+                key={ws.id}
+                onClick={() => navigate({ to: `/workspaces/${ws.id}` })}
+                className="flex flex-col p-4 rounded-xl bg-surface-secondary border border-border hover:border-border-strong transition-colors cursor-pointer text-left"
+              >
+                <div className="flex items-start justify-between mb-3 w-full">
                   <FolderKanban className="h-5 w-5 text-primary" />
                   {ws.visibility === "private" ? (
                     <Lock className="h-3.5 w-3.5 text-text-tertiary" />
@@ -67,7 +72,7 @@ function WorkspacesPage() {
                   <Users className="h-3 w-3" />
                   {ws.memberCount ?? 0} members
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
