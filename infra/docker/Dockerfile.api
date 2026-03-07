@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 FROM oven/bun:1-alpine AS builder
 
 WORKDIR /app
@@ -8,23 +10,22 @@ COPY packages/api/package.json packages/api/
 COPY packages/web/package.json packages/web/
 COPY packages/worker/package.json packages/worker/
 
-RUN bun install --frozen-lockfile
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --frozen-lockfile
 
 COPY packages/shared/ packages/shared/
 COPY packages/api/ packages/api/
 
-RUN cd packages/shared && bun run build || true
-RUN cd packages/api && bun run build || true
+# Single bundled output — all deps inlined, no node_modules needed at runtime
+RUN bun build packages/api/src/index.ts --target=bun --outdir=dist --minify
 
+# ── Runtime ──────────────────────────────────────
 FROM oven/bun:1-alpine
 
 WORKDIR /app
 
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages/shared ./packages/shared
-COPY --from=builder /app/packages/api ./packages/api
-COPY --from=builder /app/package.json ./
+COPY --from=builder /app/dist/index.js ./index.js
 
 EXPOSE 3000
 
-CMD ["bun", "run", "packages/api/src/index.ts"]
+CMD ["bun", "run", "index.js"]

@@ -1,23 +1,31 @@
-FROM node:22-alpine AS builder
+# syntax=docker/dockerfile:1
+
+# Bun for fast deps install + build, Node.js for Temporal runtime
+FROM oven/bun:1-alpine AS builder
 
 WORKDIR /app
 
-RUN npm install -g bun
-
 COPY package.json bun.lock* ./
 COPY packages/shared/package.json packages/shared/
-COPY packages/worker/package.json packages/worker/
 COPY packages/api/package.json packages/api/
 COPY packages/web/package.json packages/web/
+COPY packages/worker/package.json packages/worker/
 
-RUN bun install --frozen-lockfile
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --frozen-lockfile
 
 COPY packages/shared/ packages/shared/
 COPY packages/worker/ packages/worker/
 
-RUN cd packages/shared && npx tsc || true
-RUN cd packages/worker && npx tsc || true
+# Clean stale build artifacts, then tsc -b builds shared + worker via project references
+RUN rm -rf packages/shared/dist packages/worker/dist packages/shared/*.tsbuildinfo packages/worker/*.tsbuildinfo && \
+    cd packages/worker && bunx tsc -b
 
+# Production deps only
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --frozen-lockfile --production
+
+# ── Runtime (Node.js — required by Temporal) ─────
 FROM node:22-alpine
 
 WORKDIR /app
@@ -27,4 +35,4 @@ COPY --from=builder /app/packages/shared ./packages/shared
 COPY --from=builder /app/packages/worker ./packages/worker
 COPY --from=builder /app/package.json ./
 
-CMD ["npx", "tsx", "packages/worker/src/index.ts"]
+CMD ["node", "packages/worker/dist/index.js"]
