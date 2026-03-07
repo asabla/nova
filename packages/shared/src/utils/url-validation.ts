@@ -20,9 +20,13 @@ export const safeUrlSchema = z
   .string()
   .url()
   .refine((url) => {
-    const parsed = new URL(url);
-    if (!["http:", "https:"].includes(parsed.protocol)) return false;
-    if (parsed.hostname === "localhost") return false;
-    if (isPrivateIP(parsed.hostname)) return false;
-    return true;
+    try {
+      const parsed = new URL(url);
+      if (!["http:", "https:"].includes(parsed.protocol)) return false;
+      if (parsed.hostname === "localhost") return false;
+      if (isPrivateIP(parsed.hostname)) return false;
+      return true;
+    } catch {
+      return false;
+    }
   }, "URL points to a private or disallowed address");
