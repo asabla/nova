@@ -181,7 +181,7 @@ function NewConversationPage() {
         </div>
       </div>
 
-      <MessageInput onSend={createAndSend} />
+      <MessageInput onSend={(content) => createAndSend(content)} />
     </div>
   );
 }

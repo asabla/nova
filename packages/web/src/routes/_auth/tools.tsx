@@ -564,8 +564,8 @@ function CustomToolsTab() {
       }
     }
 
-    const hasEndpoint = schema?.servers?.[0]?.url || schema?.endpoint;
-    const isOpenApi = schema?.openapi || schema?.swagger;
+    const hasEndpoint = (schema as any)?.servers?.[0]?.url || (schema as any)?.endpoint;
+    const isOpenApi = (schema as any)?.openapi || (schema as any)?.swagger;
 
     createTool.mutate({
       name: name.trim(),

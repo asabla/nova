@@ -12,7 +12,7 @@ import {
   FileText,
   Image,
   Code,
-  BarChart,
+  BarChart as BarChartIcon,
   Table2,
   Music,
   Video,
@@ -66,7 +66,7 @@ interface ArtifactRendererProps {
 const typeConfig: Record<ArtifactType, { icon: typeof Code; label: string; color: string }> = {
   code: { icon: Code, label: "Code", color: "bg-blue-500/10 text-blue-400 border-blue-500/20" },
   csv: { icon: Table2, label: "CSV", color: "bg-green-500/10 text-green-400 border-green-500/20" },
-  chart: { icon: BarChart, label: "Chart", color: "bg-amber-500/10 text-amber-400 border-amber-500/20" },
+  chart: { icon: BarChartIcon, label: "Chart", color: "bg-amber-500/10 text-amber-400 border-amber-500/20" },
   image: { icon: Image, label: "Image", color: "bg-purple-500/10 text-purple-400 border-purple-500/20" },
   audio: { icon: Music, label: "Audio", color: "bg-teal-500/10 text-teal-400 border-teal-500/20" },
   video: { icon: Video, label: "Video", color: "bg-red-500/10 text-red-400 border-red-500/20" },

@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Bot, ArrowLeft, Save, TestTube, Copy, Settings2, Wrench, BookOpen, Brain } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { toast } from "../../components/ui/Toast";
-import { api } from "../../lib/api-client";
+import { api } from "../../lib/api";
 
 export const Route = createFileRoute("/_auth/agents/new")({
   component: AgentBuilderPage,
@@ -52,7 +52,7 @@ function AgentBuilderPage() {
     setTestResult("");
     try {
       // Simulate agent test by sending to chat completions
-      const result = await api.post("/api/v1/chat/completions", {
+      const result = await api.post<any>("/api/v1/chat/completions", {
         model: agent.modelId || "gpt-4o",
         messages: [
           ...(agent.systemPrompt ? [{ role: "system", content: agent.systemPrompt }] : []),

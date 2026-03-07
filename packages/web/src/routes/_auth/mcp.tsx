@@ -471,7 +471,7 @@ function ServerCard({
               <span className="text-danger">{testResult.error}</span>
             )}
           </div>
-          {testResult.serverInfo && (
+          {testResult.serverInfo ? (
             <details className="mt-2">
               <summary className="cursor-pointer text-text-secondary hover:text-text">
                 Server Info
@@ -480,7 +480,7 @@ function ServerCard({
                 {JSON.stringify(testResult.serverInfo, null, 2)}
               </pre>
             </details>
-          )}
+          ) : null}
         </div>
       )}
 

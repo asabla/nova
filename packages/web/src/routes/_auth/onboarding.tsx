@@ -159,7 +159,7 @@ function OnboardingPage() {
             </p>
           </div>
           <div className="flex gap-3 justify-center">
-            <Button variant="outline" onClick={() => navigate({ to: "/explore" })}>
+            <Button variant="secondary" onClick={() => navigate({ to: "/explore" })}>
               Explore Examples
             </Button>
             <Button variant="primary" onClick={() => completeOnboarding.mutate()}>

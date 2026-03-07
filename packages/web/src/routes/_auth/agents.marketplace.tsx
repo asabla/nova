@@ -72,7 +72,7 @@ function AgentMarketplacePage() {
             <p className="text-xs text-text-tertiary mt-1">
               {search ? "Try a different search term" : "Publish an agent to make it available here"}
             </p>
-            <Button variant="outline" className="mt-4" onClick={() => navigate({ to: "/agents/new" })}>
+            <Button variant="secondary" className="mt-4" onClick={() => navigate({ to: "/agents/new" })}>
               <Plus className="h-4 w-4" /> Create Agent
             </Button>
           </div>

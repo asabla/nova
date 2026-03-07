@@ -160,7 +160,7 @@ export function CommandPalette() {
         label: "Search Conversations",
         icon: <Search className="h-4 w-4" />,
         section: "commands",
-        action: runAndClose(() => navigate({ to: "/conversations", search: { q: "" } })),
+        action: runAndClose(() => navigate({ to: "/search" as any })),
         shortcut: "\u2318\u21E7F",
       },
       {

@@ -45,7 +45,7 @@ export const queryKeys = {
 export function conversationListOptions(filters?: Record<string, unknown>) {
   return queryOptions({
     queryKey: queryKeys.conversations.list(filters),
-    queryFn: () => api.get(`/api/conversations?${new URLSearchParams(filters as any).toString()}`),
+    queryFn: () => api.get<any>(`/api/conversations?${new URLSearchParams(filters as any).toString()}`),
     staleTime: 30_000,
   });
 }
@@ -53,7 +53,7 @@ export function conversationListOptions(filters?: Record<string, unknown>) {
 export function conversationDetailOptions(id: string) {
   return queryOptions({
     queryKey: queryKeys.conversations.detail(id),
-    queryFn: () => api.get(`/api/conversations/${id}`),
+    queryFn: () => api.get<any>(`/api/conversations/${id}`),
     staleTime: 30_000,
   });
 }
@@ -61,7 +61,7 @@ export function conversationDetailOptions(id: string) {
 export function messagesOptions(conversationId: string) {
   return queryOptions({
     queryKey: queryKeys.conversations.messages(conversationId),
-    queryFn: () => api.get(`/api/conversations/${conversationId}/messages`),
+    queryFn: () => api.get<any>(`/api/conversations/${conversationId}/messages`),
     staleTime: 10_000,
   });
 }

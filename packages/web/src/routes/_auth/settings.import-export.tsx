@@ -100,7 +100,7 @@ function ImportExportPage() {
                 <p className="text-xs text-text-tertiary">Download all your conversations, messages, agents, and files as JSON</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={() => exportAll.mutate()}>
+            <Button variant="secondary" size="sm" onClick={() => exportAll.mutate()}>
               <Download className="h-3.5 w-3.5" /> Export
             </Button>
           </div>
@@ -119,7 +119,7 @@ function ImportExportPage() {
                 <p className="text-xs text-text-tertiary">Download a complete copy of all your personal data (Article 20)</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={() => gdprExport.mutate()}>
+            <Button variant="secondary" size="sm" onClick={() => gdprExport.mutate()}>
               Request Export
             </Button>
           </div>
@@ -150,7 +150,7 @@ function ImportCard({ icon: Icon, title, description, onImport, loading }: {
         <h3 className="text-sm font-medium text-text">{title}</h3>
       </div>
       <p className="text-xs text-text-tertiary mb-4">{description}</p>
-      <Button variant="outline" size="sm" onClick={onImport} loading={loading}>
+      <Button variant="secondary" size="sm" onClick={onImport} loading={loading}>
         <Upload className="h-3.5 w-3.5" /> Choose File
       </Button>
     </div>

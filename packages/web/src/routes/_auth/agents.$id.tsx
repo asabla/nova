@@ -18,7 +18,7 @@ function AgentDetailPage() {
 
   const { data: agent, isLoading } = useQuery({
     queryKey: ["agents", id],
-    queryFn: () => api.get(`/api/agents/${id}`),
+    queryFn: () => api.get<any>(`/api/agents/${id}`),
   });
 
   const [form, setForm] = useState({
@@ -85,7 +85,7 @@ function AgentDetailPage() {
     setTesting(true);
     setTestResult("");
     try {
-      const result = await api.post("/api/v1/chat/completions", {
+      const result = await api.post<any>("/api/v1/chat/completions", {
         model: "gpt-4o",
         messages: [
           ...(form.systemPrompt ? [{ role: "system", content: form.systemPrompt }] : []),

@@ -163,7 +163,7 @@ function BillingPage() {
                   Current Plan
                 </Button>
               ) : plan.id === "enterprise" ? (
-                <Button variant="outline" size="sm" className="w-full">
+                <Button variant="secondary" size="sm" className="w-full">
                   Contact Sales <ArrowUpRight className="h-3.5 w-3.5" />
                 </Button>
               ) : (
@@ -199,7 +199,7 @@ function BillingPage() {
         ) : (
           <div className="text-center py-4">
             <p className="text-sm text-text-tertiary">No payment method on file</p>
-            <Button variant="outline" size="sm" className="mt-2">Add Payment Method</Button>
+            <Button variant="secondary" size="sm" className="mt-2">Add Payment Method</Button>
           </div>
         )}
       </div>

@@ -146,7 +146,7 @@ export async function createAgentConversation(
     orgId,
     ownerId: userId,
     title,
-    agentId,
+    modelParams: { agentId },
   }).returning();
   return conv;
 }

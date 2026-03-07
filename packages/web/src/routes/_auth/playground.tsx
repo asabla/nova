@@ -470,7 +470,7 @@ function PlaygroundPage() {
           <h1 className="text-lg font-semibold text-text">
             {t("playground.title", "Model Playground")}
           </h1>
-          <Badge variant="secondary">
+          <Badge variant="primary">
             {t("playground.badge", "Developer")}
           </Badge>
         </div>
@@ -865,7 +865,7 @@ function PlaygroundPage() {
                   {showRaw ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                   {t("playground.rawResponse", "Raw API Response")}
                 </button>
-                {showRaw && result?.raw && (
+                {showRaw && (result as any)?.raw && (
                   <div className="relative mt-2">
                     <button
                       type="button"
@@ -876,7 +876,7 @@ function PlaygroundPage() {
                       <Copy className="h-3.5 w-3.5" />
                     </button>
                     <pre className="p-4 rounded-xl bg-surface-secondary border border-border text-xs text-text-secondary overflow-x-auto font-mono max-h-96">
-                      {JSON.stringify(result.raw, null, 2)}
+                      {JSON.stringify(result?.raw, null, 2)}
                     </pre>
                   </div>
                 )}
