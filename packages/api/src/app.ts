@@ -36,6 +36,7 @@ import { artifactRoutes } from "./routes/artifacts";
 import { researchRoutes } from "./routes/research";
 import { contentFilter } from "./middleware/content-filter";
 import { budgetGuard } from "./middleware/budget-guard";
+import { mfaGuard } from "./middleware/mfa-guard";
 import { importRoutes } from "./routes/import";
 import { groupRoutes } from "./routes/groups";
 import { folderRoutes } from "./routes/conversation-folders";
@@ -53,6 +54,7 @@ import { domainRoutes } from "./routes/domains";
 import { urlPreviewRoutes } from "./routes/url-preview";
 import { webhookRoutes } from "./routes/webhooks";
 import { voiceRoutes } from "./routes/voice";
+import { superAdminRoutes } from "./routes/super-admin";
 
 const app = new Hono<AppContext>();
 
@@ -89,7 +91,10 @@ app.use("/api/*", authMiddleware());
 // 9. Org scoping
 app.use("/api/*", orgScope());
 
-// 10. Content filtering
+// 10. MFA enforcement (Story #6)
+app.use("/api/*", mfaGuard());
+
+// 11. Content filtering
 app.use("/api/*", contentFilter());
 
 // 11. Budget enforcement (on LLM-calling routes)
@@ -137,5 +142,6 @@ app.route("/api/org", rateLimitRoutes);
 app.route("/api/domains", domainRoutes);
 app.route("/api/url", urlPreviewRoutes);
 app.route("/api/voice", voiceRoutes);
+app.route("/api/super-admin", superAdminRoutes);
 
 export { app };
