@@ -106,4 +106,145 @@ health.get("/system", async (c) => {
   });
 });
 
+// Diagnostic test runner (Story #205)
+// Tests all external service connections and reports results
+health.post("/diagnostics", async (c) => {
+  const results: Record<string, {
+    status: "pass" | "fail" | "warn";
+    message: string;
+    latencyMs: number;
+    details?: unknown;
+  }> = {};
+
+  // 1. Database connectivity + version
+  try {
+    const start = performance.now();
+    const [row] = (await db.execute(sql`SELECT version() AS v, current_database() AS db, pg_database_size(current_database()) AS size`)) as any[];
+    results.database = {
+      status: "pass",
+      message: `Connected to ${row?.db}`,
+      latencyMs: Math.round(performance.now() - start),
+      details: { version: row?.v, sizeBytes: row?.size },
+    };
+  } catch (err: any) {
+    results.database = { status: "fail", message: err.message, latencyMs: 0 };
+  }
+
+  // 2. Database extensions (pgvector, pg_trgm)
+  try {
+    const start = performance.now();
+    const extensions = (await db.execute(sql`SELECT extname FROM pg_extension`)) as any[];
+    const extNames = extensions.map((e: any) => e.extname);
+    const hasVector = extNames.includes("vector");
+    const hasTrgm = extNames.includes("pg_trgm");
+    results.database_extensions = {
+      status: hasVector && hasTrgm ? "pass" : "warn",
+      message: `Extensions: ${extNames.join(", ")}`,
+      latencyMs: Math.round(performance.now() - start),
+      details: { pgvector: hasVector, pg_trgm: hasTrgm },
+    };
+  } catch (err: any) {
+    results.database_extensions = { status: "warn", message: err.message, latencyMs: 0 };
+  }
+
+  // 3. Redis
+  try {
+    const start = performance.now();
+    const info = await redis.info("server");
+    const versionMatch = info.match(/redis_version:(\S+)/);
+    results.redis = {
+      status: "pass",
+      message: `Redis ${versionMatch?.[1] ?? "connected"}`,
+      latencyMs: Math.round(performance.now() - start),
+    };
+  } catch (err: any) {
+    results.redis = { status: "fail", message: err.message, latencyMs: 0 };
+  }
+
+  // 4. MinIO / Object Storage
+  try {
+    const start = performance.now();
+    const minioUrl = env.MINIO_ENDPOINT ?? "http://localhost:9000";
+    const res = await fetch(`${minioUrl}/minio/health/live`, { signal: AbortSignal.timeout(5000) });
+    results.minio = {
+      status: res.ok ? "pass" : "fail",
+      message: res.ok ? "MinIO healthy" : `HTTP ${res.status}`,
+      latencyMs: Math.round(performance.now() - start),
+    };
+  } catch (err: any) {
+    results.minio = { status: "fail", message: err.message, latencyMs: 0 };
+  }
+
+  // 5. LiteLLM proxy
+  try {
+    const start = performance.now();
+    const litellmUrl = env.LITELLM_API_URL ?? "http://localhost:4000";
+    const res = await fetch(`${litellmUrl}/health`, { signal: AbortSignal.timeout(5000) });
+    results.litellm = {
+      status: res.ok ? "pass" : "warn",
+      message: res.ok ? "LiteLLM healthy" : `HTTP ${res.status}`,
+      latencyMs: Math.round(performance.now() - start),
+    };
+
+    // Also try listing models
+    const modelRes = await fetch(`${litellmUrl}/models`, {
+      headers: { Authorization: `Bearer ${env.LITELLM_MASTER_KEY}` },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (modelRes.ok) {
+      const modelData = await modelRes.json() as { data?: { id: string }[] };
+      results.litellm_models = {
+        status: "pass",
+        message: `${modelData.data?.length ?? 0} model(s) available`,
+        latencyMs: Math.round(performance.now() - start),
+        details: { models: modelData.data?.map((m: any) => m.id).slice(0, 20) },
+      };
+    }
+  } catch (err: any) {
+    results.litellm = { status: "fail", message: err.message, latencyMs: 0 };
+  }
+
+  // 6. Temporal
+  try {
+    const start = performance.now();
+    const temporalUrl = env.TEMPORAL_ADDRESS ?? "localhost:7233";
+    const host = temporalUrl.includes("://") ? temporalUrl : `http://${temporalUrl}`;
+    const res = await fetch(`${host}/api/v1/namespaces`, { signal: AbortSignal.timeout(5000) }).catch(() => null);
+    results.temporal = {
+      status: res ? "pass" : "warn",
+      message: res ? "Temporal reachable" : "Temporal unreachable (may use gRPC)",
+      latencyMs: Math.round(performance.now() - start),
+    };
+  } catch (err: any) {
+    results.temporal = { status: "warn", message: err.message, latencyMs: 0 };
+  }
+
+  // 7. DNS resolution test
+  try {
+    const start = performance.now();
+    const res = await fetch("https://dns.google/resolve?name=example.com&type=A", { signal: AbortSignal.timeout(5000) });
+    results.dns = {
+      status: res.ok ? "pass" : "warn",
+      message: res.ok ? "DNS resolution working" : "DNS may be impaired",
+      latencyMs: Math.round(performance.now() - start),
+    };
+  } catch (err: any) {
+    results.dns = { status: "warn", message: err.message, latencyMs: 0 };
+  }
+
+  const passCount = Object.values(results).filter((r) => r.status === "pass").length;
+  const failCount = Object.values(results).filter((r) => r.status === "fail").length;
+  const totalCount = Object.keys(results).length;
+
+  return c.json({
+    status: failCount === 0 ? "healthy" : "degraded",
+    summary: `${passCount}/${totalCount} checks passed, ${failCount} failed`,
+    version: env.APP_VERSION ?? "dev",
+    runtime: "bun",
+    runtimeVersion: Bun.version,
+    timestamp: new Date().toISOString(),
+    results,
+  });
+});
+
 export { health as healthRoutes };
