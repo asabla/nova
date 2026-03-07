@@ -8,7 +8,7 @@ import { eq, and, isNull, ne } from "drizzle-orm";
 import { AppError } from "@nova/shared/utils";
 import { requireRole } from "../middleware/rbac";
 import { writeAuditLog } from "../services/audit.service";
-import { randomUUID, randomBytes } from "crypto";
+import { randomUUID, randomBytes, createHash } from "crypto";
 
 const userRoutes = new Hono<AppContext>();
 
@@ -96,8 +96,19 @@ userRoutes.post("/admin/impersonate/:userId", requireRole("org-admin"), async (c
 
   if (targetProfile.length === 0) throw AppError.notFound("User");
 
-  // Generate an impersonation token (short-lived)
+  // Generate an impersonation session (short-lived, 1 hour)
   const impersonationToken = randomBytes(32).toString("hex");
+  const tokenHash = createHash("sha256").update(impersonationToken).digest("hex");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  // Create a real session for the target user
+  await db.insert(sessions).values({
+    userId: targetUserId,
+    tokenHash,
+    ipAddress: c.req.header("x-forwarded-for")?.split(",")[0] ?? null,
+    userAgent: `Impersonation by ${adminId}`,
+    expiresAt,
+  });
 
   // Audit log the impersonation
   await writeAuditLog({
@@ -115,7 +126,8 @@ userRoutes.post("/admin/impersonate/:userId", requireRole("org-admin"), async (c
     ok: true,
     impersonationToken,
     targetUserId,
-    expiresInSeconds: 3600,
+    targetDisplayName: targetProfile[0].displayName,
+    expiresAt: expiresAt.toISOString(),
   });
 });
 
@@ -273,7 +285,6 @@ userRoutes.post("/admin/invite", requireRole("org-admin"), zValidator("json", in
   const inviteToken = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
 
-  // Stub: In production this would send an email. For now, return the token directly.
   await writeAuditLog({
     orgId,
     actorId: adminId,
@@ -284,13 +295,28 @@ userRoutes.post("/admin/invite", requireRole("org-admin"), zValidator("json", in
     details: { email, role, expiresAt: expiresAt.toISOString() },
   });
 
+  // Send the invite email
+  let emailSent = false;
+  try {
+    const { sendEmail, buildNotificationEmail } = await import("../lib/email");
+    const { env } = await import("../lib/env");
+    const inviteUrl = `${env.APP_URL ?? "http://localhost:5173"}/invite?token=${inviteToken}`;
+    const emailContent = buildNotificationEmail(
+      "You've been invited to NOVA",
+      `You've been invited to join NOVA as a ${role}.\n\nClick the link below to accept your invitation:\n\n${inviteUrl}\n\nThis invitation expires on ${expiresAt.toLocaleDateString()}.`,
+    );
+    emailSent = await sendEmail({ to: email, ...emailContent });
+  } catch {
+    // Email sending failed, but invite is still valid
+  }
+
   return c.json({
     ok: true,
     email,
     role,
     inviteToken,
     expiresAt: expiresAt.toISOString(),
-    message: "Invite token generated. Email sending is not yet implemented.",
+    emailSent,
   }, 201);
 });
 

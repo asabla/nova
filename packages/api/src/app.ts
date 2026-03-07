@@ -35,6 +35,7 @@ import { sandboxRoutes } from "./routes/sandbox";
 import { artifactRoutes } from "./routes/artifacts";
 import { researchRoutes } from "./routes/research";
 import { contentFilter } from "./middleware/content-filter";
+import { budgetGuard } from "./middleware/budget-guard";
 import { importRoutes } from "./routes/import";
 import { groupRoutes } from "./routes/groups";
 import { folderRoutes } from "./routes/conversation-folders";
@@ -90,7 +91,13 @@ app.use("/api/*", orgScope());
 // 10. Content filtering
 app.use("/api/*", contentFilter());
 
-// 10. Authenticated routes
+// 11. Budget enforcement (on LLM-calling routes)
+app.use("/api/conversations/*/messages", budgetGuard());
+app.use("/v1/chat/*", budgetGuard());
+app.use("/api/sandbox/*", budgetGuard());
+app.use("/api/research/*", budgetGuard());
+
+// 12. Authenticated routes
 app.route("/api/conversations", conversationRoutes);
 app.route("/api/conversations", messageRoutes);
 app.route("/api/files", fileRoutes);
