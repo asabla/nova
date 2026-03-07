@@ -21,13 +21,16 @@ import {
   Shield,
   Mail,
   X,
+  RefreshCw,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
 import { toast } from "../../components/ui/Toast";
+import { Skeleton } from "../../components/ui/Skeleton";
 import { api, apiHeaders } from "../../lib/api";
 
 export const Route = createFileRoute("/_auth/workspaces/$id")({
@@ -37,38 +40,60 @@ export const Route = createFileRoute("/_auth/workspaces/$id")({
 type TabId = "conversations" | "files" | "members" | "settings" | "activity";
 
 function WorkspaceDetailPage() {
+  const { t } = useTranslation();
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabId>("conversations");
 
-  const { data: workspace, isLoading } = useQuery({
+  const { data: workspace, isLoading, isError, refetch } = useQuery({
     queryKey: ["workspaces", id],
     queryFn: () => api.get<any>(`/api/workspaces/${id}`),
   });
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-pulse text-text-secondary">Loading workspace...</div>
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-8 w-8 rounded" />
+            <Skeleton className="h-10 w-10 rounded-xl" />
+            <div>
+              <Skeleton className="h-5 w-48 mb-1" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-6 w-20 rounded-full" />
+          </div>
+        </div>
+        <div className="p-6 space-y-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-16 w-full max-w-3xl rounded-lg" />
+          ))}
+        </div>
       </div>
     );
   }
 
-  if (!workspace) {
+  if (isError || !workspace) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-text-secondary">Workspace not found</div>
+      <div className="flex flex-col items-center justify-center h-full">
+        <p className="text-sm text-danger mb-4">{t("workspaces.loadError", { defaultValue: "Failed to load workspace." })}</p>
+        <Button variant="secondary" onClick={() => refetch()}>
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          {t("common.retry", { defaultValue: "Retry" })}
+        </Button>
       </div>
     );
   }
 
   const tabs = [
-    { id: "conversations" as const, label: "Conversations", icon: MessageSquare },
-    { id: "files" as const, label: "Files", icon: FileText },
-    { id: "members" as const, label: "Members", icon: Users },
-    { id: "settings" as const, label: "Settings", icon: Settings2 },
-    { id: "activity" as const, label: "Activity", icon: Activity },
+    { id: "conversations" as const, label: t("workspaces.tabs.conversations", { defaultValue: "Conversations" }), icon: MessageSquare },
+    { id: "files" as const, label: t("workspaces.tabs.files", { defaultValue: "Files" }), icon: FileText },
+    { id: "members" as const, label: t("workspaces.tabs.members", { defaultValue: "Members" }), icon: Users },
+    { id: "settings" as const, label: t("workspaces.tabs.settings", { defaultValue: "Settings" }), icon: Settings2 },
+    { id: "activity" as const, label: t("workspaces.tabs.activity", { defaultValue: "Activity" }), icon: Activity },
   ];
 
   return (
@@ -79,11 +104,12 @@ function WorkspaceDetailPage() {
           <button
             onClick={() => navigate({ to: "/workspaces" })}
             className="p-1 hover:bg-surface-secondary rounded"
+            aria-label={t("common.goBack", { defaultValue: "Go back" })}
           >
-            <ArrowLeft className="h-5 w-5 text-text-secondary" />
+            <ArrowLeft className="h-5 w-5 text-text-secondary" aria-hidden="true" />
           </button>
           <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <FolderOpen className="h-5 w-5 text-primary" />
+            <FolderOpen className="h-5 w-5 text-primary" aria-hidden="true" />
           </div>
           <div>
             <h1 className="text-lg font-semibold text-text">{workspace.name}</h1>
@@ -93,8 +119,8 @@ function WorkspaceDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {workspace.archived && <Badge variant="warning">Archived</Badge>}
-          <Badge variant="default">{workspace.memberCount ?? 0} members</Badge>
+          {workspace.archived && <Badge variant="warning">{t("workspaces.archived", { defaultValue: "Archived" })}</Badge>}
+          <Badge variant="default">{workspace.memberCount ?? 0} {t("workspaces.members", { defaultValue: "members" })}</Badge>
         </div>
       </div>
 
@@ -110,7 +136,7 @@ function WorkspaceDetailPage() {
                 : "text-text-secondary hover:text-text hover:bg-surface-secondary"
             }`}
           >
-            <tab.icon className="h-3.5 w-3.5" />
+            <tab.icon className="h-3.5 w-3.5" aria-hidden="true" />
             {tab.label}
           </button>
         ))}
@@ -133,11 +159,12 @@ function WorkspaceDetailPage() {
 /* -------------------------------------------------------------------------- */
 
 function ConversationsTab({ workspaceId }: { workspaceId: string }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
 
-  const { data: conversations, isLoading } = useQuery({
+  const { data: conversations, isLoading, isError, refetch } = useQuery({
     queryKey: ["workspaces", workspaceId, "conversations"],
     queryFn: () => api.get<any[]>(`/api/workspaces/${workspaceId}/conversations`),
   });
@@ -145,30 +172,42 @@ function ConversationsTab({ workspaceId }: { workspaceId: string }) {
   const createMutation = useMutation({
     mutationFn: () =>
       api.post<any>(`/api/workspaces/${workspaceId}/conversations`, {
-        title: "New Conversation",
+        title: t("workspaces.newConversationTitle", { defaultValue: "New Conversation" }),
       }),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["workspaces", workspaceId, "conversations"] });
-      toast.success("Conversation created");
+      toast.success(t("workspaces.conversationCreated", { defaultValue: "Conversation created" }));
       navigate({ to: "/conversations/$id", params: { id: data.id } });
     },
-    onError: (err: any) => toast.error(err.message ?? "Failed to create conversation"),
+    onError: (err: any) => toast.error(err.message ?? t("workspaces.conversationCreateFailed", { defaultValue: "Failed to create conversation" })),
   });
 
   const filtered = (conversations ?? []).filter((c: any) =>
     !search || c.title?.toLowerCase().includes(search.toLowerCase()),
   );
 
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <p className="text-sm text-danger mb-4">{t("workspaces.conversationsLoadError", { defaultValue: "Failed to load conversations." })}</p>
+        <Button variant="secondary" onClick={() => refetch()}>
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          {t("common.retry", { defaultValue: "Retry" })}
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" aria-hidden="true" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search conversations..."
+            placeholder={t("workspaces.searchConversations", { defaultValue: "Search conversations..." })}
             className="w-full h-9 pl-9 pr-3 rounded-lg border border-border bg-surface text-text text-sm placeholder:text-text-tertiary"
           />
         </div>
@@ -178,7 +217,7 @@ function ConversationsTab({ workspaceId }: { workspaceId: string }) {
           onClick={() => createMutation.mutate()}
           loading={createMutation.isPending}
         >
-          <Plus className="h-3.5 w-3.5" /> New Conversation
+          <Plus className="h-3.5 w-3.5" aria-hidden="true" /> {t("workspaces.newConversation", { defaultValue: "New Conversation" })}
         </Button>
       </div>
 
@@ -190,13 +229,13 @@ function ConversationsTab({ workspaceId }: { workspaceId: string }) {
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-12">
-          <MessageSquare className="h-12 w-12 text-text-tertiary mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-text mb-1">No conversations yet</h3>
+          <MessageSquare className="h-12 w-12 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
+          <h3 className="text-lg font-medium text-text mb-1">{t("workspaces.noConversations", { defaultValue: "No conversations yet" })}</h3>
           <p className="text-sm text-text-secondary mb-4">
-            Start a conversation scoped to this workspace.
+            {t("workspaces.noConversationsDesc", { defaultValue: "Start a conversation scoped to this workspace." })}
           </p>
           <Button variant="primary" size="sm" onClick={() => createMutation.mutate()}>
-            <Plus className="h-3.5 w-3.5" /> New Conversation
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" /> {t("workspaces.newConversation", { defaultValue: "New Conversation" })}
           </Button>
         </div>
       ) : (
@@ -207,13 +246,13 @@ function ConversationsTab({ workspaceId }: { workspaceId: string }) {
               onClick={() => navigate({ to: "/conversations/$id", params: { id: conversation.id } })}
               className="w-full flex items-center gap-3 p-3 rounded-lg border border-border bg-surface hover:bg-surface-secondary transition-colors text-left"
             >
-              <MessageSquare className="h-5 w-5 text-text-tertiary shrink-0" />
+              <MessageSquare className="h-5 w-5 text-text-tertiary shrink-0" aria-hidden="true" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-text truncate">
-                  {conversation.title ?? "Untitled"}
+                  {conversation.title ?? t("workspaces.untitled", { defaultValue: "Untitled" })}
                 </p>
                 <p className="text-xs text-text-tertiary">
-                  {conversation.messageCount ?? 0} messages
+                  {conversation.messageCount ?? 0} {t("workspaces.messages", { defaultValue: "messages" })}
                   {conversation.updatedAt && (
                     <> &middot; {new Date(conversation.updatedAt).toLocaleDateString()}</>
                   )}
@@ -235,10 +274,12 @@ function ConversationsTab({ workspaceId }: { workspaceId: string }) {
 /* -------------------------------------------------------------------------- */
 
 function FilesTab({ workspaceId }: { workspaceId: string }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [deleteFileTarget, setDeleteFileTarget] = useState<any>(null);
 
-  const { data: files, isLoading } = useQuery({
+  const { data: files, isLoading, isError, refetch } = useQuery({
     queryKey: ["workspaces", workspaceId, "files"],
     queryFn: () => api.get<any[]>(`/api/workspaces/${workspaceId}/files`),
   });
@@ -250,7 +291,7 @@ function FilesTab({ workspaceId }: { workspaceId: string }) {
 
       const BASE_URL = import.meta.env.VITE_API_URL ?? "";
       const orgHeaders = apiHeaders();
-      delete orgHeaders["Content-Type"]; // Let browser set multipart boundary
+      delete orgHeaders["Content-Type"];
       const response = await fetch(`${BASE_URL}/api/workspaces/${workspaceId}/files`, {
         method: "POST",
         credentials: "include",
@@ -265,9 +306,9 @@ function FilesTab({ workspaceId }: { workspaceId: string }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workspaces", workspaceId, "files"] });
-      toast.success("Files uploaded");
+      toast.success(t("workspaces.filesUploaded", { defaultValue: "Files uploaded" }));
     },
-    onError: (err: any) => toast.error(err.message ?? "Upload failed"),
+    onError: (err: any) => toast.error(err.message ?? t("workspaces.uploadFailed", { defaultValue: "Upload failed" })),
   });
 
   const deleteMutation = useMutation({
@@ -275,9 +316,10 @@ function FilesTab({ workspaceId }: { workspaceId: string }) {
       api.delete(`/api/workspaces/${workspaceId}/files/${fileId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workspaces", workspaceId, "files"] });
-      toast.success("File deleted");
+      toast.success(t("workspaces.fileDeleted", { defaultValue: "File deleted" }));
+      setDeleteFileTarget(null);
     },
-    onError: (err: any) => toast.error(err.message ?? "Delete failed"),
+    onError: (err: any) => toast.error(err.message ?? t("workspaces.fileDeleteFailed", { defaultValue: "Delete failed" })),
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -293,11 +335,23 @@ function FilesTab({ workspaceId }: { workspaceId: string }) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <p className="text-sm text-danger mb-4">{t("workspaces.filesLoadError", { defaultValue: "Failed to load files." })}</p>
+        <Button variant="secondary" onClick={() => refetch()}>
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          {t("common.retry", { defaultValue: "Retry" })}
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-text-secondary">
-          {(files ?? []).length} file{(files ?? []).length !== 1 ? "s" : ""}
+          {(files ?? []).length} {t("workspaces.fileCount", { defaultValue: "file", count: (files ?? []).length })}{(files ?? []).length !== 1 ? "s" : ""}
         </h3>
         <div>
           <input
@@ -313,7 +367,7 @@ function FilesTab({ workspaceId }: { workspaceId: string }) {
             onClick={() => fileInputRef.current?.click()}
             loading={uploadMutation.isPending}
           >
-            <Upload className="h-3.5 w-3.5" /> Upload Files
+            <Upload className="h-3.5 w-3.5" aria-hidden="true" /> {t("workspaces.uploadFiles", { defaultValue: "Upload Files" })}
           </Button>
         </div>
       </div>
@@ -326,17 +380,17 @@ function FilesTab({ workspaceId }: { workspaceId: string }) {
         </div>
       ) : (files ?? []).length === 0 ? (
         <div className="text-center py-12">
-          <FileText className="h-12 w-12 text-text-tertiary mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-text mb-1">No files uploaded</h3>
+          <FileText className="h-12 w-12 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
+          <h3 className="text-lg font-medium text-text mb-1">{t("workspaces.noFiles", { defaultValue: "No files uploaded" })}</h3>
           <p className="text-sm text-text-secondary mb-4">
-            Upload files to share with workspace members and conversations.
+            {t("workspaces.noFilesDesc", { defaultValue: "Upload files to share with workspace members and conversations." })}
           </p>
           <Button
             variant="primary"
             size="sm"
             onClick={() => fileInputRef.current?.click()}
           >
-            <Upload className="h-3.5 w-3.5" /> Upload Files
+            <Upload className="h-3.5 w-3.5" aria-hidden="true" /> {t("workspaces.uploadFiles", { defaultValue: "Upload Files" })}
           </Button>
         </div>
       ) : (
@@ -346,7 +400,7 @@ function FilesTab({ workspaceId }: { workspaceId: string }) {
               key={file.id}
               className="flex items-center gap-3 p-3 rounded-lg border border-border bg-surface"
             >
-              <FileText className="h-5 w-5 text-text-tertiary shrink-0" />
+              <FileText className="h-5 w-5 text-text-tertiary shrink-0" aria-hidden="true" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-text truncate">{file.name}</p>
                 <p className="text-xs text-text-tertiary">
@@ -358,17 +412,38 @@ function FilesTab({ workspaceId }: { workspaceId: string }) {
                 </p>
               </div>
               <button
-                onClick={() => {
-                  if (confirm("Delete this file?")) deleteMutation.mutate(file.id);
-                }}
+                onClick={() => setDeleteFileTarget(file)}
                 className="p-1.5 rounded hover:bg-surface-secondary text-text-tertiary hover:text-danger transition-colors"
+                aria-label={t("workspaces.deleteFile", { defaultValue: "Delete file" })}
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
           ))}
         </div>
       )}
+
+      {/* Delete File Dialog */}
+      <Dialog open={!!deleteFileTarget} onClose={() => setDeleteFileTarget(null)} title={t("workspaces.deleteFileTitle", { defaultValue: "Delete File" })}>
+        <p className="text-sm text-text-secondary mb-4">
+          {t("workspaces.deleteFileConfirm", { defaultValue: "Are you sure you want to delete this file? This action cannot be undone." })}
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setDeleteFileTarget(null)}>
+            {t("common.cancel", { defaultValue: "Cancel" })}
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              if (deleteFileTarget) deleteMutation.mutate(deleteFileTarget.id);
+            }}
+            disabled={deleteMutation.isPending}
+          >
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+            {deleteMutation.isPending ? t("common.deleting", { defaultValue: "Deleting..." }) : t("common.delete", { defaultValue: "Delete" })}
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }
@@ -378,12 +453,14 @@ function FilesTab({ workspaceId }: { workspaceId: string }) {
 /* -------------------------------------------------------------------------- */
 
 function MembersTab({ workspaceId }: { workspaceId: string }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("member");
+  const [removeMemberTarget, setRemoveMemberTarget] = useState<any>(null);
 
-  const { data: members, isLoading } = useQuery({
+  const { data: members, isLoading, isError, refetch } = useQuery({
     queryKey: ["workspaces", workspaceId, "members"],
     queryFn: () => api.get<any[]>(`/api/workspaces/${workspaceId}/members`),
   });
@@ -393,12 +470,12 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
       api.post(`/api/workspaces/${workspaceId}/members/invite`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workspaces", workspaceId, "members"] });
-      toast.success("Invitation sent");
+      toast.success(t("workspaces.inviteSent", { defaultValue: "Invitation sent" }));
       setShowInvite(false);
       setInviteEmail("");
       setInviteRole("member");
     },
-    onError: (err: any) => toast.error(err.message ?? "Failed to send invite"),
+    onError: (err: any) => toast.error(err.message ?? t("workspaces.inviteFailed", { defaultValue: "Failed to send invite" })),
   });
 
   const updateRoleMutation = useMutation({
@@ -406,9 +483,9 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
       api.patch(`/api/workspaces/${workspaceId}/members/${memberId}`, { role }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workspaces", workspaceId, "members"] });
-      toast.success("Role updated");
+      toast.success(t("workspaces.roleUpdated", { defaultValue: "Role updated" }));
     },
-    onError: (err: any) => toast.error(err.message ?? "Failed to update role"),
+    onError: (err: any) => toast.error(err.message ?? t("workspaces.roleUpdateFailed", { defaultValue: "Failed to update role" })),
   });
 
   const removeMutation = useMutation({
@@ -416,17 +493,18 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
       api.delete(`/api/workspaces/${workspaceId}/members/${memberId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workspaces", workspaceId, "members"] });
-      toast.success("Member removed");
+      toast.success(t("workspaces.memberRemoved", { defaultValue: "Member removed" }));
+      setRemoveMemberTarget(null);
     },
-    onError: (err: any) => toast.error(err.message ?? "Failed to remove member"),
+    onError: (err: any) => toast.error(err.message ?? t("workspaces.memberRemoveFailed", { defaultValue: "Failed to remove member" })),
   });
 
   const roleLabel = (role: string) => {
     switch (role) {
-      case "owner": return "Owner";
-      case "admin": return "Admin";
-      case "member": return "Member";
-      case "viewer": return "Viewer";
+      case "owner": return t("workspaces.roleOwner", { defaultValue: "Owner" });
+      case "admin": return t("workspaces.roleAdmin", { defaultValue: "Admin" });
+      case "member": return t("workspaces.roleMember", { defaultValue: "Member" });
+      case "viewer": return t("workspaces.roleViewer", { defaultValue: "Viewer" });
       default: return role;
     }
   };
@@ -439,14 +517,26 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
     }
   };
 
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <p className="text-sm text-danger mb-4">{t("workspaces.membersLoadError", { defaultValue: "Failed to load members." })}</p>
+        <Button variant="secondary" onClick={() => refetch()}>
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          {t("common.retry", { defaultValue: "Retry" })}
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-text-secondary">
-          {(members ?? []).length} member{(members ?? []).length !== 1 ? "s" : ""}
+          {(members ?? []).length} {t("workspaces.memberLabel", { defaultValue: "member" })}{(members ?? []).length !== 1 ? "s" : ""}
         </h3>
         <Button variant="primary" size="sm" onClick={() => setShowInvite(true)}>
-          <UserPlus className="h-3.5 w-3.5" /> Invite Member
+          <UserPlus className="h-3.5 w-3.5" aria-hidden="true" /> {t("workspaces.inviteMember", { defaultValue: "Invite Member" })}
         </Button>
       </div>
 
@@ -458,13 +548,13 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
         </div>
       ) : (members ?? []).length === 0 ? (
         <div className="text-center py-12">
-          <Users className="h-12 w-12 text-text-tertiary mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-text mb-1">No members</h3>
+          <Users className="h-12 w-12 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
+          <h3 className="text-lg font-medium text-text mb-1">{t("workspaces.noMembers", { defaultValue: "No members" })}</h3>
           <p className="text-sm text-text-secondary mb-4">
-            Invite team members to collaborate in this workspace.
+            {t("workspaces.noMembersDesc", { defaultValue: "Invite team members to collaborate in this workspace." })}
           </p>
           <Button variant="primary" size="sm" onClick={() => setShowInvite(true)}>
-            <UserPlus className="h-3.5 w-3.5" /> Invite Member
+            <UserPlus className="h-3.5 w-3.5" aria-hidden="true" /> {t("workspaces.inviteMember", { defaultValue: "Invite Member" })}
           </Button>
         </div>
       ) : (
@@ -498,19 +588,18 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
                       updateRoleMutation.mutate({ memberId: member.id, role: e.target.value })
                     }
                     className="h-8 px-2 rounded border border-border bg-surface text-text text-xs"
+                    aria-label={t("workspaces.changeRole", { defaultValue: "Change role" })}
                   >
-                    <option value="admin">Admin</option>
-                    <option value="member">Member</option>
-                    <option value="viewer">Viewer</option>
+                    <option value="admin">{t("workspaces.roleAdmin", { defaultValue: "Admin" })}</option>
+                    <option value="member">{t("workspaces.roleMember", { defaultValue: "Member" })}</option>
+                    <option value="viewer">{t("workspaces.roleViewer", { defaultValue: "Viewer" })}</option>
                   </select>
                   <button
-                    onClick={() => {
-                      if (confirm(`Remove ${member.name ?? member.email}?`))
-                        removeMutation.mutate(member.id);
-                    }}
+                    onClick={() => setRemoveMemberTarget(member)}
                     className="p-1.5 rounded hover:bg-surface-secondary text-text-tertiary hover:text-danger transition-colors"
+                    aria-label={t("workspaces.removeMember", { defaultValue: "Remove member" })}
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
               )}
@@ -520,7 +609,7 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
       )}
 
       {/* Invite Dialog */}
-      <Dialog open={showInvite} onClose={() => setShowInvite(false)} title="Invite Member">
+      <Dialog open={showInvite} onClose={() => setShowInvite(false)} title={t("workspaces.inviteMemberTitle", { defaultValue: "Invite Member" })}>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -531,7 +620,7 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
           className="space-y-4"
         >
           <Input
-            label="Email address"
+            label={t("workspaces.emailAddress", { defaultValue: "Email address" })}
             type="email"
             value={inviteEmail}
             onChange={(e) => setInviteEmail(e.target.value)}
@@ -539,26 +628,47 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
             required
           />
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-text">Role</label>
+            <label className="text-sm font-medium text-text">{t("workspaces.role", { defaultValue: "Role" })}</label>
             <select
               value={inviteRole}
               onChange={(e) => setInviteRole(e.target.value)}
               className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-text"
             >
-              <option value="admin">Admin</option>
-              <option value="member">Member</option>
-              <option value="viewer">Viewer</option>
+              <option value="admin">{t("workspaces.roleAdmin", { defaultValue: "Admin" })}</option>
+              <option value="member">{t("workspaces.roleMember", { defaultValue: "Member" })}</option>
+              <option value="viewer">{t("workspaces.roleViewer", { defaultValue: "Viewer" })}</option>
             </select>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" type="button" onClick={() => setShowInvite(false)}>
-              Cancel
+              {t("common.cancel", { defaultValue: "Cancel" })}
             </Button>
             <Button variant="primary" type="submit" loading={inviteMutation.isPending}>
-              <Mail className="h-4 w-4" /> Send Invite
+              <Mail className="h-4 w-4" aria-hidden="true" /> {t("workspaces.sendInvite", { defaultValue: "Send Invite" })}
             </Button>
           </div>
         </form>
+      </Dialog>
+
+      {/* Remove Member Dialog */}
+      <Dialog open={!!removeMemberTarget} onClose={() => setRemoveMemberTarget(null)} title={t("workspaces.removeMemberTitle", { defaultValue: "Remove Member" })}>
+        <p className="text-sm text-text-secondary mb-4">
+          {t("workspaces.removeMemberConfirm", { defaultValue: "Are you sure you want to remove {{name}} from this workspace?", name: removeMemberTarget?.name ?? removeMemberTarget?.email ?? "" })}
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setRemoveMemberTarget(null)}>
+            {t("common.cancel", { defaultValue: "Cancel" })}
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              if (removeMemberTarget) removeMutation.mutate(removeMemberTarget.id);
+            }}
+            disabled={removeMutation.isPending}
+          >
+            {removeMutation.isPending ? t("common.removing", { defaultValue: "Removing..." }) : t("common.remove", { defaultValue: "Remove" })}
+          </Button>
+        </div>
       </Dialog>
     </div>
   );
@@ -569,8 +679,10 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
 /* -------------------------------------------------------------------------- */
 
 function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspace: any }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const [form, setForm] = useState({
     name: workspace.name ?? "",
@@ -595,13 +707,20 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
     queryFn: () => api.get<any[]>("/api/agents"),
   });
 
+  const { data: modelsData } = useQuery({
+    queryKey: ["models"],
+    queryFn: () => api.get<any>("/api/models"),
+  });
+
+  const models = (modelsData as any)?.data ?? [];
+
   const updateMutation = useMutation({
     mutationFn: (data: typeof form) => api.patch(`/api/workspaces/${workspaceId}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      toast.success("Workspace updated");
+      toast.success(t("workspaces.updated", { defaultValue: "Workspace updated" }));
     },
-    onError: (err: any) => toast.error(err.message ?? "Update failed"),
+    onError: (err: any) => toast.error(err.message ?? t("workspaces.updateFailed", { defaultValue: "Update failed" })),
   });
 
   const archiveMutation = useMutation({
@@ -609,37 +728,37 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
       api.patch(`/api/workspaces/${workspaceId}`, { archived: !workspace.archived }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      toast.success(workspace.archived ? "Workspace restored" : "Workspace archived");
+      toast.success(workspace.archived ? t("workspaces.restored", { defaultValue: "Workspace restored" }) : t("workspaces.archivedSuccess", { defaultValue: "Workspace archived" }));
     },
-    onError: (err: any) => toast.error(err.message ?? "Action failed"),
+    onError: (err: any) => toast.error(err.message ?? t("workspaces.actionFailed", { defaultValue: "Action failed" })),
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => api.delete(`/api/workspaces/${workspaceId}`),
     onSuccess: () => {
-      toast.success("Workspace deleted");
+      toast.success(t("workspaces.deleted", { defaultValue: "Workspace deleted" }));
       navigate({ to: "/workspaces" });
     },
-    onError: (err: any) => toast.error(err.message ?? "Delete failed"),
+    onError: (err: any) => toast.error(err.message ?? t("workspaces.deleteFailed", { defaultValue: "Delete failed" })),
   });
 
   return (
     <div className="max-w-2xl space-y-6">
       {/* General Settings */}
       <section className="space-y-4">
-        <h3 className="text-sm font-semibold text-text uppercase tracking-wider">General</h3>
+        <h3 className="text-sm font-semibold text-text uppercase tracking-wider">{t("workspaces.general", { defaultValue: "General" })}</h3>
         <Input
-          label="Name"
+          label={t("workspaces.name", { defaultValue: "Name" })}
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
-          placeholder="Workspace name"
+          placeholder={t("workspaces.namePlaceholder", { defaultValue: "Workspace name" })}
         />
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-text">Description</label>
+          <label className="text-sm font-medium text-text">{t("workspaces.description", { defaultValue: "Description" })}</label>
           <textarea
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
-            placeholder="What is this workspace for?"
+            placeholder={t("workspaces.descriptionPlaceholder", { defaultValue: "What is this workspace for?" })}
             rows={3}
             className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary resize-y text-sm"
           />
@@ -649,16 +768,16 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
       {/* Defaults */}
       <section className="space-y-4 pt-4 border-t border-border">
         <h3 className="text-sm font-semibold text-text uppercase tracking-wider">
-          Workspace Defaults
+          {t("workspaces.defaults", { defaultValue: "Workspace Defaults" })}
         </h3>
         <div>
-          <label className="block text-sm font-medium text-text mb-1.5">Default Agent</label>
+          <label className="block text-sm font-medium text-text mb-1.5">{t("workspaces.defaultAgent", { defaultValue: "Default Agent" })}</label>
           <select
             value={form.defaultAgentId}
             onChange={(e) => setForm({ ...form, defaultAgentId: e.target.value })}
             className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-text text-sm"
           >
-            <option value="">None (use global default)</option>
+            <option value="">{t("workspaces.noAgent", { defaultValue: "None (use global default)" })}</option>
             {(agents ?? []).map((agent: any) => (
               <option key={agent.id} value={agent.id}>
                 {agent.name}
@@ -667,29 +786,28 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-text mb-1.5">Default Model</label>
+          <label className="block text-sm font-medium text-text mb-1.5">{t("workspaces.defaultModel", { defaultValue: "Default Model" })}</label>
           <select
             value={form.defaultModel}
             onChange={(e) => setForm({ ...form, defaultModel: e.target.value })}
             className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-text text-sm"
           >
-            <option value="">None (use global default)</option>
-            <option value="gpt-4o">GPT-4o</option>
-            <option value="gpt-4o-mini">GPT-4o Mini</option>
-            <option value="claude-3.5-sonnet">Claude 3.5 Sonnet</option>
-            <option value="claude-3-opus">Claude 3 Opus</option>
-            <option value="llama-3.1-70b">Llama 3.1 70B</option>
-            <option value="mixtral-8x7b">Mixtral 8x7B</option>
+            <option value="">{t("workspaces.selectModel", { defaultValue: "Select model" })}</option>
+            {models.map((model: any) => (
+              <option key={model.id ?? model.modelId ?? model.name} value={model.id ?? model.modelId ?? model.name}>
+                {model.name ?? model.id ?? model.modelId}
+              </option>
+            ))}
           </select>
         </div>
         <div>
           <label className="block text-sm font-medium text-text mb-1.5">
-            Default System Prompt
+            {t("workspaces.defaultSystemPrompt", { defaultValue: "Default System Prompt" })}
           </label>
           <textarea
             value={form.defaultSystemPrompt}
             onChange={(e) => setForm({ ...form, defaultSystemPrompt: e.target.value })}
-            placeholder="Applied to all new conversations in this workspace..."
+            placeholder={t("workspaces.systemPromptPlaceholder", { defaultValue: "Applied to all new conversations in this workspace..." })}
             rows={5}
             className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary resize-y text-sm font-mono"
           />
@@ -703,25 +821,25 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
           onClick={() => updateMutation.mutate(form)}
           loading={updateMutation.isPending}
         >
-          <Save className="h-4 w-4" />
-          {updateMutation.isPending ? "Saving..." : "Save Changes"}
+          <Save className="h-4 w-4" aria-hidden="true" />
+          {updateMutation.isPending ? t("common.saving", { defaultValue: "Saving..." }) : t("workspaces.saveChanges", { defaultValue: "Save Changes" })}
         </Button>
       </div>
 
       {/* Danger Zone */}
       <section className="space-y-4 pt-4 border-t border-danger/30">
         <h3 className="text-sm font-semibold text-danger uppercase tracking-wider">
-          Danger Zone
+          {t("workspaces.dangerZone", { defaultValue: "Danger Zone" })}
         </h3>
         <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-surface">
           <div>
             <p className="text-sm font-medium text-text">
-              {workspace.archived ? "Restore workspace" : "Archive workspace"}
+              {workspace.archived ? t("workspaces.restoreWorkspace", { defaultValue: "Restore workspace" }) : t("workspaces.archiveWorkspace", { defaultValue: "Archive workspace" })}
             </p>
             <p className="text-xs text-text-secondary">
               {workspace.archived
-                ? "Restore this workspace to make it active again."
-                : "Archived workspaces are read-only and hidden from default views."}
+                ? t("workspaces.restoreDesc", { defaultValue: "Restore this workspace to make it active again." })
+                : t("workspaces.archiveDesc", { defaultValue: "Archived workspaces are read-only and hidden from default views." })}
             </p>
           </div>
           <Button
@@ -730,42 +848,57 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
             onClick={() => archiveMutation.mutate()}
             loading={archiveMutation.isPending}
           >
-            <Archive className="h-3.5 w-3.5" />
-            {workspace.archived ? "Restore" : "Archive"}
+            <Archive className="h-3.5 w-3.5" aria-hidden="true" />
+            {workspace.archived ? t("workspaces.restore", { defaultValue: "Restore" }) : t("workspaces.archive", { defaultValue: "Archive" })}
           </Button>
         </div>
         <div className="flex items-center justify-between p-4 rounded-lg border border-danger/30 bg-danger/5">
           <div>
-            <p className="text-sm font-medium text-text">Delete workspace</p>
+            <p className="text-sm font-medium text-text">{t("workspaces.deleteWorkspace", { defaultValue: "Delete workspace" })}</p>
             <p className="text-xs text-text-secondary">
-              Permanently delete this workspace and all its data. This cannot be undone.
+              {t("workspaces.deleteDesc", { defaultValue: "Permanently delete this workspace and all its data. This cannot be undone." })}
             </p>
           </div>
           <Button
             variant="danger"
             size="sm"
-            onClick={() => {
-              if (
-                confirm(
-                  "Are you sure you want to permanently delete this workspace? This action cannot be undone.",
-                )
-              ) {
-                deleteMutation.mutate();
-              }
-            }}
+            onClick={() => setShowDeleteDialog(true)}
             loading={deleteMutation.isPending}
           >
-            <Trash2 className="h-3.5 w-3.5" /> Delete
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> {t("common.delete", { defaultValue: "Delete" })}
           </Button>
         </div>
       </section>
 
       {/* Meta info */}
       <div className="pt-4 border-t border-border text-xs text-text-tertiary space-y-1">
-        <p>Created: {new Date(workspace.createdAt).toLocaleDateString()}</p>
-        <p>Updated: {new Date(workspace.updatedAt).toLocaleDateString()}</p>
-        <p>ID: {workspace.id}</p>
+        <p>{t("common.created", { defaultValue: "Created" })}: {new Date(workspace.createdAt).toLocaleDateString()}</p>
+        <p>{t("common.updated", { defaultValue: "Updated" })}: {new Date(workspace.updatedAt).toLocaleDateString()}</p>
+        <p>{t("common.id", { defaultValue: "ID" })}: {workspace.id}</p>
       </div>
+
+      {/* Delete Workspace Dialog */}
+      <Dialog open={showDeleteDialog} onClose={() => setShowDeleteDialog(false)} title={t("workspaces.deleteWorkspaceTitle", { defaultValue: "Delete Workspace" })}>
+        <p className="text-sm text-text-secondary mb-4">
+          {t("workspaces.deleteWorkspaceConfirm", { defaultValue: "Are you sure you want to permanently delete this workspace? This action cannot be undone." })}
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setShowDeleteDialog(false)}>
+            {t("common.cancel", { defaultValue: "Cancel" })}
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              deleteMutation.mutate();
+              setShowDeleteDialog(false);
+            }}
+            disabled={deleteMutation.isPending}
+          >
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+            {deleteMutation.isPending ? t("common.deleting", { defaultValue: "Deleting..." }) : t("workspaces.deleteForever", { defaultValue: "Delete Forever" })}
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }
@@ -775,7 +908,8 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
 /* -------------------------------------------------------------------------- */
 
 function ActivityTab({ workspaceId }: { workspaceId: string }) {
-  const { data: activities, isLoading } = useQuery({
+  const { t } = useTranslation();
+  const { data: activities, isLoading, isError, refetch } = useQuery({
     queryKey: ["workspaces", workspaceId, "activity"],
     queryFn: () => api.get<any[]>(`/api/workspaces/${workspaceId}/activity`),
   });
@@ -803,32 +937,44 @@ function ActivityTab({ workspaceId }: { workspaceId: string }) {
   };
 
   const activityLabel = (entry: any) => {
-    const actor = entry.actorName ?? "Someone";
+    const actor = entry.actorName ?? t("workspaces.someone", { defaultValue: "Someone" });
     switch (entry.type) {
       case "conversation_created":
-        return `${actor} created a conversation`;
+        return t("workspaces.activityConversationCreated", { defaultValue: "{{actor}} created a conversation", actor });
       case "conversation_updated":
-        return `${actor} updated a conversation`;
+        return t("workspaces.activityConversationUpdated", { defaultValue: "{{actor}} updated a conversation", actor });
       case "file_uploaded":
-        return `${actor} uploaded ${entry.targetName ?? "a file"}`;
+        return t("workspaces.activityFileUploaded", { defaultValue: "{{actor}} uploaded {{target}}", actor, target: entry.targetName ?? t("workspaces.aFile", { defaultValue: "a file" }) });
       case "file_deleted":
-        return `${actor} deleted ${entry.targetName ?? "a file"}`;
+        return t("workspaces.activityFileDeleted", { defaultValue: "{{actor}} deleted {{target}}", actor, target: entry.targetName ?? t("workspaces.aFile", { defaultValue: "a file" }) });
       case "member_joined":
-        return `${entry.targetName ?? actor} joined the workspace`;
+        return t("workspaces.activityMemberJoined", { defaultValue: "{{name}} joined the workspace", name: entry.targetName ?? actor });
       case "member_invited":
-        return `${actor} invited ${entry.targetName ?? "a member"}`;
+        return t("workspaces.activityMemberInvited", { defaultValue: "{{actor}} invited {{target}}", actor, target: entry.targetName ?? t("workspaces.aMember", { defaultValue: "a member" }) });
       case "member_removed":
-        return `${actor} removed ${entry.targetName ?? "a member"}`;
+        return t("workspaces.activityMemberRemoved", { defaultValue: "{{actor}} removed {{target}}", actor, target: entry.targetName ?? t("workspaces.aMember", { defaultValue: "a member" }) });
       case "settings_updated":
-        return `${actor} updated workspace settings`;
+        return t("workspaces.activitySettingsUpdated", { defaultValue: "{{actor}} updated workspace settings", actor });
       case "workspace_archived":
-        return `${actor} archived the workspace`;
+        return t("workspaces.activityArchived", { defaultValue: "{{actor}} archived the workspace", actor });
       case "workspace_restored":
-        return `${actor} restored the workspace`;
+        return t("workspaces.activityRestored", { defaultValue: "{{actor}} restored the workspace", actor });
       default:
-        return `${actor} performed an action`;
+        return t("workspaces.activityDefault", { defaultValue: "{{actor}} performed an action", actor });
     }
   };
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <p className="text-sm text-danger mb-4">{t("workspaces.activityLoadError", { defaultValue: "Failed to load activity." })}</p>
+        <Button variant="secondary" onClick={() => refetch()}>
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          {t("common.retry", { defaultValue: "Retry" })}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl">
@@ -840,10 +986,10 @@ function ActivityTab({ workspaceId }: { workspaceId: string }) {
         </div>
       ) : (activities ?? []).length === 0 ? (
         <div className="text-center py-12">
-          <Activity className="h-12 w-12 text-text-tertiary mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-text mb-1">No activity yet</h3>
+          <Activity className="h-12 w-12 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
+          <h3 className="text-lg font-medium text-text mb-1">{t("workspaces.noActivity", { defaultValue: "No activity yet" })}</h3>
           <p className="text-sm text-text-secondary">
-            Recent workspace activity will appear here.
+            {t("workspaces.noActivityDesc", { defaultValue: "Recent workspace activity will appear here." })}
           </p>
         </div>
       ) : (
@@ -857,15 +1003,15 @@ function ActivityTab({ workspaceId }: { workspaceId: string }) {
               return (
                 <div key={entry.id ?? index} className="flex items-start gap-3 relative">
                   <div className="h-10 w-10 rounded-full bg-surface border-2 border-border flex items-center justify-center shrink-0 z-10">
-                    <Icon className="h-4 w-4 text-text-tertiary" />
+                    <Icon className="h-4 w-4 text-text-tertiary" aria-hidden="true" />
                   </div>
                   <div className="flex-1 pt-1.5">
                     <p className="text-sm text-text">{activityLabel(entry)}</p>
                     <p className="text-xs text-text-tertiary flex items-center gap-1 mt-0.5">
-                      <Clock className="h-3 w-3" />
+                      <Clock className="h-3 w-3" aria-hidden="true" />
                       {entry.createdAt
                         ? formatRelativeTime(new Date(entry.createdAt))
-                        : "Unknown time"}
+                        : t("workspaces.unknownTime", { defaultValue: "Unknown time" })}
                     </p>
                   </div>
                 </div>

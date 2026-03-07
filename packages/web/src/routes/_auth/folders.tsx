@@ -196,6 +196,8 @@ function FoldersPage() {
         "success",
       );
     },
+    onError: (err: any) =>
+      toast(err.message ?? t("folders.folderSaveFailed", "Failed to save folder"), "error"),
   });
 
   const deleteFolderMut = useMutation({
@@ -205,6 +207,8 @@ function FoldersPage() {
       if (selectedFolder) setSelectedFolder(null);
       toast(t("folders.folderDeleted", "Folder deleted"), "success");
     },
+    onError: (err: any) =>
+      toast(err.message ?? t("folders.folderDeleteFailed", "Failed to delete folder"), "error"),
   });
 
   const moveToFolderMut = useMutation({
@@ -217,6 +221,8 @@ function FoldersPage() {
       setShowMoveDialog(false);
       toast(t("folders.conversationsMoved", "Conversations moved"), "success");
     },
+    onError: (err: any) =>
+      toast(err.message ?? t("folders.moveFailed", "Failed to move conversations"), "error"),
   });
 
   const bulkActionMut = useMutation({
@@ -232,6 +238,8 @@ function FoldersPage() {
       setBulkMode(false);
       toast(t("folders.bulkActionComplete", "Action completed"), "success");
     },
+    onError: (err: any) =>
+      toast(err.message ?? t("folders.bulkActionFailed", "Action failed"), "error"),
   });
 
   const createTagMut = useMutation({
@@ -241,6 +249,8 @@ function FoldersPage() {
       queryClient.invalidateQueries({ queryKey: ["conversation-tags"] });
       toast(t("folders.tagCreated", "Tag created"), "success");
     },
+    onError: (err: any) =>
+      toast(err.message ?? t("folders.tagCreateFailed", "Failed to create tag"), "error"),
   });
 
   const deleteTagMut = useMutation({
@@ -249,6 +259,8 @@ function FoldersPage() {
       queryClient.invalidateQueries({ queryKey: ["conversation-tags"] });
       toast(t("folders.tagDeleted", "Tag deleted"), "success");
     },
+    onError: (err: any) =>
+      toast(err.message ?? t("folders.tagDeleteFailed", "Failed to delete tag"), "error"),
   });
 
   // ─── Drag & Drop ────────────────────────────────────────────────────────
@@ -324,7 +336,7 @@ function FoldersPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Folder className="h-5 w-5 text-primary" />
+            <Folder className="h-5 w-5 text-primary" aria-hidden="true" />
             <h1 className="text-xl font-bold text-text">
               {t("folders.title", "Organization")}
             </h1>
@@ -422,7 +434,12 @@ function FoldersPage() {
                     setEditingFolder(f);
                     setShowCreateFolder(true);
                   }}
-                  onDelete={(id) => deleteFolderMut.mutate(id)}
+                  onDelete={(id) => {
+                    const folder = folders.find((f) => f.id === id);
+                    if (window.confirm(t("folders.confirmDelete", 'Delete folder "{{name}}"? Conversations inside will be unassigned.', { name: folder?.name ?? "" }))) {
+                      deleteFolderMut.mutate(id);
+                    }
+                  }}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
@@ -662,7 +679,7 @@ function FoldersPage() {
                         )}
 
                         {/* Drag handle */}
-                        <GripVertical className="h-3.5 w-3.5 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                        <GripVertical className="h-3.5 w-3.5 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" aria-hidden="true" />
 
                         {/* Content */}
                         <button
@@ -692,8 +709,8 @@ function FoldersPage() {
                         {/* Actions */}
                         <Dropdown
                           trigger={
-                            <button className="p-1 text-text-tertiary hover:text-text rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                              <MoreHorizontal className="h-3.5 w-3.5" />
+                            <button className="p-1 text-text-tertiary hover:text-text rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" aria-label={t("folders.moreActions", "More actions")}>
+                              <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
                             </button>
                           }
                         >
@@ -773,10 +790,15 @@ function FoldersPage() {
                     />
                     <span className="text-xs font-medium text-text">{tag.name}</span>
                     <button
-                      onClick={() => deleteTagMut.mutate(tag.id)}
+                      onClick={() => {
+                        if (window.confirm(t("folders.confirmDeleteTag", 'Delete tag "{{name}}"?', { name: tag.name }))) {
+                          deleteTagMut.mutate(tag.id);
+                        }
+                      }}
                       className="text-text-tertiary hover:text-danger"
+                      aria-label={t("folders.deleteTag", "Delete tag")}
                     >
-                      <Trash2 className="h-3 w-3" />
+                      <Trash2 className="h-3 w-3" aria-hidden="true" />
                     </button>
                   </div>
                 ))}

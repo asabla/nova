@@ -1,9 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
+import { Skeleton } from "../../components/ui/Skeleton";
+import { toast } from "../../components/ui/Toast";
 import { Palette, Image, Code, Eye, Save } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -28,8 +31,8 @@ const DEFAULT_SETTINGS: BrandingSettings = {
 };
 
 function BrandingPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [saved, setSaved] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [logoPreviewSrc, setLogoPreviewSrc] = useState<string>("");
@@ -60,9 +63,9 @@ function BrandingPage() {
       api.patch("/api/org/settings", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["org-settings"] });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      toast(t("admin.brandingSaved", { defaultValue: "Branding saved" }), "success");
     },
+    onError: (err: any) => toast(err.message ?? t("admin.brandingSaveFailed", { defaultValue: "Failed to save branding" }), "error"),
   });
 
   const handleSave = () => {
@@ -93,8 +96,18 @@ function BrandingPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+      <div className="space-y-8 max-w-2xl">
+        <div>
+          <Skeleton className="h-7 w-64" />
+          <Skeleton className="h-5 w-96 mt-1" />
+        </div>
+        <Skeleton className="h-16 w-full" />
+        <div className="space-y-6">
+          <Skeleton className="h-28 w-full" />
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
       </div>
     );
   }
@@ -104,27 +117,27 @@ function BrandingPage() {
       {/* Header */}
       <div>
         <h2 className="text-lg font-semibold text-text flex items-center gap-2">
-          <Palette className="h-5 w-5 text-primary" />
-          Branding & White-labeling
+          <Palette className="h-5 w-5 text-primary" aria-hidden="true" />
+          {t("admin.brandingTitle", { defaultValue: "Branding & White-labeling" })}
         </h2>
-        <p className="mt-1 text-sm text-text-secondary">
-          Customize the look and feel of your organization's NOVA instance.
+        <p className="text-sm text-text-secondary mt-1">
+          {t("admin.brandingDescription", { defaultValue: "Customize the look and feel of your organization's NOVA instance." })}
         </p>
       </div>
 
       {/* Branding Toggle */}
       <div className="flex items-center justify-between rounded-lg border border-border bg-surface-secondary p-4">
         <div>
-          <p className="text-sm font-medium text-text">Custom Branding</p>
+          <p className="text-sm font-medium text-text">{t("admin.customBranding", { defaultValue: "Custom Branding" })}</p>
           <p className="text-xs text-text-secondary mt-0.5">
-            Enable to use your custom logo, colors, and styles instead of the
-            defaults.
+            {t("admin.customBrandingDescription", { defaultValue: "Enable to use your custom logo, colors, and styles instead of the defaults." })}
           </p>
         </div>
         <button
           type="button"
           role="switch"
           aria-checked={form.brandingEnabled}
+          aria-label={t("admin.toggleBranding", { defaultValue: "Toggle custom branding" })}
           onClick={() => updateField("brandingEnabled", !form.brandingEnabled)}
           className={clsx(
             "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
@@ -149,8 +162,8 @@ function BrandingPage() {
         {/* Logo Upload */}
         <section className="space-y-3">
           <h3 className="text-sm font-medium text-text flex items-center gap-2">
-            <Image className="h-4 w-4 text-text-secondary" />
-            Organization Logo
+            <Image className="h-4 w-4 text-text-secondary" aria-hidden="true" />
+            {t("admin.organizationLogo", { defaultValue: "Organization Logo" })}
           </h3>
           <div className="flex items-start gap-4">
             <div
@@ -160,16 +173,16 @@ function BrandingPage() {
               {logoPreviewSrc ? (
                 <img
                   src={logoPreviewSrc}
-                  alt="Logo preview"
+                  alt={t("admin.logoPreview", { defaultValue: "Logo preview" })}
                   className="h-full w-full object-contain p-1"
                 />
               ) : (
-                <Image className="h-8 w-8 text-text-tertiary" />
+                <Image className="h-8 w-8 text-text-tertiary" aria-hidden="true" />
               )}
             </div>
             <div className="flex-1 space-y-2">
               <Input
-                label="Logo URL"
+                label={t("admin.logoUrl", { defaultValue: "Logo URL" })}
                 placeholder="https://example.com/logo.png"
                 value={form.logoUrl.startsWith("data:") ? "" : form.logoUrl}
                 onChange={(e) => {
@@ -189,7 +202,7 @@ function BrandingPage() {
                 onClick={() => logoInputRef.current?.click()}
                 className="text-xs text-primary hover:text-primary-dark transition-colors"
               >
-                Or click to upload a file
+                {t("admin.uploadFile", { defaultValue: "Or click to upload a file" })}
               </button>
             </div>
           </div>
@@ -198,8 +211,8 @@ function BrandingPage() {
         {/* Primary Color */}
         <section className="space-y-3">
           <h3 className="text-sm font-medium text-text flex items-center gap-2">
-            <Palette className="h-4 w-4 text-text-secondary" />
-            Primary Brand Color
+            <Palette className="h-4 w-4 text-text-secondary" aria-hidden="true" />
+            {t("admin.primaryBrandColor", { defaultValue: "Primary Brand Color" })}
           </h3>
           <div className="flex items-center gap-3">
             <input
@@ -207,6 +220,7 @@ function BrandingPage() {
               value={form.primaryColor}
               onChange={(e) => updateField("primaryColor", e.target.value)}
               className="h-10 w-10 cursor-pointer rounded-lg border border-border bg-transparent p-0.5"
+              aria-label={t("admin.pickColor", { defaultValue: "Pick a color" })}
             />
             <Input
               placeholder="#6366f1"
@@ -224,14 +238,14 @@ function BrandingPage() {
         {/* Favicon */}
         <section className="space-y-3">
           <h3 className="text-sm font-medium text-text flex items-center gap-2">
-            <Image className="h-4 w-4 text-text-secondary" />
-            Favicon
+            <Image className="h-4 w-4 text-text-secondary" aria-hidden="true" />
+            {t("admin.favicon", { defaultValue: "Favicon" })}
           </h3>
           <div className="flex items-center gap-3">
             {form.faviconUrl && (
               <img
                 src={form.faviconUrl}
-                alt="Favicon preview"
+                alt={t("admin.faviconPreview", { defaultValue: "Favicon preview" })}
                 className="h-8 w-8 rounded border border-border object-contain"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = "none";
@@ -240,7 +254,7 @@ function BrandingPage() {
             )}
             <div className="flex-1">
               <Input
-                label="Favicon URL"
+                label={t("admin.faviconUrl", { defaultValue: "Favicon URL" })}
                 placeholder="https://example.com/favicon.ico"
                 value={form.faviconUrl}
                 onChange={(e) => updateField("faviconUrl", e.target.value)}
@@ -252,14 +266,13 @@ function BrandingPage() {
         {/* Custom CSS */}
         <section className="space-y-3">
           <h3 className="text-sm font-medium text-text flex items-center gap-2">
-            <Code className="h-4 w-4 text-text-secondary" />
-            Custom CSS
+            <Code className="h-4 w-4 text-text-secondary" aria-hidden="true" />
+            {t("admin.customCss", { defaultValue: "Custom CSS" })}
           </h3>
           <div className="rounded-lg border border-border bg-surface-secondary p-3">
             <div className="mb-2 flex items-center gap-2 rounded-md bg-warning/10 border border-warning/30 px-3 py-2">
               <span className="text-xs text-warning font-medium">
-                Warning: Custom CSS is injected directly into the page. Improper
-                rules may break the UI. Test changes carefully.
+                {t("admin.customCssWarning", { defaultValue: "Warning: Custom CSS is injected directly into the page. Improper rules may break the UI. Test changes carefully." })}
               </span>
             </div>
             <textarea
@@ -268,6 +281,7 @@ function BrandingPage() {
               placeholder={`:root {\n  --color-primary: #6366f1;\n  --color-primary-dark: #4f46e5;\n}`}
               rows={8}
               className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm font-mono text-text placeholder:text-text-tertiary focus:outline-2 focus:outline-offset-0 focus:outline-primary focus:border-primary resize-y"
+              aria-label={t("admin.customCssTextarea", { defaultValue: "Custom CSS rules" })}
             />
           </div>
         </section>
@@ -276,15 +290,15 @@ function BrandingPage() {
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-medium text-text flex items-center gap-2">
-              <Eye className="h-4 w-4 text-text-secondary" />
-              Login Page Preview
+              <Eye className="h-4 w-4 text-text-secondary" aria-hidden="true" />
+              {t("admin.loginPagePreview", { defaultValue: "Login Page Preview" })}
             </h3>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowPreview(!showPreview)}
             >
-              {showPreview ? "Hide Preview" : "Show Preview"}
+              {showPreview ? t("admin.hidePreview", { defaultValue: "Hide Preview" }) : t("admin.showPreview", { defaultValue: "Show Preview" })}
             </Button>
           </div>
           {showPreview && (
@@ -301,7 +315,7 @@ function BrandingPage() {
                     {logoPreviewSrc ? (
                       <img
                         src={logoPreviewSrc}
-                        alt="Logo"
+                        alt={t("admin.logo", { defaultValue: "Logo" })}
                         className="h-10 w-auto object-contain"
                       />
                     ) : (
@@ -311,7 +325,7 @@ function BrandingPage() {
                       />
                     )}
                     <h3 className="text-base font-semibold text-text">
-                      Sign in to your account
+                      {t("admin.signInPreview", { defaultValue: "Sign in to your account" })}
                     </h3>
                   </div>
                   <div className="space-y-3">
@@ -321,18 +335,18 @@ function BrandingPage() {
                       className="h-10 rounded-lg flex items-center justify-center text-sm font-medium text-white"
                       style={{ backgroundColor: form.primaryColor }}
                     >
-                      Sign In
+                      {t("admin.signIn", { defaultValue: "Sign In" })}
                     </div>
                   </div>
                   <p className="text-center text-xs text-text-tertiary">
-                    Powered by NOVA
+                    {t("admin.poweredByNova", { defaultValue: "Powered by NOVA" })}
                   </p>
                 </div>
               </div>
               {form.customCss && (
                 <div className="border-t border-border bg-surface-secondary px-4 py-2">
                   <p className="text-xs text-text-tertiary">
-                    Custom CSS will also be applied on the live login page.
+                    {t("admin.customCssLiveNote", { defaultValue: "Custom CSS will also be applied on the live login page." })}
                   </p>
                 </div>
               )}
@@ -348,15 +362,9 @@ function BrandingPage() {
           onClick={handleSave}
           loading={updateBranding.isPending}
         >
-          <Save className="h-4 w-4" />
-          Save Branding
+          <Save className="h-4 w-4" aria-hidden="true" />
+          {t("admin.saveBranding", { defaultValue: "Save Branding" })}
         </Button>
-        {saved && <span className="text-sm text-success">Saved!</span>}
-        {updateBranding.isError && (
-          <span className="text-sm text-danger">
-            Failed to save. Please try again.
-          </span>
-        )}
       </div>
     </div>
   );

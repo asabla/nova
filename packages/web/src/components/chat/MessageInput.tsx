@@ -160,9 +160,10 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
               <button
                 onClick={handleFileClick}
                 className="text-text-tertiary hover:text-text-secondary p-1.5 rounded-lg hover:bg-surface-tertiary transition-colors shrink-0 mb-0.5"
+                aria-label={t("files.upload")}
                 title={t("files.upload")}
               >
-                <Paperclip className="h-4 w-4" />
+                <Paperclip className="h-4 w-4" aria-hidden="true" />
               </button>
               <input
                 ref={fileInputRef}
@@ -193,6 +194,7 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
             placeholder={t("messages.placeholder")}
             disabled={disabled}
             rows={1}
+            aria-label={t("messages.inputLabel", { defaultValue: "Message input" })}
             className="flex-1 resize-none bg-transparent text-sm text-text placeholder:text-text-tertiary focus:outline-none py-1.5 max-h-[200px]"
           />
 
@@ -202,31 +204,35 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
                 <button
                   onClick={onResume}
                   className="p-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary-dark transition-colors"
+                  aria-label={t("messages.resume", { defaultValue: "Resume streaming" })}
                   title="Resume"
                 >
-                  <Play className="h-4 w-4" />
+                  <Play className="h-4 w-4" aria-hidden="true" />
                 </button>
               ) : (
                 <button
                   onClick={onPause}
                   className="p-2 rounded-xl bg-surface-tertiary text-text-secondary hover:bg-surface-tertiary/80 transition-colors"
+                  aria-label={t("messages.pause", { defaultValue: "Pause streaming" })}
                   title="Pause"
                 >
-                  <Pause className="h-4 w-4" />
+                  <Pause className="h-4 w-4" aria-hidden="true" />
                 </button>
               )}
               <button
                 onClick={onStop}
                 className="p-2 rounded-xl bg-danger text-primary-foreground hover:bg-danger/90 transition-colors"
+                aria-label={t("messages.stop", { defaultValue: "Stop streaming" })}
                 title="Stop"
               >
-                <Square className="h-4 w-4" />
+                <Square className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
           ) : (
             <button
               onClick={handleSubmit}
               disabled={(!content.trim() && pendingFiles.length === 0) || disabled}
+              aria-label={t("messages.send")}
               className={clsx(
                 "p-2 rounded-xl transition-colors shrink-0 mb-0.5",
                 (content.trim() || pendingFiles.length > 0) && !disabled
@@ -234,11 +240,14 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
                   : "bg-surface-tertiary text-text-tertiary",
               )}
             >
-              <Send className="h-4 w-4" />
+              <Send className="h-4 w-4" aria-hidden="true" />
             </button>
           )}
         </div>
-        <p className="text-[10px] text-text-tertiary text-center mt-2">
+        <p className="text-[10px] text-text-tertiary text-center mt-1">
+          {t("messages.shiftEnterHint", { defaultValue: "Shift+Enter for new line" })}
+        </p>
+        <p className="text-[10px] text-text-tertiary text-center mt-0.5">
           {t("messages.disclaimer")}
         </p>
       </div>

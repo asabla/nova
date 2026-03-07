@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import {
   MessageSquare,
   Users,
@@ -20,6 +21,7 @@ import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
+import { Skeleton } from "../../components/ui/Skeleton";
 import { toast } from "../../components/ui/Toast";
 
 export const Route = createFileRoute("/_auth/admin/integrations")({
@@ -78,11 +80,13 @@ const INTEGRATIONS: IntegrationMeta[] = [
 ];
 
 function AdminIntegrationsPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [configuring, setConfiguring] = useState<IntegrationType | null>(null);
+  const [deleteConfirmType, setDeleteConfirmType] = useState<IntegrationType | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string }>>({});
 
-  const { data: integrationsData } = useQuery({
+  const { data: integrationsData, isLoading } = useQuery({
     queryKey: ["integrations"],
     queryFn: () => api.get<{ data: IntegrationConfig[] }>("/api/integrations"),
   });
@@ -96,25 +100,28 @@ function AdminIntegrationsPage() {
     mutationFn: ({ type, config, isEnabled }: { type: IntegrationType; config: Record<string, unknown>; isEnabled: boolean }) =>
       api.put(`/api/integrations/${type}`, { config, isEnabled }),
     onSuccess: () => {
-      toast.success("Integration saved");
+      toast(t("admin.integrationSaved", { defaultValue: "Integration saved" }), "success");
       queryClient.invalidateQueries({ queryKey: ["integrations"] });
       setConfiguring(null);
     },
-    onError: (err: any) => toast.error(err.message ?? "Failed to save"),
+    onError: (err: any) => toast(err.message ?? t("admin.integrationSaveFailed", { defaultValue: "Failed to save integration" }), "error"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (type: IntegrationType) => api.delete(`/api/integrations/${type}`),
     onSuccess: () => {
-      toast.success("Integration removed");
+      toast(t("admin.integrationRemoved", { defaultValue: "Integration removed" }), "success");
       queryClient.invalidateQueries({ queryKey: ["integrations"] });
+      setDeleteConfirmType(null);
     },
+    onError: (err: any) => toast(err.message ?? t("admin.integrationRemoveFailed", { defaultValue: "Failed to remove integration" }), "error"),
   });
 
   const toggleMutation = useMutation({
     mutationFn: ({ type, config, isEnabled }: { type: IntegrationType; config: Record<string, unknown>; isEnabled: boolean }) =>
       api.put(`/api/integrations/${type}`, { config, isEnabled }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["integrations"] }),
+    onError: (err: any) => toast(err.message ?? t("admin.integrationToggleFailed", { defaultValue: "Failed to update integration" }), "error"),
   });
 
   const handleTest = async (type: IntegrationType) => {
@@ -129,115 +136,123 @@ function AdminIntegrationsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-sm font-medium text-text">Integrations</h2>
-        <p className="text-xs text-text-tertiary mt-1">
-          Connect external services to your NOVA organization.
+        <h2 className="text-lg font-semibold text-text">{t("admin.integrationsTitle", { defaultValue: "Integrations" })}</h2>
+        <p className="text-sm text-text-secondary mt-1">
+          {t("admin.integrationsDescription", { defaultValue: "Connect external services to your NOVA organization." })}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {INTEGRATIONS.map((meta) => {
-          const config = getConfig(meta.type);
-          const Icon = meta.icon;
-          const testResult = testResults[meta.type];
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-48 w-full" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {INTEGRATIONS.map((meta) => {
+            const config = getConfig(meta.type);
+            const Icon = meta.icon;
+            const testResult = testResults[meta.type];
 
-          return (
-            <div
-              key={meta.type}
-              className="p-4 rounded-xl bg-surface-secondary border border-border flex flex-col"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${config?.isEnabled ? "bg-primary/10 text-primary" : "bg-surface-tertiary text-text-tertiary"}`}>
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-text">{meta.label}</p>
-                    <Badge variant={config?.isEnabled ? "success" : "default"} className="mt-0.5">
-                      {config ? (config.isEnabled ? "Connected" : "Disabled") : "Not configured"}
-                    </Badge>
+            return (
+              <div
+                key={meta.type}
+                className="p-4 rounded-xl bg-surface-secondary border border-border flex flex-col"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${config?.isEnabled ? "bg-primary/10 text-primary" : "bg-surface-tertiary text-text-tertiary"}`}>
+                      <Icon className="h-5 w-5" aria-hidden="true" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-text">{meta.label}</p>
+                      <Badge variant={config?.isEnabled ? "success" : "default"} className="mt-0.5">
+                        {config ? (config.isEnabled ? t("admin.connected", { defaultValue: "Connected" }) : t("admin.disabled", { defaultValue: "Disabled" })) : t("admin.notConfigured", { defaultValue: "Not configured" })}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <p className="text-xs text-text-tertiary mb-4 flex-1">{meta.description}</p>
+                <p className="text-xs text-text-tertiary mb-4 flex-1">{meta.description}</p>
 
-              {config?.lastTestedAt && (
-                <p className="text-xs text-text-tertiary mb-2">
-                  Last tested: {new Date(config.lastTestedAt).toLocaleString()}
-                  {config.lastTestSuccess !== undefined && (
-                    <span className={config.lastTestSuccess ? " text-success" : " text-danger"}>
-                      {config.lastTestSuccess ? " (passed)" : " (failed)"}
-                    </span>
-                  )}
-                </p>
-              )}
-
-              {testResult && (
-                <div className={`mb-3 p-2 rounded-lg text-xs ${
-                  testResult.success ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
-                }`}>
-                  <div className="flex items-center gap-1">
-                    {testResult.success ? (
-                      <CheckCircle className="h-3 w-3 shrink-0" />
-                    ) : (
-                      <XCircle className="h-3 w-3 shrink-0" />
+                {config?.lastTestedAt && (
+                  <p className="text-xs text-text-tertiary mb-2">
+                    {t("admin.lastTested", { defaultValue: "Last tested" })}: {new Date(config.lastTestedAt).toLocaleString()}
+                    {config.lastTestSuccess !== undefined && (
+                      <span className={config.lastTestSuccess ? " text-success" : " text-danger"}>
+                        {config.lastTestSuccess ? ` (${t("admin.passed", { defaultValue: "passed" })})` : ` (${t("admin.failed", { defaultValue: "failed" })})`}
+                      </span>
                     )}
-                    <span>{testResult.message}</span>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-center gap-1.5 mt-auto pt-2 border-t border-border">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setConfiguring(meta.type)}
-                >
-                  <Settings className="h-3.5 w-3.5" /> Configure
-                </Button>
-                {config && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        toggleMutation.mutate({
-                          type: meta.type,
-                          config: config.config,
-                          isEnabled: !config.isEnabled,
-                        })
-                      }
-                    >
-                      <Power className="h-3.5 w-3.5" />
-                      {config.isEnabled ? "Disable" : "Enable"}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleTest(meta.type)}
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" /> Test
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-danger ml-auto"
-                      onClick={() => {
-                        if (confirm(`Remove ${meta.label} integration?`)) {
-                          deleteMutation.mutate(meta.type);
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </>
+                  </p>
                 )}
+
+                {testResult && (
+                  <div className={`mb-3 p-2 rounded-lg text-xs ${
+                    testResult.success ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
+                  }`}>
+                    <div className="flex items-center gap-1">
+                      {testResult.success ? (
+                        <CheckCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
+                      ) : (
+                        <XCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
+                      )}
+                      <span>{testResult.message}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-1.5 mt-auto pt-2 border-t border-border">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setConfiguring(meta.type)}
+                    aria-label={t("admin.configureIntegration", { defaultValue: "Configure {{label}}", label: meta.label })}
+                  >
+                    <Settings className="h-3.5 w-3.5" aria-hidden="true" /> {t("admin.configure", { defaultValue: "Configure" })}
+                  </Button>
+                  {config && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          toggleMutation.mutate({
+                            type: meta.type,
+                            config: config.config,
+                            isEnabled: !config.isEnabled,
+                          })
+                        }
+                        aria-label={config.isEnabled ? t("admin.disableIntegration", { defaultValue: "Disable {{label}}", label: meta.label }) : t("admin.enableIntegration", { defaultValue: "Enable {{label}}", label: meta.label })}
+                      >
+                        <Power className="h-3.5 w-3.5" aria-hidden="true" />
+                        {config.isEnabled ? t("admin.disable", { defaultValue: "Disable" }) : t("admin.enable", { defaultValue: "Enable" })}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleTest(meta.type)}
+                        aria-label={t("admin.testIntegration", { defaultValue: "Test {{label}}", label: meta.label })}
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" /> {t("admin.test", { defaultValue: "Test" })}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-danger ml-auto"
+                        onClick={() => setDeleteConfirmType(meta.type)}
+                        aria-label={t("admin.removeIntegration", { defaultValue: "Remove {{label}}", label: meta.label })}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {configuring && (
         <IntegrationConfigDialog
@@ -251,6 +266,33 @@ function AdminIntegrationsPage() {
           saving={upsertMutation.isPending}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={!!deleteConfirmType}
+        onClose={() => setDeleteConfirmType(null)}
+        title={t("admin.confirmDelete", { defaultValue: "Confirm Delete" })}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-text-secondary">
+            {t("admin.confirmDeleteIntegration", { defaultValue: "Are you sure you want to remove this integration? This will disconnect the service and delete its configuration." })}
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => setDeleteConfirmType(null)}>
+              {t("admin.cancel", { defaultValue: "Cancel" })}
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              className="bg-danger hover:bg-danger/90"
+              onClick={() => deleteConfirmType && deleteMutation.mutate(deleteConfirmType)}
+              loading={deleteMutation.isPending}
+            >
+              {t("admin.remove", { defaultValue: "Remove" })}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }
@@ -272,6 +314,7 @@ function IntegrationConfigDialog({
   onSave: (config: Record<string, unknown>, isEnabled: boolean) => void;
   saving: boolean;
 }) {
+  const { t } = useTranslation();
   const [isEnabled, setIsEnabled] = useState(existing?.isEnabled ?? true);
   const existingConfig = existing?.config ?? {};
 
@@ -356,7 +399,7 @@ function IntegrationConfigDialog({
   };
 
   return (
-    <Dialog open onClose={onClose} title={`Configure ${meta.label}`}>
+    <Dialog open onClose={onClose} title={t("admin.configureLabel", { defaultValue: "Configure {{label}}", label: meta.label })}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="flex items-center gap-2">
           <input
@@ -367,27 +410,27 @@ function IntegrationConfigDialog({
             className="rounded border-border"
           />
           <label htmlFor="integrationEnabled" className="text-sm text-text">
-            Enable this integration
+            {t("admin.enableIntegrationCheckbox", { defaultValue: "Enable this integration" })}
           </label>
         </div>
 
         {type === "slack" && (
           <>
             <Input
-              label="Webhook URL"
+              label={t("admin.webhookUrl", { defaultValue: "Webhook URL" })}
               value={slackWebhookUrl}
               onChange={(e) => setSlackWebhookUrl(e.target.value)}
               placeholder="https://hooks.slack.com/services/..."
               required
             />
             <Input
-              label="Channel (optional)"
+              label={t("admin.channelOptional", { defaultValue: "Channel (optional)" })}
               value={slackChannel}
               onChange={(e) => setSlackChannel(e.target.value)}
               placeholder="#general"
             />
             <Input
-              label="Events (comma-separated)"
+              label={t("admin.eventsCommaSeparated", { defaultValue: "Events (comma-separated)" })}
               value={slackEvents}
               onChange={(e) => setSlackEvents(e.target.value)}
               placeholder="message.new, conversation.created"
@@ -398,14 +441,14 @@ function IntegrationConfigDialog({
         {type === "teams" && (
           <>
             <Input
-              label="Webhook URL"
+              label={t("admin.webhookUrl", { defaultValue: "Webhook URL" })}
               value={teamsWebhookUrl}
               onChange={(e) => setTeamsWebhookUrl(e.target.value)}
               placeholder="https://outlook.office.com/webhook/..."
               required
             />
             <Input
-              label="Channel (optional)"
+              label={t("admin.channelOptional", { defaultValue: "Channel (optional)" })}
               value={teamsChannel}
               onChange={(e) => setTeamsChannel(e.target.value)}
               placeholder="General"
@@ -416,14 +459,14 @@ function IntegrationConfigDialog({
         {type === "email" && (
           <>
             <Input
-              label="SMTP Host"
+              label={t("admin.smtpHost", { defaultValue: "SMTP Host" })}
               value={emailHost}
               onChange={(e) => setEmailHost(e.target.value)}
               placeholder="smtp.example.com"
               required
             />
             <Input
-              label="Port"
+              label={t("admin.port", { defaultValue: "Port" })}
               type="number"
               value={emailPort}
               onChange={(e) => setEmailPort(e.target.value)}
@@ -431,7 +474,7 @@ function IntegrationConfigDialog({
               required
             />
             <Input
-              label="From Address"
+              label={t("admin.fromAddress", { defaultValue: "From Address" })}
               type="email"
               value={emailFrom}
               onChange={(e) => setEmailFrom(e.target.value)}
@@ -439,12 +482,12 @@ function IntegrationConfigDialog({
               required
             />
             <Input
-              label="Username (optional)"
+              label={t("admin.usernameOptional", { defaultValue: "Username (optional)" })}
               value={emailUsername}
               onChange={(e) => setEmailUsername(e.target.value)}
             />
             <Input
-              label="Password (optional)"
+              label={t("admin.passwordOptional", { defaultValue: "Password (optional)" })}
               type="password"
               value={emailPassword}
               onChange={(e) => setEmailPassword(e.target.value)}
@@ -458,7 +501,7 @@ function IntegrationConfigDialog({
                 className="rounded border-border"
               />
               <label htmlFor="emailSecure" className="text-sm text-text">
-                Use TLS/SSL
+                {t("admin.useTls", { defaultValue: "Use TLS/SSL" })}
               </label>
             </div>
           </>
@@ -468,11 +511,11 @@ function IntegrationConfigDialog({
           <>
             <div className="p-3 rounded-lg bg-surface-tertiary text-xs text-text-secondary">
               {existing?.config?.accessToken
-                ? "Google Drive is connected via OAuth. You can update the sync folder below."
-                : "OAuth connection required. Click 'Save' to store settings, then use the Google OAuth flow to connect."}
+                ? t("admin.driveConnected", { defaultValue: "Google Drive is connected via OAuth. You can update the sync folder below." })
+                : t("admin.driveNotConnected", { defaultValue: "OAuth connection required. Click 'Save' to store settings, then use the Google OAuth flow to connect." })}
             </div>
             <Input
-              label="Sync Folder (optional)"
+              label={t("admin.syncFolderOptional", { defaultValue: "Sync Folder (optional)" })}
               value={driveSyncFolder}
               onChange={(e) => setDriveSyncFolder(e.target.value)}
               placeholder="NOVA Exports"
@@ -483,26 +526,26 @@ function IntegrationConfigDialog({
         {type === "webhook" && (
           <>
             <Input
-              label="Endpoint URL"
+              label={t("admin.endpointUrl", { defaultValue: "Endpoint URL" })}
               value={webhookUrl}
               onChange={(e) => setWebhookUrl(e.target.value)}
               placeholder="https://api.example.com/webhooks/nova"
               required
             />
             <Input
-              label="Secret (optional)"
+              label={t("admin.secretOptional", { defaultValue: "Secret (optional)" })}
               value={webhookSecret}
               onChange={(e) => setWebhookSecret(e.target.value)}
               placeholder="whsec_..."
             />
             <Input
-              label="Events (comma-separated)"
+              label={t("admin.eventsCommaSeparated", { defaultValue: "Events (comma-separated)" })}
               value={webhookEvents}
               onChange={(e) => setWebhookEvents(e.target.value)}
               placeholder="message.new, conversation.created, agent.complete"
             />
             <div>
-              <label className="block text-sm font-medium text-text mb-1">HTTP Method</label>
+              <label className="block text-sm font-medium text-text mb-1">{t("admin.httpMethod", { defaultValue: "HTTP Method" })}</label>
               <select
                 value={webhookMethod}
                 onChange={(e) => setWebhookMethod(e.target.value)}
@@ -517,10 +560,10 @@ function IntegrationConfigDialog({
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
+            {t("admin.cancel", { defaultValue: "Cancel" })}
           </Button>
           <Button type="submit" variant="primary" loading={saving}>
-            Save
+            {t("admin.save", { defaultValue: "Save" })}
           </Button>
         </div>
       </form>

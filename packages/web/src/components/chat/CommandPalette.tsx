@@ -50,24 +50,12 @@ interface AgentResult {
 }
 
 // ---------------------------------------------------------------------------
-// Section labels & ordering
+// Platform detection
 // ---------------------------------------------------------------------------
 
-const SECTION_LABELS: Record<ResultSection, string> = {
-  recent: "Recent",
-  conversations: "Conversations",
-  agents: "Agents",
-  commands: "Commands",
-  settings: "Settings",
-};
-
-const SECTION_ORDER: ResultSection[] = [
-  "recent",
-  "conversations",
-  "agents",
-  "commands",
-  "settings",
-];
+const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+const modKey = isMac ? "\u2318" : "Ctrl+";
+const shiftKey = isMac ? "\u21E7" : "Shift+";
 
 // ---------------------------------------------------------------------------
 // Component
@@ -90,6 +78,23 @@ export function CommandPalette() {
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // ---- Section labels & ordering ----
+  const SECTION_LABELS: Record<ResultSection, string> = useMemo(() => ({
+    recent: t("commandPalette.recent", { defaultValue: "Recent" }),
+    conversations: t("commandPalette.conversations", { defaultValue: "Conversations" }),
+    agents: t("commandPalette.agents", { defaultValue: "Agents" }),
+    commands: t("commandPalette.commands", { defaultValue: "Commands" }),
+    settings: t("commandPalette.settings", { defaultValue: "Settings" }),
+  }), [t]);
+
+  const SECTION_ORDER: ResultSection[] = [
+    "recent",
+    "conversations",
+    "agents",
+    "commands",
+    "settings",
+  ];
 
   // ---- Toggle on Cmd+K / Ctrl+K ----
   useKeyboardShortcuts([
@@ -142,94 +147,94 @@ export function CommandPalette() {
       // Quick actions (commands)
       {
         id: "cmd-new-chat",
-        label: "New Chat",
-        icon: <Plus className="h-4 w-4" />,
+        label: t("commandPalette.newChat", { defaultValue: "New Chat" }),
+        icon: <Plus className="h-4 w-4" aria-hidden="true" />,
         section: "commands",
         action: runAndClose(() => navigate({ to: "/conversations/new" })),
-        shortcut: "\u2318N",
+        shortcut: `${modKey}N`,
       },
       {
         id: "cmd-new-agent",
-        label: "New Agent",
-        icon: <Bot className="h-4 w-4" />,
+        label: t("commandPalette.newAgent", { defaultValue: "New Agent" }),
+        icon: <Bot className="h-4 w-4" aria-hidden="true" />,
         section: "commands",
         action: runAndClose(() => navigate({ to: "/agents/new" })),
       },
       {
         id: "cmd-search",
-        label: "Search Conversations",
-        icon: <Search className="h-4 w-4" />,
+        label: t("commandPalette.searchConversations", { defaultValue: "Search Conversations" }),
+        icon: <Search className="h-4 w-4" aria-hidden="true" />,
         section: "commands",
         action: runAndClose(() => navigate({ to: "/search" as any })),
-        shortcut: "\u2318\u21E7F",
+        shortcut: `${modKey}${shiftKey}F`,
       },
       {
         id: "cmd-shortcuts",
-        label: "Keyboard Shortcuts",
-        icon: <Keyboard className="h-4 w-4" />,
+        label: t("commandPalette.keyboardShortcuts", { defaultValue: "Keyboard Shortcuts" }),
+        icon: <Keyboard className="h-4 w-4" aria-hidden="true" />,
         section: "commands",
         action: runAndClose(() => toggleShortcutsHelp()),
-        shortcut: "\u2318/",
+        shortcut: `${modKey}/`,
       },
       {
         id: "cmd-toggle-sidebar",
-        label: "Toggle Sidebar",
-        icon: <ArrowRight className="h-4 w-4" />,
+        label: t("commandPalette.toggleSidebar", { defaultValue: "Toggle Sidebar" }),
+        icon: <ArrowRight className="h-4 w-4" aria-hidden="true" />,
         section: "commands",
         action: runAndClose(() => toggleSidebar()),
-        shortcut: "\u2318B",
+        shortcut: `${modKey}B`,
       },
 
       // Navigation / Settings
       {
         id: "nav-agents",
-        label: "Agents",
-        icon: <Bot className="h-4 w-4" />,
+        label: t("commandPalette.agentsNav", { defaultValue: "Agents" }),
+        icon: <Bot className="h-4 w-4" aria-hidden="true" />,
         section: "settings",
         action: runAndClose(() => navigate({ to: "/agents" })),
       },
       {
         id: "nav-knowledge",
-        label: "Knowledge Base",
-        icon: <BookOpen className="h-4 w-4" />,
+        label: t("commandPalette.knowledgeBase", { defaultValue: "Knowledge Base" }),
+        icon: <BookOpen className="h-4 w-4" aria-hidden="true" />,
         section: "settings",
         action: runAndClose(() => navigate({ to: "/knowledge" })),
       },
       {
         id: "nav-workspaces",
-        label: "Workspaces",
-        icon: <FolderKanban className="h-4 w-4" />,
+        label: t("commandPalette.workspaces", { defaultValue: "Workspaces" }),
+        icon: <FolderKanban className="h-4 w-4" aria-hidden="true" />,
         section: "settings",
         action: runAndClose(() => navigate({ to: "/workspaces" })),
       },
       {
         id: "nav-settings",
-        label: t("app.settings"),
-        icon: <Settings className="h-4 w-4" />,
+        label: t("app.settings", { defaultValue: "Settings" }),
+        icon: <Settings className="h-4 w-4" aria-hidden="true" />,
         section: "settings",
         action: runAndClose(() => navigate({ to: "/settings/profile" })),
-        shortcut: "\u2318,",
+        shortcut: `${modKey},`,
       },
 
       // Theme
       {
         id: "theme-light",
-        label: "Light Mode",
-        icon: <Sun className="h-4 w-4" />,
+        label: t("commandPalette.lightMode", { defaultValue: "Light Mode" }),
+        icon: <Sun className="h-4 w-4" aria-hidden="true" />,
         section: "settings",
         action: runAndClose(() => setTheme("light")),
       },
       {
         id: "theme-dark",
-        label: "Dark Mode",
-        icon: <Moon className="h-4 w-4" />,
+        label: t("commandPalette.darkMode", { defaultValue: "Dark Mode" }),
+        icon: <Moon className="h-4 w-4" aria-hidden="true" />,
         section: "settings",
         action: runAndClose(() => setTheme("dark")),
       },
       {
         id: "theme-system",
-        label: "System Theme",
-        icon: <Monitor className="h-4 w-4" />,
+        label: t("commandPalette.systemTheme", { defaultValue: "System Theme" }),
+        icon: <Monitor className="h-4 w-4" aria-hidden="true" />,
         section: "settings",
         action: runAndClose(() => setTheme("system")),
       },
@@ -244,8 +249,8 @@ export function CommandPalette() {
     for (const conv of conversations) {
       items.push({
         id: `conv-${conv.id}`,
-        label: conv.title || "Untitled Conversation",
-        icon: <MessageSquare className="h-4 w-4" />,
+        label: conv.title || t("commandPalette.untitledConversation", { defaultValue: "Untitled Conversation" }),
+        icon: <MessageSquare className="h-4 w-4" aria-hidden="true" />,
         section: query ? "conversations" : "recent",
         action: runAndClose(() => navigate({ to: "/conversations/$id", params: { id: conv.id } })),
       });
@@ -256,14 +261,14 @@ export function CommandPalette() {
         id: `agent-${agent.id}`,
         label: agent.name,
         description: agent.description,
-        icon: <Bot className="h-4 w-4" />,
+        icon: <Bot className="h-4 w-4" aria-hidden="true" />,
         section: query ? "agents" : "recent",
         action: runAndClose(() => navigate({ to: "/agents/$id", params: { id: agent.id } })),
       });
     }
 
     return items;
-  }, [conversations, agents, query, navigate, runAndClose]);
+  }, [conversations, agents, query, navigate, runAndClose, t]);
 
   // ---- Merge & filter ----
   const allItems = useMemo(
@@ -296,7 +301,7 @@ export function CommandPalette() {
       label: SECTION_LABELS[s],
       items: map.get(s)!,
     }));
-  }, [filtered]);
+  }, [filtered, SECTION_LABELS]);
 
   // Flat list for keyboard navigation indexing
   const flatItems = useMemo(
@@ -360,15 +365,15 @@ export function CommandPalette() {
       <div className="relative w-full max-w-lg bg-surface border border-border rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-4 duration-150">
         {/* Search input */}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
-          <Search className="h-4 w-4 text-text-tertiary shrink-0" />
+          <Search className="h-4 w-4 text-text-tertiary shrink-0" aria-hidden="true" />
           <input
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search conversations, agents, commands..."
+            placeholder={t("commandPalette.placeholder", { defaultValue: "Search conversations, agents, commands..." })}
             className="flex-1 bg-transparent text-sm text-text placeholder:text-text-tertiary focus:outline-none"
-            aria-label="Command palette search"
+            aria-label={t("commandPalette.searchLabel", { defaultValue: "Command palette search" })}
             role="combobox"
             aria-expanded="true"
             aria-controls="command-palette-list"
@@ -392,18 +397,17 @@ export function CommandPalette() {
         >
           {loading && flatItems.length === 0 && (
             <div className="px-4 py-6 text-center text-sm text-text-tertiary">
-              Loading...
+              {t("commandPalette.loading", { defaultValue: "Loading..." })}
             </div>
           )}
 
           {!loading && flatItems.length === 0 && (
             <div className="px-4 py-6 text-center text-sm text-text-tertiary">
-              No results for &ldquo;{query}&rdquo;
+              {t("commandPalette.noResults", { defaultValue: "No results for" })} &ldquo;{query}&rdquo;
             </div>
           )}
 
           {grouped.map((group) => {
-            const groupStart = runningIndex;
             const groupEl = (
               <div key={group.section}>
                 {/* Section header */}
@@ -457,15 +461,15 @@ export function CommandPalette() {
         <div className="flex items-center gap-4 px-4 py-2 border-t border-border text-[10px] text-text-tertiary">
           <span className="flex items-center gap-1">
             <kbd className="bg-surface-tertiary px-1 py-0.5 rounded border border-border">&uarr;&darr;</kbd>
-            Navigate
+            {t("commandPalette.navigate", { defaultValue: "Navigate" })}
           </span>
           <span className="flex items-center gap-1">
             <kbd className="bg-surface-tertiary px-1 py-0.5 rounded border border-border">&crarr;</kbd>
-            Select
+            {t("commandPalette.select", { defaultValue: "Select" })}
           </span>
           <span className="flex items-center gap-1">
             <kbd className="bg-surface-tertiary px-1 py-0.5 rounded border border-border">Esc</kbd>
-            Close
+            {t("commandPalette.close", { defaultValue: "Close" })}
           </span>
         </div>
       </div>

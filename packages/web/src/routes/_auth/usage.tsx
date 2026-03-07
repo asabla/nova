@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import {
   Zap,
   DollarSign,
@@ -9,6 +10,7 @@ import {
   BarChart3,
   Cpu,
   TrendingUp,
+  XCircle,
 } from "lucide-react";
 import { Badge } from "../../components/ui/Badge";
 import { api } from "../../lib/api";
@@ -87,13 +89,14 @@ function formatBytes(bytes: number): string {
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 // ── Main component ───────────────────────────────────────────────────
 
 function UsagePage() {
-  const { data: usageRaw, isLoading } = useQuery({
+  const { t } = useTranslation();
+  const { data: usageRaw, isLoading, isError } = useQuery({
     queryKey: ["my-usage"],
     queryFn: () => api.get<PersonalUsage>("/api/analytics/me"),
     staleTime: 30_000,
@@ -123,11 +126,22 @@ function UsagePage() {
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div>
-        <h1 className="text-lg font-semibold text-text">My Usage</h1>
+        <h1 className="text-lg font-semibold text-text">{t("usage.title", "My Usage")}</h1>
         <p className="text-sm text-text-secondary">
-          Track your personal token usage, costs, and storage.
+          {t("usage.subtitle", "Track your personal token usage, costs, and storage.")}
         </p>
       </div>
+
+      {/* ── Error state ──────────────────────────────────────────── */}
+      {isError && (
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-danger/5 border border-danger/20">
+          <XCircle className="h-5 w-5 text-danger shrink-0" aria-hidden="true" />
+          <div>
+            <p className="text-sm font-medium text-danger">{t("usage.loadError", "Failed to load usage data")}</p>
+            <p className="text-xs text-text-secondary mt-0.5">{t("common.tryAgain", "Please try again later.")}</p>
+          </div>
+        </div>
+      )}
 
       {/* ── Budget warning banner ──────────────────────────────────── */}
       {showWarning && (
@@ -142,6 +156,7 @@ function UsagePage() {
             className={`h-5 w-5 shrink-0 mt-0.5 ${
               tokenCritical || costCritical ? "text-danger" : "text-warning"
             }`}
+            aria-hidden="true"
           />
           <div>
             <p
@@ -150,8 +165,8 @@ function UsagePage() {
               }`}
             >
               {tokenCritical || costCritical
-                ? "Budget limit nearly reached"
-                : "Approaching budget limit"}
+                ? t("usage.budgetCritical", "Budget limit nearly reached")
+                : t("usage.budgetWarning", "Approaching budget limit")}
             </p>
             <div className="text-xs text-text-secondary mt-1 space-y-0.5">
               {tokenWarning && budget?.monthlyTokenLimit != null && (
@@ -176,23 +191,23 @@ function UsagePage() {
       {/* ── Personal stat cards ────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <PersonalStatCard
-          icon={<Zap className="h-4 w-4 text-primary" />}
-          label="My Tokens"
+          icon={<Zap className="h-4 w-4 text-primary" aria-hidden="true" />}
+          label={t("usage.myTokens", "My Tokens")}
           value={isLoading ? null : formatTokens(usage?.totalTokens ?? 0)}
         />
         <PersonalStatCard
-          icon={<DollarSign className="h-4 w-4 text-success" />}
-          label="My Cost"
+          icon={<DollarSign className="h-4 w-4 text-success" aria-hidden="true" />}
+          label={t("usage.myCost", "My Cost")}
           value={isLoading ? null : formatCost(usage?.totalCostCents ?? 0)}
         />
         <PersonalStatCard
-          icon={<MessageSquare className="h-4 w-4 text-primary" />}
-          label="My Requests"
+          icon={<MessageSquare className="h-4 w-4 text-primary" aria-hidden="true" />}
+          label={t("usage.myRequests", "My Requests")}
           value={isLoading ? null : String(usage?.requestCount ?? 0)}
         />
         <PersonalStatCard
-          icon={<HardDrive className="h-4 w-4 text-warning" />}
-          label="My Storage"
+          icon={<HardDrive className="h-4 w-4 text-warning" aria-hidden="true" />}
+          label={t("usage.myStorage", "My Storage")}
           value={isLoading ? null : formatBytes(usage?.storageBytes ?? 0)}
         />
       </div>
@@ -202,13 +217,13 @@ function UsagePage() {
         (budget.monthlyTokenLimit != null ||
           budget.monthlyCostLimitCents != null) && (
           <div className="bg-surface-secondary border border-border rounded-xl p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-text">Monthly Budget</h3>
+            <h3 className="text-sm font-semibold text-text">{t("usage.monthlyBudget", "Monthly Budget")}</h3>
 
             {budget.monthlyTokenLimit != null && (
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs text-text-secondary">
-                    Token Budget
+                    {t("usage.tokenBudget", "Token Budget")}
                   </span>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-text tabular-nums">
@@ -236,7 +251,7 @@ function UsagePage() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs text-text-secondary">
-                    Cost Budget
+                    {t("usage.costBudget", "Cost Budget")}
                   </span>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-text tabular-nums">
@@ -265,8 +280,8 @@ function UsagePage() {
       {/* ── Daily mini-chart (last 14 days) ────────────────────────── */}
       <div className="bg-surface-secondary border border-border rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
-          <BarChart3 className="h-4 w-4 text-text-tertiary" />
-          <h3 className="text-sm font-semibold text-text">Last 14 Days</h3>
+          <BarChart3 className="h-4 w-4 text-text-tertiary" aria-hidden="true" />
+          <h3 className="text-sm font-semibold text-text">{t("usage.last14Days", "Last 14 Days")}</h3>
         </div>
         {isLoading ? (
           <LoadingSkeleton />
@@ -320,8 +335,8 @@ function UsagePage() {
       {/* ── Per-model breakdown with progress bars ─────────────────── */}
       <div className="bg-surface-secondary border border-border rounded-xl p-5">
         <div className="flex items-center gap-2 mb-4">
-          <Cpu className="h-4 w-4 text-text-tertiary" />
-          <h3 className="text-sm font-semibold text-text">Usage by Model</h3>
+          <Cpu className="h-4 w-4 text-text-tertiary" aria-hidden="true" />
+          <h3 className="text-sm font-semibold text-text">{t("usage.usageByModel", "Usage by Model")}</h3>
         </div>
         {isLoading ? (
           <LoadingSkeleton />
@@ -369,8 +384,8 @@ function UsagePage() {
       <div className="bg-surface-secondary border border-border rounded-xl p-5">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <HardDrive className="h-4 w-4 text-text-tertiary" />
-            <h3 className="text-sm font-semibold text-text">Storage</h3>
+            <HardDrive className="h-4 w-4 text-text-tertiary" aria-hidden="true" />
+            <h3 className="text-sm font-semibold text-text">{t("usage.storage", "Storage")}</h3>
           </div>
           <span className="text-xs text-text-secondary tabular-nums">
             {storageMb.toFixed(1)} MB of {storageQuotaMb.toLocaleString()} MB
@@ -392,9 +407,9 @@ function UsagePage() {
           <span className="text-[10px] text-text-tertiary">
             {storagePercent.toFixed(1)}% used
           </span>
-          {storagePercent >= 90 && <Badge variant="danger">Nearly full</Badge>}
+          {storagePercent >= 90 && <Badge variant="danger">{t("usage.nearlyFull", "Nearly full")}</Badge>}
           {storagePercent >= 70 && storagePercent < 90 && (
-            <Badge variant="warning">Getting full</Badge>
+            <Badge variant="warning">{t("usage.gettingFull", "Getting full")}</Badge>
           )}
         </div>
       </div>
@@ -403,28 +418,28 @@ function UsagePage() {
       {usage?.rateLimit && (
         <div className="bg-surface-secondary border border-border rounded-xl p-5">
           <div className="flex items-center gap-2 mb-3">
-            <TrendingUp className="h-4 w-4 text-text-tertiary" />
+            <TrendingUp className="h-4 w-4 text-text-tertiary" aria-hidden="true" />
             <h3 className="text-sm font-semibold text-text">
-              Rate Limit Status
+              {t("usage.rateLimitStatus", "Rate Limit Status")}
             </h3>
           </div>
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
-              <p className="text-xs text-text-tertiary mb-0.5">Requests/min</p>
+              <p className="text-xs text-text-tertiary mb-0.5">{t("usage.requestsPerMin", "Requests/min")}</p>
               <p className="text-text tabular-nums">
                 {usage.rateLimit.requestsUsed} /{" "}
                 {usage.rateLimit.requestsLimit}
               </p>
             </div>
             <div>
-              <p className="text-xs text-text-tertiary mb-0.5">Tokens/day</p>
+              <p className="text-xs text-text-tertiary mb-0.5">{t("usage.tokensPerDay", "Tokens/day")}</p>
               <p className="text-text tabular-nums">
                 {formatTokens(usage.rateLimit.tokensUsed)} /{" "}
                 {formatTokens(usage.rateLimit.tokensLimit)}
               </p>
             </div>
             <div>
-              <p className="text-xs text-text-tertiary mb-0.5">Resets in</p>
+              <p className="text-xs text-text-tertiary mb-0.5">{t("usage.resetsIn", "Resets in")}</p>
               <p className="text-text">{usage.rateLimit.resetsIn}</p>
             </div>
           </div>

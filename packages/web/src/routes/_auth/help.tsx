@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import {
   HelpCircle,
   Search,
@@ -198,17 +199,27 @@ interface ShortcutDef {
   category: string;
 }
 
-const shortcuts: ShortcutDef[] = [
-  { keys: "Cmd+K", label: "Open command palette", category: "Navigation" },
-  { keys: "Cmd+N", label: "New conversation", category: "Navigation" },
-  { keys: "Cmd+/", label: "Focus message input", category: "Navigation" },
-  { keys: "Cmd+?", label: "Show keyboard shortcuts", category: "Navigation" },
-  { keys: "Cmd+,", label: "Open settings", category: "Navigation" },
-  { keys: "Enter", label: "Send message", category: "Chat" },
-  { keys: "Shift+Enter", label: "New line in message", category: "Chat" },
-  { keys: "Escape", label: "Close modal / cancel", category: "General" },
-  { keys: "Cmd+Shift+S", label: "Toggle sidebar", category: "General" },
-];
+function getModKey(): string {
+  if (typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/i.test(navigator.platform ?? navigator.userAgent)) {
+    return "Cmd";
+  }
+  return "Ctrl";
+}
+
+function buildShortcuts(): ShortcutDef[] {
+  const mod = getModKey();
+  return [
+    { keys: `${mod}+K`, label: "Open command palette", category: "Navigation" },
+    { keys: `${mod}+N`, label: "New conversation", category: "Navigation" },
+    { keys: `${mod}+/`, label: "Focus message input", category: "Navigation" },
+    { keys: `${mod}+?`, label: "Show keyboard shortcuts", category: "Navigation" },
+    { keys: `${mod}+,`, label: "Open settings", category: "Navigation" },
+    { keys: "Enter", label: "Send message", category: "Chat" },
+    { keys: "Shift+Enter", label: "New line in message", category: "Chat" },
+    { keys: "Escape", label: "Close modal / cancel", category: "General" },
+    { keys: `${mod}+Shift+S`, label: "Toggle sidebar", category: "General" },
+  ];
+}
 
 // ---------------------------------------------------------------------------
 // Components
@@ -246,7 +257,7 @@ function SectionCard({
         className="w-full flex items-center gap-3 p-4 text-left hover:bg-surface-tertiary transition-colors"
       >
         <div className="h-9 w-9 rounded-xl bg-surface flex items-center justify-center shrink-0">
-          <Icon className={`h-4.5 w-4.5 ${section.color}`} />
+          <Icon className={`h-4.5 w-4.5 ${section.color}`} aria-hidden="true" />
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-semibold text-text">{section.title}</h3>
@@ -334,6 +345,7 @@ function FaqAccordion({ faqs, searchQuery }: { faqs: FaqItem[]; searchQuery: str
 }
 
 function ShortcutsReference({ searchQuery }: { searchQuery: string }) {
+  const shortcuts = useMemo(() => buildShortcuts(), []);
   const filtered = useMemo(() => {
     if (!searchQuery) return shortcuts;
     const q = searchQuery.toLowerCase();
@@ -384,6 +396,7 @@ function ShortcutsReference({ searchQuery }: { searchQuery: string }) {
 type ActiveTab = "topics" | "faq" | "shortcuts";
 
 function HelpPage() {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<ActiveTab>("topics");
 
@@ -400,24 +413,23 @@ function HelpPage() {
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
             <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-              <HelpCircle className="h-7 w-7 text-primary" />
+              <HelpCircle className="h-7 w-7 text-primary" aria-hidden="true" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-text mb-2">Help Center</h1>
+          <h1 className="text-2xl font-bold text-text mb-2">{t("help.title", "Help Center")}</h1>
           <p className="text-sm text-text-secondary max-w-md mx-auto">
-            Learn how to get the most out of NOVA. Search for a topic or browse
-            the sections below.
+            {t("help.subtitle", "Learn how to get the most out of NOVA. Search for a topic or browse the sections below.")}
           </p>
         </div>
 
         {/* Search */}
         <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary pointer-events-none" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary pointer-events-none" aria-hidden="true" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search help articles, FAQ, shortcuts..."
+            placeholder={t("help.searchPlaceholder", "Search help articles, FAQ, shortcuts...")}
             className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary focus:outline-2 focus:outline-offset-0 focus:outline-primary focus:border-primary transition-colors"
           />
         </div>
@@ -437,7 +449,7 @@ function HelpPage() {
                     : "border-transparent text-text-secondary hover:text-text"
                 }`}
               >
-                <TabIcon className="h-4 w-4" />
+                <TabIcon className="h-4 w-4" aria-hidden="true" />
                 {tab.label}
               </button>
             );
@@ -465,9 +477,9 @@ function HelpPage() {
                 );
               }) && (
                 <div className="text-center py-12">
-                  <Search className="h-8 w-8 text-text-tertiary mx-auto mb-3" />
+                  <Search className="h-8 w-8 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
                   <p className="text-sm text-text-secondary">
-                    No articles matching "{searchQuery}"
+                    {t("help.noArticles", 'No articles matching "{{query}}"', { query: searchQuery })}
                   </p>
                 </div>
               )}
@@ -486,9 +498,9 @@ function HelpPage() {
                 );
               }) && (
                 <div className="text-center py-12">
-                  <Search className="h-8 w-8 text-text-tertiary mx-auto mb-3" />
+                  <Search className="h-8 w-8 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
                   <p className="text-sm text-text-secondary">
-                    No FAQ matching "{searchQuery}"
+                    {t("help.noFaq", 'No FAQ matching "{{query}}"', { query: searchQuery })}
                   </p>
                 </div>
               )}
@@ -502,16 +514,16 @@ function HelpPage() {
         {/* External docs link */}
         <div className="mt-10 p-4 rounded-xl border border-border bg-surface-secondary text-center">
           <p className="text-sm text-text-secondary mb-3">
-            Need more detailed documentation?
+            {t("help.needMoreDocs", "Need more detailed documentation?")}
           </p>
           <a
-            href="https://docs.nova.dev"
+            href="https://github.com/nova-platform/nova"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary-dark transition-colors"
           >
-            Visit full documentation
-            <ExternalLink className="h-3.5 w-3.5" />
+            {t("help.visitDocs", "Visit project repository")}
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
           </a>
         </div>
       </div>

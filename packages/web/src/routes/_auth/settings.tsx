@@ -26,9 +26,12 @@ function SettingsLayout() {
       <div className="max-w-4xl mx-auto px-4 py-6">
         <h1 className="text-xl font-bold text-text mb-6">{t("app.settings")}</h1>
 
-        <div className="flex gap-6">
+        <div className="flex flex-col md:flex-row gap-6">
           {/* Sidebar navigation */}
-          <nav className="w-44 shrink-0 space-y-0.5">
+          <nav
+            aria-label="Settings navigation"
+            className="md:w-44 shrink-0 flex md:flex-col overflow-x-auto md:overflow-visible gap-0.5"
+          >
             {tabs.map(({ to, icon: Icon, label }) => {
               const isActive = matchRoute({ to });
               return (
@@ -36,7 +39,7 @@ function SettingsLayout() {
                   key={to}
                   to={to}
                   className={clsx(
-                    "flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
+                    "flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors whitespace-nowrap",
                     isActive
                       ? "bg-primary/10 text-primary font-medium"
                       : "text-text-secondary hover:bg-surface-secondary hover:text-text",

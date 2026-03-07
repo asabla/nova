@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Sun, Moon, Monitor, Type } from "lucide-react";
 import { clsx } from "clsx";
@@ -32,12 +33,12 @@ const FONT_SIZE_OPTIONS: Array<{
 
 /** Color swatches used in the theme preview */
 const PREVIEW_SWATCHES = [
-  { name: "Primary", varLight: "oklch(0.585 0.233 277.117)", varDark: "oklch(0.704 0.191 277.117)" },
-  { name: "Surface", varLight: "oklch(1 0 0)", varDark: "oklch(0.17 0.01 285)" },
-  { name: "Text", varLight: "oklch(0.14 0 0)", varDark: "oklch(0.95 0 0)" },
-  { name: "Border", varLight: "oklch(0.9 0 0)", varDark: "oklch(0.3 0.01 285)" },
-  { name: "Success", varLight: "oklch(0.627 0.194 149.214)", varDark: "oklch(0.627 0.194 149.214)" },
-  { name: "Danger", varLight: "oklch(0.577 0.245 27.325)", varDark: "oklch(0.577 0.245 27.325)" },
+  { nameKey: "settings.colorPrimary", name: "Primary", varLight: "oklch(0.585 0.233 277.117)", varDark: "oklch(0.704 0.191 277.117)" },
+  { nameKey: "settings.colorSurface", name: "Surface", varLight: "oklch(1 0 0)", varDark: "oklch(0.17 0.01 285)" },
+  { nameKey: "settings.colorText", name: "Text", varLight: "oklch(0.14 0 0)", varDark: "oklch(0.95 0 0)" },
+  { nameKey: "settings.colorBorder", name: "Border", varLight: "oklch(0.9 0 0)", varDark: "oklch(0.3 0.01 285)" },
+  { nameKey: "settings.colorSuccess", name: "Success", varLight: "oklch(0.627 0.194 149.214)", varDark: "oklch(0.627 0.194 149.214)" },
+  { nameKey: "settings.colorDanger", name: "Danger", varLight: "oklch(0.577 0.245 27.325)", varDark: "oklch(0.577 0.245 27.325)" },
 ];
 
 function ThemePreview({ effectiveTheme }: { effectiveTheme: "light" | "dark" }) {
@@ -104,9 +105,9 @@ function ColorSwatches({ effectiveTheme }: { effectiveTheme: "light" | "dark" })
             <div
               className="w-10 h-10 rounded-lg border border-border shadow-sm transition-colors"
               style={{ backgroundColor: isDark ? swatch.varDark : swatch.varLight }}
-              title={swatch.name}
+              title={t(swatch.nameKey, swatch.name)}
             />
-            <span className="text-xs text-text-tertiary">{swatch.name}</span>
+            <span className="text-xs text-text-tertiary">{t(swatch.nameKey, swatch.name)}</span>
           </div>
         ))}
       </div>
@@ -118,11 +119,35 @@ function AppearanceSettings() {
   const { t } = useTranslation();
   const { theme, effectiveTheme, setTheme, fontSize, fontSizePx, setFontSize } = useTheme();
 
+  const handleThemeKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const currentIndex = THEME_OPTIONS.findIndex((o) => o.value === theme);
+      let nextIndex = currentIndex;
+
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        nextIndex = (currentIndex + 1) % THEME_OPTIONS.length;
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        nextIndex = (currentIndex - 1 + THEME_OPTIONS.length) % THEME_OPTIONS.length;
+      } else {
+        return;
+      }
+
+      setTheme(THEME_OPTIONS[nextIndex].value);
+      // Focus the newly selected radio button
+      const container = e.currentTarget;
+      const buttons = container.querySelectorAll<HTMLButtonElement>('[role="radio"]');
+      buttons[nextIndex]?.focus();
+    },
+    [theme, setTheme],
+  );
+
   return (
     <div className="space-y-8 max-w-2xl">
       {/* Theme Selection */}
       <fieldset>
-        <legend className="text-sm font-medium text-text mb-1">
+        <legend id="theme-legend" className="text-sm font-medium text-text mb-1">
           {t("settings.theme")}
         </legend>
         <p className="text-sm text-text-secondary mb-3" id="theme-description">
@@ -133,6 +158,7 @@ function AppearanceSettings() {
           role="radiogroup"
           aria-labelledby="theme-legend"
           aria-describedby="theme-description"
+          onKeyDown={handleThemeKeyDown}
         >
           {THEME_OPTIONS.map(({ value, icon: Icon, labelKey, descriptionKey }) => (
             <button
@@ -140,6 +166,7 @@ function AppearanceSettings() {
               role="radio"
               aria-checked={theme === value}
               aria-label={t(labelKey)}
+              tabIndex={theme === value ? 0 : -1}
               onClick={() => setTheme(value)}
               className={clsx(
                 "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-colors",

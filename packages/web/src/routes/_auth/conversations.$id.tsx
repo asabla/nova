@@ -1,11 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import React, { useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { RefreshCw } from "lucide-react";
 import { api } from "../../lib/api";
 import { queryKeys, messagesOptions, conversationDetailOptions } from "../../lib/query-keys";
 import { MessageList } from "../../components/chat/MessageList";
 import { MessageInput } from "../../components/chat/MessageInput";
 import { ConversationHeader } from "../../components/chat/ConversationHeader";
+import { MessageSkeleton } from "../../components/ui/Skeleton";
+import { Button } from "../../components/ui/Button";
 import { useSSEStream } from "../../hooks/useSSE";
 import { useAuthStore } from "../../stores/auth.store";
 import { useDragDrop } from "../../hooks/useDragDrop";
@@ -19,16 +23,18 @@ export const Route = createFileRoute("/_auth/conversations/$id")({
 
 function ConversationPage() {
   const { id } = Route.useParams();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const { tokens, status, startStream, stopStream, pauseStream, resumeStream, resetStream } = useSSEStream();
   const { onKeystroke, stopTyping } = useTypingIndicator(id);
 
-  const { data: conversation } = useQuery(conversationDetailOptions(id));
-  const { data: messagesData } = useQuery(messagesOptions(id));
+  const { data: conversation, isLoading: isConversationLoading } = useQuery(conversationDetailOptions(id));
+  const { data: messagesData, isLoading: isMessagesLoading } = useQuery(messagesOptions(id));
 
   const messages = (messagesData as any)?.data ?? [];
+  const isLoading = isConversationLoading || isMessagesLoading;
 
   useEffect(() => {
     if (status === "done" && tokens) {
@@ -44,7 +50,7 @@ function ConversationPage() {
       api.patch(`/api/conversations/${id}/messages/${messageId}`, { content }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
-      toast("Message updated", "success");
+      toast(t("conversations.messageUpdated", "Message updated"), "success");
     },
   });
 
@@ -60,32 +66,38 @@ function ConversationPage() {
   const handleSend = useCallback(async (content: string) => {
     stopTyping();
 
-    await api.post(`/api/conversations/${id}/messages`, {
-      content,
-      senderType: "user",
-    });
+    try {
+      await api.post(`/api/conversations/${id}/messages`, {
+        content,
+        senderType: "user",
+      });
 
-    queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
 
-    const model = conversation?.modelId;
-    const modelParams = getModelParams();
-    const apiUrl = import.meta.env.VITE_API_URL ?? "";
-    startStream(`${apiUrl}/api/conversations/${id}/messages/stream`, {
-      content,
-      model: model ?? "default",
-      ...modelParams,
-      messages: [
-        ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
-        ...messages.map((m: any) => ({ role: m.senderType === "user" ? "user" : "assistant", content: m.content })),
-        { role: "user", content },
-      ],
-    });
-  }, [id, queryClient, startStream, conversation, messages, getModelParams, stopTyping]);
+      const model = conversation?.modelId;
+      const modelParams = getModelParams();
+      const apiUrl = import.meta.env.VITE_API_URL ?? "";
+      startStream(`${apiUrl}/api/conversations/${id}/messages/stream`, {
+        content,
+        model: model ?? "default",
+        ...modelParams,
+        messages: [
+          ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
+          ...messages.map((m: any) => ({ role: m.senderType === "user" ? "user" : "assistant", content: m.content })),
+          { role: "user", content },
+        ],
+      });
+    } catch {
+      toast(t("conversations.sendFailed", "Failed to send message"), "error");
+    }
+  }, [id, queryClient, startStream, conversation, messages, getModelParams, stopTyping, t]);
 
   // Auto-send initial message from new conversation page
+  // Only send when conversation data has loaded to avoid race condition
   const initialMessageSent = React.useRef(false);
   useEffect(() => {
     if (initialMessageSent.current) return;
+    if (!conversation) return; // Wait for conversation data to load
     try {
       const initial = sessionStorage.getItem("nova:initial-message");
       if (initial) {
@@ -94,51 +106,63 @@ function ConversationPage() {
         handleSend(initial);
       }
     } catch { /* sessionStorage unavailable */ }
-  }, [handleSend]);
+  }, [handleSend, conversation]);
 
   const handleRate = useCallback(async (messageId: string, rating: 1 | -1) => {
-    await api.post(`/api/conversations/${id}/messages/${messageId}/rate`, { rating });
-    toast(rating === 1 ? "Upvoted" : "Downvoted", "success");
-  }, [id]);
+    try {
+      await api.post(`/api/conversations/${id}/messages/${messageId}/rate`, { rating });
+      toast(rating === 1 ? t("conversations.upvoted", "Upvoted") : t("conversations.downvoted", "Downvoted"), "success");
+    } catch {
+      toast(t("conversations.rateFailed", "Failed to rate message"), "error");
+    }
+  }, [id, t]);
 
   const handleNote = useCallback(async (messageId: string, content: string) => {
-    await api.post(`/api/conversations/${id}/messages/${messageId}/notes`, { content });
-    toast("Note added", "success");
-  }, [id]);
+    try {
+      await api.post(`/api/conversations/${id}/messages/${messageId}/notes`, { content });
+      toast(t("conversations.noteAdded", "Note added"), "success");
+    } catch {
+      toast(t("conversations.noteFailed", "Failed to add note"), "error");
+    }
+  }, [id, t]);
 
   const handleEdit = useCallback((messageId: string, content: string) => {
     editMessage.mutate({ messageId, content });
   }, [editMessage]);
 
   const handleEditAndRerun = useCallback(async (messageId: string, content: string) => {
-    // First, save the edit (storing old content in history)
-    await api.patch(`/api/conversations/${id}/messages/${messageId}`, { content });
-    await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
+    try {
+      // First, save the edit (storing old content in history)
+      await api.patch(`/api/conversations/${id}/messages/${messageId}`, { content });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
 
-    // Then trigger a re-run using all messages up to and including the edited one
-    const msg = messages.find((m: any) => m.id === messageId);
-    if (!msg) return;
+      // Then trigger a re-run using all messages up to and including the edited one
+      const msg = messages.find((m: any) => m.id === messageId);
+      if (!msg) return;
 
-    const idx = messages.indexOf(msg);
-    const previousMessages = messages.slice(0, idx);
-    const modelParams = getModelParams();
+      const idx = messages.indexOf(msg);
+      const previousMessages = messages.slice(0, idx);
+      const modelParams = getModelParams();
 
-    const apiUrl = import.meta.env.VITE_API_URL ?? "";
-    startStream(`${apiUrl}/api/conversations/${id}/messages/stream`, {
-      model: conversation?.modelId ?? "default",
-      ...modelParams,
-      messages: [
-        ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
-        ...previousMessages.map((m: any) => ({
-          role: m.senderType === "user" ? "user" : "assistant",
-          content: m.content,
-        })),
-        { role: "user", content },
-      ],
-    });
+      const apiUrl = import.meta.env.VITE_API_URL ?? "";
+      startStream(`${apiUrl}/api/conversations/${id}/messages/stream`, {
+        model: conversation?.modelId ?? "default",
+        ...modelParams,
+        messages: [
+          ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
+          ...previousMessages.map((m: any) => ({
+            role: m.senderType === "user" ? "user" : "assistant",
+            content: m.content,
+          })),
+          { role: "user", content },
+        ],
+      });
 
-    toast("Message updated — re-running...", "info");
-  }, [id, messages, conversation, startStream, getModelParams, queryClient]);
+      toast(t("conversations.messageRerunning", "Message updated — re-running..."), "info");
+    } catch {
+      toast(t("conversations.editRerunFailed", "Failed to edit and re-run message"), "error");
+    }
+  }, [id, messages, conversation, startStream, getModelParams, queryClient, t]);
 
   const handleRerun = useCallback(async (messageId: string, modelId?: string) => {
     const msg = messages.find((m: any) => m.id === messageId);
@@ -166,11 +190,11 @@ function ConversationPage() {
     mutationFn: (messageId: string) =>
       api.post<{ id: string }>(`/api/conversations/${id}/fork`, { messageId }),
     onSuccess: (data) => {
-      toast("Conversation forked from message", "success");
+      toast(t("conversations.forked", "Conversation forked from message"), "success");
       navigate({ to: `/conversations/${data.id}` });
     },
     onError: () => {
-      toast("Failed to fork conversation", "error");
+      toast(t("conversations.forkFailed", "Failed to fork conversation"), "error");
     },
   });
 
@@ -200,11 +224,11 @@ function ConversationPage() {
     const failed = results.filter((r) => r.status === "rejected").length;
 
     if (failed === 0) {
-      toast(`${succeeded} file${succeeded !== 1 ? "s" : ""} uploaded`, "success");
+      toast(`${succeeded} ${t("conversations.filesUploaded", "file(s) uploaded")}`, "success");
     } else {
-      toast(`${succeeded} uploaded, ${failed} failed`, "error");
+      toast(`${succeeded} ${t("conversations.uploaded", "uploaded")}, ${failed} ${t("conversations.failed", "failed")}`, "error");
     }
-  }, [uploadSingleFile]);
+  }, [uploadSingleFile, t]);
 
   const { isDragging, dragHandlers } = useDragDrop((files) => {
     handleFileUpload(files);
@@ -212,27 +236,61 @@ function ConversationPage() {
 
   useClipboardPaste((file) => handleFileUpload([file]));
 
+  // Handle SSE error status
+  const handleRetryLastMessage = useCallback(() => {
+    resetStream();
+    const lastUserMessage = [...messages].reverse().find((m: any) => m.senderType === "user");
+    if (lastUserMessage) {
+      handleSend(lastUserMessage.content);
+    }
+  }, [messages, handleSend, resetStream]);
+
   return (
     <div className="flex flex-col flex-1 min-h-0 relative" {...dragHandlers}>
       {isDragging && (
         <div className="absolute inset-0 z-30 bg-primary/10 border-2 border-dashed border-primary rounded-xl flex items-center justify-center">
-          <p className="text-primary font-medium">Drop files here</p>
+          <p className="text-primary font-medium">{t("conversations.dropFilesHere", "Drop files here")}</p>
         </div>
       )}
       <ConversationHeader conversation={conversation} />
-      <MessageList
-        messages={messages}
-        streamingContent={(status === "streaming" || status === "paused") ? tokens : undefined}
-        isStreaming={status === "streaming" || status === "paused"}
-        userName={user?.name}
-        conversationId={id}
-        onRate={handleRate}
-        onEdit={handleEdit}
-        onEditAndRerun={handleEditAndRerun}
-        onRerun={handleRerun}
-        onNote={handleNote}
-        onFork={handleFork}
-      />
+
+      {isLoading ? (
+        <div className="flex-1 overflow-y-auto">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <MessageSkeleton key={i} />
+          ))}
+        </div>
+      ) : (
+        <>
+          <MessageList
+            messages={messages}
+            streamingContent={(status === "streaming" || status === "paused") ? tokens : undefined}
+            isStreaming={status === "streaming" || status === "paused"}
+            userName={user?.name}
+            conversationId={id}
+            onRate={handleRate}
+            onEdit={handleEdit}
+            onEditAndRerun={handleEditAndRerun}
+            onRerun={handleRerun}
+            onNote={handleNote}
+            onFork={handleFork}
+          />
+
+          {/* SSE error state */}
+          {status === "error" && (
+            <div className="px-4 py-3 bg-danger/10 border-t border-danger/20 flex items-center justify-between">
+              <p className="text-sm text-danger">
+                {t("conversations.streamError", "Something went wrong while generating a response.")}
+              </p>
+              <Button variant="ghost" size="sm" onClick={handleRetryLastMessage}>
+                <RefreshCw className="h-4 w-4" />
+                {t("common.retry", "Retry")}
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+
       <MessageInput
         onSend={handleSend}
         onStop={stopStream}
@@ -242,6 +300,7 @@ function ConversationPage() {
         isPaused={status === "paused"}
         onFileUpload={handleFileUpload}
         onTyping={onKeystroke}
+        disabled={isLoading}
       />
     </div>
   );

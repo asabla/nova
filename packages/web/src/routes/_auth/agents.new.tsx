@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Bot, ArrowLeft, Save, TestTube, Copy, Settings2, Wrench, BookOpen, Brain } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
 import { toast } from "../../components/ui/Toast";
 import { api } from "../../lib/api";
@@ -10,6 +11,7 @@ export const Route = createFileRoute("/_auth/agents/new")({
 });
 
 function AgentBuilderPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<"config" | "tools" | "knowledge" | "memory" | "test">("config");
   const [saving, setSaving] = useState(false);
@@ -30,17 +32,17 @@ function AgentBuilderPage() {
 
   const handleSave = async () => {
     if (!agent.name.trim()) {
-      toast.error("Agent name is required");
+      toast.error(t("agents.nameRequired", { defaultValue: "Agent name is required" }));
       return;
     }
 
     setSaving(true);
     try {
       const result = await api.post("/api/agents", agent);
-      toast.success("Agent created successfully");
+      toast.success(t("agents.created", { defaultValue: "Agent created successfully" }));
       navigate({ to: "/agents" });
     } catch (err: any) {
-      toast.error(err.message ?? "Failed to create agent");
+      toast.error(err.message ?? t("agents.createFailed", { defaultValue: "Failed to create agent" }));
     } finally {
       setSaving(false);
     }
@@ -51,7 +53,6 @@ function AgentBuilderPage() {
     setTesting(true);
     setTestResult("");
     try {
-      // Simulate agent test by sending to chat completions
       const result = await api.post<any>("/api/v1/chat/completions", {
         model: agent.modelId || "gpt-4o",
         messages: [
@@ -59,20 +60,20 @@ function AgentBuilderPage() {
           { role: "user", content: testPrompt },
         ],
       });
-      setTestResult(result.choices?.[0]?.message?.content ?? "No response");
+      setTestResult(result.choices?.[0]?.message?.content ?? t("agents.noResponse", { defaultValue: "No response" }));
     } catch (err: any) {
-      setTestResult(`Error: ${err.message ?? "Test failed"}`);
+      setTestResult(`${t("common.error", { defaultValue: "Error" })}: ${err.message ?? t("agents.testFailed", { defaultValue: "Test failed" })}`);
     } finally {
       setTesting(false);
     }
   };
 
   const tabs = [
-    { id: "config" as const, label: "Configuration", icon: Settings2 },
-    { id: "tools" as const, label: "Tools", icon: Wrench },
-    { id: "knowledge" as const, label: "Knowledge", icon: BookOpen },
-    { id: "memory" as const, label: "Memory", icon: Brain },
-    { id: "test" as const, label: "Test", icon: TestTube },
+    { id: "config" as const, label: t("agents.tabs.config", { defaultValue: "Configuration" }), icon: Settings2 },
+    { id: "tools" as const, label: t("agents.tabs.tools", { defaultValue: "Tools" }), icon: Wrench },
+    { id: "knowledge" as const, label: t("agents.tabs.knowledge", { defaultValue: "Knowledge" }), icon: BookOpen },
+    { id: "memory" as const, label: t("agents.tabs.memory", { defaultValue: "Memory" }), icon: Brain },
+    { id: "test" as const, label: t("agents.tabs.test", { defaultValue: "Test" }), icon: TestTube },
   ];
 
   return (
@@ -80,34 +81,36 @@ function AgentBuilderPage() {
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate({ to: "/agents" })} className="p-1 hover:bg-surface-secondary rounded">
-            <ArrowLeft className="h-5 w-5 text-text-secondary" />
+          <button onClick={() => navigate({ to: "/agents" })} className="p-1 hover:bg-surface-secondary rounded" aria-label={t("common.goBack", { defaultValue: "Go back" })}>
+            <ArrowLeft className="h-5 w-5 text-text-secondary" aria-hidden="true" />
           </button>
           <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Bot className="h-5 w-5 text-primary" />
+            <Bot className="h-5 w-5 text-primary" aria-hidden="true" />
           </div>
           <div>
             <input
               type="text"
               value={agent.name}
               onChange={(e) => setAgent({ ...agent, name: e.target.value })}
-              placeholder="Agent name..."
+              placeholder={t("agents.namePlaceholder", { defaultValue: "Agent name..." })}
               className="text-lg font-semibold text-text bg-transparent border-none outline-none placeholder:text-text-tertiary"
+              aria-label={t("agents.nameLabel", { defaultValue: "Agent name" })}
             />
             <input
               type="text"
               value={agent.description}
               onChange={(e) => setAgent({ ...agent, description: e.target.value })}
-              placeholder="Description..."
+              placeholder={t("agents.descriptionPlaceholder", { defaultValue: "Description..." })}
               className="text-sm text-text-secondary bg-transparent border-none outline-none block placeholder:text-text-tertiary"
+              aria-label={t("agents.descriptionLabel", { defaultValue: "Agent description" })}
             />
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" onClick={() => navigate({ to: "/agents" })}>Cancel</Button>
+          <Button variant="ghost" onClick={() => navigate({ to: "/agents" })}>{t("common.cancel", { defaultValue: "Cancel" })}</Button>
           <Button variant="primary" onClick={handleSave} disabled={saving}>
-            <Save className="h-4 w-4" />
-            {saving ? "Saving..." : "Create Agent"}
+            <Save className="h-4 w-4" aria-hidden="true" />
+            {saving ? t("common.saving", { defaultValue: "Saving..." }) : t("agents.createAgent", { defaultValue: "Create Agent" })}
           </Button>
         </div>
       </div>
@@ -124,7 +127,7 @@ function AgentBuilderPage() {
                 : "text-text-secondary hover:text-text hover:bg-surface-secondary"
             }`}
           >
-            <tab.icon className="h-3.5 w-3.5" />
+            <tab.icon className="h-3.5 w-3.5" aria-hidden="true" />
             {tab.label}
           </button>
         ))}
@@ -135,62 +138,62 @@ function AgentBuilderPage() {
         {activeTab === "config" && (
           <div className="max-w-2xl space-y-6">
             <div>
-              <label className="block text-sm font-medium text-text mb-1.5">System Prompt</label>
+              <label className="block text-sm font-medium text-text mb-1.5">{t("agents.systemPrompt", { defaultValue: "System Prompt" })}</label>
               <textarea
                 value={agent.systemPrompt}
                 onChange={(e) => setAgent({ ...agent, systemPrompt: e.target.value })}
-                placeholder="You are a helpful assistant that..."
+                placeholder={t("agents.systemPromptNewPlaceholder", { defaultValue: "You are a helpful assistant that..." })}
                 rows={8}
                 className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary resize-y text-sm font-mono"
               />
               <p className="text-xs text-text-tertiary mt-1">
-                Instructions that define the agent's behavior, personality, and capabilities.
+                {t("agents.systemPromptHint", { defaultValue: "Instructions that define the agent's behavior, personality, and capabilities." })}
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-text mb-1.5">Visibility</label>
+                <label className="block text-sm font-medium text-text mb-1.5">{t("agents.visibility", { defaultValue: "Visibility" })}</label>
                 <select
                   value={agent.visibility}
                   onChange={(e) => setAgent({ ...agent, visibility: e.target.value as any })}
                   className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm"
                 >
-                  <option value="private">Private (only you)</option>
-                  <option value="team">Team</option>
-                  <option value="org">Organization</option>
-                  <option value="public">Public</option>
+                  <option value="private">{t("agents.visibilityPrivateOnly", { defaultValue: "Private (only you)" })}</option>
+                  <option value="team">{t("agents.visibilityTeam", { defaultValue: "Team" })}</option>
+                  <option value="org">{t("agents.visibilityOrg", { defaultValue: "Organization" })}</option>
+                  <option value="public">{t("agents.visibilityPublic", { defaultValue: "Public" })}</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-text mb-1.5">Tool Approval</label>
+                <label className="block text-sm font-medium text-text mb-1.5">{t("agents.toolApproval", { defaultValue: "Tool Approval" })}</label>
                 <select
                   value={agent.toolApprovalMode}
                   onChange={(e) => setAgent({ ...agent, toolApprovalMode: e.target.value as any })}
                   className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm"
                 >
-                  <option value="auto">Auto-approve</option>
-                  <option value="always-ask">Always ask</option>
-                  <option value="never">Never allow</option>
+                  <option value="auto">{t("agents.toolAuto", { defaultValue: "Auto-approve" })}</option>
+                  <option value="always-ask">{t("agents.toolAlwaysAsk", { defaultValue: "Always ask" })}</option>
+                  <option value="never">{t("agents.toolNever", { defaultValue: "Never allow" })}</option>
                 </select>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-text mb-1.5">Memory Scope</label>
+                <label className="block text-sm font-medium text-text mb-1.5">{t("agents.memoryScope", { defaultValue: "Memory Scope" })}</label>
                 <select
                   value={agent.memoryScope}
                   onChange={(e) => setAgent({ ...agent, memoryScope: e.target.value as any })}
                   className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm"
                 >
-                  <option value="per-user">Per user</option>
-                  <option value="per-conversation">Per conversation</option>
-                  <option value="global">Global</option>
+                  <option value="per-user">{t("agents.memoryPerUser", { defaultValue: "Per user" })}</option>
+                  <option value="per-conversation">{t("agents.memoryPerConversation", { defaultValue: "Per conversation" })}</option>
+                  <option value="global">{t("agents.memoryGlobal", { defaultValue: "Global" })}</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-text mb-1.5">Max Steps</label>
+                <label className="block text-sm font-medium text-text mb-1.5">{t("agents.maxSteps", { defaultValue: "Max Steps" })}</label>
                 <input
                   type="number"
                   value={agent.maxSteps}
@@ -207,12 +210,12 @@ function AgentBuilderPage() {
         {activeTab === "tools" && (
           <div className="max-w-2xl">
             <div className="text-center py-12">
-              <Wrench className="h-12 w-12 text-text-tertiary mx-auto mb-3" />
-              <h3 className="text-lg font-medium text-text mb-1">Attach Tools</h3>
+              <Wrench className="h-12 w-12 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
+              <h3 className="text-lg font-medium text-text mb-1">{t("agents.attachTools", { defaultValue: "Attach Tools" })}</h3>
               <p className="text-sm text-text-secondary mb-4">
-                Enable tools from the marketplace or connect custom tools via OpenAPI specs.
+                {t("agents.attachToolsDesc", { defaultValue: "Enable tools from the marketplace or connect custom tools via OpenAPI specs." })}
               </p>
-              <Button variant="primary" onClick={() => navigate({ to: "/tools" })}>Browse Tools</Button>
+              <Button variant="primary" onClick={() => navigate({ to: "/tools" })}>{t("agents.browseTools", { defaultValue: "Browse Tools" })}</Button>
             </div>
           </div>
         )}
@@ -220,12 +223,12 @@ function AgentBuilderPage() {
         {activeTab === "knowledge" && (
           <div className="max-w-2xl">
             <div className="text-center py-12">
-              <BookOpen className="h-12 w-12 text-text-tertiary mx-auto mb-3" />
-              <h3 className="text-lg font-medium text-text mb-1">Connect Knowledge</h3>
+              <BookOpen className="h-12 w-12 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
+              <h3 className="text-lg font-medium text-text mb-1">{t("agents.connectKnowledge", { defaultValue: "Connect Knowledge" })}</h3>
               <p className="text-sm text-text-secondary mb-4">
-                Attach knowledge collections so this agent can search and reference your documents.
+                {t("agents.connectKnowledgeDesc", { defaultValue: "Attach knowledge collections so this agent can search and reference your documents." })}
               </p>
-              <Button variant="primary" onClick={() => navigate({ to: "/knowledge" })}>Browse Collections</Button>
+              <Button variant="primary" onClick={() => navigate({ to: "/knowledge" })}>{t("agents.browseCollections", { defaultValue: "Browse Collections" })}</Button>
             </div>
           </div>
         )}
@@ -233,13 +236,13 @@ function AgentBuilderPage() {
         {activeTab === "memory" && (
           <div className="max-w-2xl">
             <div className="text-center py-12">
-              <Brain className="h-12 w-12 text-text-tertiary mx-auto mb-3" />
-              <h3 className="text-lg font-medium text-text mb-1">Agent Memory</h3>
+              <Brain className="h-12 w-12 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
+              <h3 className="text-lg font-medium text-text mb-1">{t("agents.agentMemory", { defaultValue: "Agent Memory" })}</h3>
               <p className="text-sm text-text-secondary mb-4">
-                Memory entries will appear here once the agent starts storing information.
+                {t("agents.agentMemoryDesc", { defaultValue: "Memory entries will appear here once the agent starts storing information." })}
               </p>
               <p className="text-xs text-text-tertiary">
-                Memory scope: <span className="font-medium">{agent.memoryScope}</span>
+                {t("agents.memoryScopeLabel", { defaultValue: "Memory scope" })}: <span className="font-medium">{agent.memoryScope}</span>
               </p>
             </div>
           </div>
@@ -248,25 +251,25 @@ function AgentBuilderPage() {
         {activeTab === "test" && (
           <div className="max-w-2xl space-y-4">
             <div>
-              <label className="block text-sm font-medium text-text mb-1.5">Test Prompt</label>
+              <label className="block text-sm font-medium text-text mb-1.5">{t("agents.testPrompt", { defaultValue: "Test Prompt" })}</label>
               <div className="flex gap-2">
                 <textarea
                   value={testPrompt}
                   onChange={(e) => setTestPrompt(e.target.value)}
-                  placeholder="Enter a test message..."
+                  placeholder={t("agents.testPlaceholder", { defaultValue: "Enter a test message..." })}
                   rows={3}
                   className="flex-1 px-3 py-2 rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary resize-y text-sm"
                 />
                 <Button variant="primary" onClick={handleTest} disabled={testing || !testPrompt.trim()}>
-                  <TestTube className="h-4 w-4" />
-                  {testing ? "Running..." : "Test"}
+                  <TestTube className="h-4 w-4" aria-hidden="true" />
+                  {testing ? t("agents.running", { defaultValue: "Running..." }) : t("agents.test", { defaultValue: "Test" })}
                 </Button>
               </div>
             </div>
 
             {testResult && (
               <div>
-                <label className="block text-sm font-medium text-text mb-1.5">Response</label>
+                <label className="block text-sm font-medium text-text mb-1.5">{t("agents.response", { defaultValue: "Response" })}</label>
                 <div className="px-3 py-2 rounded-lg border border-border bg-surface-secondary text-sm text-text whitespace-pre-wrap">
                   {testResult}
                 </div>

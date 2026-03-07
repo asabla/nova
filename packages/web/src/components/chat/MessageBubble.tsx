@@ -28,6 +28,7 @@ interface MessageBubbleProps {
     tokenCountCompletion?: number | null;
     costCents?: number | null;
     modelId?: string | null;
+    rating?: "up" | "down" | null;
   };
   userName?: string;
   onRate?: (messageId: string, rating: 1 | -1) => void;
@@ -175,7 +176,7 @@ export function MessageBubble({ message, userName, onRate, onEdit, onEditAndReru
           <Avatar name={userName} size="sm" />
         ) : (
           <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center">
-            <svg className="h-4 w-4 text-primary" viewBox="0 0 24 24" fill="currentColor">
+            <svg className="h-4 w-4 text-primary" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
             </svg>
           </div>
@@ -203,21 +204,21 @@ export function MessageBubble({ message, userName, onRate, onEdit, onEditAndReru
                 onClick={handleEditSubmit}
                 className="flex items-center gap-1 px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-lg hover:opacity-90"
               >
-                <Send className="h-3 w-3" /> Save
+                <Send className="h-3 w-3" aria-hidden="true" /> {t("common.save")}
               </button>
               {onEditAndRerun && (
                 <button
                   onClick={handleEditAndRerunSubmit}
                   className="flex items-center gap-1 px-3 py-1.5 bg-primary/80 text-primary-foreground text-xs font-medium rounded-lg hover:opacity-90"
                 >
-                  <RotateCcw className="h-3 w-3" /> Save &amp; Re-run
+                  <RotateCcw className="h-3 w-3" aria-hidden="true" /> {t("messages.saveAndRerun", { defaultValue: "Save & Re-run" })}
                 </button>
               )}
               <button
                 onClick={handleEditCancel}
                 className="flex items-center gap-1 px-3 py-1.5 text-xs text-text-secondary hover:text-text"
               >
-                <X className="h-3 w-3" /> Cancel
+                <X className="h-3 w-3" aria-hidden="true" /> {t("common.cancel")}
               </button>
             </div>
           </div>
@@ -243,6 +244,8 @@ export function MessageBubble({ message, userName, onRate, onEdit, onEditAndReru
                 <span className="h-2 w-2 bg-text-tertiary rounded-full animate-bounce [animation-delay:0.1s]" />
                 <span className="h-2 w-2 bg-text-tertiary rounded-full animate-bounce [animation-delay:0.2s]" />
               </div>
+            ) : message.status === "failed" ? (
+              <p className="text-sm text-danger" role="alert">{message.content ?? t("errors.messageFailed", { defaultValue: "Message failed to send." })}</p>
             ) : null}
           </div>
         )}
@@ -254,8 +257,8 @@ export function MessageBubble({ message, userName, onRate, onEdit, onEditAndReru
               onClick={handleToggleHistory}
               className="text-[10px] text-text-tertiary hover:text-text-secondary flex items-center gap-0.5"
             >
-              (edited)
-              <History className="h-2.5 w-2.5" />
+              {t("messages.edited")}
+              <History className="h-2.5 w-2.5" aria-hidden="true" />
             </button>
           )}
           {isAssistant && totalTokens > 0 && (
@@ -271,27 +274,27 @@ export function MessageBubble({ message, userName, onRate, onEdit, onEditAndReru
           <div className="mt-2 p-3 rounded-xl bg-surface border border-border max-w-full min-w-[280px]">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-text">
-                Edit History
+                {t("messages.editHistory", { defaultValue: "Edit History" })}
                 {editHistory.length > 0 && (
                   <span className="ml-1 text-text-tertiary font-normal">
-                    ({editHistory.length} {editHistory.length === 1 ? "revision" : "revisions"})
+                    ({t("messages.revisionCount", { count: editHistory.length, defaultValue: `${editHistory.length} revision(s)` })})
                   </span>
                 )}
               </span>
-              <button onClick={() => setShowHistory(false)} className="text-text-tertiary hover:text-text">
-                <X className="h-3 w-3" />
+              <button onClick={() => setShowHistory(false)} className="text-text-tertiary hover:text-text p-1 rounded" aria-label={t("actions.close", { defaultValue: "Close" })}>
+                <X className="h-3 w-3" aria-hidden="true" />
               </button>
             </div>
             {historyLoading ? (
-              <div className="py-3 text-center text-xs text-text-tertiary">Loading history...</div>
+              <div className="py-3 text-center text-xs text-text-tertiary">{t("common.loading")}</div>
             ) : editHistory.length === 0 ? (
-              <div className="py-3 text-center text-xs text-text-tertiary">No previous versions found.</div>
+              <div className="py-3 text-center text-xs text-text-tertiary">{t("messages.noVersions", { defaultValue: "No previous versions found." })}</div>
             ) : (
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {/* Current version */}
                 <div className="p-2 rounded-lg bg-primary/5 border border-primary/20 text-xs">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-semibold text-primary">Current version</span>
+                    <span className="text-[10px] font-semibold text-primary">{t("messages.currentVersion", { defaultValue: "Current version" })}</span>
                   </div>
                   <p className="text-text whitespace-pre-wrap line-clamp-4">{message.content}</p>
                 </div>
@@ -301,7 +304,7 @@ export function MessageBubble({ message, userName, onRate, onEdit, onEditAndReru
                   return (
                     <div key={i} className="p-2 rounded-lg bg-surface-secondary text-xs">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] font-semibold text-text-tertiary">Version {versionNum}</span>
+                        <span className="text-[10px] font-semibold text-text-tertiary">{t("messages.version", { number: versionNum, defaultValue: `Version ${versionNum}` })}</span>
                         <span className="text-[10px] text-text-tertiary">
                           {formatDistanceToNow(new Date(entry.editedAt), { addSuffix: true })}
                         </span>
@@ -315,23 +318,43 @@ export function MessageBubble({ message, userName, onRate, onEdit, onEditAndReru
           </div>
         )}
 
-        {/* Actions */}
+        {/* Actions - visible by default on touch devices, hover-reveal on desktop */}
         {!isEditing && (
-          <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1 mt-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
             <button
               onClick={handleCopy}
               className="text-text-tertiary hover:text-text-secondary p-1 rounded"
-              title={t("messages.copy")}
+              aria-label={t("messages.copy", { defaultValue: "Copy message" })}
             >
-              {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? <Check className="h-3.5 w-3.5 text-success" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
             </button>
             {isAssistant && onRate && (
               <>
-                <button onClick={() => onRate(message.id, 1)} className="text-text-tertiary hover:text-success p-1 rounded" title="Good response">
-                  <ThumbsUp className="h-3.5 w-3.5" />
+                <button
+                  onClick={() => onRate(message.id, 1)}
+                  className={clsx(
+                    "p-1 rounded",
+                    message.rating === "up"
+                      ? "text-primary"
+                      : "text-text-tertiary hover:text-success",
+                  )}
+                  aria-label={t("messages.rateUp", { defaultValue: "Good response" })}
+                  aria-pressed={message.rating === "up"}
+                >
+                  <ThumbsUp className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
-                <button onClick={() => onRate(message.id, -1)} className="text-text-tertiary hover:text-danger p-1 rounded" title="Bad response">
-                  <ThumbsDown className="h-3.5 w-3.5" />
+                <button
+                  onClick={() => onRate(message.id, -1)}
+                  className={clsx(
+                    "p-1 rounded",
+                    message.rating === "down"
+                      ? "text-danger"
+                      : "text-text-tertiary hover:text-danger",
+                  )}
+                  aria-label={t("messages.rateDown", { defaultValue: "Bad response" })}
+                  aria-pressed={message.rating === "down"}
+                >
+                  <ThumbsDown className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               </>
             )}
@@ -344,30 +367,34 @@ export function MessageBubble({ message, userName, onRate, onEdit, onEditAndReru
                     ? "text-primary hover:text-primary/80"
                     : "text-text-tertiary hover:text-text-secondary",
                 )}
-                title={isSpeaking ? "Stop listening" : "Listen"}
+                aria-label={isSpeaking ? t("messages.stopListening", { defaultValue: "Stop listening" }) : t("messages.listen", { defaultValue: "Listen" })}
               >
-                {isSpeaking ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                {isSpeaking ? <VolumeX className="h-3.5 w-3.5" aria-hidden="true" /> : <Volume2 className="h-3.5 w-3.5" aria-hidden="true" />}
               </button>
             )}
             {isAssistant && onRerun && (
               <div className="relative" ref={modelSelectorRef}>
-                <button onClick={() => onRerun(message.id)} className="text-text-tertiary hover:text-text-secondary p-1 rounded" title="Re-run">
-                  <RotateCcw className="h-3.5 w-3.5" />
+                <button
+                  onClick={() => onRerun(message.id)}
+                  className="text-text-tertiary hover:text-text-secondary p-1 rounded"
+                  aria-label={t("messages.rerun", { defaultValue: "Re-run" })}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
                 <button
                   onClick={() => setShowModelSelector(!showModelSelector)}
                   className="text-text-tertiary hover:text-text-secondary p-1 rounded"
-                  title="Replay with different model"
+                  aria-label={t("messages.rerunWithModel", { defaultValue: "Replay with different model" })}
                 >
-                  <ChevronDown className="h-3.5 w-3.5" />
+                  <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
                 {showModelSelector && (
                   <div className="absolute bottom-full left-0 mb-1 w-56 py-1 bg-surface border border-border rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
                     <div className="px-3 py-1.5 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider">
-                      Replay with model
+                      {t("messages.rerunWithModel", { defaultValue: "Replay with different model" })}
                     </div>
                     {availableModels.length === 0 && (
-                      <div className="px-3 py-2 text-xs text-text-tertiary">Loading models...</div>
+                      <div className="px-3 py-2 text-xs text-text-tertiary">{t("common.loading")}</div>
                     )}
                     {availableModels.map((m: any) => (
                       <button
@@ -385,7 +412,7 @@ export function MessageBubble({ message, userName, onRate, onEdit, onEditAndReru
                       >
                         {m.name}
                         {m.modelIdExternal === message.modelId && (
-                          <span className="ml-1 text-[10px] text-text-tertiary">(current)</span>
+                          <span className="ml-1 text-[10px] text-text-tertiary">({t("messages.currentModel", { defaultValue: "current" })})</span>
                         )}
                       </button>
                     ))}
@@ -397,27 +424,27 @@ export function MessageBubble({ message, userName, onRate, onEdit, onEditAndReru
               <button
                 onClick={() => setIsEditing(true)}
                 className="text-text-tertiary hover:text-text-secondary p-1 rounded"
-                title="Edit message"
+                aria-label={t("messages.edit", { defaultValue: "Edit message" })}
               >
-                <Pencil className="h-3.5 w-3.5" />
+                <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             )}
             {onNote && (
               <button
                 onClick={() => setShowNoteInput(!showNoteInput)}
                 className="text-text-tertiary hover:text-text-secondary p-1 rounded"
-                title="Add note"
+                aria-label={t("messages.addNote", { defaultValue: "Add note" })}
               >
-                <StickyNote className="h-3.5 w-3.5" />
+                <StickyNote className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             )}
             {onFork && (
               <button
                 onClick={() => onFork(message.id)}
                 className="text-text-tertiary hover:text-text-secondary p-1 rounded"
-                title="Fork from here"
+                aria-label={t("messages.fork", { defaultValue: "Fork from here" })}
               >
-                <GitBranch className="h-3.5 w-3.5" />
+                <GitBranch className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             )}
           </div>
@@ -439,7 +466,7 @@ export function MessageBubble({ message, userName, onRate, onEdit, onEditAndReru
                 }
                 if (e.key === "Escape") setShowNoteInput(false);
               }}
-              placeholder="Add a private note..."
+              placeholder={t("messages.notePlaceholder")}
               className="flex-1 h-7 px-2 text-xs bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary"
             />
             <button

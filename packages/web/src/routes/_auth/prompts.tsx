@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   FileText,
   Plus,
@@ -17,12 +18,15 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  XCircle,
 } from "lucide-react";
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Dialog } from "../../components/ui/Dialog";
 import { Badge } from "../../components/ui/Badge";
+import { Skeleton } from "../../components/ui/Skeleton";
+import { toast } from "../../components/ui/Toast";
 
 export const Route = createFileRoute("/_auth/prompts")({
   component: PromptsPage,
@@ -61,13 +65,14 @@ interface PromptVersion {
 // --- Main Page ---
 
 function PromptsPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [selectedPrompt, setSelectedPrompt] = useState<PromptTemplate | null>(null);
 
-  const { data: promptsData } = useQuery({
+  const { data: promptsData, isLoading, isError } = useQuery({
     queryKey: ["prompts", search, categoryFilter],
     queryFn: () => {
       const params = new URLSearchParams();
@@ -80,11 +85,13 @@ function PromptsPage() {
   const deletePrompt = useMutation({
     mutationFn: (id: string) => api.delete(`/api/prompts/${id}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["prompts"] }),
+    onError: (err: any) => toast(err.message ?? t("prompts.errors.deleteFailed", "Failed to delete template"), "error"),
   });
 
   const forkPrompt = useMutation({
     mutationFn: (id: string) => api.post<PromptTemplate>(`/api/prompts/${id}/fork`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["prompts"] }),
+    onError: (err: any) => toast(err.message ?? t("prompts.errors.forkFailed", "Failed to fork template"), "error"),
   });
 
   const prompts = promptsData?.data ?? [];
@@ -92,29 +99,43 @@ function PromptsPage() {
   // Extract unique categories for the filter
   const categories = [...new Set(prompts.map((p) => p.category).filter(Boolean))] as string[];
 
+  if (isError) {
+    return (
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-5xl mx-auto px-4 py-6">
+          <div className="text-center py-16">
+            <XCircle className="h-10 w-10 text-danger mx-auto mb-3" aria-hidden="true" />
+            <p className="text-sm text-danger">{t("prompts.errors.loadFailed", "Failed to load prompt templates")}</p>
+            <p className="text-xs text-text-tertiary mt-1">{t("prompts.errors.tryAgain", "Please try again later")}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-5xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl font-bold text-text">Prompt Library</h1>
+            <h1 className="text-xl font-bold text-text">{t("prompts.title", "Prompt Library")}</h1>
             <p className="text-sm text-text-secondary mt-1">
-              Save, version, fork, and share reusable prompt templates
+              {t("prompts.subtitle", "Save, version, fork, and share reusable prompt templates")}
             </p>
           </div>
           <Button variant="primary" onClick={() => setShowCreate(true)}>
-            <Plus className="h-4 w-4" />
-            New Template
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {t("prompts.newTemplate", "New Template")}
           </Button>
         </div>
 
         {/* Search and Filter Bar */}
         <div className="flex gap-3 mb-4">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" aria-hidden="true" />
             <input
               type="text"
-              placeholder="Search templates..."
+              placeholder={t("prompts.searchPlaceholder", "Search templates...")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full h-10 pl-10 pr-4 text-sm rounded-xl bg-surface-secondary border border-border text-text placeholder:text-text-tertiary focus:outline-primary"
@@ -126,7 +147,7 @@ function PromptsPage() {
               onChange={(e) => setCategoryFilter(e.target.value)}
               className="h-10 px-3 text-sm rounded-xl bg-surface-secondary border border-border text-text focus:outline-primary"
             >
-              <option value="">All categories</option>
+              <option value="">{t("prompts.allCategories", "All categories")}</option>
               {categories.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
@@ -137,18 +158,24 @@ function PromptsPage() {
         </div>
 
         {/* Prompts Grid */}
-        {prompts.length === 0 ? (
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-48 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : prompts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-              <FileText className="h-8 w-8 text-primary" />
+              <FileText className="h-8 w-8 text-primary" aria-hidden="true" />
             </div>
-            <h2 className="text-lg font-semibold text-text mb-2">No prompt templates</h2>
+            <h2 className="text-lg font-semibold text-text mb-2">{t("prompts.empty.title", "No prompt templates")}</h2>
             <p className="text-sm text-text-secondary max-w-sm mb-6">
-              Create reusable templates with variables to speed up your workflows.
+              {t("prompts.empty.subtitle", "Create reusable templates with variables to speed up your workflows.")}
             </p>
             <Button variant="primary" onClick={() => setShowCreate(true)}>
-              <Plus className="h-4 w-4" />
-              Create your first template
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              {t("prompts.empty.cta", "Create your first template")}
             </Button>
           </div>
         ) : (
@@ -159,7 +186,11 @@ function PromptsPage() {
                 prompt={p}
                 onSelect={() => setSelectedPrompt(p)}
                 onFork={() => forkPrompt.mutate(p.id)}
-                onDelete={() => deletePrompt.mutate(p.id)}
+                onDelete={() => {
+                  if (window.confirm(t("prompts.confirmDelete", 'Delete template "{{name}}"? This cannot be undone.', { name: p.name }))) {
+                    deletePrompt.mutate(p.id);
+                  }
+                }}
               />
             ))}
           </div>
@@ -197,6 +228,7 @@ function PromptCard({
   onFork: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   const tags = prompt.tags ?? [];
   const rating = prompt.avgRating ? parseFloat(prompt.avgRating) : null;
 
@@ -215,7 +247,7 @@ function PromptCard({
 
       {/* Description */}
       <p className="text-xs text-text-tertiary mb-2 line-clamp-2">
-        {prompt.description ?? "No description"}
+        {prompt.description ?? t("prompts.noDescription", "No description")}
       </p>
 
       {/* Tags */}
@@ -226,7 +258,7 @@ function PromptCard({
               key={tag}
               className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-md bg-primary/10 text-primary"
             >
-              <Tag className="h-2.5 w-2.5" />
+              <Tag className="h-2.5 w-2.5" aria-hidden="true" />
               {tag}
             </span>
           ))}
@@ -242,51 +274,51 @@ function PromptCard({
       <div className="flex items-center justify-between mt-auto">
         <div className="flex items-center gap-3 text-[11px] text-text-tertiary">
           <span className="flex items-center gap-1">
-            <History className="h-3 w-3" />
+            <History className="h-3 w-3" aria-hidden="true" />
             v{prompt.currentVersion}
           </span>
           {rating !== null && (
             <span className="flex items-center gap-1">
-              <Star className="h-3 w-3 fill-warning text-warning" />
+              <Star className="h-3 w-3 fill-warning text-warning" aria-hidden="true" />
               {rating.toFixed(1)}
             </span>
           )}
-          <span>{prompt.usageCount} uses</span>
+          <span>{prompt.usageCount} {t("prompts.uses", "uses")}</span>
           {prompt.forkedFromTemplateId && (
             <span className="flex items-center gap-1">
-              <GitFork className="h-3 w-3" />
-              fork
+              <GitFork className="h-3 w-3" aria-hidden="true" />
+              {t("prompts.fork", "fork")}
             </span>
           )}
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={onSelect}
-            title="View details"
             className="text-text-tertiary hover:text-text-secondary p-1 rounded cursor-pointer transition-colors"
+            aria-label={t("prompts.viewDetails", "View details")}
           >
-            <Eye className="h-3.5 w-3.5" />
+            <Eye className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
           <button
             onClick={() => navigator.clipboard.writeText(prompt.content)}
-            title="Copy content"
             className="text-text-tertiary hover:text-text-secondary p-1 rounded cursor-pointer transition-colors"
+            aria-label={t("prompts.copyContent", "Copy content")}
           >
-            <Copy className="h-3.5 w-3.5" />
+            <Copy className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
           <button
             onClick={onFork}
-            title="Fork template"
             className="text-text-tertiary hover:text-text-secondary p-1 rounded cursor-pointer transition-colors"
+            aria-label={t("prompts.forkTemplate", "Fork template")}
           >
-            <GitFork className="h-3.5 w-3.5" />
+            <GitFork className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
           <button
             onClick={onDelete}
-            title="Delete"
             className="text-text-tertiary hover:text-danger p-1 rounded cursor-pointer transition-colors"
+            aria-label={t("prompts.deleteTemplate", "Delete template")}
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -297,23 +329,24 @@ function PromptCard({
 // --- Visibility Icon ---
 
 function VisibilityIcon({ visibility }: { visibility: string }) {
+  const { t } = useTranslation();
   switch (visibility) {
     case "org":
       return (
-        <span title="Visible to org" className="text-text-tertiary">
-          <Users className="h-3.5 w-3.5" />
+        <span title={t("prompts.visibility.org", "Visible to org")} className="text-text-tertiary">
+          <Users className="h-3.5 w-3.5" aria-hidden="true" />
         </span>
       );
     case "team":
       return (
-        <span title="Visible to team" className="text-text-tertiary">
-          <Eye className="h-3.5 w-3.5" />
+        <span title={t("prompts.visibility.team", "Visible to team")} className="text-text-tertiary">
+          <Eye className="h-3.5 w-3.5" aria-hidden="true" />
         </span>
       );
     default:
       return (
-        <span title="Private" className="text-text-tertiary">
-          <EyeOff className="h-3.5 w-3.5" />
+        <span title={t("prompts.visibility.private", "Private")} className="text-text-tertiary">
+          <EyeOff className="h-3.5 w-3.5" aria-hidden="true" />
         </span>
       );
   }
@@ -330,6 +363,7 @@ function StarRating({
   onChange?: (rating: number) => void;
   readonly?: boolean;
 }) {
+  const { t } = useTranslation();
   const [hover, setHover] = useState(0);
 
   return (
@@ -343,6 +377,7 @@ function StarRating({
           onMouseEnter={() => !readonly && setHover(star)}
           onMouseLeave={() => !readonly && setHover(0)}
           className={`p-0.5 ${readonly ? "cursor-default" : "cursor-pointer"}`}
+          aria-label={t("prompts.rateStar", "Rate {{star}} star(s)", { star })}
         >
           <Star
             className={`h-4 w-4 ${
@@ -350,6 +385,7 @@ function StarRating({
                 ? "fill-warning text-warning"
                 : "text-text-tertiary"
             }`}
+            aria-hidden="true"
           />
         </button>
       ))}
@@ -368,13 +404,14 @@ function PromptDetailDialog({
   open: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"details" | "versions">("details");
   const [showNewVersion, setShowNewVersion] = useState(false);
   const [editingTags, setEditingTags] = useState(false);
   const [tagInput, setTagInput] = useState("");
 
-  const { data: prompt } = useQuery({
+  const { data: prompt, isLoading, isError } = useQuery({
     queryKey: ["prompts", promptId],
     queryFn: () => api.get<PromptTemplate>(`/api/prompts/${promptId}`),
     enabled: open,
@@ -389,6 +426,7 @@ function PromptDetailDialog({
   const rateMutation = useMutation({
     mutationFn: (rating: number) => api.post(`/api/prompts/${promptId}/rate`, { rating }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["prompts", promptId] }),
+    onError: (err: any) => toast(err.message ?? t("prompts.errors.rateFailed", "Failed to rate template"), "error"),
   });
 
   const updateTagsMutation = useMutation({
@@ -397,15 +435,38 @@ function PromptDetailDialog({
       queryClient.invalidateQueries({ queryKey: ["prompts", promptId] });
       setEditingTags(false);
     },
+    onError: (err: any) => toast(err.message ?? t("prompts.errors.tagsFailed", "Failed to update tags"), "error"),
   });
 
   const updateVisibilityMutation = useMutation({
     mutationFn: (visibility: string) =>
       api.patch(`/api/prompts/${promptId}/visibility`, { visibility }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["prompts", promptId] }),
+    onError: (err: any) => toast(err.message ?? t("prompts.errors.visibilityFailed", "Failed to update visibility"), "error"),
   });
 
-  if (!prompt) return null;
+  if (isLoading) {
+    return (
+      <Dialog open={open} onClose={onClose} title="..." className="max-w-2xl">
+        <div className="space-y-4">
+          <Skeleton className="h-6 w-2/3" />
+          <Skeleton className="h-4 w-1/2" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </Dialog>
+    );
+  }
+
+  if (isError || !prompt) {
+    return (
+      <Dialog open={open} onClose={onClose} title={t("prompts.errors.title", "Error")} className="max-w-2xl">
+        <div className="text-center py-8">
+          <XCircle className="h-8 w-8 text-danger mx-auto mb-2" aria-hidden="true" />
+          <p className="text-sm text-danger">{t("prompts.errors.loadDetailFailed", "Failed to load template details")}</p>
+        </div>
+      </Dialog>
+    );
+  }
 
   const tags = (prompt.tags ?? []) as string[];
   const currentRating = prompt.avgRating ? parseFloat(prompt.avgRating) : 0;
@@ -419,7 +480,7 @@ function PromptDetailDialog({
   };
 
   const removeTag = (tag: string) => {
-    updateTagsMutation.mutate(tags.filter((t) => t !== tag));
+    updateTagsMutation.mutate(tags.filter((tagItem) => tagItem !== tag));
   };
 
   return (
@@ -434,7 +495,7 @@ function PromptDetailDialog({
               : "border-transparent text-text-secondary hover:text-text"
           }`}
         >
-          Details
+          {t("prompts.tabs.details", "Details")}
         </button>
         <button
           onClick={() => setActiveTab("versions")}
@@ -444,8 +505,8 @@ function PromptDetailDialog({
               : "border-transparent text-text-secondary hover:text-text"
           }`}
         >
-          <History className="h-3.5 w-3.5 inline mr-1" />
-          Versions ({prompt.currentVersion})
+          <History className="h-3.5 w-3.5 inline mr-1" aria-hidden="true" />
+          {t("prompts.tabs.versions", "Versions")} ({prompt.currentVersion})
         </button>
       </div>
 
@@ -460,12 +521,12 @@ function PromptDetailDialog({
           <div className="flex items-center gap-4 text-sm">
             {prompt.category && <Badge variant="default">{prompt.category}</Badge>}
             <span className="text-text-tertiary">v{prompt.currentVersion}</span>
-            <span className="text-text-tertiary">{prompt.usageCount} uses</span>
+            <span className="text-text-tertiary">{prompt.usageCount} {t("prompts.uses", "uses")}</span>
           </div>
 
           {/* Rating */}
           <div className="flex items-center gap-3">
-            <span className="text-sm text-text-secondary">Rate:</span>
+            <span className="text-sm text-text-secondary">{t("prompts.rate", "Rate:")}</span>
             <StarRating value={Math.round(currentRating)} onChange={(r) => rateMutation.mutate(r)} />
             {currentRating > 0 && (
               <span className="text-sm text-text-tertiary">{currentRating.toFixed(1)}</span>
@@ -474,7 +535,7 @@ function PromptDetailDialog({
 
           {/* Visibility Toggle */}
           <div className="flex items-center gap-3">
-            <span className="text-sm text-text-secondary">Visibility:</span>
+            <span className="text-sm text-text-secondary">{t("prompts.visibilityLabel", "Visibility:")}</span>
             <div className="flex rounded-lg border border-border overflow-hidden">
               {(["private", "team", "org"] as const).map((v) => (
                 <button
@@ -495,13 +556,13 @@ function PromptDetailDialog({
           {/* Tags */}
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-sm text-text-secondary">Tags:</span>
+              <span className="text-sm text-text-secondary">{t("prompts.tagsLabel", "Tags:")}</span>
               {!editingTags && (
                 <button
                   onClick={() => setEditingTags(true)}
                   className="text-xs text-primary hover:underline"
                 >
-                  Edit
+                  {t("prompts.edit", "Edit")}
                 </button>
               )}
             </div>
@@ -511,11 +572,11 @@ function PromptDetailDialog({
                   key={tag}
                   className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md bg-primary/10 text-primary"
                 >
-                  <Tag className="h-3 w-3" />
+                  <Tag className="h-3 w-3" aria-hidden="true" />
                   {tag}
                   {editingTags && (
-                    <button onClick={() => removeTag(tag)} className="hover:text-danger">
-                      <X className="h-3 w-3" />
+                    <button onClick={() => removeTag(tag)} className="hover:text-danger" aria-label={t("prompts.removeTag", "Remove tag")}>
+                      <X className="h-3 w-3" aria-hidden="true" />
                     </button>
                   )}
                 </span>
@@ -532,7 +593,7 @@ function PromptDetailDialog({
                     type="text"
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
-                    placeholder="Add tag..."
+                    placeholder={t("prompts.addTagPlaceholder", "Add tag...")}
                     className="h-6 w-24 px-2 text-xs rounded-md border border-border bg-surface text-text placeholder:text-text-tertiary focus:outline-primary"
                     autoFocus
                   />
@@ -543,7 +604,7 @@ function PromptDetailDialog({
                   onClick={() => setEditingTags(false)}
                   className="text-xs text-text-tertiary hover:text-text"
                 >
-                  Done
+                  {t("prompts.done", "Done")}
                 </button>
               )}
             </div>
@@ -551,7 +612,7 @@ function PromptDetailDialog({
 
           {/* Content */}
           <div>
-            <span className="text-sm text-text-secondary block mb-1">Content:</span>
+            <span className="text-sm text-text-secondary block mb-1">{t("prompts.contentLabel", "Content:")}</span>
             <pre className="text-xs bg-surface border border-border rounded-lg p-3 overflow-auto max-h-64 text-text-secondary font-mono whitespace-pre-wrap">
               {prompt.content}
             </pre>
@@ -560,7 +621,7 @@ function PromptDetailDialog({
           {/* System Prompt */}
           {prompt.systemPrompt && (
             <div>
-              <span className="text-sm text-text-secondary block mb-1">System Prompt:</span>
+              <span className="text-sm text-text-secondary block mb-1">{t("prompts.systemPromptLabel", "System Prompt:")}</span>
               <pre className="text-xs bg-surface border border-border rounded-lg p-3 overflow-auto max-h-40 text-text-secondary font-mono whitespace-pre-wrap">
                 {prompt.systemPrompt}
               </pre>
@@ -573,8 +634,8 @@ function PromptDetailDialog({
         <div className="space-y-3">
           <div className="flex justify-end">
             <Button size="sm" variant="primary" onClick={() => setShowNewVersion(true)}>
-              <Plus className="h-3.5 w-3.5" />
-              New Version
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              {t("prompts.newVersion", "New Version")}
             </Button>
           </div>
 
@@ -601,6 +662,7 @@ function PromptDetailDialog({
 // --- Version Entry ---
 
 function VersionEntry({ version }: { version: PromptVersion }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -616,9 +678,9 @@ function VersionEntry({ version }: { version: PromptVersion }) {
           </span>
         </div>
         {expanded ? (
-          <ChevronUp className="h-4 w-4 text-text-tertiary" />
+          <ChevronUp className="h-4 w-4 text-text-tertiary" aria-hidden="true" />
         ) : (
-          <ChevronDown className="h-4 w-4 text-text-tertiary" />
+          <ChevronDown className="h-4 w-4 text-text-tertiary" aria-hidden="true" />
         )}
       </button>
 
@@ -634,7 +696,7 @@ function VersionEntry({ version }: { version: PromptVersion }) {
           {version.systemPrompt && (
             <div>
               <span className="text-[10px] uppercase tracking-wide text-text-tertiary">
-                System Prompt
+                {t("prompts.systemPromptLabel", "System Prompt")}
               </span>
               <pre className="text-xs bg-surface border border-border rounded-lg p-2 overflow-auto max-h-32 text-text-secondary font-mono whitespace-pre-wrap">
                 {version.systemPrompt}
@@ -658,6 +720,7 @@ function CreateVersionForm({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [content, setContent] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
@@ -670,11 +733,12 @@ function CreateVersionForm({
       queryClient.invalidateQueries({ queryKey: ["prompts", promptId, "versions"] });
       onCreated();
     },
+    onError: (err: any) => toast(err.message ?? t("prompts.errors.versionFailed", "Failed to create version"), "error"),
   });
 
   return (
     <div className="border border-primary/30 rounded-lg p-4 bg-primary/5">
-      <h4 className="text-sm font-medium text-text mb-3">Create New Version</h4>
+      <h4 className="text-sm font-medium text-text mb-3">{t("prompts.createVersion", "Create New Version")}</h4>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -687,40 +751,40 @@ function CreateVersionForm({
         className="space-y-3"
       >
         <div>
-          <label className="block text-xs font-medium text-text mb-1">Content</label>
+          <label className="block text-xs font-medium text-text mb-1">{t("prompts.contentLabel", "Content")}</label>
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             rows={5}
             required
-            placeholder="Updated template content..."
+            placeholder={t("prompts.versionContentPlaceholder", "Updated template content...")}
             className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary focus:outline-primary resize-none font-mono"
           />
         </div>
         <div>
           <label className="block text-xs font-medium text-text mb-1">
-            System Prompt (optional)
+            {t("prompts.systemPromptOptional", "System Prompt (optional)")}
           </label>
           <textarea
             value={systemPrompt}
             onChange={(e) => setSystemPrompt(e.target.value)}
             rows={2}
-            placeholder="System prompt for this version..."
+            placeholder={t("prompts.systemPromptPlaceholder", "System prompt for this version...")}
             className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary focus:outline-primary resize-none font-mono"
           />
         </div>
         <Input
-          label="Changelog (optional)"
+          label={t("prompts.changelogLabel", "Changelog (optional)")}
           value={changelog}
           onChange={(e) => setChangelog(e.target.value)}
-          placeholder="What changed in this version?"
+          placeholder={t("prompts.changelogPlaceholder", "What changed in this version?")}
         />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={onClose}>
-            Cancel
+            {t("common.cancel", "Cancel")}
           </Button>
           <Button type="submit" variant="primary" size="sm" loading={create.isPending}>
-            Save Version
+            {t("prompts.saveVersion", "Save Version")}
           </Button>
         </div>
       </form>
@@ -731,6 +795,7 @@ function CreateVersionForm({
 // --- Create Prompt Dialog ---
 
 function CreatePromptDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -754,6 +819,7 @@ function CreatePromptDialog({ open, onClose }: { open: boolean; onClose: () => v
       setTags([]);
       setVisibility("private");
     },
+    onError: (err: any) => toast(err.message ?? t("prompts.errors.createFailed", "Failed to create template"), "error"),
   });
 
   const addTag = () => {
@@ -765,7 +831,7 @@ function CreatePromptDialog({ open, onClose }: { open: boolean; onClose: () => v
   };
 
   return (
-    <Dialog open={open} onClose={onClose} title="Create Prompt Template" className="max-w-2xl">
+    <Dialog open={open} onClose={onClose} title={t("prompts.createTitle", "Create Prompt Template")} className="max-w-2xl">
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -782,27 +848,27 @@ function CreatePromptDialog({ open, onClose }: { open: boolean; onClose: () => v
         className="space-y-4"
       >
         <Input
-          label="Name"
+          label={t("prompts.form.name", "Name")}
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
           autoFocus
         />
         <Input
-          label="Description (optional)"
+          label={t("prompts.form.description", "Description (optional)")}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
         <Input
-          label="Category (optional)"
+          label={t("prompts.form.category", "Category (optional)")}
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          placeholder="e.g., coding, writing, analysis"
+          placeholder={t("prompts.form.categoryPlaceholder", "e.g., coding, writing, analysis")}
         />
 
         {/* Tags */}
         <div>
-          <label className="block text-sm font-medium text-text mb-1">Tags (optional)</label>
+          <label className="block text-sm font-medium text-text mb-1">{t("prompts.form.tags", "Tags (optional)")}</label>
           <div className="flex flex-wrap gap-1.5 mb-2">
             {tags.map((tag) => (
               <span
@@ -812,10 +878,11 @@ function CreatePromptDialog({ open, onClose }: { open: boolean; onClose: () => v
                 {tag}
                 <button
                   type="button"
-                  onClick={() => setTags(tags.filter((t) => t !== tag))}
+                  onClick={() => setTags(tags.filter((tagItem) => tagItem !== tag))}
                   className="hover:text-danger"
+                  aria-label={t("prompts.removeTag", "Remove tag")}
                 >
-                  <X className="h-3 w-3" />
+                  <X className="h-3 w-3" aria-hidden="true" />
                 </button>
               </span>
             ))}
@@ -831,18 +898,18 @@ function CreatePromptDialog({ open, onClose }: { open: boolean; onClose: () => v
                   addTag();
                 }
               }}
-              placeholder="Type and press Enter..."
+              placeholder={t("prompts.form.tagPlaceholder", "Type and press Enter...")}
               className="flex-1 h-8 px-3 text-sm rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary focus:outline-primary"
             />
             <Button type="button" variant="secondary" size="sm" onClick={addTag}>
-              Add
+              {t("prompts.form.addTag", "Add")}
             </Button>
           </div>
         </div>
 
         {/* Visibility */}
         <div>
-          <label className="block text-sm font-medium text-text mb-1">Visibility</label>
+          <label className="block text-sm font-medium text-text mb-1">{t("prompts.form.visibility", "Visibility")}</label>
           <div className="flex rounded-lg border border-border overflow-hidden w-fit">
             {(["private", "team", "org"] as const).map((v) => (
               <button
@@ -863,13 +930,13 @@ function CreatePromptDialog({ open, onClose }: { open: boolean; onClose: () => v
 
         {/* Content */}
         <div>
-          <label className="block text-sm font-medium text-text mb-1">Content</label>
+          <label className="block text-sm font-medium text-text mb-1">{t("prompts.form.content", "Content")}</label>
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             rows={6}
             required
-            placeholder="Use {{variable}} for template variables..."
+            placeholder={t("prompts.form.contentPlaceholder", "Use {{variable}} for template variables...")}
             className="w-full px-3 py-2 text-sm bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary focus:outline-primary resize-none font-mono"
           />
         </div>
@@ -877,23 +944,23 @@ function CreatePromptDialog({ open, onClose }: { open: boolean; onClose: () => v
         {/* System Prompt */}
         <div>
           <label className="block text-sm font-medium text-text mb-1">
-            System Prompt (optional)
+            {t("prompts.form.systemPrompt", "System Prompt (optional)")}
           </label>
           <textarea
             value={systemPrompt}
             onChange={(e) => setSystemPrompt(e.target.value)}
             rows={3}
-            placeholder="System-level instructions..."
+            placeholder={t("prompts.form.systemPromptPlaceholder", "System-level instructions...")}
             className="w-full px-3 py-2 text-sm bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary focus:outline-primary resize-none font-mono"
           />
         </div>
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
+            {t("common.cancel", "Cancel")}
           </Button>
           <Button type="submit" variant="primary" loading={create.isPending}>
-            Create
+            {t("prompts.create", "Create")}
           </Button>
         </div>
       </form>

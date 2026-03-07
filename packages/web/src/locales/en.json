@@ -27,7 +27,11 @@
     "help": "Help",
     "sectionBuild": "Build",
     "sectionDiscover": "Discover",
-    "sectionDeveloper": "Developer"
+    "sectionDeveloper": "Developer",
+    "collapseSidebar": "Collapse sidebar",
+    "openSidebar": "Open sidebar",
+    "conversations": "Conversations",
+    "profile": "Profile settings"
   },
   "common": {
     "save": "Save",
@@ -64,7 +68,8 @@
     "learnMore": "Learn more",
     "optional": "Optional",
     "required": "Required",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "archive": "Archive"
   },
   "auth": {
     "login": "Log in",
@@ -112,6 +117,9 @@
     "forked": "Forked from {{name}}",
     "delete": "Delete conversation",
     "deleteConfirm": "Are you sure you want to delete this conversation? This cannot be undone.",
+    "deleteConfirmTitle": "Delete conversations",
+    "deleteConfirmMessage": "Are you sure you want to delete {{count}} conversation(s)? This cannot be undone.",
+    "deleted": "Conversations deleted",
     "share": "Share conversation",
     "shareLink": "Share link",
     "rename": "Rename conversation",
@@ -127,7 +135,33 @@
     "previous30Days": "Previous 30 days",
     "older": "Older",
     "newTitle": "Start a new conversation",
-    "newDescription": "Choose a model and begin chatting"
+    "newDescription": "Choose a model and begin chatting",
+    "filter": "Filter conversations",
+    "bulkSelect": "Bulk select",
+    "untitled": "Untitled"
+  },
+  "conversation": {
+    "archive": "Archive",
+    "archived": "Conversation archived",
+    "delete": "Delete",
+    "deleteConfirmTitle": "Delete conversation",
+    "deleteConfirmMessage": "Are you sure you want to delete this conversation? This action cannot be undone.",
+    "deleted": "Conversation deleted",
+    "exportCsv": "Export CSV",
+    "exportHtml": "Export HTML",
+    "exportJson": "Export JSON",
+    "exportMarkdown": "Export Markdown",
+    "fork": "Fork",
+    "forked": "Conversation forked",
+    "moreActions": "More actions",
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "rename": "Rename",
+    "renameInput": "Conversation title",
+    "settings": "Conversation settings",
+    "share": "Share",
+    "shareCopied": "Share link copied to clipboard",
+    "untitled": "Untitled"
   },
   "agents": {
     "create": "Create agent",
@@ -336,21 +370,44 @@
     "passwordChanged": "Password changed successfully",
     "updatePassword": "Update password",
     "save": "Save changes",
-    "saved": "Saved!"
+    "saved": "Saved!",
+    "conversationSettings": "Conversation Settings",
+    "model": "Model",
+    "orgDefault": "Organization default",
+    "systemPrompt": "System Prompt",
+    "systemPromptPlaceholder": "You are a helpful assistant...",
+    "temperature": "Temperature",
+    "precise": "Precise",
+    "creative": "Creative",
+    "topP": "Top P",
+    "maxTokens": "Max Tokens",
+    "frequencyPenalty": "Frequency Penalty",
+    "presencePenalty": "Presence Penalty",
+    "visibility": "Visibility",
+    "private": "Private",
+    "privateDesc": "Only you",
+    "team": "Team",
+    "teamDesc": "Your team members",
+    "public": "Public",
+    "publicDesc": "Anyone with link"
   },
   "messages": {
     "send": "Send message",
     "placeholder": "Type a message...",
     "disclaimer": "AI responses may contain inaccuracies. Verify important information.",
-    "sendPlaceholder": "Type a message...",
     "edit": "Edit message",
     "edited": "Edited",
     "rate": "Rate response",
     "rateGood": "Good response",
     "rateBad": "Bad response",
+    "rateUp": "Good response",
+    "rateDown": "Bad response",
     "note": "Add note",
+    "addNote": "Add note",
     "notePlaceholder": "Add a note about this message...",
     "retry": "Regenerate response",
+    "rerun": "Re-run",
+    "rerunWithModel": "Replay with different model",
     "stop": "Stop generating",
     "copy": "Copy message",
     "thinking": "Thinking...",
@@ -359,7 +416,33 @@
     "attachFile": "Attach file",
     "attachImage": "Attach image",
     "branchFrom": "Branch from here",
-    "viewSource": "View source"
+    "fork": "Fork from here",
+    "viewSource": "View source",
+    "empty": "No messages yet. Start the conversation below.",
+    "newMessages": "New messages",
+    "inputLabel": "Message input",
+    "shiftEnterHint": "Shift+Enter for new line",
+    "listen": "Listen",
+    "stopListening": "Stop listening",
+    "pause": "Pause streaming",
+    "resume": "Resume streaming",
+    "saveAndRerun": "Save & Re-run",
+    "editHistory": "Edit History",
+    "revisionCount": "{{count}} revision(s)",
+    "noVersions": "No previous versions found.",
+    "currentVersion": "Current version",
+    "version": "Version {{number}}",
+    "currentModel": "current"
+  },
+  "voice": {
+    "unsupported": "Speech recognition is not supported in this browser",
+    "cancelRecording": "Cancel recording",
+    "sendRecording": "Send audio recording",
+    "stopRecording": "Stop recording",
+    "startStt": "Voice input (speech-to-text)",
+    "startAudio": "Record audio message",
+    "modeStt": "Mode: Speech-to-text (click to switch to audio recording)",
+    "modeAudio": "Mode: Audio recording (click to switch to speech-to-text)"
   },
   "files": {
     "upload": "Upload file"
@@ -379,6 +462,7 @@
   "search": {
     "title": "Search",
     "placeholder": "Search conversations, agents, files, knowledge...",
+    "openPalette": "Search or run a command",
     "noResults": "No results found",
     "noResultsHint": "Try different keywords or broaden your search",
     "searching": "Searching...",
@@ -405,6 +489,32 @@
     "tip": {
       "semantic": "Use natural language for semantic search"
     }
+  },
+  "commandPalette": {
+    "placeholder": "Search conversations, agents, commands...",
+    "searchLabel": "Command palette search",
+    "noResults": "No results for",
+    "loading": "Loading...",
+    "close": "Close",
+    "select": "Select",
+    "recent": "Recent",
+    "commands": "Commands",
+    "navigate": "Navigate",
+    "conversations": "Conversations",
+    "untitledConversation": "Untitled Conversation",
+    "newChat": "New Chat",
+    "searchConversations": "Search Conversations",
+    "agents": "Agents",
+    "agentsNav": "Agents",
+    "newAgent": "New Agent",
+    "knowledgeBase": "Knowledge Base",
+    "workspaces": "Workspaces",
+    "settings": "Settings",
+    "keyboardShortcuts": "Keyboard Shortcuts",
+    "toggleSidebar": "Toggle Sidebar",
+    "lightMode": "Light Mode",
+    "darkMode": "Dark Mode",
+    "systemTheme": "System Theme"
   },
   "folders": {
     "title": "Folders",
@@ -571,9 +681,16 @@
   },
   "status": {
     "connected": "Connected",
+    "connecting": "Connecting...",
     "reconnecting": "Reconnecting...",
     "offline": "Offline",
     "degraded": "Some services are experiencing issues"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "toggle": "Theme: {{current}}. Switch to {{next}}"
   },
   "systemStatus": {
     "downTitle": "System is currently unavailable",
@@ -606,6 +723,13 @@
     "retry": "Retry",
     "retryIn": "Retry in {{seconds}}s",
     "autoRetrying": "Retrying automatically...",
-    "retryWithFallback": "Trying alternative..."
+    "retryWithFallback": "Trying alternative...",
+    "archiveFailed": "Failed to archive conversation",
+    "deleteFailed": "Failed to delete conversation",
+    "forkFailed": "Failed to fork conversation",
+    "messageFailed": "Message failed to send.",
+    "settingsFailed": "Failed to save settings",
+    "shareFailed": "Failed to create share link",
+    "updateFailed": "Failed to update conversation"
   }
 }

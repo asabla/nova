@@ -85,7 +85,7 @@ function SearchPage() {
   const workspaces = (workspacesData as any)?.data ?? [];
 
   // Main search query
-  const { data: results, isLoading } = useQuery({
+  const { data: results, isLoading, isError } = useQuery({
     queryKey: [
       "search",
       debouncedQuery,
@@ -189,13 +189,13 @@ function SearchPage() {
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
         {/* Header */}
         <div className="flex items-center gap-3 mb-2">
-          <Search className="h-5 w-5 text-primary" />
+          <Search className="h-5 w-5 text-primary" aria-hidden="true" />
           <h1 className="text-xl font-bold text-text">{t("search.title", "Search")}</h1>
         </div>
 
         {/* Search Input */}
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-text-tertiary" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-text-tertiary" aria-hidden="true" />
           <input
             type="text"
             value={query}
@@ -218,24 +218,30 @@ function SearchPage() {
                   ? t("search.mode.semantic", "Semantic search")
                   : t("search.mode.keyword", "Keyword search")
               }
+              aria-label={
+                searchMode === "semantic"
+                  ? t("search.mode.semantic", "Semantic search")
+                  : t("search.mode.keyword", "Keyword search")
+              }
               className={`p-1.5 rounded-lg transition-colors ${
                 searchMode === "semantic"
                   ? "bg-primary/10 text-primary"
                   : "text-text-tertiary hover:text-text-secondary"
               }`}
             >
-              <Sparkles className="h-4 w-4" />
+              <Sparkles className="h-4 w-4" aria-hidden="true" />
             </button>
             {/* Filter toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
+              aria-label={t("search.toggleFilters", "Toggle filters")}
               className={`p-1.5 rounded-lg transition-colors ${
                 showFilters || hasFilters
                   ? "bg-primary/10 text-primary"
                   : "text-text-tertiary hover:text-text-secondary"
               }`}
             >
-              <Filter className="h-4 w-4" />
+              <Filter className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -345,10 +351,19 @@ function SearchPage() {
           </div>
         )}
 
+        {/* Error */}
+        {isError && debouncedQuery.length >= 2 && (
+          <div className="text-center py-12">
+            <Search className="h-8 w-8 text-danger mx-auto mb-3 opacity-60" aria-hidden="true" />
+            <p className="text-sm text-danger">{t("search.error", "Search failed")}</p>
+            <p className="text-xs text-text-tertiary mt-1">{t("common.tryAgain", "Please try again later.")}</p>
+          </div>
+        )}
+
         {/* Loading */}
         {isLoading && debouncedQuery.length >= 2 && (
           <div className="flex items-center justify-center gap-2 py-12 text-sm text-text-tertiary">
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             {t("search.searching", "Searching...")}
           </div>
         )}
@@ -358,7 +373,7 @@ function SearchPage() {
           <div className="space-y-1">
             {searchMode === "semantic" && (
               <div className="flex items-center gap-1.5 px-1 pb-1">
-                <Sparkles className="h-3 w-3 text-primary" />
+                <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
                 <span className="text-[10px] text-primary font-medium">
                   {t("search.semanticMode", "Semantic search")}
                 </span>

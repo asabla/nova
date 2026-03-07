@@ -37,11 +37,11 @@ function ToolCallItem({ call, onApprove, onReject }: {
   const [expanded, setExpanded] = useState(false);
 
   const statusIcon = {
-    pending: <Loader2 className="h-3.5 w-3.5 text-text-tertiary animate-spin" />,
-    running: <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />,
-    success: <Check className="h-3.5 w-3.5 text-success" />,
-    failed: <X className="h-3.5 w-3.5 text-danger" />,
-    approval_required: <Wrench className="h-3.5 w-3.5 text-warning" />,
+    pending: <Loader2 className="h-3.5 w-3.5 text-text-tertiary animate-spin" aria-hidden="true" />,
+    running: <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" aria-hidden="true" />,
+    success: <Check className="h-3.5 w-3.5 text-success" aria-hidden="true" />,
+    failed: <X className="h-3.5 w-3.5 text-danger" aria-hidden="true" />,
+    approval_required: <Wrench className="h-3.5 w-3.5 text-warning" aria-hidden="true" />,
   };
 
   return (
@@ -49,8 +49,9 @@ function ToolCallItem({ call, onApprove, onReject }: {
       <button
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-surface-tertiary/50 transition-colors"
+        aria-expanded={expanded}
       >
-        {expanded ? <ChevronDown className="h-3.5 w-3.5 text-text-tertiary" /> : <ChevronRight className="h-3.5 w-3.5 text-text-tertiary" />}
+        {expanded ? <ChevronDown className="h-3.5 w-3.5 text-text-tertiary" aria-hidden="true" /> : <ChevronRight className="h-3.5 w-3.5 text-text-tertiary" aria-hidden="true" />}
         {statusIcon[call.status]}
         <span className="text-xs font-mono text-text">{call.name}</span>
         <span className={clsx(
@@ -86,10 +87,10 @@ function ToolCallItem({ call, onApprove, onReject }: {
           {call.status === "approval_required" && onApprove && onReject && (
             <div className="flex items-center gap-2 pt-1">
               <Button size="sm" variant="primary" onClick={() => onApprove(call.id)}>
-                <Check className="h-3 w-3" /> Approve
+                <Check className="h-3 w-3" aria-hidden="true" /> Approve
               </Button>
               <Button size="sm" variant="ghost" onClick={() => onReject(call.id)}>
-                <X className="h-3 w-3" /> Reject
+                <X className="h-3 w-3" aria-hidden="true" /> Reject
               </Button>
             </div>
           )}

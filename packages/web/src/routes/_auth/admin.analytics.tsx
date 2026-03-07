@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Coins,
   DollarSign,
@@ -34,6 +35,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { Badge } from "../../components/ui/Badge";
+import { toast } from "../../components/ui/Toast";
 import { api, apiHeaders } from "../../lib/api";
 
 export const Route = createFileRoute("/_auth/admin/analytics")({
@@ -215,12 +217,12 @@ function formatLatency(ms: number): string {
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function formatDateTime(dateStr: string): string {
   const d = new Date(dateStr);
-  return d.toLocaleDateString("en-US", {
+  return d.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -268,6 +270,7 @@ function defaultDateRange() {
 // ── Main component ───────────────────────────────────────────────────
 
 function AdminAnalyticsPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [datePreset, setDatePreset] = useState<DatePreset>("30d");
   const [customRange, setCustomRange] = useState(defaultDateRange);
@@ -456,6 +459,7 @@ function AdminAnalyticsPage() {
       queryClient.invalidateQueries({ queryKey: ["analytics-budget-status"] });
       setShowBudgetForm(false);
     },
+    onError: (err: any) => toast(err.message ?? t("admin.alertCreateFailed", { defaultValue: "Failed to create alert" }), "error"),
   });
 
   const deleteAlertMutation = useMutation({
@@ -465,6 +469,7 @@ function AdminAnalyticsPage() {
       queryClient.invalidateQueries({ queryKey: ["analytics-budget-alerts"] });
       queryClient.invalidateQueries({ queryKey: ["analytics-budget-status"] });
     },
+    onError: (err: any) => toast(err.message ?? t("admin.alertDeleteFailed", { defaultValue: "Failed to delete alert" }), "error"),
   });
 
   const toggleAlertMutation = useMutation({
@@ -474,6 +479,7 @@ function AdminAnalyticsPage() {
       queryClient.invalidateQueries({ queryKey: ["analytics-budget-alerts"] });
       queryClient.invalidateQueries({ queryKey: ["analytics-budget-status"] });
     },
+    onError: (err: any) => toast(err.message ?? t("admin.alertToggleFailed", { defaultValue: "Failed to toggle alert" }), "error"),
   });
 
   // ── Date preset buttons ────────────────────────────────────────
@@ -502,10 +508,10 @@ function AdminAnalyticsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-text">
-            Analytics Overview
+            {t("admin.analyticsTitle", { defaultValue: "Analytics Overview" })}
           </h2>
-          <p className="text-sm text-text-secondary">
-            Organization-wide usage metrics, costs, and trends.
+          <p className="text-sm text-text-secondary mt-1">
+            {t("admin.analyticsDescription", { defaultValue: "Organization-wide usage metrics, costs, and trends." })}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -554,7 +560,7 @@ function AdminAnalyticsPage() {
             disabled={exporting}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-text bg-surface border border-border rounded-lg hover:bg-surface-tertiary transition-colors disabled:opacity-50"
           >
-            <Download className="h-3.5 w-3.5" />
+            <Download className="h-3.5 w-3.5" aria-hidden="true" />
             {exporting ? "Exporting..." : "Export CSV"}
           </button>
         </div>
@@ -584,7 +590,7 @@ function AdminAnalyticsPage() {
           {/* Summary stat cards */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <StatCard
-              icon={<Coins className="h-5 w-5 text-primary" />}
+              icon={<Coins className="h-5 w-5 text-primary" aria-hidden="true" />}
               label="Total Tokens"
               value={summaryLoading ? null : formatNumber(s?.totalTokens ?? 0)}
               subtitle={
@@ -594,7 +600,7 @@ function AdminAnalyticsPage() {
               }
             />
             <StatCard
-              icon={<DollarSign className="h-5 w-5 text-success" />}
+              icon={<DollarSign className="h-5 w-5 text-success" aria-hidden="true" />}
               label="Total Cost"
               value={summaryLoading ? null : formatCost(s?.totalCostCents ?? 0)}
               subtitle={
@@ -602,20 +608,20 @@ function AdminAnalyticsPage() {
               }
             />
             <StatCard
-              icon={<Users className="h-5 w-5 text-primary" />}
+              icon={<Users className="h-5 w-5 text-primary" aria-hidden="true" />}
               label="Active Users"
               value={summaryLoading ? null : String(s?.activeUsers ?? 0)}
               subtitle={s ? `of ${s.totalUsers} total` : undefined}
             />
             <StatCard
-              icon={<Timer className="h-5 w-5 text-warning" />}
+              icon={<Timer className="h-5 w-5 text-warning" aria-hidden="true" />}
               label="Avg Latency"
               value={
                 summaryLoading ? null : formatLatency(s?.avgLatencyMs ?? 0)
               }
             />
             <StatCard
-              icon={<AlertTriangle className="h-5 w-5 text-danger" />}
+              icon={<AlertTriangle className="h-5 w-5 text-danger" aria-hidden="true" />}
               label="Error Rate"
               value={summaryLoading ? null : `${s?.errorRate ?? 0}%`}
               subtitle={s ? `${s.totalErrors} total errors` : undefined}
@@ -1053,7 +1059,7 @@ function AdminAnalyticsPage() {
                   disabled={exporting}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-text bg-surface border border-border rounded-lg hover:bg-surface-tertiary transition-colors disabled:opacity-50"
                 >
-                  <Download className="h-3.5 w-3.5" />
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" />
                   Daily
                 </button>
                 <button
@@ -1061,7 +1067,7 @@ function AdminAnalyticsPage() {
                   disabled={exporting}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-text bg-surface border border-border rounded-lg hover:bg-surface-tertiary transition-colors disabled:opacity-50"
                 >
-                  <Download className="h-3.5 w-3.5" />
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" />
                   By Model
                 </button>
                 <button
@@ -1069,7 +1075,7 @@ function AdminAnalyticsPage() {
                   disabled={exporting}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-text bg-surface border border-border rounded-lg hover:bg-surface-tertiary transition-colors disabled:opacity-50"
                 >
-                  <Download className="h-3.5 w-3.5" />
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" />
                   By User
                 </button>
               </div>
@@ -1471,13 +1477,14 @@ function AdminAnalyticsPage() {
         <div className="bg-surface-secondary border border-border rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-text-tertiary" />
+              <Activity className="h-4 w-4 text-text-tertiary" aria-hidden="true" />
               <h3 className="text-sm font-semibold text-text">
-                Agent Run Traces
+                {t("admin.agentTraces", { defaultValue: "Agent Run Traces" })}
               </h3>
+              <Badge variant="warning">{t("admin.sampleData", { defaultValue: "Sample data" })}</Badge>
             </div>
             <p className="text-xs text-text-tertiary">
-              Recent agent executions with tool call details
+              {t("admin.agentTracesDescription", { defaultValue: "Recent agent executions with tool call details" })}
             </p>
           </div>
 

@@ -24,6 +24,7 @@ import {
   EyeOff,
   AlertTriangle,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
@@ -80,6 +81,7 @@ interface TestResult {
 // ---------------------------------------------------------------------------
 
 function McpPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [showRegister, setShowRegister] = useState(false);
@@ -89,7 +91,7 @@ function McpPage() {
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
 
   // Fetch servers
-  const { data: serversData, isLoading } = useQuery({
+  const { data: serversData, isLoading, isError } = useQuery({
     queryKey: ["mcp", "servers"],
     queryFn: () => api.get<{ data: McpServer[] }>("/api/mcp/servers"),
   });
@@ -121,10 +123,10 @@ function McpPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mcp", "servers"] });
       setShowRegister(false);
-      toast("MCP server registered", "success");
+      toast(t("mcp.registered", "MCP server registered"), "success");
     },
     onError: (err: any) =>
-      toast(err.message ?? "Failed to register server", "error"),
+      toast(err.message ?? t("mcp.registerFailed", "Failed to register server"), "error"),
   });
 
   // Delete server
@@ -132,10 +134,10 @@ function McpPage() {
     mutationFn: (id: string) => api.delete(`/api/mcp/servers/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mcp", "servers"] });
-      toast("MCP server removed", "success");
+      toast(t("mcp.removed", "MCP server removed"), "success");
     },
     onError: (err: any) =>
-      toast(err.message ?? "Failed to delete server", "error"),
+      toast(err.message ?? t("mcp.removeFailed", "Failed to delete server"), "error"),
   });
 
   // Toggle enable/disable
@@ -145,12 +147,12 @@ function McpPage() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["mcp", "servers"] });
       toast(
-        variables.isEnabled ? "Server enabled" : "Server disabled",
+        variables.isEnabled ? t("mcp.enabled", "Server enabled") : t("mcp.disabled", "Server disabled"),
         "success",
       );
     },
     onError: (err: any) =>
-      toast(err.message ?? "Failed to update server", "error"),
+      toast(err.message ?? t("mcp.updateFailed", "Failed to update server"), "error"),
   });
 
   // Test connectivity
@@ -161,11 +163,13 @@ function McpPage() {
       setTestResults((prev) => ({ ...prev, [id]: data }));
       queryClient.invalidateQueries({ queryKey: ["mcp", "servers"] });
       if (data.connected) {
-        toast(`Connected (${data.latencyMs}ms)`, "success");
+        toast(t("mcp.connected", "Connected ({{ms}}ms)", { ms: data.latencyMs }), "success");
       } else {
-        toast(data.error ?? "Connection failed", "error");
+        toast(data.error ?? t("mcp.connectionFailed", "Connection failed"), "error");
       }
     },
+    onError: (err: any) =>
+      toast(err.message ?? t("mcp.testFailed", "Failed to test server"), "error"),
   });
 
   return (
@@ -174,8 +178,8 @@ function McpPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Puzzle className="h-5 w-5 text-primary" />
-            <h1 className="text-xl font-bold text-text">MCP Servers</h1>
+            <Puzzle className="h-5 w-5 text-primary" aria-hidden="true" />
+            <h1 className="text-xl font-bold text-text">{t("mcp.title", "MCP Servers")}</h1>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -183,14 +187,14 @@ function McpPage() {
               size="sm"
               onClick={() => setShowWhitelist(true)}
             >
-              <Shield className="h-3.5 w-3.5" /> Whitelist
+              <Shield className="h-3.5 w-3.5" aria-hidden="true" /> {t("mcp.whitelist", "Whitelist")}
             </Button>
             <Button
               variant="primary"
               size="sm"
               onClick={() => setShowRegister(true)}
             >
-              <Plus className="h-3.5 w-3.5" /> Add Server
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" /> {t("mcp.addServer", "Add Server")}
             </Button>
           </div>
         </div>
@@ -199,28 +203,28 @@ function McpPage() {
         {servers.length > 0 && (
           <div className="grid grid-cols-3 gap-3 mb-6">
             <div className="flex items-center gap-2 p-3 rounded-xl bg-success/5 border border-success/20">
-              <CheckCircle className="h-4 w-4 text-success shrink-0" />
+              <CheckCircle className="h-4 w-4 text-success shrink-0" aria-hidden="true" />
               <div>
                 <p className="text-lg font-semibold text-text">
                   {connectedCount}
                 </p>
-                <p className="text-xs text-text-tertiary">Connected</p>
+                <p className="text-xs text-text-tertiary">{t("mcp.statusConnected", "Connected")}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 p-3 rounded-xl bg-danger/5 border border-danger/20">
-              <XCircle className="h-4 w-4 text-danger shrink-0" />
+              <XCircle className="h-4 w-4 text-danger shrink-0" aria-hidden="true" />
               <div>
                 <p className="text-lg font-semibold text-text">{errorCount}</p>
-                <p className="text-xs text-text-tertiary">Error</p>
+                <p className="text-xs text-text-tertiary">{t("mcp.statusError", "Error")}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 p-3 rounded-xl bg-warning/5 border border-warning/20">
-              <Clock className="h-4 w-4 text-warning shrink-0" />
+              <Clock className="h-4 w-4 text-warning shrink-0" aria-hidden="true" />
               <div>
                 <p className="text-lg font-semibold text-text">
                   {pendingCount}
                 </p>
-                <p className="text-xs text-text-tertiary">Pending</p>
+                <p className="text-xs text-text-tertiary">{t("mcp.statusPending", "Pending")}</p>
               </div>
             </div>
           </div>
@@ -228,35 +232,41 @@ function McpPage() {
 
         {/* Search */}
         <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" aria-hidden="true" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search servers by name or URL..."
+            placeholder={t("mcp.searchPlaceholder", "Search servers by name or URL...")}
             className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary focus:outline-primary"
           />
         </div>
 
         {/* Server List */}
         <div className="space-y-2">
-          {isLoading ? (
+          {isError ? (
             <div className="text-center py-16">
-              <Loader2 className="h-6 w-6 text-text-tertiary mx-auto mb-3 animate-spin" />
-              <p className="text-sm text-text-secondary">Loading servers...</p>
+              <XCircle className="h-10 w-10 text-danger mx-auto mb-3 opacity-60" aria-hidden="true" />
+              <p className="text-sm text-danger">{t("mcp.loadError", "Failed to load MCP servers")}</p>
+              <p className="text-xs text-text-tertiary mt-1">{t("common.tryAgain", "Please try again later.")}</p>
+            </div>
+          ) : isLoading ? (
+            <div className="text-center py-16">
+              <Loader2 className="h-6 w-6 text-text-tertiary mx-auto mb-3 animate-spin" aria-hidden="true" />
+              <p className="text-sm text-text-secondary">{t("mcp.loading", "Loading servers...")}</p>
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-16">
-              <Puzzle className="h-10 w-10 text-text-tertiary mx-auto mb-3" />
+              <Puzzle className="h-10 w-10 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
               <p className="text-sm text-text-secondary">
                 {search
-                  ? "No servers match your search"
-                  : "No MCP servers registered"}
+                  ? t("mcp.noSearchResults", "No servers match your search")
+                  : t("mcp.noServers", "No MCP servers registered")}
               </p>
               <p className="text-xs text-text-tertiary mt-1">
                 {search
-                  ? "Try a different search term"
-                  : "Add an MCP server to connect external tools"}
+                  ? t("mcp.tryDifferentSearch", "Try a different search term")
+                  : t("mcp.noServersHint", "Add an MCP server to connect external tools")}
               </p>
               {!search && (
                 <Button
@@ -265,7 +275,7 @@ function McpPage() {
                   className="mt-4"
                   onClick={() => setShowRegister(true)}
                 >
-                  <Plus className="h-3.5 w-3.5" /> Add Server
+                  <Plus className="h-3.5 w-3.5" aria-hidden="true" /> {t("mcp.addServer", "Add Server")}
                 </Button>
               )}
             </div>
@@ -311,6 +321,7 @@ function McpPage() {
           onClose={() => setShowRegister(false)}
           onSubmit={(data) => registerServer.mutate(data)}
           isPending={registerServer.isPending}
+          t={t}
         />
 
         {/* Whitelist Dialog */}
@@ -373,11 +384,12 @@ function ServerCard({
           <button
             onClick={onToggleExpand}
             className="text-text-tertiary hover:text-text"
+            aria-label={isExpanded ? "Collapse server details" : "Expand server details"}
           >
             {isExpanded ? (
-              <ChevronDown className="h-4 w-4" />
+              <ChevronDown className="h-4 w-4" aria-hidden="true" />
             ) : (
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
             )}
           </button>
           <StatusIndicator status={server.healthStatus} />
@@ -409,11 +421,12 @@ function ServerCard({
             disabled={isTesting}
             className="p-1.5 text-text-tertiary hover:text-primary rounded-lg hover:bg-surface disabled:opacity-50"
             title="Test connectivity"
+            aria-label="Test connectivity"
           >
             {isTesting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
             ) : (
-              <Zap className="h-3.5 w-3.5" />
+              <Zap className="h-3.5 w-3.5" aria-hidden="true" />
             )}
           </button>
           <button
@@ -424,19 +437,21 @@ function ServerCard({
                 : "text-text-tertiary hover:text-success"
             }`}
             title={server.isEnabled ? "Disable server" : "Enable server"}
+            aria-label={server.isEnabled ? "Disable server" : "Enable server"}
           >
             {server.isEnabled ? (
-              <Power className="h-3.5 w-3.5" />
+              <Power className="h-3.5 w-3.5" aria-hidden="true" />
             ) : (
-              <PowerOff className="h-3.5 w-3.5" />
+              <PowerOff className="h-3.5 w-3.5" aria-hidden="true" />
             )}
           </button>
           <button
             onClick={onDelete}
             className="p-1.5 text-text-tertiary hover:text-danger rounded-lg hover:bg-surface"
             title="Remove server"
+            aria-label="Remove server"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -694,6 +709,7 @@ function ToolItem({
 function RegisterServerDialog({
   open,
   onClose,
+  t,
   onSubmit,
   isPending,
 }: {
@@ -706,6 +722,7 @@ function RegisterServerDialog({
     authType?: string;
   }) => void;
   isPending: boolean;
+  t: any;
 }) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
@@ -837,7 +854,7 @@ function RegisterServerDialog({
             Cancel
           </Button>
           <Button type="submit" variant="primary" loading={isPending}>
-            Add Server
+            {t("mcp.addServer", "Add Server")}
           </Button>
         </div>
       </form>

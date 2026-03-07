@@ -26,6 +26,7 @@ import {
   Trash2,
   LayoutList,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
@@ -93,6 +94,7 @@ type OutputFormat = "markdown" | "structured";
 // ---------------------------------------------------------------------------
 
 function ResearchPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
@@ -100,7 +102,7 @@ function ResearchPage() {
 
   // ---- Data fetching ----
 
-  const { data: reportsData, isLoading } = useQuery({
+  const { data: reportsData, isLoading, isError } = useQuery({
     queryKey: ["research-reports"],
     queryFn: () => api.get<{ data: ResearchReport[] }>("/api/research"),
     refetchInterval: 10_000,
@@ -130,22 +132,22 @@ function ResearchPage() {
       outputFormat?: OutputFormat;
     }) => api.post<ResearchReport>("/api/research", data),
     onSuccess: (data: any) => {
-      toast("Research task started", "success");
+      toast(t("research.started", "Research task started"), "success");
       queryClient.invalidateQueries({ queryKey: ["research-reports"] });
       setSelectedReport(data.id);
       setShowNewForm(false);
     },
-    onError: (err: any) => toast(err.message ?? "Failed to start research", "error"),
+    onError: (err: any) => toast(err.message ?? t("research.startFailed", "Failed to start research"), "error"),
   });
 
   const deleteReport = useMutation({
     mutationFn: (id: string) => api.delete(`/api/research/${id}`),
     onSuccess: () => {
-      toast("Report deleted", "success");
+      toast(t("research.deleted", "Report deleted"), "success");
       queryClient.invalidateQueries({ queryKey: ["research-reports"] });
       setSelectedReport(null);
     },
-    onError: () => toast("Failed to delete report", "error"),
+    onError: () => toast(t("research.deleteFailed", "Failed to delete report"), "error"),
   });
 
   // ---- Handlers ----
@@ -174,15 +176,15 @@ function ResearchPage() {
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-text flex items-center gap-2">
-              <Search className="h-4 w-4 text-primary" />
-              Deep Research
+              <Search className="h-4 w-4 text-primary" aria-hidden="true" />
+              {t("research.title", "Deep Research")}
             </h2>
             <Button
               variant={showNewForm ? "ghost" : "primary"}
               size="sm"
               onClick={() => setShowNewForm((v) => !v)}
             >
-              {showNewForm ? "Cancel" : "New"}
+              {showNewForm ? t("common.cancel", "Cancel") : t("research.new", "New")}
             </Button>
           </div>
 
@@ -213,12 +215,20 @@ function ResearchPage() {
             />
           ))}
 
-          {reports.length === 0 && !isLoading && (
+          {isError && (
             <div className="text-center py-12 px-4">
-              <BookOpen className="h-10 w-10 mx-auto mb-3 text-text-tertiary opacity-40" />
-              <p className="text-sm text-text-tertiary">No research reports yet.</p>
+              <XCircle className="h-10 w-10 mx-auto mb-3 text-danger opacity-60" aria-hidden="true" />
+              <p className="text-sm text-danger">{t("research.loadError", "Failed to load research reports")}</p>
+              <p className="text-xs text-text-tertiary mt-1">{t("common.tryAgain", "Please try again later.")}</p>
+            </div>
+          )}
+
+          {reports.length === 0 && !isLoading && !isError && (
+            <div className="text-center py-12 px-4">
+              <BookOpen className="h-10 w-10 mx-auto mb-3 text-text-tertiary opacity-40" aria-hidden="true" />
+              <p className="text-sm text-text-tertiary">{t("research.empty", "No research reports yet.")}</p>
               <p className="text-xs text-text-tertiary mt-1">
-                Click &quot;New&quot; above to start your first research.
+                {t("research.emptyHint", 'Click "New" above to start your first research.')}
               </p>
             </div>
           )}
@@ -272,6 +282,7 @@ function NewResearchForm({
   isPending: boolean;
   defaultValues?: { query?: string; maxSources?: number; maxIterations?: number; outputFormat?: OutputFormat };
 }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState(defaultValues?.query ?? "");
   const [maxSources, setMaxSources] = useState(defaultValues?.maxSources ?? 10);
   const [maxIterations, setMaxIterations] = useState(defaultValues?.maxIterations ?? 5);
@@ -292,17 +303,17 @@ function NewResearchForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-3 mt-2">
       <div>
-        <label className="block text-xs font-medium text-text-secondary mb-1">Research Query</label>
+        <label className="block text-xs font-medium text-text-secondary mb-1">{t("research.queryLabel", "Research Query")}</label>
         <textarea
           ref={textareaRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="What would you like to research in depth?"
+          placeholder={t("research.queryPlaceholder", "What would you like to research in depth?")}
           rows={3}
           className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary text-sm resize-none focus:outline-2 focus:outline-primary focus:border-primary transition-colors"
         />
         {query.length > 0 && query.trim().length < 3 && (
-          <p className="text-xs text-danger mt-1">Query must be at least 3 characters</p>
+          <p className="text-xs text-danger mt-1">{t("research.queryMinLength", "Query must be at least 3 characters")}</p>
         )}
       </div>
 
@@ -312,8 +323,8 @@ function NewResearchForm({
         onClick={() => setShowAdvanced((v) => !v)}
         className="flex items-center gap-1 text-xs text-text-secondary hover:text-text transition-colors"
       >
-        <Settings2 className="h-3 w-3" />
-        Advanced settings
+        <Settings2 className="h-3 w-3" aria-hidden="true" />
+        {t("research.advancedSettings", "Advanced settings")}
         {showAdvanced ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
       </button>
 
@@ -322,8 +333,8 @@ function NewResearchForm({
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="block text-xs text-text-tertiary mb-1 flex items-center gap-1">
-                <Globe className="h-3 w-3" />
-                Max Sources
+                <Globe className="h-3 w-3" aria-hidden="true" />
+                {t("research.maxSources", "Max Sources")}
               </label>
               <input
                 type="number"
@@ -336,8 +347,8 @@ function NewResearchForm({
             </div>
             <div className="flex-1">
               <label className="block text-xs text-text-tertiary mb-1 flex items-center gap-1">
-                <Zap className="h-3 w-3" />
-                Max Iterations
+                <Zap className="h-3 w-3" aria-hidden="true" />
+                {t("research.maxIterations", "Max Iterations")}
               </label>
               <input
                 type="number"
@@ -352,8 +363,8 @@ function NewResearchForm({
 
           <div>
             <label className="block text-xs text-text-tertiary mb-1 flex items-center gap-1">
-              <LayoutList className="h-3 w-3" />
-              Output Format
+              <LayoutList className="h-3 w-3" aria-hidden="true" />
+              {t("research.outputFormat", "Output Format")}
             </label>
             <div className="flex gap-2">
               <button
@@ -365,7 +376,7 @@ function NewResearchForm({
                     : "border-border bg-surface text-text-secondary hover:border-border-strong"
                 }`}
               >
-                Markdown
+                {t("research.formatMarkdown", "Markdown")}
               </button>
               <button
                 type="button"
@@ -376,7 +387,7 @@ function NewResearchForm({
                     : "border-border bg-surface text-text-secondary hover:border-border-strong"
                 }`}
               >
-                Structured
+                {t("research.formatStructured", "Structured")}
               </button>
             </div>
           </div>
@@ -390,8 +401,8 @@ function NewResearchForm({
         disabled={query.trim().length < 3 || isPending}
         loading={isPending}
       >
-        <Search className="h-3.5 w-3.5" />
-        {isPending ? "Starting..." : "Start Research"}
+        <Search className="h-3.5 w-3.5" aria-hidden="true" />
+        {isPending ? t("research.starting", "Starting...") : t("research.startResearch", "Start Research")}
       </Button>
     </form>
   );
@@ -470,6 +481,7 @@ function ReportDetail({
   onRerun: (report: ResearchReport) => void;
   onDelete: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   const [copiedReport, setCopiedReport] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set());
   const progressEndRef = useRef<HTMLDivElement>(null);
@@ -623,8 +635,8 @@ function ReportDetail({
       {report.status === "failed" && (
         <div className="p-4 rounded-xl bg-danger/5 border border-danger/20">
           <div className="flex items-center gap-2 mb-1">
-            <XCircle className="h-4 w-4 text-danger" />
-            <span className="text-sm font-medium text-danger">Research failed</span>
+            <XCircle className="h-4 w-4 text-danger" aria-hidden="true" />
+            <span className="text-sm font-medium text-danger">{t("research.failed", "Research failed")}</span>
           </div>
           <p className="text-xs text-text-secondary">
             {report.error ?? "An unexpected error occurred. Please try again."}
@@ -641,8 +653,8 @@ function ReportDetail({
               onClick={handleCopyReport}
               className="flex items-center gap-1 text-xs text-text-tertiary hover:text-text transition-colors"
             >
-              {copiedReport ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
-              {copiedReport ? "Copied" : "Copy"}
+              {copiedReport ? <Check className="h-3 w-3 text-success" aria-hidden="true" /> : <Copy className="h-3 w-3" aria-hidden="true" />}
+              {copiedReport ? t("common.copied", "Copied") : t("common.copy", "Copy")}
             </button>
           </div>
           <div className="rounded-xl bg-surface border border-border overflow-hidden">
@@ -731,38 +743,42 @@ function ReportDetail({
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border">
           {/* Re-run (#82) */}
           <Button variant="secondary" size="sm" onClick={() => onRerun(report)}>
-            <RefreshCw className="h-3.5 w-3.5" />
-            Re-run with different parameters
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+            {t("research.rerun", "Re-run with different parameters")}
           </Button>
 
           {/* Export buttons (#80) */}
           {report.status === "completed" && (
             <>
               <div className="h-5 w-px bg-border mx-1" />
-              <span className="text-xs text-text-tertiary mr-1">Export:</span>
+              <span className="text-xs text-text-tertiary mr-1">{t("research.export", "Export")}:</span>
               <Button variant="ghost" size="sm" onClick={() => handleExport("pdf")}>
-                <FileText className="h-3.5 w-3.5" />
+                <FileText className="h-3.5 w-3.5" aria-hidden="true" />
                 PDF
               </Button>
               <Button variant="ghost" size="sm" onClick={() => handleExport("docx")}>
-                <FileType className="h-3.5 w-3.5" />
+                <FileType className="h-3.5 w-3.5" aria-hidden="true" />
                 DOCX
               </Button>
               <Button variant="ghost" size="sm" onClick={() => handleExport("json")}>
-                <FileJson className="h-3.5 w-3.5" />
+                <FileJson className="h-3.5 w-3.5" aria-hidden="true" />
                 JSON
               </Button>
               <Button variant="ghost" size="sm" onClick={() => handleExport("markdown")}>
-                <Download className="h-3.5 w-3.5" />
-                Markdown
+                <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                {t("research.formatMarkdown", "Markdown")}
               </Button>
             </>
           )}
 
           <div className="flex-1" />
-          <Button variant="ghost" size="sm" onClick={() => onDelete(report.id)} className="text-danger">
-            <Trash2 className="h-3.5 w-3.5" />
-            Delete
+          <Button variant="ghost" size="sm" onClick={() => {
+            if (window.confirm(t("research.confirmDelete", "Delete this research report? This cannot be undone."))) {
+              onDelete(report.id);
+            }
+          }} className="text-danger">
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+            {t("common.delete", "Delete")}
           </Button>
         </div>
       )}
@@ -865,14 +881,15 @@ function ProgressFeed({
 // ---------------------------------------------------------------------------
 
 function SourcesList({ sources }: { sources: ResearchSource[] }) {
+  const { t } = useTranslation();
   const [showAll, setShowAll] = useState(false);
   const visible = showAll ? sources : sources.slice(0, 5);
 
   return (
     <div>
       <h3 className="text-sm font-semibold text-text mb-3 flex items-center gap-2">
-        <Globe className="h-4 w-4 text-text-tertiary" />
-        Sources ({sources.length})
+        <Globe className="h-4 w-4 text-text-tertiary" aria-hidden="true" />
+        {t("research.sources", "Sources")} ({sources.length})
       </h3>
       <div className="space-y-2">
         {visible.map((source, i) => (
@@ -924,7 +941,7 @@ function SourcesList({ sources }: { sources: ResearchSource[] }) {
           onClick={() => setShowAll((v) => !v)}
           className="mt-2 flex items-center gap-1 text-xs text-primary hover:underline"
         >
-          {showAll ? "Show less" : `Show all ${sources.length} sources`}
+          {showAll ? t("common.showLess", "Show less") : t("research.showAllSources", "Show all {{count}} sources", { count: sources.length })}
           <ArrowRight className="h-3 w-3" />
         </button>
       )}
@@ -947,10 +964,11 @@ function RerunDialog({
   onSubmit: (params: { query: string; maxSources: number; maxIterations: number; outputFormat: OutputFormat }) => void;
   isPending: boolean;
 }) {
+  const { t } = useTranslation();
   return (
-    <Dialog open onClose={onClose} title="Re-run Research" className="max-w-md">
+    <Dialog open onClose={onClose} title={t("research.rerunTitle", "Re-run Research")} className="max-w-md">
       <p className="text-xs text-text-secondary mb-4">
-        Adjust the parameters below and re-run this research task.
+        {t("research.rerunDescription", "Adjust the parameters below and re-run this research task.")}
       </p>
       <NewResearchForm
         onSubmit={onSubmit}
@@ -971,17 +989,18 @@ function RerunDialog({
 // ---------------------------------------------------------------------------
 
 function EmptyDetailState({ onNew }: { onNew: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center justify-center h-full text-text-tertiary">
       <div className="text-center">
-        <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-40" />
-        <p className="text-sm font-medium text-text-secondary">Select a report or start new research</p>
+        <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-40" aria-hidden="true" />
+        <p className="text-sm font-medium text-text-secondary">{t("research.selectOrStart", "Select a report or start new research")}</p>
         <p className="text-xs text-text-tertiary mt-1 max-w-xs mx-auto">
-          Deep research performs multi-step web research, visiting multiple sources and synthesizing a comprehensive report.
+          {t("research.description", "Deep research performs multi-step web research, visiting multiple sources and synthesizing a comprehensive report.")}
         </p>
         <Button variant="primary" size="sm" className="mt-4" onClick={onNew}>
-          <Search className="h-3.5 w-3.5" />
-          Start Research
+          <Search className="h-3.5 w-3.5" aria-hidden="true" />
+          {t("research.startResearch", "Start Research")}
         </Button>
       </div>
     </div>

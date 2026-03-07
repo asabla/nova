@@ -67,36 +67,62 @@ function AdminLayout() {
       <div className="max-w-6xl mx-auto px-4 py-6">
         <h1 className="text-xl font-bold text-text mb-6">{t("admin.title")}</h1>
 
-        <div className="flex gap-6">
-          {/* Sidebar navigation */}
-          <nav className="w-52 shrink-0 space-y-4">
-            {tabGroups.map((group) => (
-              <div key={group.label}>
-                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary px-3 mb-1">
-                  {group.label}
-                </h3>
-                <div className="space-y-0.5">
-                  {group.tabs.map(({ to, icon: Icon, label }) => {
-                    const isActive = matchRoute({ to });
-                    return (
-                      <Link
-                        key={to}
-                        to={to}
-                        className={clsx(
-                          "flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
-                          isActive
-                            ? "bg-primary/10 text-primary font-medium"
-                            : "text-text-secondary hover:bg-surface-secondary hover:text-text",
-                        )}
-                      >
-                        <Icon className="h-4 w-4" />
-                        {t(label)}
-                      </Link>
-                    );
-                  })}
+        <div className="flex flex-col md:flex-row gap-6">
+          {/* Sidebar navigation - horizontal scrollable tabs on mobile, vertical sidebar on desktop */}
+          <nav className="w-full md:w-52 shrink-0 md:space-y-4 overflow-x-auto md:overflow-x-visible">
+            {/* Mobile: horizontal scrollable tabs */}
+            <div className="flex md:hidden gap-1 pb-2">
+              {tabGroups.flatMap((group) =>
+                group.tabs.map(({ to, icon: Icon, label }) => {
+                  const isActive = matchRoute({ to });
+                  return (
+                    <Link
+                      key={to}
+                      to={to}
+                      className={clsx(
+                        "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm whitespace-nowrap transition-colors",
+                        isActive
+                          ? "bg-primary/10 text-primary font-medium"
+                          : "text-text-secondary hover:bg-surface-secondary hover:text-text",
+                      )}
+                    >
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                      {t(label)}
+                    </Link>
+                  );
+                }),
+              )}
+            </div>
+            {/* Desktop: vertical sidebar */}
+            <div className="hidden md:block space-y-4">
+              {tabGroups.map((group) => (
+                <div key={group.label}>
+                  <h3 className="text-[10px] font-semibold uppercase tracking-wider text-text-tertiary px-3 mb-1">
+                    {group.label}
+                  </h3>
+                  <div className="space-y-0.5">
+                    {group.tabs.map(({ to, icon: Icon, label }) => {
+                      const isActive = matchRoute({ to });
+                      return (
+                        <Link
+                          key={to}
+                          to={to}
+                          className={clsx(
+                            "flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
+                            isActive
+                              ? "bg-primary/10 text-primary font-medium"
+                              : "text-text-secondary hover:bg-surface-secondary hover:text-text",
+                          )}
+                        >
+                          <Icon className="h-4 w-4" aria-hidden="true" />
+                          {t(label)}
+                        </Link>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </nav>
 
           {/* Content */}

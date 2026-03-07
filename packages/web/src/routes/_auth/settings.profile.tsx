@@ -7,6 +7,7 @@ import { queryKeys } from "../../lib/query-keys";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Avatar } from "../../components/ui/Avatar";
+import { toast } from "../../components/ui/Toast";
 
 export const Route = createFileRoute("/_auth/settings/profile")({
   component: ProfileSettings,
@@ -16,19 +17,55 @@ const LANGUAGES = [
   { value: "en", label: "English" },
   { value: "sv", label: "Svenska" },
   { value: "de", label: "Deutsch" },
-  { value: "fr", label: "Francais" },
-  { value: "es", label: "Espanol" },
-  { value: "ja", label: "Japanese" },
-  { value: "zh", label: "Chinese" },
-  { value: "ko", label: "Korean" },
-  { value: "pt", label: "Portugues" },
+  { value: "fr", label: "Français" },
+  { value: "es", label: "Español" },
+  { value: "ja", label: "日本語" },
+  { value: "zh", label: "中文" },
+  { value: "ko", label: "한국어" },
+  { value: "pt", label: "Português" },
 ];
+
+function ProfileSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      <div className="flex items-center gap-4">
+        <div className="h-12 w-12 rounded-full bg-surface-secondary" />
+        <div className="space-y-2">
+          <div className="h-4 w-32 bg-surface-secondary rounded" />
+          <div className="h-3 w-48 bg-surface-secondary rounded" />
+        </div>
+      </div>
+      <div className="space-y-4 max-w-md">
+        <div className="space-y-1.5">
+          <div className="h-3 w-24 bg-surface-secondary rounded" />
+          <div className="h-10 w-full bg-surface-secondary rounded-lg" />
+        </div>
+        <div className="space-y-1.5">
+          <div className="h-3 w-16 bg-surface-secondary rounded" />
+          <div className="h-10 w-full bg-surface-secondary rounded-lg" />
+        </div>
+        <div className="space-y-1.5">
+          <div className="h-3 w-20 bg-surface-secondary rounded" />
+          <div className="h-10 w-full bg-surface-secondary rounded-lg" />
+        </div>
+        <div className="space-y-1.5">
+          <div className="h-3 w-20 bg-surface-secondary rounded" />
+          <div className="h-10 w-full bg-surface-secondary rounded-lg" />
+        </div>
+        <div className="space-y-1.5">
+          <div className="h-3 w-20 bg-surface-secondary rounded" />
+          <div className="h-10 w-full bg-surface-secondary rounded-lg" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ProfileSettings() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
-  const { data: profile } = useQuery({
+  const { data: profile, isLoading } = useQuery({
     queryKey: queryKeys.user.profile(),
     queryFn: () => api.get<any>("/api/users/me"),
   });
@@ -85,6 +122,9 @@ function ProfileSettings() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     },
+    onError: () => {
+      toast(t("settings.profileUpdateFailed", "Failed to update profile. Please try again."), "error");
+    },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -96,6 +136,10 @@ function ProfileSettings() {
       locale,
     });
   };
+
+  if (isLoading) {
+    return <ProfileSkeleton />;
+  }
 
   return (
     <div className="space-y-6">
@@ -134,9 +178,10 @@ function ProfileSettings() {
           </label>
           <select
             id="timezone-select"
+            aria-label={t("settings.timezone", "Timezone")}
             value={timezone}
             onChange={(e) => setTimezone(e.target.value)}
-            className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-text hover:border-border-strong focus:outline-2 focus:outline-offset-0 focus:outline-primary focus:border-primary"
+            className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-text hover:border-border-strong focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary focus-visible:border-primary transition-colors"
           >
             {timezones.map((tz) => (
               <option key={tz} value={tz}>
@@ -152,9 +197,10 @@ function ProfileSettings() {
           </label>
           <select
             id="language-select"
+            aria-label={t("settings.language", "Language")}
             value={locale}
             onChange={(e) => setLocale(e.target.value)}
-            className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-text hover:border-border-strong focus:outline-2 focus:outline-offset-0 focus:outline-primary focus:border-primary"
+            className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-text hover:border-border-strong focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary focus-visible:border-primary transition-colors"
           >
             {LANGUAGES.map((lang) => (
               <option key={lang.value} value={lang.value}>
@@ -168,7 +214,11 @@ function ProfileSettings() {
           <Button type="submit" variant="primary" loading={updateProfile.isPending}>
             {t("settings.save")}
           </Button>
-          {saved && <span className="text-sm text-success">{t("settings.saved")}</span>}
+          {saved && (
+            <span className="text-sm text-success" role="status" aria-live="polite">
+              {t("settings.saved")}
+            </span>
+          )}
         </div>
       </form>
     </div>

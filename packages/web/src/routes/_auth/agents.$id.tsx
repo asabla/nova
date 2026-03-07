@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Bot, ArrowLeft, Save, Trash2, Copy, Share2, History, TestTube, Settings2, Wrench, BookOpen, Brain } from "lucide-react";
+import { Bot, ArrowLeft, Save, Trash2, Copy, Share2, History, TestTube, Settings2, Wrench, BookOpen, Brain, RefreshCw } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
+import { Dialog } from "../../components/ui/Dialog";
 import { toast } from "../../components/ui/Toast";
+import { Skeleton } from "../../components/ui/Skeleton";
 import { api } from "../../lib/api";
 
 export const Route = createFileRoute("/_auth/agents/$id")({
@@ -11,12 +14,14 @@ export const Route = createFileRoute("/_auth/agents/$id")({
 });
 
 function AgentDetailPage() {
+  const { t } = useTranslation();
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"config" | "tools" | "knowledge" | "memory" | "test">("config");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  const { data: agent, isLoading } = useQuery({
+  const { data: agent, isLoading, isError, refetch } = useQuery({
     queryKey: ["agents", id],
     queryFn: () => api.get<any>(`/api/agents/${id}`),
   });
@@ -46,19 +51,19 @@ function AgentDetailPage() {
   const updateMutation = useMutation({
     mutationFn: (data: typeof form) => api.patch(`/api/agents/${id}`, data),
     onSuccess: () => {
-      toast.success("Agent updated");
+      toast.success(t("agents.updated", { defaultValue: "Agent updated" }));
       queryClient.invalidateQueries({ queryKey: ["agents"] });
     },
-    onError: (err: any) => toast.error(err.message ?? "Update failed"),
+    onError: (err: any) => toast.error(err.message ?? t("agents.updateFailed", { defaultValue: "Update failed" })),
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => api.delete(`/api/agents/${id}`),
     onSuccess: () => {
-      toast.success("Agent deleted");
+      toast.success(t("agents.deleted", { defaultValue: "Agent deleted" }));
       navigate({ to: "/agents" });
     },
-    onError: (err: any) => toast.error(err.message ?? "Delete failed"),
+    onError: (err: any) => toast.error(err.message ?? t("agents.deleteFailed", { defaultValue: "Delete failed" })),
   });
 
   const cloneMutation = useMutation({
@@ -71,9 +76,10 @@ function AgentDetailPage() {
       memoryScope: form.memoryScope,
     }),
     onSuccess: (data: any) => {
-      toast.success("Agent cloned");
+      toast.success(t("agents.cloned", { defaultValue: "Agent cloned" }));
       navigate({ to: "/agents/$id", params: { id: data.id } });
     },
+    onError: (err: any) => toast.error(err.message ?? t("agents.cloneFailed", { defaultValue: "Clone failed" })),
   });
 
   const [testPrompt, setTestPrompt] = useState("");
@@ -92,9 +98,9 @@ function AgentDetailPage() {
           { role: "user", content: testPrompt },
         ],
       });
-      setTestResult(result.choices?.[0]?.message?.content ?? "No response");
+      setTestResult(result.choices?.[0]?.message?.content ?? t("agents.noResponse", { defaultValue: "No response" }));
     } catch (err: any) {
-      setTestResult(`Error: ${err.message ?? "Test failed"}`);
+      setTestResult(`${t("common.error", { defaultValue: "Error" })}: ${err.message ?? t("agents.testFailed", { defaultValue: "Test failed" })}`);
     } finally {
       setTesting(false);
     }
@@ -102,29 +108,63 @@ function AgentDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-pulse text-text-secondary">Loading agent...</div>
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-8 w-8 rounded" />
+            <Skeleton className="h-10 w-10 rounded-xl" />
+            <div>
+              <Skeleton className="h-5 w-48 mb-1" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-8 w-20 rounded-lg" />
+            <Skeleton className="h-8 w-20 rounded-lg" />
+            <Skeleton className="h-9 w-24 rounded-lg" />
+          </div>
+        </div>
+        <div className="p-6 space-y-4">
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-40 w-full max-w-2xl rounded-lg" />
+          <div className="grid grid-cols-2 gap-4 max-w-2xl">
+            <Skeleton className="h-10 rounded-lg" />
+            <Skeleton className="h-10 rounded-lg" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full">
+        <p className="text-sm text-danger mb-4">{t("agents.loadError", { defaultValue: "Failed to load agent." })}</p>
+        <Button variant="secondary" onClick={() => refetch()}>
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          {t("common.retry", { defaultValue: "Retry" })}
+        </Button>
       </div>
     );
   }
 
   const tabs = [
-    { id: "config" as const, label: "Configuration", icon: Settings2 },
-    { id: "tools" as const, label: "Tools", icon: Wrench },
-    { id: "knowledge" as const, label: "Knowledge", icon: BookOpen },
-    { id: "memory" as const, label: "Memory", icon: Brain },
-    { id: "test" as const, label: "Test", icon: TestTube },
+    { id: "config" as const, label: t("agents.tabs.config", { defaultValue: "Configuration" }), icon: Settings2 },
+    { id: "tools" as const, label: t("agents.tabs.tools", { defaultValue: "Tools" }), icon: Wrench },
+    { id: "knowledge" as const, label: t("agents.tabs.knowledge", { defaultValue: "Knowledge" }), icon: BookOpen },
+    { id: "memory" as const, label: t("agents.tabs.memory", { defaultValue: "Memory" }), icon: Brain },
+    { id: "test" as const, label: t("agents.tabs.test", { defaultValue: "Test" }), icon: TestTube },
   ];
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-6 py-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate({ to: "/agents" })} className="p-1 hover:bg-surface-secondary rounded">
-            <ArrowLeft className="h-5 w-5 text-text-secondary" />
+          <button onClick={() => navigate({ to: "/agents" })} className="p-1 hover:bg-surface-secondary rounded" aria-label={t("common.goBack", { defaultValue: "Go back" })}>
+            <ArrowLeft className="h-5 w-5 text-text-secondary" aria-hidden="true" />
           </button>
           <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Bot className="h-5 w-5 text-primary" />
+            <Bot className="h-5 w-5 text-primary" aria-hidden="true" />
           </div>
           <div>
             <input
@@ -132,37 +172,37 @@ function AgentDetailPage() {
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="text-lg font-semibold text-text bg-transparent border-none outline-none"
+              aria-label={t("agents.nameLabel", { defaultValue: "Agent name" })}
             />
             <input
               type="text"
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              placeholder="Description..."
+              placeholder={t("agents.descriptionPlaceholder", { defaultValue: "Description..." })}
               className="text-sm text-text-secondary bg-transparent border-none outline-none block placeholder:text-text-tertiary"
+              aria-label={t("agents.descriptionLabel", { defaultValue: "Agent description" })}
             />
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => cloneMutation.mutate()}>
-            <Copy className="h-3.5 w-3.5" /> Clone
+            <Copy className="h-3.5 w-3.5" aria-hidden="true" /> {t("agents.clone", { defaultValue: "Clone" })}
           </Button>
           <Button
             variant="ghost"
             size="sm"
             className="text-danger hover:text-danger"
-            onClick={() => {
-              if (confirm("Delete this agent?")) deleteMutation.mutate();
-            }}
+            onClick={() => setShowDeleteDialog(true)}
           >
-            <Trash2 className="h-3.5 w-3.5" /> Delete
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> {t("common.delete", { defaultValue: "Delete" })}
           </Button>
           <Button
             variant="primary"
             onClick={() => updateMutation.mutate(form)}
             disabled={updateMutation.isPending}
           >
-            <Save className="h-4 w-4" />
-            {updateMutation.isPending ? "Saving..." : "Save"}
+            <Save className="h-4 w-4" aria-hidden="true" />
+            {updateMutation.isPending ? t("common.saving", { defaultValue: "Saving..." }) : t("common.save", { defaultValue: "Save" })}
           </Button>
         </div>
       </div>
@@ -178,7 +218,7 @@ function AgentDetailPage() {
                 : "text-text-secondary hover:text-text hover:bg-surface-secondary"
             }`}
           >
-            <tab.icon className="h-3.5 w-3.5" />
+            <tab.icon className="h-3.5 w-3.5" aria-hidden="true" />
             {tab.label}
           </button>
         ))}
@@ -188,11 +228,11 @@ function AgentDetailPage() {
         {activeTab === "config" && (
           <div className="max-w-2xl space-y-6">
             <div>
-              <label className="block text-sm font-medium text-text mb-1.5">System Prompt</label>
+              <label className="block text-sm font-medium text-text mb-1.5">{t("agents.systemPrompt", { defaultValue: "System Prompt" })}</label>
               <textarea
                 value={form.systemPrompt}
                 onChange={(e) => setForm({ ...form, systemPrompt: e.target.value })}
-                placeholder="You are a helpful assistant..."
+                placeholder={t("agents.systemPromptPlaceholder", { defaultValue: "You are a helpful assistant..." })}
                 rows={8}
                 className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary resize-y text-sm font-mono"
               />
@@ -200,50 +240,50 @@ function AgentDetailPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-text mb-1.5">Visibility</label>
+                <label className="block text-sm font-medium text-text mb-1.5">{t("agents.visibility", { defaultValue: "Visibility" })}</label>
                 <select
                   value={form.visibility}
                   onChange={(e) => setForm({ ...form, visibility: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm"
                 >
-                  <option value="private">Private</option>
-                  <option value="team">Team</option>
-                  <option value="org">Organization</option>
-                  <option value="public">Public</option>
+                  <option value="private">{t("agents.visibilityPrivate", { defaultValue: "Private" })}</option>
+                  <option value="team">{t("agents.visibilityTeam", { defaultValue: "Team" })}</option>
+                  <option value="org">{t("agents.visibilityOrg", { defaultValue: "Organization" })}</option>
+                  <option value="public">{t("agents.visibilityPublic", { defaultValue: "Public" })}</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-text mb-1.5">Tool Approval</label>
+                <label className="block text-sm font-medium text-text mb-1.5">{t("agents.toolApproval", { defaultValue: "Tool Approval" })}</label>
                 <select
                   value={form.toolApprovalMode}
                   onChange={(e) => setForm({ ...form, toolApprovalMode: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm"
                 >
-                  <option value="auto">Auto-approve</option>
-                  <option value="always-ask">Always ask</option>
-                  <option value="never">Never allow</option>
+                  <option value="auto">{t("agents.toolAuto", { defaultValue: "Auto-approve" })}</option>
+                  <option value="always-ask">{t("agents.toolAlwaysAsk", { defaultValue: "Always ask" })}</option>
+                  <option value="never">{t("agents.toolNever", { defaultValue: "Never allow" })}</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-text mb-1.5">Memory Scope</label>
+              <label className="block text-sm font-medium text-text mb-1.5">{t("agents.memoryScope", { defaultValue: "Memory Scope" })}</label>
               <select
                 value={form.memoryScope}
                 onChange={(e) => setForm({ ...form, memoryScope: e.target.value })}
                 className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm"
               >
-                <option value="per-user">Per user</option>
-                <option value="per-conversation">Per conversation</option>
-                <option value="global">Global</option>
+                <option value="per-user">{t("agents.memoryPerUser", { defaultValue: "Per user" })}</option>
+                <option value="per-conversation">{t("agents.memoryPerConversation", { defaultValue: "Per conversation" })}</option>
+                <option value="global">{t("agents.memoryGlobal", { defaultValue: "Global" })}</option>
               </select>
             </div>
 
             {agent && (
               <div className="pt-4 border-t border-border text-xs text-text-tertiary space-y-1">
-                <p>Version: {agent.currentVersion}</p>
-                <p>Created: {new Date(agent.createdAt).toLocaleDateString()}</p>
-                <p>Updated: {new Date(agent.updatedAt).toLocaleDateString()}</p>
+                <p>{t("agents.version", { defaultValue: "Version" })}: {agent.currentVersion}</p>
+                <p>{t("common.created", { defaultValue: "Created" })}: {new Date(agent.createdAt).toLocaleDateString()}</p>
+                <p>{t("common.updated", { defaultValue: "Updated" })}: {new Date(agent.updatedAt).toLocaleDateString()}</p>
               </div>
             )}
           </div>
@@ -252,18 +292,18 @@ function AgentDetailPage() {
         {activeTab === "test" && (
           <div className="max-w-2xl space-y-4">
             <div>
-              <label className="block text-sm font-medium text-text mb-1.5">Test Prompt</label>
+              <label className="block text-sm font-medium text-text mb-1.5">{t("agents.testPrompt", { defaultValue: "Test Prompt" })}</label>
               <div className="flex gap-2">
                 <textarea
                   value={testPrompt}
                   onChange={(e) => setTestPrompt(e.target.value)}
-                  placeholder="Enter a test message..."
+                  placeholder={t("agents.testPlaceholder", { defaultValue: "Enter a test message..." })}
                   rows={3}
                   className="flex-1 px-3 py-2 rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary resize-y text-sm"
                 />
                 <Button variant="primary" onClick={handleTest} disabled={testing || !testPrompt.trim()}>
-                  <TestTube className="h-4 w-4" />
-                  {testing ? "Running..." : "Test"}
+                  <TestTube className="h-4 w-4" aria-hidden="true" />
+                  {testing ? t("agents.running", { defaultValue: "Running..." }) : t("agents.test", { defaultValue: "Test" })}
                 </Button>
               </div>
             </div>
@@ -279,13 +319,37 @@ function AgentDetailPage() {
         {activeTab === "knowledge" && <AgentKnowledgeTab agentId={id} />}
         {activeTab === "memory" && <AgentMemoryTab agentId={id} />}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onClose={() => setShowDeleteDialog(false)} title={t("agents.deleteTitle", { defaultValue: "Delete Agent" })}>
+        <p className="text-sm text-text-secondary mb-4">
+          {t("agents.deleteConfirm", { defaultValue: "Are you sure you want to delete this agent? This action cannot be undone." })}
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setShowDeleteDialog(false)}>
+            {t("common.cancel", { defaultValue: "Cancel" })}
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              deleteMutation.mutate();
+              setShowDeleteDialog(false);
+            }}
+            disabled={deleteMutation.isPending}
+          >
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+            {deleteMutation.isPending ? t("common.deleting", { defaultValue: "Deleting..." }) : t("common.delete", { defaultValue: "Delete" })}
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }
 
 function AgentToolsTab({ agentId }: { agentId: string }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { data: agentTools } = useQuery({
+  const { data: agentTools, isLoading: toolsLoading, isError: toolsError, refetch: refetchTools } = useQuery({
     queryKey: ["agents", agentId, "tools"],
     queryFn: () => api.get<any>(`/api/agents/${agentId}/tools`),
   });
@@ -299,42 +363,66 @@ function AgentToolsTab({ agentId }: { agentId: string }) {
     mutationFn: (toolId: string) => api.post(`/api/agents/${agentId}/tools`, { toolId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agents", agentId, "tools"] });
-      toast.success("Tool attached");
+      toast.success(t("agents.toolAttached", { defaultValue: "Tool attached" }));
     },
+    onError: (err: any) => toast.error(err.message ?? t("agents.toolAttachFailed", { defaultValue: "Failed to attach tool" })),
   });
 
   const detachTool = useMutation({
     mutationFn: (toolId: string) => api.delete(`/api/agents/${agentId}/tools/${toolId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agents", agentId, "tools"] });
-      toast.success("Tool removed");
+      toast.success(t("agents.toolRemoved", { defaultValue: "Tool removed" }));
     },
+    onError: (err: any) => toast.error(err.message ?? t("agents.toolRemoveFailed", { defaultValue: "Failed to remove tool" })),
   });
 
   const attached = (agentTools as any)?.data ?? [];
   const available = ((allTools as any)?.data ?? []).filter(
-    (t: any) => !attached.some((at: any) => at.toolId === t.id),
+    (tool: any) => !attached.some((at: any) => at.toolId === tool.id),
   );
+
+  if (toolsLoading) {
+    return (
+      <div className="max-w-2xl space-y-3">
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-14 w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  if (toolsError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <p className="text-sm text-danger mb-4">{t("agents.toolsLoadError", { defaultValue: "Failed to load tools." })}</p>
+        <Button variant="secondary" onClick={() => refetchTools()}>
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          {t("common.retry", { defaultValue: "Retry" })}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h3 className="text-sm font-semibold text-text mb-3">Attached Tools ({attached.length})</h3>
+        <h3 className="text-sm font-semibold text-text mb-3">{t("agents.attachedTools", { defaultValue: "Attached Tools" })} ({attached.length})</h3>
         {attached.length === 0 ? (
-          <p className="text-sm text-text-tertiary py-4">No tools attached yet.</p>
+          <p className="text-sm text-text-tertiary py-4">{t("agents.noToolsAttached", { defaultValue: "No tools attached yet." })}</p>
         ) : (
           <div className="space-y-2">
-            {attached.map((t: any) => (
-              <div key={t.id} className="flex items-center justify-between p-3 rounded-lg bg-surface-secondary border border-border">
+            {attached.map((tool: any) => (
+              <div key={tool.id} className="flex items-center justify-between p-3 rounded-lg bg-surface-secondary border border-border">
                 <div className="flex items-center gap-2">
-                  <Wrench className="h-4 w-4 text-primary" />
-                  <span className="text-sm text-text font-medium">{t.name ?? t.toolId}</span>
+                  <Wrench className="h-4 w-4 text-primary" aria-hidden="true" />
+                  <span className="text-sm text-text font-medium">{tool.name ?? tool.toolId}</span>
                 </div>
                 <button
-                  onClick={() => detachTool.mutate(t.toolId ?? t.id)}
+                  onClick={() => detachTool.mutate(tool.toolId ?? tool.id)}
                   className="text-xs text-danger hover:underline cursor-pointer"
                 >
-                  Remove
+                  {t("common.remove", { defaultValue: "Remove" })}
                 </button>
               </div>
             ))}
@@ -344,16 +432,16 @@ function AgentToolsTab({ agentId }: { agentId: string }) {
 
       {available.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-text mb-3">Available Tools</h3>
+          <h3 className="text-sm font-semibold text-text mb-3">{t("agents.availableTools", { defaultValue: "Available Tools" })}</h3>
           <div className="space-y-2">
-            {available.map((t: any) => (
-              <div key={t.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
+            {available.map((tool: any) => (
+              <div key={tool.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
                 <div>
-                  <span className="text-sm text-text font-medium">{t.name}</span>
-                  {t.description && <p className="text-xs text-text-tertiary">{t.description}</p>}
+                  <span className="text-sm text-text font-medium">{tool.name}</span>
+                  {tool.description && <p className="text-xs text-text-tertiary">{tool.description}</p>}
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => attachTool.mutate(t.id)}>
-                  Attach
+                <Button variant="ghost" size="sm" onClick={() => attachTool.mutate(tool.id)}>
+                  {t("agents.attach", { defaultValue: "Attach" })}
                 </Button>
               </div>
             ))}
@@ -365,13 +453,14 @@ function AgentToolsTab({ agentId }: { agentId: string }) {
 }
 
 function AgentKnowledgeTab({ agentId }: { agentId: string }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { data: collections } = useQuery({
     queryKey: ["knowledge"],
     queryFn: () => api.get<any>("/api/knowledge"),
   });
 
-  const { data: agentKnowledge } = useQuery({
+  const { data: agentKnowledge, isLoading: knowledgeLoading, isError: knowledgeError, refetch: refetchKnowledge } = useQuery({
     queryKey: ["agents", agentId, "knowledge"],
     queryFn: () => api.get<any>(`/api/agents/${agentId}/knowledge`),
   });
@@ -381,8 +470,9 @@ function AgentKnowledgeTab({ agentId }: { agentId: string }) {
       api.post(`/api/agents/${agentId}/knowledge`, { collectionId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agents", agentId, "knowledge"] });
-      toast.success("Knowledge collection connected");
+      toast.success(t("agents.knowledgeConnected", { defaultValue: "Knowledge collection connected" }));
     },
+    onError: (err: any) => toast.error(err.message ?? t("agents.knowledgeConnectFailed", { defaultValue: "Failed to connect knowledge" })),
   });
 
   const detachKnowledge = useMutation({
@@ -390,8 +480,9 @@ function AgentKnowledgeTab({ agentId }: { agentId: string }) {
       api.delete(`/api/agents/${agentId}/knowledge/${collectionId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agents", agentId, "knowledge"] });
-      toast.success("Knowledge collection disconnected");
+      toast.success(t("agents.knowledgeDisconnected", { defaultValue: "Knowledge collection disconnected" }));
     },
+    onError: (err: any) => toast.error(err.message ?? t("agents.knowledgeDisconnectFailed", { defaultValue: "Failed to disconnect knowledge" })),
   });
 
   const attached = (agentKnowledge as any)?.data ?? [];
@@ -400,25 +491,47 @@ function AgentKnowledgeTab({ agentId }: { agentId: string }) {
     (c: any) => !attached.some((ac: any) => ac.collectionId === c.id),
   );
 
+  if (knowledgeLoading) {
+    return (
+      <div className="max-w-2xl space-y-3">
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-14 w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  if (knowledgeError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <p className="text-sm text-danger mb-4">{t("agents.knowledgeLoadError", { defaultValue: "Failed to load knowledge." })}</p>
+        <Button variant="secondary" onClick={() => refetchKnowledge()}>
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          {t("common.retry", { defaultValue: "Retry" })}
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h3 className="text-sm font-semibold text-text mb-3">Connected Collections ({attached.length})</h3>
+        <h3 className="text-sm font-semibold text-text mb-3">{t("agents.connectedCollections", { defaultValue: "Connected Collections" })} ({attached.length})</h3>
         {attached.length === 0 ? (
-          <p className="text-sm text-text-tertiary py-4">No knowledge collections connected.</p>
+          <p className="text-sm text-text-tertiary py-4">{t("agents.noKnowledge", { defaultValue: "No knowledge collections connected." })}</p>
         ) : (
           <div className="space-y-2">
             {attached.map((c: any) => (
               <div key={c.id} className="flex items-center justify-between p-3 rounded-lg bg-surface-secondary border border-border">
                 <div className="flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-green-400" />
+                  <BookOpen className="h-4 w-4 text-green-400" aria-hidden="true" />
                   <span className="text-sm text-text font-medium">{c.name ?? c.collectionId}</span>
                 </div>
                 <button
                   onClick={() => detachKnowledge.mutate(c.collectionId ?? c.id)}
                   className="text-xs text-danger hover:underline cursor-pointer"
                 >
-                  Disconnect
+                  {t("agents.disconnect", { defaultValue: "Disconnect" })}
                 </button>
               </div>
             ))}
@@ -428,7 +541,7 @@ function AgentKnowledgeTab({ agentId }: { agentId: string }) {
 
       {available.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-text mb-3">Available Collections</h3>
+          <h3 className="text-sm font-semibold text-text mb-3">{t("agents.availableCollections", { defaultValue: "Available Collections" })}</h3>
           <div className="space-y-2">
             {available.map((c: any) => (
               <div key={c.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
@@ -437,7 +550,7 @@ function AgentKnowledgeTab({ agentId }: { agentId: string }) {
                   {c.description && <p className="text-xs text-text-tertiary">{c.description}</p>}
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => attachKnowledge.mutate(c.id)}>
-                  Connect
+                  {t("agents.connect", { defaultValue: "Connect" })}
                 </Button>
               </div>
             ))}
@@ -449,11 +562,12 @@ function AgentKnowledgeTab({ agentId }: { agentId: string }) {
 }
 
 function AgentMemoryTab({ agentId }: { agentId: string }) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
 
-  const { data: memoryData } = useQuery({
+  const { data: memoryData, isLoading: memoryLoading, isError: memoryError, refetch: refetchMemory } = useQuery({
     queryKey: ["agents", agentId, "memory"],
     queryFn: () => api.get<any>(`/api/agents/${agentId}/memory`),
   });
@@ -462,8 +576,9 @@ function AgentMemoryTab({ agentId }: { agentId: string }) {
     mutationFn: (memoryId: string) => api.delete(`/api/agents/${agentId}/memory/${memoryId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agents", agentId, "memory"] });
-      toast.success("Memory entry deleted");
+      toast.success(t("agents.memoryDeleted", { defaultValue: "Memory entry deleted" }));
     },
+    onError: (err: any) => toast.error(err.message ?? t("agents.memoryDeleteFailed", { defaultValue: "Failed to delete memory entry" })),
   });
 
   const updateMemory = useMutation({
@@ -472,8 +587,9 @@ function AgentMemoryTab({ agentId }: { agentId: string }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agents", agentId, "memory"] });
       setEditingId(null);
-      toast.success("Memory entry updated");
+      toast.success(t("agents.memoryUpdated", { defaultValue: "Memory entry updated" }));
     },
+    onError: (err: any) => toast.error(err.message ?? t("agents.memoryUpdateFailed", { defaultValue: "Failed to update memory entry" })),
   });
 
   const exportMemory = () => {
@@ -482,22 +598,44 @@ function AgentMemoryTab({ agentId }: { agentId: string }) {
 
   const entries = (memoryData as any)?.data ?? [];
 
+  if (memoryLoading) {
+    return (
+      <div className="max-w-2xl space-y-3">
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-20 w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  if (memoryError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <p className="text-sm text-danger mb-4">{t("agents.memoryLoadError", { defaultValue: "Failed to load memory." })}</p>
+        <Button variant="secondary" onClick={() => refetchMemory()}>
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          {t("common.retry", { defaultValue: "Retry" })}
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-text">Memory Entries ({entries.length})</h3>
+        <h3 className="text-sm font-semibold text-text">{t("agents.memoryEntries", { defaultValue: "Memory Entries" })} ({entries.length})</h3>
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" onClick={exportMemory}>
-            Export JSON
+            {t("agents.exportJson", { defaultValue: "Export JSON" })}
           </Button>
         </div>
       </div>
 
       {entries.length === 0 ? (
         <div className="text-center py-12">
-          <Brain className="h-12 w-12 text-text-tertiary mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-text mb-1">No memories yet</h3>
-          <p className="text-sm text-text-secondary">This agent hasn't stored any memories.</p>
+          <Brain className="h-12 w-12 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
+          <h3 className="text-lg font-medium text-text mb-1">{t("agents.noMemories", { defaultValue: "No memories yet" })}</h3>
+          <p className="text-sm text-text-secondary">{t("agents.noMemoriesDesc", { defaultValue: "This agent hasn't stored any memories." })}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -514,9 +652,9 @@ function AgentMemoryTab({ agentId }: { agentId: string }) {
                   />
                   <div className="flex gap-2">
                     <Button variant="primary" size="sm" onClick={() => updateMemory.mutate({ memoryId: entry.id, content: editContent })}>
-                      Save
+                      {t("common.save", { defaultValue: "Save" })}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>{t("common.cancel", { defaultValue: "Cancel" })}</Button>
                   </div>
                 </div>
               ) : (
@@ -532,13 +670,13 @@ function AgentMemoryTab({ agentId }: { agentId: string }) {
                         onClick={() => { setEditingId(entry.id); setEditContent(entry.content); }}
                         className="text-xs text-text-tertiary hover:text-text"
                       >
-                        Edit
+                        {t("common.edit", { defaultValue: "Edit" })}
                       </button>
                       <button
                         onClick={() => deleteMemory.mutate(entry.id)}
                         className="text-xs text-text-tertiary hover:text-danger"
                       >
-                        Delete
+                        {t("common.delete", { defaultValue: "Delete" })}
                       </button>
                     </div>
                   </div>

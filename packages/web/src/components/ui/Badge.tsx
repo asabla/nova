@@ -4,9 +4,10 @@ interface BadgeProps {
   children: React.ReactNode;
   variant?: "default" | "primary" | "success" | "warning" | "danger";
   className?: string;
+  "aria-label"?: string;
 }
 
-export function Badge({ children, variant = "default", className }: BadgeProps) {
+export function Badge({ children, variant = "default", className, "aria-label": ariaLabel }: BadgeProps) {
   return (
     <span
       className={clsx(
@@ -20,6 +21,7 @@ export function Badge({ children, variant = "default", className }: BadgeProps) 
         },
         className,
       )}
+      aria-label={ariaLabel}
     >
       {children}
     </span>

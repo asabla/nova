@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { clsx } from "clsx";
 
 interface AvatarProps {
@@ -20,8 +21,8 @@ function getInitials(name?: string): string {
 function getColor(name?: string): string {
   if (!name) return "bg-surface-tertiary";
   const colors = [
-    "bg-blue-500", "bg-purple-500", "bg-pink-500", "bg-orange-500",
-    "bg-teal-500", "bg-cyan-500", "bg-indigo-500", "bg-rose-500",
+    "bg-blue-600", "bg-purple-600", "bg-pink-600", "bg-orange-600",
+    "bg-teal-600", "bg-cyan-600", "bg-indigo-600", "bg-rose-600",
   ];
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
@@ -31,6 +32,8 @@ function getColor(name?: string): string {
 }
 
 export function Avatar({ src, name, size = "md", className }: AvatarProps) {
+  const [imgError, setImgError] = useState(false);
+
   const sizeClasses = {
     xs: "h-5 w-5 text-[8px]",
     sm: "h-7 w-7 text-xs",
@@ -38,11 +41,12 @@ export function Avatar({ src, name, size = "md", className }: AvatarProps) {
     lg: "h-12 w-12 text-base",
   };
 
-  if (src) {
+  if (src && !imgError) {
     return (
       <img
         src={src}
-        alt={name ?? "Avatar"}
+        alt={name ? `${name}'s avatar` : "User avatar"}
+        onError={() => setImgError(true)}
         className={clsx("rounded-full object-cover", sizeClasses[size], className)}
       />
     );
@@ -50,6 +54,8 @@ export function Avatar({ src, name, size = "md", className }: AvatarProps) {
 
   return (
     <div
+      role="img"
+      aria-label={name ? `${name}'s avatar` : "User avatar"}
       className={clsx(
         "rounded-full flex items-center justify-center font-medium text-white",
         sizeClasses[size],

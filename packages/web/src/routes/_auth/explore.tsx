@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import {
   Compass,
   MessageSquare,
@@ -223,6 +224,7 @@ function ConversationCard({
   conversation: SampleConversation;
   onStart: (starterMessage: string) => void;
 }) {
+  const { t } = useTranslation();
   const Icon = conversation.icon;
 
   return (
@@ -231,7 +233,7 @@ function ConversationCard({
         <div
           className={`h-10 w-10 rounded-xl ${conversation.bgColor} flex items-center justify-center`}
         >
-          <Icon className={`h-5 w-5 ${conversation.color}`} />
+          <Icon className={`h-5 w-5 ${conversation.color}`} aria-hidden="true" />
         </div>
         <div className="flex gap-1">
           {conversation.tags.map((tag) => (
@@ -256,8 +258,8 @@ function ConversationCard({
         onClick={() => onStart(conversation.starterMessage)}
         className="flex items-center gap-2 text-xs font-medium text-primary hover:text-primary-dark transition-colors group-hover:gap-3"
       >
-        Try this conversation
-        <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+        {t("explore.tryConversation", "Try this conversation")}
+        <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
       </button>
     </div>
   );
@@ -268,6 +270,7 @@ function ConversationCard({
 // ---------------------------------------------------------------------------
 
 function ExplorePage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState<Category>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -309,24 +312,23 @@ function ExplorePage() {
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
             <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-              <Compass className="h-7 w-7 text-primary" />
+              <Compass className="h-7 w-7 text-primary" aria-hidden="true" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-text mb-2">Explore</h1>
+          <h1 className="text-2xl font-bold text-text mb-2">{t("explore.title", "Explore")}</h1>
           <p className="text-sm text-text-secondary max-w-md mx-auto">
-            Discover what NOVA can do. Browse sample conversations and start one
-            with a single click.
+            {t("explore.subtitle", "Discover what NOVA can do. Browse sample conversations and start one with a single click.")}
           </p>
         </div>
 
         {/* Search */}
         <div className="relative max-w-md mx-auto mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary pointer-events-none" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary pointer-events-none" aria-hidden="true" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search conversations..."
+            placeholder={t("explore.searchPlaceholder", "Search conversations...")}
             className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary focus:outline-2 focus:outline-offset-0 focus:outline-primary focus:border-primary transition-colors"
           />
         </div>
@@ -346,7 +348,7 @@ function ExplorePage() {
                     : "bg-surface-secondary border border-border text-text-secondary hover:text-text hover:border-border-strong"
                 }`}
               >
-                <CatIcon className="h-3.5 w-3.5" />
+                <CatIcon className="h-3.5 w-3.5" aria-hidden="true" />
                 {cat.label}
               </button>
             );
@@ -366,9 +368,9 @@ function ExplorePage() {
           </div>
         ) : (
           <div className="text-center py-16">
-            <Search className="h-8 w-8 text-text-tertiary mx-auto mb-3" />
+            <Search className="h-8 w-8 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
             <p className="text-sm text-text-secondary">
-              No conversations matching your search
+              {t("explore.noResults", "No conversations matching your search")}
             </p>
             <button
               onClick={() => {
@@ -377,7 +379,7 @@ function ExplorePage() {
               }}
               className="text-xs text-primary hover:text-primary-dark mt-2 underline"
             >
-              Clear filters
+              {t("explore.clearFilters", "Clear filters")}
             </button>
           </div>
         )}
@@ -385,14 +387,14 @@ function ExplorePage() {
         {/* CTA */}
         <div className="mt-12 text-center">
           <p className="text-sm text-text-tertiary mb-3">
-            Don't see what you're looking for?
+            {t("explore.ctaText", "Don't see what you're looking for?")}
           </p>
           <Button
             variant="primary"
             onClick={() => navigate({ to: "/conversations/new" })}
           >
-            <MessageSquare className="h-4 w-4" />
-            Start a blank conversation
+            <MessageSquare className="h-4 w-4" aria-hidden="true" />
+            {t("explore.startBlank", "Start a blank conversation")}
           </Button>
         </div>
       </div>

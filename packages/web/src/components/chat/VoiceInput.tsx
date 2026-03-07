@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Mic, MicOff, Loader2, AudioLines, Send, X } from "lucide-react";
 import { clsx } from "clsx";
+import { useTranslation } from "react-i18next";
 
 // ---------- Types for the Web Speech API ----------
 // These are not universally available in all TS lib targets, so we declare
@@ -127,6 +128,7 @@ function WaveformVisualizer({ analyser }: { analyser: AnalyserNode | null }) {
 // ---------- Component ----------
 
 export function VoiceInput({ onTranscript, onAudioFile, disabled }: VoiceInputProps) {
+  const { t } = useTranslation();
   const [supported, setSupported] = useState(true);
   const [mode, setMode] = useState<VoiceMode>("speech-to-text");
   const [recording, setRecording] = useState(false);
@@ -402,7 +404,7 @@ export function VoiceInput({ onTranscript, onAudioFile, disabled }: VoiceInputPr
       <button
         disabled
         className="text-text-tertiary p-1.5 rounded-lg shrink-0 mb-0.5 cursor-not-allowed opacity-50"
-        title="Speech recognition is not supported in this browser"
+        aria-label={t("voice.unsupported", { defaultValue: "Speech recognition is not supported in this browser" })}
       >
         <MicOff className="h-4 w-4" />
       </button>
@@ -417,7 +419,7 @@ export function VoiceInput({ onTranscript, onAudioFile, disabled }: VoiceInputPr
         <button
           onClick={cancelAudioRecording}
           className="text-text-tertiary hover:text-danger p-1.5 rounded-lg transition-colors"
-          title="Cancel recording"
+          aria-label={t("voice.cancelRecording", { defaultValue: "Cancel recording" })}
         >
           <X className="h-4 w-4" />
         </button>
@@ -435,7 +437,7 @@ export function VoiceInput({ onTranscript, onAudioFile, disabled }: VoiceInputPr
         <button
           onClick={stopAudioRecording}
           className="text-primary hover:text-primary/80 p-1.5 rounded-lg bg-primary/10 transition-colors"
-          title="Send audio recording"
+          aria-label={t("voice.sendRecording", { defaultValue: "Send audio recording" })}
         >
           <Send className="h-4 w-4" />
         </button>
@@ -454,10 +456,10 @@ export function VoiceInput({ onTranscript, onAudioFile, disabled }: VoiceInputPr
             "p-1 rounded-lg text-text-tertiary hover:text-text-secondary transition-colors",
             disabled && "opacity-50 cursor-not-allowed",
           )}
-          title={
+          aria-label={
             mode === "speech-to-text"
-              ? "Mode: Speech-to-text (click to switch to audio recording)"
-              : "Mode: Audio recording (click to switch to speech-to-text)"
+              ? t("voice.modeStt", { defaultValue: "Mode: Speech-to-text (click to switch to audio recording)" })
+              : t("voice.modeAudio", { defaultValue: "Mode: Audio recording (click to switch to speech-to-text)" })
           }
         >
           <AudioLines className="h-3.5 w-3.5" />
@@ -487,12 +489,12 @@ export function VoiceInput({ onTranscript, onAudioFile, disabled }: VoiceInputPr
               : "text-text-tertiary hover:text-text-secondary hover:bg-surface-tertiary",
             disabled && "opacity-50 cursor-not-allowed",
           )}
-          title={
+          aria-label={
             recording
-              ? "Stop recording"
+              ? t("voice.stopRecording", { defaultValue: "Stop recording" })
               : mode === "speech-to-text"
-                ? "Voice input (speech-to-text)"
-                : "Record audio message"
+                ? t("voice.startStt", { defaultValue: "Voice input (speech-to-text)" })
+                : t("voice.startAudio", { defaultValue: "Record audio message" })
           }
         >
           {recording ? (

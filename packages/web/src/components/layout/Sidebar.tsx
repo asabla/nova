@@ -15,6 +15,8 @@ import { useUIStore } from "../../stores/ui.store";
 import { useAuthStore } from "../../stores/auth.store";
 import { Button } from "../ui/Button";
 import { toast } from "../ui/Toast";
+import { Dialog } from "../ui/Dialog";
+import { ConversationListSkeleton } from "../ui/Skeleton";
 
 export function Sidebar() {
   const { t } = useTranslation();
@@ -29,8 +31,9 @@ export function Sidebar() {
   const [bulkMode, setBulkMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const { data: conversationsData } = useQuery({
+  const { data: conversationsData, isLoading: loadingConversations } = useQuery({
     queryKey: queryKeys.conversations.list({ isArchived: false }),
     queryFn: () => api.get<any>(`/api/conversations?isArchived=false`),
     staleTime: 30_000,
@@ -49,7 +52,10 @@ export function Sidebar() {
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
       setSelected(new Set());
       setBulkMode(false);
-      toast("Conversations archived", "success");
+      toast(t("conversations.archived", { defaultValue: "Conversations archived" }), "success");
+    },
+    onError: () => {
+      toast(t("errors.generic", { defaultValue: "Something went wrong" }), "error");
     },
   });
 
@@ -60,7 +66,10 @@ export function Sidebar() {
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
       setSelected(new Set());
       setBulkMode(false);
-      toast("Conversations deleted", "success");
+      toast(t("conversations.deleted", { defaultValue: "Conversations deleted" }), "success");
+    },
+    onError: () => {
+      toast(t("errors.generic", { defaultValue: "Something went wrong" }), "error");
     },
   });
 
@@ -94,187 +103,232 @@ export function Sidebar() {
   const isAdmin = user?.role === "org-admin" || user?.role === "admin";
 
   return (
-    <aside
-      className={clsx(
-        "flex flex-col h-full bg-surface-secondary border-r border-border transition-all duration-200",
-        sidebarOpen ? "w-[280px]" : "w-0 overflow-hidden",
-      )}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          <span className="font-bold text-sm tracking-tight">NOVA</span>
-        </div>
-        <button onClick={toggleSidebar} className="text-text-tertiary hover:text-text p-1 rounded-lg hover:bg-surface-tertiary">
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* New Conversation */}
-      <div className="px-3 pt-3 flex gap-1.5">
-        <Button
-          variant="primary"
-          size="sm"
-          className="flex-1"
-          onClick={() => navigate({ to: "/conversations/new" })}
-        >
-          <MessageSquarePlus className="h-4 w-4" />
-          {t("conversations.new")}
-        </Button>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={clsx(
-            "p-1.5 rounded-lg transition-colors",
-            showFilters ? "bg-primary/10 text-primary" : "text-text-tertiary hover:text-text hover:bg-surface-tertiary",
-          )}
-          title="Filter conversations"
-        >
-          <Filter className="h-4 w-4" />
-        </button>
-        <button
-          onClick={() => { setBulkMode(!bulkMode); setSelected(new Set()); }}
-          className={clsx(
-            "p-1.5 rounded-lg transition-colors",
-            bulkMode ? "bg-primary/10 text-primary" : "text-text-tertiary hover:text-text hover:bg-surface-tertiary",
-          )}
-          title="Bulk select"
-        >
-          <CheckSquare className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* Filters */}
-      {showFilters && (
-        <div className="px-3 pt-2 space-y-1.5">
-          {workspaces.length > 0 && (
-            <select
-              value={filterWorkspace}
-              onChange={(e) => setFilterWorkspace(e.target.value)}
-              className="w-full h-7 px-2 text-[11px] bg-surface border border-border rounded text-text"
-            >
-              <option value="">All workspaces</option>
-              {workspaces.map((w: any) => (
-                <option key={w.id} value={w.id}>{w.name}</option>
-              ))}
-            </select>
-          )}
-        </div>
-      )}
-
-      {/* Bulk Actions */}
-      {bulkMode && selected.size > 0 && (
-        <div className="px-3 pt-2 flex gap-1.5">
-          <button
-            onClick={() => bulkArchive.mutate(Array.from(selected))}
-            className="flex-1 flex items-center justify-center gap-1 h-7 text-[11px] bg-surface border border-border rounded text-text-secondary hover:text-text"
-          >
-            <Archive className="h-3 w-3" /> Archive ({selected.size})
-          </button>
-          <button
-            onClick={() => {
-              if (confirm(`Delete ${selected.size} conversations?`))
-                bulkDelete.mutate(Array.from(selected));
-            }}
-            className="flex-1 flex items-center justify-center gap-1 h-7 text-[11px] bg-surface border border-danger/30 rounded text-danger hover:bg-danger/5"
-          >
-            <Trash2 className="h-3 w-3" /> Delete
-          </button>
-        </div>
-      )}
-
-      {/* Search */}
-      <div className="px-3 pt-2">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary" />
-          <input
-            type="text"
-            placeholder={t("conversations.search")}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-8 pl-8 pr-3 text-xs rounded-lg bg-surface border border-border text-text placeholder:text-text-tertiary focus:outline-primary"
-          />
-        </div>
-      </div>
-
-      {/* Conversation List */}
-      <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
-        {filteredConversations.length === 0 ? (
-          <div className="px-3 py-8 text-center">
-            <p className="text-xs text-text-tertiary">{t("conversations.empty")}</p>
-            <p className="text-xs text-text-tertiary mt-1">{t("conversations.startPrompt")}</p>
-          </div>
-        ) : (
-          filteredConversations.map((conv: any) => (
-            <button
-              key={conv.id}
-              onClick={() => {
-                if (bulkMode) {
-                  toggleSelect(conv.id);
-                } else {
-                  navigate({ to: `/conversations/${conv.id}` });
-                }
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm text-text-secondary hover:bg-surface-tertiary hover:text-text transition-colors group"
-            >
-              {bulkMode && (
-                selected.has(conv.id)
-                  ? <CheckSquare className="h-3.5 w-3.5 text-primary shrink-0" />
-                  : <Square className="h-3.5 w-3.5 text-text-tertiary shrink-0" />
-              )}
-              {!bulkMode && conv.isPinned && <Pin className="h-3 w-3 text-primary shrink-0" />}
-              <span className="truncate flex-1">{conv.title ?? "Untitled"}</span>
-              {conv.workspaceId && <FolderOpen className="h-3 w-3 text-text-tertiary shrink-0 opacity-0 group-hover:opacity-100" />}
-            </button>
-          ))
+    <>
+      <aside
+        className={clsx(
+          "flex flex-col h-full bg-surface-secondary border-r border-border transition-all duration-200",
+          sidebarOpen ? "w-[280px]" : "w-0 overflow-hidden",
         )}
-      </nav>
-
-      {/* Bottom Navigation - Grouped */}
-      <div className="border-t border-border px-2 py-2 space-y-1 overflow-y-auto max-h-[45%]">
-        {/* Build section */}
-        <NavSection
-          label={t("nav.sectionBuild")}
-          collapsed={collapsedSections.has("build")}
-          onToggle={() => toggleSection("build")}
-        >
-          <SidebarLink icon={Bot} label={t("nav.agents")} to="/agents" />
-          <SidebarLink icon={BookOpen} label={t("nav.knowledge")} to="/knowledge" />
-          <SidebarLink icon={Wrench} label={t("nav.tools")} to="/tools" />
-          <SidebarLink icon={FileText} label={t("nav.prompts")} to="/prompts" />
-          <SidebarLink icon={FolderKanban} label={t("nav.workspaces")} to="/workspaces" />
-        </NavSection>
-
-        {/* Discover section */}
-        <NavSection
-          label={t("nav.sectionDiscover")}
-          collapsed={collapsedSections.has("discover")}
-          onToggle={() => toggleSection("discover")}
-        >
-          <SidebarLink icon={Compass} label={t("nav.explore")} to="/explore" />
-          <SidebarLink icon={Microscope} label={t("nav.research")} to="/research" />
-        </NavSection>
-
-        {/* Developer section */}
-        <NavSection
-          label={t("nav.sectionDeveloper")}
-          collapsed={collapsedSections.has("developer")}
-          onToggle={() => toggleSection("developer")}
-        >
-          <SidebarLink icon={Code2} label={t("nav.playground")} to="/playground" />
-          <SidebarLink icon={GitCompare} label={t("nav.compare")} to="/model-compare" />
-          <SidebarLink icon={Puzzle} label={t("nav.mcp")} to="/mcp" />
-        </NavSection>
-
-        {/* System - always visible, no collapse */}
-        <div className="pt-1 border-t border-border/50 space-y-0.5">
-          <SidebarLink icon={BarChart3} label={t("nav.usage")} to="/usage" />
-          <SidebarLink icon={Settings} label={t("nav.settings")} to="/settings" />
-          {isAdmin && <SidebarLink icon={ShieldCheck} label={t("nav.admin")} to="/admin" />}
-          <SidebarLink icon={HelpCircle} label={t("nav.help")} to="/help" />
+        aria-hidden={!sidebarOpen}
+        {...(!sidebarOpen && { inert: "" as any })}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" aria-hidden="true" />
+            <span className="font-bold text-sm tracking-tight">NOVA</span>
+          </div>
+          <button
+            onClick={toggleSidebar}
+            aria-label={t("nav.collapseSidebar", { defaultValue: "Collapse sidebar" })}
+            className="text-text-tertiary hover:text-text p-1 rounded-lg hover:bg-surface-tertiary focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          </button>
         </div>
-      </div>
-    </aside>
+
+        {/* New Conversation */}
+        <div className="px-3 pt-3 flex gap-1.5">
+          <Button
+            variant="primary"
+            size="sm"
+            className="flex-1"
+            onClick={() => navigate({ to: "/conversations/new" })}
+          >
+            <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />
+            {t("conversations.new")}
+          </Button>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={clsx(
+              "p-1.5 rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-primary",
+              showFilters ? "bg-primary/10 text-primary" : "text-text-tertiary hover:text-text hover:bg-surface-tertiary",
+            )}
+            aria-label={t("conversations.filter", { defaultValue: "Filter conversations" })}
+            aria-pressed={showFilters}
+          >
+            <Filter className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <button
+            onClick={() => { setBulkMode(!bulkMode); setSelected(new Set()); }}
+            className={clsx(
+              "p-1.5 rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-primary",
+              bulkMode ? "bg-primary/10 text-primary" : "text-text-tertiary hover:text-text hover:bg-surface-tertiary",
+            )}
+            aria-label={t("conversations.bulkSelect", { defaultValue: "Bulk select" })}
+            aria-pressed={bulkMode}
+          >
+            <CheckSquare className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+
+        {/* Filters */}
+        {showFilters && (
+          <div className="px-3 pt-2 space-y-1.5">
+            {workspaces.length > 0 && (
+              <select
+                value={filterWorkspace}
+                onChange={(e) => setFilterWorkspace(e.target.value)}
+                aria-label={t("search.filter.workspace", { defaultValue: "Filter by workspace" })}
+                className="w-full h-7 px-2 text-[11px] bg-surface border border-border rounded text-text"
+              >
+                <option value="">{t("search.filter.allWorkspaces", { defaultValue: "All workspaces" })}</option>
+                {workspaces.map((w: any) => (
+                  <option key={w.id} value={w.id}>{w.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
+
+        {/* Bulk Actions */}
+        {bulkMode && selected.size > 0 && (
+          <div className="px-3 pt-2 flex gap-1.5">
+            <button
+              onClick={() => bulkArchive.mutate(Array.from(selected))}
+              disabled={bulkArchive.isPending}
+              className="flex-1 flex items-center justify-center gap-1 h-7 text-[11px] bg-surface border border-border rounded text-text-secondary hover:text-text disabled:opacity-50"
+            >
+              <Archive className="h-3 w-3" aria-hidden="true" />
+              {t("common.archive", { defaultValue: "Archive" })} ({selected.size})
+            </button>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={bulkDelete.isPending}
+              className="flex-1 flex items-center justify-center gap-1 h-7 text-[11px] bg-surface border border-danger/30 rounded text-danger hover:bg-danger/5 disabled:opacity-50"
+            >
+              <Trash2 className="h-3 w-3" aria-hidden="true" />
+              {t("common.delete", { defaultValue: "Delete" })}
+            </button>
+          </div>
+        )}
+
+        {/* Search */}
+        <div className="px-3 pt-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary" aria-hidden="true" />
+            <input
+              type="text"
+              placeholder={t("conversations.search")}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-8 pl-8 pr-3 text-xs rounded-lg bg-surface border border-border text-text placeholder:text-text-tertiary focus-visible:outline-2 focus-visible:outline-primary"
+            />
+          </div>
+        </div>
+
+        {/* Conversation List */}
+        <nav aria-label={t("nav.conversations", { defaultValue: "Conversations" })} className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
+          {loadingConversations ? (
+            <ConversationListSkeleton />
+          ) : filteredConversations.length === 0 ? (
+            <div className="px-3 py-8 text-center">
+              <p className="text-xs text-text-tertiary">{t("conversations.empty")}</p>
+              <p className="text-xs text-text-tertiary mt-1">{t("conversations.startPrompt")}</p>
+            </div>
+          ) : (
+            filteredConversations.map((conv: any) => (
+              <button
+                key={conv.id}
+                onClick={() => {
+                  if (bulkMode) {
+                    toggleSelect(conv.id);
+                  } else {
+                    navigate({ to: `/conversations/${conv.id}` });
+                  }
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm text-text-secondary hover:bg-surface-tertiary hover:text-text transition-colors group"
+              >
+                {bulkMode && (
+                  selected.has(conv.id)
+                    ? <CheckSquare className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden="true" />
+                    : <Square className="h-3.5 w-3.5 text-text-tertiary shrink-0" aria-hidden="true" />
+                )}
+                {!bulkMode && conv.isPinned && <Pin className="h-3 w-3 text-primary shrink-0" aria-hidden="true" />}
+                <span className="truncate flex-1">{conv.title ?? t("conversations.untitled", { defaultValue: "Untitled" })}</span>
+                {conv.workspaceId && <FolderOpen className="h-3 w-3 text-text-tertiary shrink-0 opacity-0 group-hover:opacity-100" aria-hidden="true" />}
+              </button>
+            ))
+          )}
+        </nav>
+
+        {/* Bottom Navigation - Grouped */}
+        <div className="border-t border-border px-2 py-2 space-y-1 overflow-y-auto max-h-[45%]">
+          {/* Build section */}
+          <NavSection
+            label={t("nav.sectionBuild")}
+            collapsed={collapsedSections.has("build")}
+            onToggle={() => toggleSection("build")}
+          >
+            <SidebarLink icon={Bot} label={t("nav.agents")} to="/agents" />
+            <SidebarLink icon={BookOpen} label={t("nav.knowledge")} to="/knowledge" />
+            <SidebarLink icon={Wrench} label={t("nav.tools")} to="/tools" />
+            <SidebarLink icon={FileText} label={t("nav.prompts")} to="/prompts" />
+            <SidebarLink icon={FolderKanban} label={t("nav.workspaces")} to="/workspaces" />
+          </NavSection>
+
+          {/* Discover section */}
+          <NavSection
+            label={t("nav.sectionDiscover")}
+            collapsed={collapsedSections.has("discover")}
+            onToggle={() => toggleSection("discover")}
+          >
+            <SidebarLink icon={Compass} label={t("nav.explore")} to="/explore" />
+            <SidebarLink icon={Microscope} label={t("nav.research")} to="/research" />
+          </NavSection>
+
+          {/* Developer section */}
+          <NavSection
+            label={t("nav.sectionDeveloper")}
+            collapsed={collapsedSections.has("developer")}
+            onToggle={() => toggleSection("developer")}
+          >
+            <SidebarLink icon={Code2} label={t("nav.playground")} to="/playground" />
+            <SidebarLink icon={GitCompare} label={t("nav.compare")} to="/model-compare" />
+            <SidebarLink icon={Puzzle} label={t("nav.mcp")} to="/mcp" />
+          </NavSection>
+
+          {/* System - always visible, no collapse */}
+          <div className="pt-1 border-t border-border/50 space-y-0.5">
+            <SidebarLink icon={BarChart3} label={t("nav.usage")} to="/usage" />
+            <SidebarLink icon={Settings} label={t("nav.settings")} to="/settings" />
+            {isAdmin && <SidebarLink icon={ShieldCheck} label={t("nav.admin")} to="/admin" />}
+            <SidebarLink icon={HelpCircle} label={t("nav.help")} to="/help" />
+          </div>
+        </div>
+      </aside>
+
+      {/* Delete confirmation dialog */}
+      <Dialog
+        open={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        title={t("conversations.deleteConfirmTitle", { defaultValue: "Delete conversations" })}
+        size="sm"
+      >
+        <p className="text-sm text-text-secondary mb-4">
+          {t("conversations.deleteConfirmMessage", {
+            count: selected.size,
+            defaultValue: `Are you sure you want to delete ${selected.size} conversation(s)? This cannot be undone.`,
+          })}
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setShowDeleteConfirm(false)}>
+            {t("common.cancel", { defaultValue: "Cancel" })}
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            loading={bulkDelete.isPending}
+            onClick={() => {
+              bulkDelete.mutate(Array.from(selected));
+              setShowDeleteConfirm(false);
+            }}
+          >
+            {t("common.delete", { defaultValue: "Delete" })}
+          </Button>
+        </div>
+      </Dialog>
+    </>
   );
 }
 
@@ -293,10 +347,11 @@ function NavSection({
     <div>
       <button
         onClick={onToggle}
+        aria-expanded={!collapsed}
         className="w-full flex items-center justify-between px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary hover:text-text-secondary transition-colors"
       >
         {label}
-        <ChevronDown className={clsx("h-3 w-3 transition-transform", collapsed && "-rotate-90")} />
+        <ChevronDown className={clsx("h-3 w-3 transition-transform", collapsed && "-rotate-90")} aria-hidden="true" />
       </button>
       {!collapsed && <div className="space-y-0.5">{children}</div>}
     </div>
@@ -318,7 +373,7 @@ function SidebarLink({ icon: Icon, label, to }: { icon: any; label: string; to: 
           : "text-text-secondary hover:bg-surface-tertiary hover:text-text",
       )}
     >
-      <Icon className="h-4 w-4" />
+      <Icon className="h-4 w-4" aria-hidden="true" />
       {label}
     </button>
   );

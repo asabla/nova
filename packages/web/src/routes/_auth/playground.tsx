@@ -466,7 +466,7 @@ function PlaygroundPage() {
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <Code2 className="h-5 w-5 text-primary" />
+          <Code2 className="h-5 w-5 text-primary" aria-hidden="true" />
           <h1 className="text-lg font-semibold text-text">
             {t("playground.title", "Model Playground")}
           </h1>
@@ -505,11 +505,11 @@ function PlaygroundPage() {
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
         {/* ============================================================= */}
         {/* LEFT PANEL: Inputs                                            */}
         {/* ============================================================= */}
-        <div className="w-1/2 border-r border-border overflow-y-auto p-6 space-y-5">
+        <div className="w-full md:w-1/2 border-b md:border-b-0 md:border-r border-border overflow-y-auto p-6 space-y-5">
           {/* Model selector */}
           <div>
             <label className="block text-sm font-medium text-text mb-1.5">
@@ -622,8 +622,9 @@ function PlaygroundPage() {
                     onClick={() => removeMessage(msg.id)}
                     disabled={running || messages.length <= 1}
                     className="self-start p-2 rounded-lg text-text-tertiary hover:text-danger hover:bg-danger/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    aria-label={t("playground.removeMessage", "Remove message")}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
               ))}
@@ -761,20 +762,20 @@ function PlaygroundPage() {
         {/* ============================================================= */}
         {/* RIGHT PANEL: Output                                           */}
         {/* ============================================================= */}
-        <div className="w-1/2 overflow-y-auto flex flex-col">
+        <div className="w-full md:w-1/2 overflow-y-auto flex flex-col">
           {result || (running && stream) ? (
             <div className="flex flex-col flex-1">
               {/* Stats bar */}
               <div className="flex flex-wrap items-center gap-4 px-6 py-3 bg-surface-secondary border-b border-border text-xs text-text-secondary">
                 {result?.model && (
                   <span className="flex items-center gap-1">
-                    <Zap className="h-3 w-3" />
+                    <Zap className="h-3 w-3" aria-hidden="true" />
                     {result.model}
                   </span>
                 )}
                 {(result?.durationMs ?? 0) > 0 && (
                   <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
+                    <Clock className="h-3 w-3" aria-hidden="true" />
                     {result!.durationMs}ms
                   </span>
                 )}
@@ -785,7 +786,7 @@ function PlaygroundPage() {
                 )}
                 {result?.usage && (
                   <span className="flex items-center gap-1">
-                    <Hash className="h-3 w-3" />
+                    <Hash className="h-3 w-3" aria-hidden="true" />
                     {result.usage.prompt_tokens}p / {result.usage.completion_tokens}c = {result.usage.total_tokens} total
                   </span>
                 )}
@@ -841,9 +842,9 @@ function PlaygroundPage() {
                       type="button"
                       onClick={handleCopyResponse}
                       className="p-1.5 rounded-lg hover:bg-surface-secondary text-text-tertiary hover:text-text transition-colors"
-                      title={t("playground.copyResponse", "Copy response")}
+                      aria-label={t("playground.copyResponse", "Copy response")}
                     >
-                      <Copy className="h-3.5 w-3.5" />
+                      <Copy className="h-3.5 w-3.5" aria-hidden="true" />
                     </button>
                   </div>
                   <div className="px-4 py-3 rounded-xl border border-border bg-surface text-sm text-text whitespace-pre-wrap leading-relaxed">
@@ -871,9 +872,9 @@ function PlaygroundPage() {
                       type="button"
                       onClick={handleCopyRaw}
                       className="absolute top-2 right-2 p-1.5 rounded-lg hover:bg-surface text-text-tertiary hover:text-text transition-colors"
-                      title={t("playground.copyRaw", "Copy raw JSON")}
+                      aria-label={t("playground.copyRaw", "Copy raw JSON")}
                     >
-                      <Copy className="h-3.5 w-3.5" />
+                      <Copy className="h-3.5 w-3.5" aria-hidden="true" />
                     </button>
                     <pre className="p-4 rounded-xl bg-surface-secondary border border-border text-xs text-text-secondary overflow-x-auto font-mono max-h-96">
                       {JSON.stringify(result?.raw, null, 2)}
@@ -885,7 +886,7 @@ function PlaygroundPage() {
           ) : (
             <div className="flex items-center justify-center h-full text-text-tertiary">
               <div className="text-center">
-                <Code2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <Code2 className="h-12 w-12 mx-auto mb-3 opacity-50" aria-hidden="true" />
                 <p className="text-sm">{t("playground.emptyTitle", "Run a prompt to see results")}</p>
                 <p className="text-xs mt-1">
                   {t("playground.emptyHint", "Select a model and enter a message, then click Run")}
@@ -913,8 +914,9 @@ function PlaygroundPage() {
                 type="button"
                 onClick={() => setShowPresetDialog(false)}
                 className="p-1.5 rounded-lg hover:bg-surface-secondary text-text-tertiary"
+                aria-label={t("common.close", "Close")}
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
             <input
@@ -955,8 +957,9 @@ function PlaygroundPage() {
                 type="button"
                 onClick={() => setShowLoadDialog(false)}
                 className="p-1.5 rounded-lg hover:bg-surface-secondary text-text-tertiary"
+                aria-label={t("common.close", "Close")}
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
             {presets.length === 0 ? (
@@ -987,8 +990,9 @@ function PlaygroundPage() {
                         handleDeletePreset(preset.name);
                       }}
                       className="p-1.5 rounded-lg text-text-tertiary hover:text-danger hover:bg-danger/10 opacity-0 group-hover:opacity-100 transition-all"
+                      aria-label={t("playground.deletePreset", "Delete preset")}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                     </button>
                   </div>
                 ))}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useId } from "react";
 import { useTranslation } from "react-i18next";
 import { Wifi, WifiOff, RefreshCw } from "lucide-react";
 import { clsx } from "clsx";
@@ -39,10 +39,12 @@ export function ConnectionStatus() {
   const { t } = useTranslation();
   const { isOnline, apiReachable, lastChecked, wsConnected } = useConnectionStatus();
   const [showTooltip, setShowTooltip] = useState(false);
+  const tooltipId = useId();
 
   // Derive effective status from all signals:
   // - Browser offline → disconnected
-  // - API reachable (primary transport is HTTP/SSE) → connected
+  // - API reachable AND WebSocket connected → connected
+  // - API reachable but WS not connected → connected (SSE is primary transport)
   // - API unreachable but online → reconnecting
   const effectiveStatus: keyof typeof statusConfig = !isOnline
     ? "disconnected"
@@ -65,9 +67,12 @@ export function ConnectionStatus() {
         type="button"
         className={clsx(
           "flex items-center justify-center p-2 rounded-lg transition-colors",
-          "hover:bg-surface-secondary text-text-secondary hover:text-text",
+          "hover:bg-surface-secondary text-text-secondary hover:text-text focus-visible:outline-2 focus-visible:outline-primary",
         )}
         aria-label={t(config.labelKey)}
+        aria-describedby={showTooltip ? tooltipId : undefined}
+        onFocus={() => setShowTooltip(true)}
+        onBlur={() => setShowTooltip(false)}
       >
         <span className="relative flex h-3 w-3">
           {/* Ping animation for non-connected states */}
@@ -92,6 +97,8 @@ export function ConnectionStatus() {
       {/* Tooltip */}
       {showTooltip && (
         <div
+          id={tooltipId}
+          role="tooltip"
           className={clsx(
             "absolute right-0 top-full mt-1 z-50",
             "w-64 rounded-xl border border-border bg-surface p-3 shadow-lg",
@@ -107,6 +114,7 @@ export function ConnectionStatus() {
                 effectiveStatus === "disconnected" && "text-danger",
                 isAnimating && "animate-spin",
               )}
+              aria-hidden="true"
             />
             <span className="text-sm font-medium text-text">
               {t(config.labelKey)}

@@ -7,6 +7,7 @@ import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
+import { Dialog } from "../../components/ui/Dialog";
 import { toast } from "../../components/ui/Toast";
 import { QRCode } from "../../components/ui/QRCode";
 import { formatDistanceToNow } from "date-fns";
@@ -14,6 +15,31 @@ import { formatDistanceToNow } from "date-fns";
 export const Route = createFileRoute("/_auth/settings/security")({
   component: SecuritySettings,
 });
+
+function SecuritySkeleton() {
+  return (
+    <div className="space-y-8 max-w-md animate-pulse">
+      <div className="space-y-3">
+        <div className="h-4 w-40 bg-surface-secondary rounded" />
+        <div className="space-y-3">
+          <div className="h-10 w-full bg-surface-secondary rounded-lg" />
+          <div className="h-10 w-full bg-surface-secondary rounded-lg" />
+          <div className="h-10 w-full bg-surface-secondary rounded-lg" />
+        </div>
+        <div className="h-9 w-36 bg-surface-secondary rounded-lg" />
+      </div>
+      <div className="space-y-3">
+        <div className="h-4 w-56 bg-surface-secondary rounded" />
+        <div className="h-24 w-full bg-surface-secondary rounded-xl" />
+      </div>
+      <div className="space-y-3">
+        <div className="h-4 w-32 bg-surface-secondary rounded" />
+        <div className="h-16 w-full bg-surface-secondary rounded-xl" />
+        <div className="h-16 w-full bg-surface-secondary rounded-xl" />
+      </div>
+    </div>
+  );
+}
 
 function SecuritySettings() {
   const { t } = useTranslation();
@@ -23,18 +49,20 @@ function SecuritySettings() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [passwordChanging, setPasswordChanging] = useState(false);
 
   // TOTP state
   const [totpSetup, setTotpSetup] = useState<{ secret: string; otpauthUri: string } | null>(null);
   const [totpCode, setTotpCode] = useState("");
   const [totpError, setTotpError] = useState("");
+  const [showDisable2faDialog, setShowDisable2faDialog] = useState(false);
 
-  const { data: sessions } = useQuery({
+  const { data: sessions, isLoading: sessionsLoading } = useQuery({
     queryKey: queryKeys.user.sessions(),
     queryFn: () => api.get<any>("/api/users/me/sessions"),
   });
 
-  const { data: totpStatus } = useQuery({
+  const { data: totpStatus, isLoading: totpLoading } = useQuery({
     queryKey: ["totp-status"],
     queryFn: () => api.get<any>("/api/auth/totp/status"),
     staleTime: 60_000,
@@ -44,7 +72,10 @@ function SecuritySettings() {
     mutationFn: (sessionId: string) => api.delete(`/api/users/me/sessions/${sessionId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.user.sessions() });
-      toast("Session revoked", "success");
+      toast(t("settings.sessionRevoked", "Session revoked"), "success");
+    },
+    onError: () => {
+      toast(t("settings.sessionRevokeFailed", "Failed to revoke session"), "error");
     },
   });
 
@@ -52,6 +83,9 @@ function SecuritySettings() {
     mutationFn: () => api.post<{ secret: string; otpauthUri: string }>("/api/auth/totp/setup"),
     onSuccess: (data) => {
       setTotpSetup(data);
+    },
+    onError: () => {
+      toast(t("settings.totpSetupFailed", "Failed to set up two-factor authentication"), "error");
     },
   });
 
@@ -61,10 +95,10 @@ function SecuritySettings() {
       setTotpSetup(null);
       setTotpCode("");
       queryClient.invalidateQueries({ queryKey: ["totp-status"] });
-      toast("Two-factor authentication enabled", "success");
+      toast(t("settings.totpEnabled", "Two-factor authentication enabled"), "success");
     },
     onError: () => {
-      setTotpError("Invalid code. Please try again.");
+      setTotpError(t("settings.totpInvalidCode", "Invalid code. Please try again."));
     },
   });
 
@@ -72,7 +106,11 @@ function SecuritySettings() {
     mutationFn: () => api.post("/api/auth/totp/disable"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["totp-status"] });
-      toast("Two-factor authentication disabled", "success");
+      setShowDisable2faDialog(false);
+      toast(t("settings.totpDisabled", "Two-factor authentication disabled"), "success");
+    },
+    onError: () => {
+      toast(t("settings.totpDisableFailed", "Failed to disable two-factor authentication"), "error");
     },
   });
 
@@ -91,6 +129,7 @@ function SecuritySettings() {
       return;
     }
 
+    setPasswordChanging(true);
     try {
       await api.post("/api/users/me/change-password", {
         currentPassword,
@@ -102,10 +141,16 @@ function SecuritySettings() {
       setConfirmPassword("");
     } catch {
       setError(t("settings.passwordChangeFailed"));
+    } finally {
+      setPasswordChanging(false);
     }
   };
 
   const totpEnabled = (totpStatus as any)?.enabled ?? false;
+
+  if (sessionsLoading && totpLoading) {
+    return <SecuritySkeleton />;
+  }
 
   return (
     <div className="space-y-8 max-w-md">
@@ -118,12 +163,12 @@ function SecuritySettings() {
 
         <form onSubmit={handlePasswordChange} className="space-y-3">
           {error && (
-            <div className="bg-danger/10 border border-danger/20 text-danger text-sm rounded-lg px-3 py-2">
+            <div role="alert" className="bg-danger/10 border border-danger/20 text-danger text-sm rounded-lg px-3 py-2">
               {error}
             </div>
           )}
           {success && (
-            <div className="bg-success/10 border border-success/20 text-success text-sm rounded-lg px-3 py-2">
+            <div role="alert" className="bg-success/10 border border-success/20 text-success text-sm rounded-lg px-3 py-2">
               {t("settings.passwordChanged")}
             </div>
           )}
@@ -150,7 +195,9 @@ function SecuritySettings() {
             required
           />
 
-          <Button type="submit" variant="primary">{t("settings.updatePassword")}</Button>
+          <Button type="submit" variant="primary" loading={passwordChanging}>
+            {t("settings.updatePassword")}
+          </Button>
         </form>
       </div>
 
@@ -158,73 +205,111 @@ function SecuritySettings() {
       <div>
         <h3 className="text-sm font-medium text-text mb-4 flex items-center gap-2">
           <Smartphone className="h-4 w-4" />
-          Two-Factor Authentication (TOTP)
+          {t("settings.twoFactorAuth", "Two-Factor Authentication (TOTP)")}
         </h3>
 
-        <div className="p-4 rounded-xl bg-surface-secondary border border-border">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
+        {totpLoading ? (
+          <div className="h-24 w-full bg-surface-secondary rounded-xl animate-pulse" />
+        ) : (
+          <div className="p-4 rounded-xl bg-surface-secondary border border-border">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                {totpEnabled ? (
+                  <CheckCircle className="h-4 w-4 text-success" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-text-tertiary" />
+                )}
+                <span className="text-sm text-text font-medium">
+                  {totpEnabled
+                    ? t("settings.totpStatusEnabled", "Enabled")
+                    : t("settings.totpStatusDisabled", "Not enabled")}
+                </span>
+              </div>
               {totpEnabled ? (
-                <CheckCircle className="h-4 w-4 text-success" />
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => setShowDisable2faDialog(true)}
+                  loading={disableTotp.isPending}
+                >
+                  {t("settings.disable2fa", "Disable 2FA")}
+                </Button>
               ) : (
-                <XCircle className="h-4 w-4 text-text-tertiary" />
+                <Button variant="primary" size="sm" onClick={() => setupTotp.mutate()} loading={setupTotp.isPending}>
+                  {t("settings.enable2fa", "Enable 2FA")}
+                </Button>
               )}
-              <span className="text-sm text-text font-medium">
-                {totpEnabled ? "Enabled" : "Not enabled"}
-              </span>
             </div>
-            {totpEnabled ? (
+
+            <p className="text-xs text-text-tertiary">
+              {totpEnabled
+                ? t("settings.totpEnabledDescription", "Your account is protected with two-factor authentication.")
+                : t("settings.totpDisabledDescription", "Add an extra layer of security by enabling TOTP-based two-factor authentication.")}
+            </p>
+          </div>
+        )}
+
+        {/* Disable 2FA Confirmation Dialog */}
+        <Dialog
+          open={showDisable2faDialog}
+          onClose={() => setShowDisable2faDialog(false)}
+          title={t("settings.disable2faTitle", "Disable Two-Factor Authentication")}
+          size="sm"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-text-secondary">
+              {t("settings.disable2faConfirmation", "Are you sure you want to disable two-factor authentication? This will make your account less secure.")}
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setShowDisable2faDialog(false)}>
+                {t("common.cancel", "Cancel")}
+              </Button>
               <Button
                 variant="danger"
-                size="sm"
-                onClick={() => {
-                  if (confirm("Disable two-factor authentication?")) disableTotp.mutate();
-                }}
+                onClick={() => disableTotp.mutate()}
                 loading={disableTotp.isPending}
               >
-                Disable 2FA
+                {t("settings.disable2faConfirm", "Disable 2FA")}
               </Button>
-            ) : (
-              <Button variant="primary" size="sm" onClick={() => setupTotp.mutate()} loading={setupTotp.isPending}>
-                Enable 2FA
-              </Button>
-            )}
+            </div>
           </div>
-
-          <p className="text-xs text-text-tertiary">
-            {totpEnabled
-              ? "Your account is protected with two-factor authentication."
-              : "Add an extra layer of security by enabling TOTP-based two-factor authentication."}
-          </p>
-        </div>
+        </Dialog>
 
         {/* TOTP Setup Flow */}
         {totpSetup && (
           <div className="mt-4 p-4 rounded-xl bg-surface border border-primary/20 space-y-4">
             <div>
-              <p className="text-sm font-medium text-text mb-2">1. Scan this QR code with your authenticator app</p>
+              <p className="text-sm font-medium text-text mb-2">
+                {t("settings.totpStep1", "1. Scan this QR code with your authenticator app")}
+              </p>
               <div className="flex justify-center p-4 bg-white rounded-lg">
                 <QRCode data={totpSetup.otpauthUri} />
               </div>
               <p className="text-xs text-text-tertiary text-center mt-2">
-                Or enter this secret manually: <code className="bg-surface-secondary px-1 py-0.5 rounded text-text">{totpSetup.secret}</code>
+                {t("settings.totpManualEntry", "Or enter this secret manually:")}{" "}
+                <code className="bg-surface-secondary px-1 py-0.5 rounded text-text">{totpSetup.secret}</code>
               </p>
             </div>
 
             <div>
-              <p className="text-sm font-medium text-text mb-2">2. Enter the 6-digit code from your app</p>
+              <p className="text-sm font-medium text-text mb-2">
+                {t("settings.totpStep2", "2. Enter the 6-digit code from your app")}
+              </p>
               {totpError && (
-                <div className="bg-danger/10 border border-danger/20 text-danger text-xs rounded-lg px-3 py-2 mb-2">
+                <div role="alert" className="bg-danger/10 border border-danger/20 text-danger text-xs rounded-lg px-3 py-2 mb-2">
                   {totpError}
                 </div>
               )}
               <div className="flex gap-2">
                 <input
                   type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={totpCode}
                   onChange={(e) => { setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6)); setTotpError(""); }}
                   placeholder="000000"
                   maxLength={6}
+                  aria-label={t("settings.totpCodeLabel", "TOTP verification code")}
                   className="w-32 h-10 px-3 text-center text-lg font-mono tracking-widest bg-surface-secondary border border-border rounded-lg text-text"
                 />
                 <Button
@@ -233,10 +318,10 @@ function SecuritySettings() {
                   disabled={totpCode.length !== 6}
                   loading={verifyTotp.isPending}
                 >
-                  Verify
+                  {t("settings.totpVerify", "Verify")}
                 </Button>
                 <Button variant="ghost" onClick={() => setTotpSetup(null)}>
-                  Cancel
+                  {t("common.cancel", "Cancel")}
                 </Button>
               </div>
             </div>
@@ -251,28 +336,46 @@ function SecuritySettings() {
           {t("settings.activeSessions")}
         </h3>
         <div className="space-y-2">
-          {(sessions as any)?.data?.length === 0 && (
-            <p className="text-sm text-text-tertiary">No active sessions found.</p>
-          )}
-          {(sessions as any)?.data?.map((session: any) => (
-            <div key={session.id} className="flex items-center justify-between p-3 rounded-xl bg-surface-secondary border border-border">
-              <div>
-                <p className="text-sm text-text">{session.userAgent ?? "Unknown device"}</p>
-                <p className="text-xs text-text-tertiary">
-                  {session.ipAddress} - {formatDistanceToNow(new Date(session.createdAt), { addSuffix: true })}
-                  {session.isCurrent && <span className="text-primary ml-1">(current)</span>}
-                </p>
-              </div>
-              {!session.isCurrent && (
-                <button
-                  onClick={() => revokeSession.mutate(session.id)}
-                  className="text-text-tertiary hover:text-danger p-1 rounded transition-colors cursor-pointer"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
+          {sessionsLoading ? (
+            <div className="space-y-2 animate-pulse">
+              <div className="h-16 w-full bg-surface-secondary rounded-xl" />
+              <div className="h-16 w-full bg-surface-secondary rounded-xl" />
             </div>
-          ))}
+          ) : (
+            <>
+              {(sessions as any)?.data?.length === 0 && (
+                <p className="text-sm text-text-tertiary">
+                  {t("settings.noActiveSessions", "No active sessions found.")}
+                </p>
+              )}
+              {(sessions as any)?.data?.map((session: any) => (
+                <div key={session.id} className="flex items-center justify-between p-3 rounded-xl bg-surface-secondary border border-border">
+                  <div>
+                    <p className="text-sm text-text">
+                      {session.userAgent ?? t("settings.unknownDevice", "Unknown device")}
+                    </p>
+                    <p className="text-xs text-text-tertiary">
+                      {session.ipAddress} - {formatDistanceToNow(new Date(session.createdAt), { addSuffix: true })}
+                      {session.isCurrent && (
+                        <span className="text-primary ml-1">
+                          ({t("settings.currentSession", "current")})
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                  {!session.isCurrent && (
+                    <button
+                      onClick={() => revokeSession.mutate(session.id)}
+                      aria-label={t("settings.revokeSession", "Revoke session")}
+                      className="text-text-tertiary hover:text-danger p-1 rounded transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </>
+          )}
         </div>
       </div>
     </div>

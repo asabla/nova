@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import {
   Wrench,
   Plus,
@@ -32,6 +33,7 @@ import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
 import { Input } from "../../components/ui/Input";
+import { Skeleton } from "../../components/ui/Skeleton";
 import { toast } from "../../components/ui/Toast";
 import { useAuthStore } from "../../stores/auth.store";
 
@@ -78,18 +80,19 @@ const categoryToType: Record<ToolCategory, string | null> = {
 // ---------------------------------------------------------------------------
 
 function ToolsPage() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.role === "org-admin" || user?.role === "admin";
   const [activeTab, setActiveTab] = useState<TabId>("my-tools");
 
   const tabs: { id: TabId; label: string; icon: React.ReactNode; adminOnly?: boolean }[] = [
-    { id: "my-tools", label: "My Tools", icon: <Wrench className="h-4 w-4" /> },
-    { id: "marketplace", label: "Marketplace", icon: <Store className="h-4 w-4" /> },
-    { id: "custom", label: "Custom Tools", icon: <Plus className="h-4 w-4" /> },
-    { id: "admin", label: "Admin Review", icon: <ShieldCheck className="h-4 w-4" />, adminOnly: true },
+    { id: "my-tools", label: t("tools.tabs.myTools", "My Tools"), icon: <Wrench className="h-4 w-4" aria-hidden="true" /> },
+    { id: "marketplace", label: t("tools.tabs.marketplace", "Marketplace"), icon: <Store className="h-4 w-4" aria-hidden="true" /> },
+    { id: "custom", label: t("tools.tabs.custom", "Custom Tools"), icon: <Plus className="h-4 w-4" aria-hidden="true" /> },
+    { id: "admin", label: t("tools.tabs.adminReview", "Admin Review"), icon: <ShieldCheck className="h-4 w-4" aria-hidden="true" />, adminOnly: true },
   ];
 
-  const visibleTabs = tabs.filter((t) => !t.adminOnly || isAdmin);
+  const visibleTabs = tabs.filter((tab) => !tab.adminOnly || isAdmin);
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -97,10 +100,10 @@ function ToolsPage() {
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-1">
-            <Wrench className="h-5 w-5 text-primary" />
-            <h1 className="text-xl font-bold text-text">Tools</h1>
+            <Wrench className="h-5 w-5 text-primary" aria-hidden="true" />
+            <h1 className="text-xl font-bold text-text">{t("tools.title", "Tools")}</h1>
           </div>
-          <p className="text-sm text-text-secondary ml-8">Manage and configure tools available to your agents and conversations.</p>
+          <p className="text-sm text-text-secondary ml-8">{t("tools.subtitle", "Manage and configure tools available to your agents and conversations.")}</p>
         </div>
 
         {/* Tabs */}
@@ -138,13 +141,13 @@ function ToolsPage() {
 function typeIcon(type: string) {
   switch (type) {
     case "function":
-      return <Code2 className="h-4 w-4 text-blue-400" />;
+      return <Code2 className="h-4 w-4 text-blue-400" aria-hidden="true" />;
     case "openapi":
-      return <Globe className="h-4 w-4 text-green-400" />;
+      return <Globe className="h-4 w-4 text-green-400" aria-hidden="true" />;
     case "mcp":
-      return <Puzzle className="h-4 w-4 text-purple-400" />;
+      return <Puzzle className="h-4 w-4 text-purple-400" aria-hidden="true" />;
     default:
-      return <Wrench className="h-4 w-4 text-text-tertiary" />;
+      return <Wrench className="h-4 w-4 text-text-tertiary" aria-hidden="true" />;
   }
 }
 
@@ -166,11 +169,12 @@ function typeBadgeVariant(type: string): "default" | "primary" | "success" | "wa
 // ---------------------------------------------------------------------------
 
 function MyToolsTab() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [detailTool, setDetailTool] = useState<Tool | null>(null);
 
-  const { data: tools, isLoading } = useQuery({
+  const { data: tools, isLoading, isError } = useQuery({
     queryKey: ["tools"],
     queryFn: () => api.get<{ data: Tool[] }>("/api/tools"),
   });
@@ -180,56 +184,68 @@ function MyToolsTab() {
       api.patch(`/api/tools/${id}`, { isEnabled }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tools"] });
-      toast("Tool updated", "success");
+      toast(t("tools.toolUpdated", "Tool updated"), "success");
     },
-    onError: () => toast("Failed to update tool", "error"),
+    onError: (err: any) => toast(err.message ?? t("tools.errors.updateFailed", "Failed to update tool"), "error"),
   });
 
   const deleteTool = useMutation({
     mutationFn: (id: string) => api.delete(`/api/tools/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tools"] });
-      toast("Tool deleted", "success");
+      toast(t("tools.toolDeleted", "Tool deleted"), "success");
     },
-    onError: () => toast("Failed to delete tool", "error"),
+    onError: (err: any) => toast(err.message ?? t("tools.errors.deleteFailed", "Failed to delete tool"), "error"),
   });
 
   const toolList = (tools as any)?.data ?? [];
   const filtered = search
     ? toolList.filter(
-        (t: Tool) =>
-          t.name.toLowerCase().includes(search.toLowerCase()) ||
-          t.description?.toLowerCase().includes(search.toLowerCase()),
+        (tool: Tool) =>
+          tool.name.toLowerCase().includes(search.toLowerCase()) ||
+          tool.description?.toLowerCase().includes(search.toLowerCase()),
       )
     : toolList;
+
+  if (isError) {
+    return (
+      <div className="text-center py-16">
+        <XCircle className="h-10 w-10 text-danger mx-auto mb-3" aria-hidden="true" />
+        <p className="text-sm text-danger">{t("tools.errors.loadFailed", "Failed to load tools")}</p>
+        <p className="text-xs text-text-tertiary mt-1">{t("tools.errors.tryAgain", "Please try again later")}</p>
+      </div>
+    );
+  }
 
   return (
     <>
       {/* Search */}
       <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" aria-hidden="true" />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search your tools..."
+          placeholder={t("tools.searchPlaceholder", "Search your tools...")}
           className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary focus:outline-primary"
         />
       </div>
 
       {/* Tools List */}
       {isLoading ? (
-        <div className="text-center py-12">
-          <p className="text-sm text-text-tertiary animate-pulse">Loading tools...</p>
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-xl" />
+          ))}
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
-          <Wrench className="h-10 w-10 text-text-tertiary mx-auto mb-3" />
+          <Wrench className="h-10 w-10 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
           <p className="text-sm text-text-secondary">
-            {search ? "No tools match your search" : "No tools enabled yet"}
+            {search ? t("tools.noSearchResults", "No tools match your search") : t("tools.noTools", "No tools enabled yet")}
           </p>
           <p className="text-xs text-text-tertiary mt-1">
-            Browse the Marketplace to find tools, or register a custom one
+            {t("tools.noToolsHint", "Browse the Marketplace to find tools, or register a custom one")}
           </p>
         </div>
       ) : (
@@ -248,8 +264,8 @@ function MyToolsTab() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium text-text">{tool.name}</span>
                     <Badge variant={typeBadgeVariant(tool.type)}>{tool.type}</Badge>
-                    {tool.isApproved && <Badge variant="success">Approved</Badge>}
-                    {!tool.isEnabled && <Badge variant="warning">Disabled</Badge>}
+                    {tool.isApproved && <Badge variant="success">{t("tools.approved", "Approved")}</Badge>}
+                    {!tool.isEnabled && <Badge variant="warning">{t("tools.disabled", "Disabled")}</Badge>}
                   </div>
                   {tool.description && (
                     <p className="text-xs text-text-tertiary mt-0.5 line-clamp-1">{tool.description}</p>
@@ -261,31 +277,31 @@ function MyToolsTab() {
                 <button
                   onClick={() => toggleTool.mutate({ id: tool.id, isEnabled: !tool.isEnabled })}
                   className="p-1.5 text-text-tertiary hover:text-primary rounded-lg hover:bg-surface"
-                  title={tool.isEnabled ? "Disable" : "Enable"}
+                  aria-label={tool.isEnabled ? t("tools.disableTool", "Disable tool") : t("tools.enableTool", "Enable tool")}
                 >
                   {tool.isEnabled ? (
-                    <ToggleRight className="h-5 w-5 text-primary" />
+                    <ToggleRight className="h-5 w-5 text-primary" aria-hidden="true" />
                   ) : (
-                    <ToggleLeft className="h-5 w-5" />
+                    <ToggleLeft className="h-5 w-5" aria-hidden="true" />
                   )}
                 </button>
                 {/* Detail */}
                 <button
                   onClick={() => setDetailTool(tool)}
                   className="p-1.5 text-text-tertiary hover:text-primary rounded-lg hover:bg-surface"
-                  title="Details"
+                  aria-label={t("tools.viewDetails", "View details")}
                 >
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
                 </button>
                 {/* Delete */}
                 <button
                   onClick={() => {
-                    if (confirm("Delete this tool?")) deleteTool.mutate(tool.id);
+                    if (confirm(t("tools.confirmDelete", "Delete this tool?"))) deleteTool.mutate(tool.id);
                   }}
                   className="p-1.5 text-text-tertiary hover:text-danger rounded-lg hover:bg-surface"
-                  title="Delete"
+                  aria-label={t("tools.deleteTool", "Delete tool")}
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -306,12 +322,13 @@ function MyToolsTab() {
 // ---------------------------------------------------------------------------
 
 function MarketplaceTab() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<ToolCategory>("All");
   const [detailTool, setDetailTool] = useState<Tool | null>(null);
 
-  const { data: marketplace, isLoading } = useQuery({
+  const { data: marketplace, isLoading, isError } = useQuery({
     queryKey: ["tools-marketplace", search, category],
     queryFn: () => {
       const params = new URLSearchParams();
@@ -329,7 +346,7 @@ function MarketplaceTab() {
 
   const enabledIds = useMemo(() => {
     const list = (myTools as any)?.data ?? [];
-    return new Set(list.map((t: Tool) => t.id));
+    return new Set(list.map((tool: Tool) => tool.id));
   }, [myTools]);
 
   const toggleTool = useMutation({
@@ -338,12 +355,21 @@ function MarketplaceTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tools"] });
       queryClient.invalidateQueries({ queryKey: ["tools-marketplace"] });
-      toast("Tool updated", "success");
+      toast(t("tools.toolUpdated", "Tool updated"), "success");
     },
-    onError: () => toast("Failed to update tool", "error"),
+    onError: (err: any) => toast(err.message ?? t("tools.errors.updateFailed", "Failed to update tool"), "error"),
   });
 
   const toolList = (marketplace as any)?.data ?? [];
+
+  if (isError) {
+    return (
+      <div className="text-center py-16">
+        <XCircle className="h-10 w-10 text-danger mx-auto mb-3" aria-hidden="true" />
+        <p className="text-sm text-danger">{t("tools.errors.marketplaceFailed", "Failed to load marketplace")}</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -351,29 +377,29 @@ function MarketplaceTab() {
       <div className="text-center mb-6">
         <div className="flex justify-center mb-3">
           <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center">
-            <Store className="h-6 w-6 text-primary" />
+            <Store className="h-6 w-6 text-primary" aria-hidden="true" />
           </div>
         </div>
-        <h2 className="text-lg font-semibold text-text mb-1">Tool Marketplace</h2>
+        <h2 className="text-lg font-semibold text-text mb-1">{t("tools.marketplace.title", "Tool Marketplace")}</h2>
         <p className="text-sm text-text-secondary max-w-md mx-auto">
-          Browse approved tools available in your organization. Enable them to use in conversations.
+          {t("tools.marketplace.subtitle", "Browse approved tools available in your organization. Enable them to use in conversations.")}
         </p>
       </div>
 
       {/* Search + Categories */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" aria-hidden="true" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search marketplace..."
+            placeholder={t("tools.marketplace.searchPlaceholder", "Search marketplace...")}
             className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary focus:outline-primary"
           />
         </div>
         <div className="flex items-center gap-1">
-          <Filter className="h-4 w-4 text-text-tertiary mr-1" />
+          <Filter className="h-4 w-4 text-text-tertiary mr-1" aria-hidden="true" />
           {TOOL_CATEGORIES.map((cat) => (
             <button
               key={cat}
@@ -392,14 +418,16 @@ function MarketplaceTab() {
 
       {/* Grid */}
       {isLoading ? (
-        <div className="text-center py-12">
-          <p className="text-sm text-text-tertiary animate-pulse">Loading marketplace...</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-48 w-full rounded-xl" />
+          ))}
         </div>
       ) : toolList.length === 0 ? (
         <div className="text-center py-16">
-          <Store className="h-10 w-10 text-text-tertiary mx-auto mb-3" />
+          <Store className="h-10 w-10 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
           <p className="text-sm text-text-secondary">
-            {search || category !== "All" ? "No tools match your filters" : "No tools available yet"}
+            {search || category !== "All" ? t("tools.marketplace.noFilterResults", "No tools match your filters") : t("tools.marketplace.noTools", "No tools available yet")}
           </p>
         </div>
       ) : (
@@ -427,12 +455,12 @@ function MarketplaceTab() {
 
                 <div className="flex items-center gap-3 text-[10px] text-text-tertiary mb-4">
                   <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
+                    <Clock className="h-3 w-3" aria-hidden="true" />
                     {new Date(tool.createdAt).toLocaleDateString()}
                   </span>
                   {tool.isApproved && (
                     <span className="flex items-center gap-1 text-success">
-                      <CheckCircle className="h-3 w-3" /> Approved
+                      <CheckCircle className="h-3 w-3" aria-hidden="true" /> {t("tools.approved", "Approved")}
                     </span>
                   )}
                 </div>
@@ -441,8 +469,9 @@ function MarketplaceTab() {
                   <button
                     onClick={() => setDetailTool(tool)}
                     className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-dark"
+                    aria-label={t("tools.viewDetails", "View details")}
                   >
-                    <Eye className="h-3 w-3" /> Details
+                    <Eye className="h-3 w-3" aria-hidden="true" /> {t("tools.details", "Details")}
                   </button>
                   <button
                     onClick={() => toggleTool.mutate({ id: tool.id, isEnabled: !isEnabled })}
@@ -451,14 +480,15 @@ function MarketplaceTab() {
                         ? "text-text-secondary hover:text-text"
                         : "text-primary hover:text-primary-dark"
                     }`}
+                    aria-label={isEnabled ? t("tools.disableTool", "Disable tool") : t("tools.enableTool", "Enable tool")}
                   >
                     {isEnabled ? (
                       <>
-                        <ToggleRight className="h-4 w-4" /> Enabled
+                        <ToggleRight className="h-4 w-4" aria-hidden="true" /> {t("tools.enabled", "Enabled")}
                       </>
                     ) : (
                       <>
-                        <ToggleLeft className="h-4 w-4" /> Enable
+                        <ToggleLeft className="h-4 w-4" aria-hidden="true" /> {t("tools.enable", "Enable")}
                       </>
                     )}
                   </button>
@@ -482,6 +512,7 @@ function MarketplaceTab() {
 // ---------------------------------------------------------------------------
 
 function CustomToolsTab() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [importMode, setImportMode] = useState<"paste" | "url">("paste");
   const [name, setName] = useState("");
@@ -497,9 +528,9 @@ function CustomToolsTab() {
       queryClient.invalidateQueries({ queryKey: ["tools"] });
       queryClient.invalidateQueries({ queryKey: ["tools-pending"] });
       resetForm();
-      toast("Custom tool registered and submitted for review", "success");
+      toast(t("tools.custom.registered", "Custom tool registered and submitted for review"), "success");
     },
-    onError: () => toast("Failed to register tool", "error"),
+    onError: (err: any) => toast(err.message ?? t("tools.errors.registerFailed", "Failed to register tool"), "error"),
   });
 
   const fetchSpec = useMutation({
@@ -511,10 +542,10 @@ function CustomToolsTab() {
     onSuccess: (text) => {
       setSpecText(text);
       tryParseSpec(text);
-      toast("Spec fetched successfully", "success");
+      toast(t("tools.custom.specFetched", "Spec fetched successfully"), "success");
     },
     onError: (err: Error) => {
-      setParseError(`Failed to fetch spec: ${err.message}`);
+      setParseError(t("tools.custom.fetchError", "Failed to fetch spec: {{message}}", { message: err.message }));
     },
   });
 
@@ -533,9 +564,8 @@ function CustomToolsTab() {
         setDescription(parsed.info?.description ?? parsed.description);
       }
     } catch {
-      // Try YAML-like simple detection (just key: value on first lines)
       setParseError(
-        "Could not parse as JSON. Please provide a valid JSON OpenAPI spec, or paste a JSON function schema.",
+        t("tools.custom.parseError", "Could not parse as JSON. Please provide a valid JSON OpenAPI spec, or paste a JSON function schema."),
       );
     }
   }
@@ -552,7 +582,7 @@ function CustomToolsTab() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) {
-      toast("Tool name is required", "warning");
+      toast(t("tools.custom.nameRequired", "Tool name is required"), "warning");
       return;
     }
 
@@ -562,7 +592,7 @@ function CustomToolsTab() {
       try {
         schema = JSON.parse(specText);
       } catch {
-        setParseError("Invalid JSON in spec field");
+        setParseError(t("tools.custom.invalidJson", "Invalid JSON in spec field"));
         return;
       }
     }
@@ -598,34 +628,34 @@ function CustomToolsTab() {
       <div className="text-center mb-6">
         <div className="flex justify-center mb-3">
           <div className="h-12 w-12 rounded-2xl bg-green-500/10 flex items-center justify-center">
-            <FileJson className="h-6 w-6 text-green-400" />
+            <FileJson className="h-6 w-6 text-green-400" aria-hidden="true" />
           </div>
         </div>
-        <h2 className="text-lg font-semibold text-text mb-1">Register Custom Tool</h2>
+        <h2 className="text-lg font-semibold text-text mb-1">{t("tools.custom.title", "Register Custom Tool")}</h2>
         <p className="text-sm text-text-secondary max-w-md mx-auto">
-          Import a tool by pasting an OpenAPI JSON spec or providing a URL. Custom tools are submitted for admin review before becoming available.
+          {t("tools.custom.subtitle", "Import a tool by pasting an OpenAPI JSON spec or providing a URL. Custom tools are submitted for admin review before becoming available.")}
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Name + Description */}
         <Input
-          label="Tool Name"
+          label={t("tools.custom.nameLabel", "Tool Name")}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Weather API, Code Formatter"
+          placeholder={t("tools.custom.namePlaceholder", "e.g. Weather API, Code Formatter")}
           required
         />
         <Input
-          label="Description"
+          label={t("tools.custom.descriptionLabel", "Description")}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Brief description of what this tool does"
+          placeholder={t("tools.custom.descriptionPlaceholder", "Brief description of what this tool does")}
         />
 
         {/* Import Mode Toggle */}
         <div>
-          <label className="block text-sm font-medium text-text mb-2">OpenAPI / Function Schema</label>
+          <label className="block text-sm font-medium text-text mb-2">{t("tools.custom.schemaLabel", "OpenAPI / Function Schema")}</label>
           <div className="flex items-center gap-1 mb-3">
             <button
               type="button"
@@ -636,7 +666,7 @@ function CustomToolsTab() {
                   : "text-text-secondary hover:bg-surface-secondary"
               }`}
             >
-              <FileJson className="h-3.5 w-3.5" /> Paste Spec
+              <FileJson className="h-3.5 w-3.5" aria-hidden="true" /> {t("tools.custom.pasteSpec", "Paste Spec")}
             </button>
             <button
               type="button"
@@ -647,7 +677,7 @@ function CustomToolsTab() {
                   : "text-text-secondary hover:bg-surface-secondary"
               }`}
             >
-              <Link className="h-3.5 w-3.5" /> Import from URL
+              <Link className="h-3.5 w-3.5" aria-hidden="true" /> {t("tools.custom.importUrl", "Import from URL")}
             </button>
           </div>
 
@@ -667,7 +697,7 @@ function CustomToolsTab() {
                 onClick={() => specUrl && fetchSpec.mutate(specUrl)}
                 loading={fetchSpec.isPending}
               >
-                <Upload className="h-3.5 w-3.5" /> Fetch
+                <Upload className="h-3.5 w-3.5" aria-hidden="true" /> {t("tools.custom.fetch", "Fetch")}
               </Button>
             </div>
           )}
@@ -688,15 +718,15 @@ function CustomToolsTab() {
           {/* Parse status */}
           {parseError && (
             <div className="flex items-center gap-2 mt-2 text-xs text-danger">
-              <XCircle className="h-3.5 w-3.5 shrink-0" />
+              <XCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               {parseError}
             </div>
           )}
           {parsedSpec && (
             <div className="flex items-center gap-2 mt-2 text-xs text-success">
-              <CheckCircle className="h-3.5 w-3.5 shrink-0" />
-              Spec parsed successfully
-              {operationCount > 0 && <span>- {operationCount} operation{operationCount !== 1 ? "s" : ""} found</span>}
+              <CheckCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              {t("tools.custom.parsed", "Spec parsed successfully")}
+              {operationCount > 0 && <span>- {operationCount} {t("tools.custom.operations", "operation(s) found")}</span>}
             </div>
           )}
         </div>
@@ -705,27 +735,27 @@ function CustomToolsTab() {
         {parsedSpec && (
           <div className="p-4 rounded-xl bg-surface-secondary border border-border">
             <h3 className="text-xs font-semibold text-text mb-2 flex items-center gap-2">
-              <Eye className="h-3.5 w-3.5" /> Spec Preview
+              <Eye className="h-3.5 w-3.5" aria-hidden="true" /> {t("tools.custom.preview", "Spec Preview")}
             </h3>
             <div className="space-y-1 text-xs text-text-secondary">
               {(parsedSpec as any).info?.title && (
                 <p>
-                  <span className="text-text-tertiary">Title:</span> {(parsedSpec as any).info.title}
+                  <span className="text-text-tertiary">{t("tools.custom.previewTitle", "Title:")}</span> {(parsedSpec as any).info.title}
                 </p>
               )}
               {(parsedSpec as any).info?.version && (
                 <p>
-                  <span className="text-text-tertiary">Version:</span> {(parsedSpec as any).info.version}
+                  <span className="text-text-tertiary">{t("tools.custom.previewVersion", "Version:")}</span> {(parsedSpec as any).info.version}
                 </p>
               )}
               {(parsedSpec as any).servers?.[0]?.url && (
                 <p>
-                  <span className="text-text-tertiary">Server:</span> {(parsedSpec as any).servers[0].url}
+                  <span className="text-text-tertiary">{t("tools.custom.previewServer", "Server:")}</span> {(parsedSpec as any).servers[0].url}
                 </p>
               )}
               {operationCount > 0 && (
                 <p>
-                  <span className="text-text-tertiary">Operations:</span> {operationCount}
+                  <span className="text-text-tertiary">{t("tools.custom.previewOps", "Operations:")}</span> {operationCount}
                 </p>
               )}
             </div>
@@ -735,10 +765,10 @@ function CustomToolsTab() {
         {/* Actions */}
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="ghost" onClick={resetForm}>
-            Reset
+            {t("tools.custom.reset", "Reset")}
           </Button>
           <Button type="submit" variant="primary" loading={createTool.isPending}>
-            <Plus className="h-3.5 w-3.5" /> Register Tool
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" /> {t("tools.custom.register", "Register Tool")}
           </Button>
         </div>
       </form>
@@ -751,9 +781,10 @@ function CustomToolsTab() {
 // ---------------------------------------------------------------------------
 
 function AdminReviewTab() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
-  const { data: pending, isLoading } = useQuery({
+  const { data: pending, isLoading, isError } = useQuery({
     queryKey: ["tools-pending"],
     queryFn: () => api.get<{ data: Tool[] }>("/api/tools?approved=false"),
   });
@@ -769,7 +800,7 @@ function AdminReviewTab() {
     if (fromPending.length > 0) return fromPending;
     // Fallback: filter all tools for unapproved
     const all = (allTools as any)?.data ?? [];
-    return all.filter((t: Tool) => !t.isApproved);
+    return all.filter((tool: Tool) => !tool.isApproved);
   }, [pending, allTools]);
 
   const reviewTool = useMutation({
@@ -779,9 +810,9 @@ function AdminReviewTab() {
       queryClient.invalidateQueries({ queryKey: ["tools"] });
       queryClient.invalidateQueries({ queryKey: ["tools-pending"] });
       queryClient.invalidateQueries({ queryKey: ["tools-marketplace"] });
-      toast(vars.isApproved ? "Tool approved" : "Tool rejected", "success");
+      toast(vars.isApproved ? t("tools.admin.approved", "Tool approved") : t("tools.admin.rejected", "Tool rejected"), "success");
     },
-    onError: () => toast("Failed to review tool", "error"),
+    onError: (err: any) => toast(err.message ?? t("tools.errors.reviewFailed", "Failed to review tool"), "error"),
   });
 
   const deleteTool = useMutation({
@@ -789,31 +820,42 @@ function AdminReviewTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tools"] });
       queryClient.invalidateQueries({ queryKey: ["tools-pending"] });
-      toast("Tool deleted", "success");
+      toast(t("tools.toolDeleted", "Tool deleted"), "success");
     },
-    onError: () => toast("Failed to delete tool", "error"),
+    onError: (err: any) => toast(err.message ?? t("tools.errors.deleteFailed", "Failed to delete tool"), "error"),
   });
 
   const [detailTool, setDetailTool] = useState<Tool | null>(null);
 
+  if (isError) {
+    return (
+      <div className="text-center py-16">
+        <XCircle className="h-10 w-10 text-danger mx-auto mb-3" aria-hidden="true" />
+        <p className="text-sm text-danger">{t("tools.errors.loadPendingFailed", "Failed to load pending tools")}</p>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="mb-6">
-        <h2 className="text-lg font-semibold text-text mb-1">Pending Review</h2>
+        <h2 className="text-lg font-semibold text-text mb-1">{t("tools.admin.title", "Pending Review")}</h2>
         <p className="text-sm text-text-secondary">
-          Review custom tools submitted by organization members. Approved tools become available in the marketplace.
+          {t("tools.admin.subtitle", "Review custom tools submitted by organization members. Approved tools become available in the marketplace.")}
         </p>
       </div>
 
       {isLoading ? (
-        <div className="text-center py-12">
-          <p className="text-sm text-text-tertiary animate-pulse">Loading pending tools...</p>
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-xl" />
+          ))}
         </div>
       ) : pendingList.length === 0 ? (
         <div className="text-center py-16">
-          <ShieldCheck className="h-10 w-10 text-text-tertiary mx-auto mb-3" />
-          <p className="text-sm text-text-secondary">No tools pending review</p>
-          <p className="text-xs text-text-tertiary mt-1">All submitted tools have been reviewed</p>
+          <ShieldCheck className="h-10 w-10 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
+          <p className="text-sm text-text-secondary">{t("tools.admin.noPending", "No tools pending review")}</p>
+          <p className="text-xs text-text-tertiary mt-1">{t("tools.admin.allReviewed", "All submitted tools have been reviewed")}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -829,15 +871,15 @@ function AdminReviewTab() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-medium text-text">{tool.name}</span>
                       <Badge variant={typeBadgeVariant(tool.type)}>{tool.type}</Badge>
-                      <Badge variant="warning">Pending</Badge>
+                      <Badge variant="warning">{t("tools.admin.pending", "Pending")}</Badge>
                     </div>
                     {tool.description && (
                       <p className="text-xs text-text-tertiary mt-1 line-clamp-2">{tool.description}</p>
                     )}
                     <div className="flex items-center gap-3 mt-2 text-[10px] text-text-tertiary">
                       <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        Submitted {new Date(tool.createdAt).toLocaleDateString()}
+                        <Clock className="h-3 w-3" aria-hidden="true" />
+                        {t("tools.admin.submitted", "Submitted")} {new Date(tool.createdAt).toLocaleDateString()}
                       </span>
                     </div>
                   </div>
@@ -847,34 +889,34 @@ function AdminReviewTab() {
                   <button
                     onClick={() => setDetailTool(tool)}
                     className="p-1.5 text-text-tertiary hover:text-primary rounded-lg hover:bg-surface"
-                    title="View Details"
+                    aria-label={t("tools.viewDetails", "View details")}
                   >
-                    <Eye className="h-4 w-4" />
+                    <Eye className="h-4 w-4" aria-hidden="true" />
                   </button>
                   <button
                     onClick={() => reviewTool.mutate({ id: tool.id, isApproved: true })}
                     className="p-1.5 text-text-tertiary hover:text-success rounded-lg hover:bg-surface"
-                    title="Approve"
+                    aria-label={t("tools.admin.approveTool", "Approve")}
                     disabled={reviewTool.isPending}
                   >
-                    <ThumbsUp className="h-4 w-4" />
+                    <ThumbsUp className="h-4 w-4" aria-hidden="true" />
                   </button>
                   <button
                     onClick={() => reviewTool.mutate({ id: tool.id, isApproved: false })}
                     className="p-1.5 text-text-tertiary hover:text-warning rounded-lg hover:bg-surface"
-                    title="Reject"
+                    aria-label={t("tools.admin.rejectTool", "Reject")}
                     disabled={reviewTool.isPending}
                   >
-                    <ThumbsDown className="h-4 w-4" />
+                    <ThumbsDown className="h-4 w-4" aria-hidden="true" />
                   </button>
                   <button
                     onClick={() => {
-                      if (confirm("Permanently delete this tool?")) deleteTool.mutate(tool.id);
+                      if (confirm(t("tools.admin.confirmDelete", "Permanently delete this tool?"))) deleteTool.mutate(tool.id);
                     }}
                     className="p-1.5 text-text-tertiary hover:text-danger rounded-lg hover:bg-surface"
-                    title="Delete"
+                    aria-label={t("tools.deleteTool", "Delete tool")}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -896,6 +938,7 @@ function AdminReviewTab() {
 // ---------------------------------------------------------------------------
 
 function ToolDetailModal({ tool, open, onClose }: { tool: Tool; open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
   const [testInput, setTestInput] = useState("{}");
   const [testResult, setTestResult] = useState<any>(null);
   const [showTestPanel, setShowTestPanel] = useState(false);
@@ -912,7 +955,10 @@ function ToolDetailModal({ tool, open, onClose }: { tool: Tool; open: boolean; o
       return api.post<any>(`/api/tools/${id}/test`, { input: parsed });
     },
     onSuccess: (data) => setTestResult(data),
-    onError: (err: Error) => setTestResult({ success: false, error: err.message }),
+    onError: (err: Error) => {
+      setTestResult({ success: false, error: err.message });
+      toast(err.message ?? t("tools.errors.testFailed", "Test execution failed"), "error");
+    },
   });
 
   const calls = (callHistory as any)?.data ?? [];
@@ -956,170 +1002,105 @@ function ToolDetailModal({ tool, open, onClose }: { tool: Tool; open: boolean; o
         <div className="flex items-center gap-2 flex-wrap">
           {typeIcon(tool.type)}
           <Badge variant={typeBadgeVariant(tool.type)}>{tool.type}</Badge>
-          {tool.isApproved && <Badge variant="success">Approved</Badge>}
-          {tool.isEnabled ? (
-            <Badge variant="success">Enabled</Badge>
-          ) : (
-            <Badge variant="warning">Disabled</Badge>
-          )}
+          {tool.isApproved && <Badge variant="success">{t("tools.approved", "Approved")}</Badge>}
+          {!tool.isEnabled && <Badge variant="warning">{t("tools.disabled", "Disabled")}</Badge>}
         </div>
 
-        {tool.description && <p className="text-sm text-text-secondary">{tool.description}</p>}
+        {tool.description && (
+          <p className="text-sm text-text-secondary">{tool.description}</p>
+        )}
 
         {tool.endpoint && (
-          <div className="flex items-center gap-2 text-xs text-text-tertiary">
-            <Globe className="h-3.5 w-3.5" />
-            <span className="font-mono">{tool.endpoint}</span>
+          <div className="text-xs text-text-tertiary font-mono bg-surface-secondary p-2 rounded-lg border border-border overflow-auto">
+            {tool.endpoint}
           </div>
         )}
 
-        {/* Parameters / Schema */}
+        {/* Parameters */}
         {hasParameters && (
           <div>
-            <h3 className="text-sm font-semibold text-text mb-2 flex items-center gap-2">
-              <Code2 className="h-3.5 w-3.5" /> Parameters
-            </h3>
+            <h3 className="text-xs font-semibold text-text mb-2">{t("tools.detail.parameters", "Parameters")}</h3>
             <div className="space-y-1.5">
-              {Object.entries(schemaProperties).map(([key, value]) => {
-                const prop = value as Record<string, unknown>;
-                const required = ((schema as any)?.required ?? []).includes(key);
-                return (
-                  <div
-                    key={key}
-                    className="flex items-start gap-3 p-2.5 rounded-lg bg-surface-secondary border border-border"
-                  >
-                    <code className="text-xs font-medium text-primary shrink-0">{key}</code>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-text-tertiary font-mono">
-                          {String(prop.type ?? "any")}
-                        </span>
-                        {required && (
-                          <span className="text-[10px] text-danger font-medium">required</span>
-                        )}
-                      </div>
-                      {prop.description ? (
-                        <p className="text-xs text-text-tertiary mt-0.5">
-                          {String(prop.description)}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
+              {Object.entries(schemaProperties).map(([paramName, paramSchema]: [string, any]) => (
+                <div key={paramName} className="flex items-start gap-2 p-2 rounded-lg bg-surface-secondary border border-border text-xs">
+                  <code className="font-mono font-medium text-text">{paramName}</code>
+                  <span className="text-text-tertiary">{paramSchema?.type ?? "any"}</span>
+                  {paramSchema?.description && (
+                    <span className="text-text-tertiary ml-auto">{paramSchema.description}</span>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Schema (raw) if no structured parameters */}
-        {!hasParameters && Object.keys(schema).length > 0 && (
-          <div>
-            <h3 className="text-sm font-semibold text-text mb-2">Schema</h3>
-            <pre className="p-3 rounded-lg bg-surface-secondary border border-border text-xs text-text-secondary font-mono overflow-auto max-h-48">
-              {JSON.stringify(schema, null, 2)}
-            </pre>
-          </div>
-        )}
-
-        {/* Usage Stats */}
-        <div className="flex items-center gap-4 p-3 rounded-xl bg-surface-secondary border border-border">
-          <div className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-text-tertiary" />
-            <span className="text-xs text-text-secondary">
-              {calls.length} call{calls.length !== 1 ? "s" : ""} recorded
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-text-tertiary" />
-            <span className="text-xs text-text-secondary">
-              Updated {new Date(tool.updatedAt).toLocaleDateString()}
-            </span>
-          </div>
-        </div>
-
         {/* Test Panel Toggle */}
-        <div className="border-t border-border pt-4">
-          <button
+        <div>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
+              setShowTestPanel(!showTestPanel);
               if (!showTestPanel && hasParameters) {
                 setTestInput(generateInputTemplate());
               }
-              setShowTestPanel((prev) => !prev);
-              setTestResult(null);
             }}
-            className="flex items-center gap-2 text-sm font-medium text-primary hover:text-primary-dark transition-colors"
           >
-            <Play className="h-4 w-4" />
-            {showTestPanel ? "Hide Test Panel" : "Test This Tool"}
-          </button>
+            <Play className="h-3.5 w-3.5" aria-hidden="true" /> {t("tools.detail.testTool", "Test Tool")}
+          </Button>
 
           {showTestPanel && (
-            <div className="mt-4 space-y-3">
-              {/* Input fields */}
-              {hasParameters ? (
-                <div>
-                  <label className="block text-xs font-medium text-text mb-1">
-                    Input Parameters (JSON)
-                  </label>
-                  <p className="text-[10px] text-text-tertiary mb-2">
-                    Pre-filled from schema. Edit values below and execute.
-                  </p>
-                  <textarea
-                    value={testInput}
-                    onChange={(e) => setTestInput(e.target.value)}
-                    rows={Math.min(Object.keys(schemaProperties).length * 2 + 2, 10)}
-                    className="w-full p-3 text-sm bg-surface border border-border rounded-lg text-text font-mono resize-y focus:outline-primary"
-                  />
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-xs font-medium text-text mb-1">Input (JSON)</label>
-                  <textarea
-                    value={testInput}
-                    onChange={(e) => setTestInput(e.target.value)}
-                    rows={5}
-                    className="w-full p-3 text-sm bg-surface border border-border rounded-lg text-text font-mono resize-y focus:outline-primary"
-                  />
-                </div>
-              )}
-
+            <div className="mt-3 space-y-3 p-3 rounded-lg bg-surface-secondary border border-border">
+              <textarea
+                value={testInput}
+                onChange={(e) => setTestInput(e.target.value)}
+                rows={5}
+                className="w-full p-2 text-xs font-mono bg-surface border border-border rounded-lg text-text resize-y"
+                placeholder='{"key": "value"}'
+              />
               <Button
                 variant="primary"
                 size="sm"
                 onClick={() => testTool.mutate({ id: tool.id, input: testInput })}
                 loading={testTool.isPending}
               >
-                <Play className="h-3.5 w-3.5" /> Execute Test
+                <Play className="h-3 w-3" aria-hidden="true" /> {t("tools.detail.run", "Run")}
               </Button>
 
-              {/* Result */}
               {testResult && (
-                <div
-                  className={`p-3 rounded-lg border ${
-                    testResult.success
-                      ? "bg-success/5 border-success/20"
-                      : "bg-danger/5 border-danger/20"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    {testResult.success ? (
-                      <CheckCircle className="h-4 w-4 text-success" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-danger" />
-                    )}
-                    <span className="text-xs font-medium text-text">
-                      {testResult.success ? "Success" : "Failed"}
-                      {testResult.latencyMs != null && ` (${testResult.latencyMs}ms)`}
-                    </span>
-                  </div>
-                  <pre className="text-xs text-text-secondary overflow-auto max-h-40 font-mono">
-                    {JSON.stringify(testResult.result ?? testResult.error, null, 2)}
-                  </pre>
-                </div>
+                <pre className="p-2 text-xs font-mono rounded-lg border border-border bg-surface text-text-secondary overflow-auto max-h-48">
+                  {JSON.stringify(testResult, null, 2)}
+                </pre>
               )}
             </div>
           )}
         </div>
+
+        {/* Call History */}
+        {calls.length > 0 && (
+          <div>
+            <h3 className="text-xs font-semibold text-text mb-2 flex items-center gap-1">
+              <BarChart3 className="h-3.5 w-3.5" aria-hidden="true" /> {t("tools.detail.recentCalls", "Recent Calls")} ({calls.length})
+            </h3>
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {calls.slice(0, 10).map((call: any, idx: number) => (
+                <div key={idx} className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-surface border border-border text-xs">
+                  <span className="text-text-secondary truncate">{call.input ? JSON.stringify(call.input).slice(0, 80) : "..."}</span>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    {call.success ? (
+                      <CheckCircle className="h-3 w-3 text-success" aria-hidden="true" />
+                    ) : (
+                      <XCircle className="h-3 w-3 text-danger" aria-hidden="true" />
+                    )}
+                    {call.durationMs != null && (
+                      <span className="text-text-tertiary">{call.durationMs}ms</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </Dialog>
   );

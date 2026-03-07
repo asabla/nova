@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
+import { toast } from "../../components/ui/Toast";
 
 interface NotificationPrefs {
   emailOnShare: boolean;
@@ -28,7 +29,26 @@ function NotificationSettings() {
   const updatePrefs = useMutation({
     mutationFn: (patch: Partial<NotificationPrefs>) =>
       api.patch("/api/notifications/preferences", patch),
-    onSuccess: () =>
+    onMutate: async (patch) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["notification-preferences"] });
+      // Snapshot previous value
+      const previous = queryClient.getQueryData<{ data: NotificationPrefs }>(["notification-preferences"]);
+      // Optimistically update
+      queryClient.setQueryData<{ data: NotificationPrefs }>(["notification-preferences"], (old) => {
+        if (!old) return old;
+        return { ...old, data: { ...old.data, ...patch } };
+      });
+      return { previous };
+    },
+    onError: (_err, _patch, context) => {
+      // Rollback on error
+      if (context?.previous) {
+        queryClient.setQueryData(["notification-preferences"], context.previous);
+      }
+      toast(t("settings.notificationUpdateFailed", "Failed to update notification preferences."), "error");
+    },
+    onSettled: () =>
       queryClient.invalidateQueries({ queryKey: ["notification-preferences"] }),
   });
 
@@ -50,25 +70,25 @@ function NotificationSettings() {
       <div className="space-y-3">
         <Toggle
           label={t("settings.inAppNotifications", "In-app notifications")}
-          description="Show real-time notifications inside the app"
+          description={t("settings.inAppNotificationsDescription", "Show real-time notifications inside the app")}
           checked={prefs?.inAppEnabled ?? true}
           onChange={(v) => togglePref("inAppEnabled", v)}
         />
         <Toggle
           label={t("settings.emailOnShare", "Email on conversation share")}
-          description="Receive an email when someone shares a conversation with you"
+          description={t("settings.emailOnShareDescription", "Receive an email when someone shares a conversation with you")}
           checked={prefs?.emailOnShare ?? true}
           onChange={(v) => togglePref("emailOnShare", v)}
         />
         <Toggle
           label={t("settings.emailOnMention", "Email on @mention")}
-          description="Receive an email when someone mentions you in a message"
+          description={t("settings.emailOnMentionDescription", "Receive an email when someone mentions you in a message")}
           checked={prefs?.emailOnMention ?? true}
           onChange={(v) => togglePref("emailOnMention", v)}
         />
         <Toggle
           label={t("settings.emailOnAgentComplete", "Email on agent completion")}
-          description="Receive an email when an agent run finishes"
+          description={t("settings.emailOnAgentCompleteDescription", "Receive an email when an agent run finishes")}
           checked={prefs?.emailOnAgentComplete ?? false}
           onChange={(v) => togglePref("emailOnAgentComplete", v)}
         />
@@ -92,8 +112,9 @@ function Toggle({ label, description, checked, onChange }: {
       <button
         role="switch"
         aria-checked={checked}
+        aria-label={label}
         onClick={() => onChange(!checked)}
-        className={`relative w-10 h-6 rounded-full transition-colors shrink-0 ${
+        className={`relative w-10 h-6 rounded-full transition-colors shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
           checked ? "bg-primary" : "bg-border-strong"
         }`}
       >
