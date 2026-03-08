@@ -118,6 +118,15 @@ knowledgeRoutes.delete("/:collectionId/documents/:docId", async (c) => {
   return c.body(null, 204);
 });
 
+// Delete a document by ID (without needing collection ID in path)
+knowledgeRoutes.delete("/documents/:docId", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  await knowledgeService.removeDocument(orgId, c.req.param("docId"));
+  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "knowledge.document.delete", resourceType: "knowledge_document", resourceId: c.req.param("docId") });
+  return c.body(null, 204);
+});
+
 // Re-index all documents in a collection
 knowledgeRoutes.post("/:id/reindex", async (c) => {
   const orgId = c.get("orgId");

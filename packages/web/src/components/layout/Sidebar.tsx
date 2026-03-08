@@ -7,7 +7,7 @@ import {
   Archive, Pin, Trash2, ChevronLeft, BookOpen,
   FolderKanban, Settings, ShieldCheck,
   Microscope, Compass, HelpCircle, Filter,
-  CheckSquare, Square, FolderOpen, MessageSquare, Zap,
+  CheckSquare, Square, FolderOpen, MessageSquare, Zap, HardDrive,
 } from "lucide-react";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
@@ -127,6 +127,7 @@ export function Sidebar() {
           <SidebarLink icon={BookOpen} label={t("nav.knowledge", { defaultValue: "Knowledge" })} to="/knowledge" />
           <SidebarLink icon={Compass} label={t("nav.explore", { defaultValue: "Explore" })} to="/explore" />
           <SidebarLink icon={FolderKanban} label={t("nav.workspaces", { defaultValue: "Workspaces" })} to="/workspaces" />
+          <SidebarLink icon={HardDrive} label={t("nav.files", { defaultValue: "Files" })} to="/files" />
         </nav>
 
         <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mx-4" />

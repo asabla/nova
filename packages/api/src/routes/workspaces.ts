@@ -260,6 +260,53 @@ workspaceRoutes.post("/:id/files", zValidator("json", uploadFileSchema), async (
   return c.json({ uploadUrl: url, fileId: file.id, key }, 201);
 });
 
+workspaceRoutes.delete("/:id/files/:fileId", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const workspaceId = c.req.param("id");
+  const fileId = c.req.param("fileId");
+
+  // Verify workspace exists
+  await workspaceService.get(orgId, workspaceId);
+
+  // Get the file
+  const [file] = await db.select().from(files).where(and(
+    eq(files.id, fileId),
+    eq(files.orgId, orgId),
+    eq(files.workspaceId, workspaceId),
+    isNull(files.deletedAt),
+  ));
+
+  if (!file) throw AppError.notFound("File");
+
+  // Check permissions: file owner or workspace admin/owner
+  const isFileOwner = file.userId === userId;
+  const [membership] = await db.select().from(workspaceMemberships).where(and(
+    eq(workspaceMemberships.workspaceId, workspaceId),
+    eq(workspaceMemberships.userId, userId),
+    eq(workspaceMemberships.orgId, orgId),
+    isNull(workspaceMemberships.deletedAt),
+  ));
+  const isAdmin = membership?.role === "admin" || membership?.role === "owner";
+
+  // Also check workspace ownership
+  const [ws] = await db.select({ ownerId: workspaces.ownerId }).from(workspaces).where(eq(workspaces.id, workspaceId));
+  const isWorkspaceOwner = ws?.ownerId === userId;
+
+  if (!isFileOwner && !isAdmin && !isWorkspaceOwner) {
+    throw AppError.forbidden("You do not have permission to delete this file");
+  }
+
+  // Soft-delete the file
+  await db.update(files).set({ deletedAt: new Date() }).where(eq(files.id, fileId));
+
+  // Delete from storage
+  const { deleteObject } = await import("../lib/minio");
+  await deleteObject(file.storagePath);
+
+  return c.json({ ok: true });
+});
+
 // --- Members ---
 
 workspaceRoutes.get("/:id/members", async (c) => {

@@ -164,10 +164,12 @@ function ConversationsTab({ workspaceId }: { workspaceId: string }) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
 
-  const { data: conversations, isLoading, isError, refetch } = useQuery({
+  const { data: conversationsData, isLoading, isError, refetch } = useQuery({
     queryKey: ["workspaces", workspaceId, "conversations"],
-    queryFn: () => api.get<any[]>(`/api/workspaces/${workspaceId}/conversations`),
+    queryFn: () => api.get<any>(`/api/workspaces/${workspaceId}/conversations`),
   });
+
+  const conversations = (conversationsData as any)?.data ?? conversationsData;
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -279,10 +281,12 @@ function FilesTab({ workspaceId }: { workspaceId: string }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [deleteFileTarget, setDeleteFileTarget] = useState<any>(null);
 
-  const { data: files, isLoading, isError, refetch } = useQuery({
+  const { data: filesData, isLoading, isError, refetch } = useQuery({
     queryKey: ["workspaces", workspaceId, "files"],
-    queryFn: () => api.get<any[]>(`/api/workspaces/${workspaceId}/files`),
+    queryFn: () => api.get<any>(`/api/workspaces/${workspaceId}/files`),
   });
+
+  const files = (filesData as any)?.data ?? filesData;
 
   const uploadMutation = useMutation({
     mutationFn: async (fileList: FileList) => {
@@ -460,10 +464,12 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
   const [inviteRole, setInviteRole] = useState("member");
   const [removeMemberTarget, setRemoveMemberTarget] = useState<any>(null);
 
-  const { data: members, isLoading, isError, refetch } = useQuery({
+  const { data: membersData, isLoading, isError, refetch } = useQuery({
     queryKey: ["workspaces", workspaceId, "members"],
-    queryFn: () => api.get<any[]>(`/api/workspaces/${workspaceId}/members`),
+    queryFn: () => api.get<any>(`/api/workspaces/${workspaceId}/members`),
   });
+
+  const members = (membersData as any)?.data ?? membersData;
 
   const inviteMutation = useMutation({
     mutationFn: (data: { email: string; role: string }) =>

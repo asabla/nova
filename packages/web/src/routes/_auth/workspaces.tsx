@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Outlet, useMatchRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { FolderKanban, Plus, Users, Lock, Globe, RefreshCw } from "lucide-react";
@@ -13,6 +13,17 @@ export const Route = createFileRoute("/_auth/workspaces")({
 });
 
 function WorkspacesPage() {
+  const matchRoute = useMatchRoute();
+  const isChildRoute = matchRoute({ to: "/workspaces/$id", fuzzy: true });
+
+  if (isChildRoute) {
+    return <Outlet />;
+  }
+
+  return <WorkspacesListPage />;
+}
+
+function WorkspacesListPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
