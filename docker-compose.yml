@@ -208,6 +208,16 @@ services:
     depends_on:
       - api
 
+  # ─── NOVA Storybook ────────────────────────────
+  storybook:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.storybook
+    container_name: nova-storybook
+    restart: unless-stopped
+    ports:
+      - "6006:80"
+
 volumes:
   postgres_data:
   redis_data:

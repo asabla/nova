@@ -19,6 +19,9 @@ bun.lock
 .playwright-cli/
 coverage/
 
+# Storybook
+storybook-static/
+
 # Agentic specific directories
 .claude/
 .codex/

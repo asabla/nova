@@ -18,12 +18,15 @@
     "db:generate": "bun run --filter @nova/api db:generate",
     "db:migrate": "bun run --filter @nova/api db:migrate",
     "db:push": "bun run --filter @nova/api db:push",
-    "db:studio": "bun run --filter @nova/api db:studio"
+    "db:studio": "bun run --filter @nova/api db:studio",
+    "storybook": "bun run --filter @nova/web storybook",
+    "storybook:build": "bun run --filter @nova/web storybook:build"
   },
   "dependencies": {
     "pdf-parse": "1.1.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2"
+    "@playwright/test": "^1.58.2",
+    "@storybook/addon-docs": "^10.2.16"
   }
 }
