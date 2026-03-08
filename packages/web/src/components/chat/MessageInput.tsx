@@ -137,7 +137,7 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
       <div className="max-w-3xl mx-auto">
         <AttachmentBar files={pendingFiles} onRemove={removeFile} />
         <div
-          className="relative flex items-end gap-2 rounded-2xl border border-border bg-surface-secondary px-3 py-2 focus-within:border-primary/50 transition-colors"
+          className="relative flex items-end gap-2 rounded-2xl border border-border bg-surface-secondary px-3 py-2 input-glow transition-colors"
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
           onDrop={(e) => {
             e.preventDefault();

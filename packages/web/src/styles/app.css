@@ -258,6 +258,11 @@ body {
     0 4px 16px -2px color-mix(in oklch, var(--color-primary) 8%, transparent);
 }
 
+/* Suppress inner focus-visible outline; the container glow handles it */
+.input-glow *:focus-visible {
+  outline: none;
+}
+
 /* OmniBar backdrop */
 .omni-backdrop {
   background: color-mix(in oklch, var(--color-surface) 60%, transparent);

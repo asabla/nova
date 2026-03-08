@@ -161,7 +161,7 @@ function HomePage() {
               onKeyDown={handleKeyDown}
               placeholder={t("home.inputPlaceholder", "Ask anything...")}
               rows={2}
-              className="w-full resize-none bg-transparent text-[15px] leading-relaxed text-text placeholder:text-text-tertiary px-5 pt-5 pb-2 focus:outline-none rounded-2xl"
+              className="w-full resize-none bg-transparent text-[15px] leading-relaxed text-text placeholder:text-text-tertiary px-5 pt-5 pb-2 outline-none ring-0 focus:outline-none focus:ring-0 focus:shadow-none"
             />
             <div className="flex items-center justify-between px-4 pb-3.5">
               <div className="flex items-center gap-1">
