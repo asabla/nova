@@ -52,7 +52,18 @@ export async function smartChatWorkflow(input: SmartChatInput): Promise<SmartCha
     while (steps < maxSteps && !cancelled) {
       steps++;
 
-      // 1. Execute pending tool calls
+      // 1. Add assistant message with tool_calls to history (required by OpenAI API format)
+      messageHistory.push({
+        role: "assistant",
+        content: "",
+        tool_calls: pendingToolCalls.map((tc) => ({
+          id: tc.id,
+          type: "function",
+          function: { name: tc.function.name, arguments: tc.function.arguments },
+        })),
+      } as any);
+
+      // 2. Execute pending tool calls
       for (const tc of pendingToolCalls) {
         if (cancelled) break;
 
@@ -70,8 +81,9 @@ export async function smartChatWorkflow(input: SmartChatInput): Promise<SmartCha
 
         messageHistory.push({
           role: "tool",
+          tool_call_id: tc.id,
           content: JSON.stringify(result),
-        });
+        } as any);
       }
 
       if (cancelled) break;
@@ -96,7 +108,6 @@ export async function smartChatWorkflow(input: SmartChatInput): Promise<SmartCha
       // 3. Check if more tool calls are needed
       if (llmResult.finishReason === "tool_calls" && llmResult.toolCalls.length > 0) {
         pendingToolCalls = llmResult.toolCalls;
-        // Add the assistant message with tool_calls to history for proper API format
         continue;
       }
 

@@ -398,7 +398,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
               streamChannelId,
               messageHistory: body.messages,
               pendingToolCalls: toolCalls,
-              model: body.model,
+              model: resolvedModel,
               modelParams: { temperature: body.temperature, maxTokens: body.maxTokens },
               tools: body.enableTools ? DEFAULT_TOOLS : undefined,
               maxSteps: 5,
