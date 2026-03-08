@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { fn } from "storybook/test";
+import { fn, expect, userEvent, within } from "storybook/test";
 import { Button } from "@/components/ui/Button";
 import { Plus, Send, Trash2, Download, Settings, Sparkles } from "lucide-react";
 
@@ -38,6 +38,13 @@ export const Primary: Story = {
   args: {
     variant: "primary",
     children: "Primary Button",
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const button = canvas.getByRole("button", { name: "Primary Button" });
+    await expect(button).toBeVisible();
+    await userEvent.click(button);
+    await expect(args.onClick).toHaveBeenCalledOnce();
   },
 };
 
@@ -87,6 +94,11 @@ export const Disabled: Story = {
   args: {
     disabled: true,
     children: "Disabled",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const button = canvas.getByRole("button", { name: "Disabled" });
+    await expect(button).toBeDisabled();
   },
 };
 

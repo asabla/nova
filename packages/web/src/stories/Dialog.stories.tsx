@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent, within } from "storybook/test";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -42,6 +43,13 @@ function DialogDemo({ size, title, children }: { size?: "sm" | "md" | "lg"; titl
 
 export const Default: Story = {
   render: () => <DialogDemo title="Dialog Title" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const openButton = canvas.getByRole("button", { name: "Open Dialog" });
+    await userEvent.click(openButton);
+    // Dialog renders in a portal, so query from document body
+    await expect(document.body.querySelector("[role='dialog']")).not.toBeNull();
+  },
 };
 
 export const Small: Story = {

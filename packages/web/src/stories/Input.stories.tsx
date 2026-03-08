@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent, within } from "storybook/test";
 import { Input } from "@/components/ui/Input";
 import { Search, Mail, Lock, Globe } from "lucide-react";
 
@@ -21,6 +22,13 @@ export const Default: Story = {
   args: {
     placeholder: "Enter text...",
   },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByPlaceholderText("Enter text...");
+    await expect(input).toBeVisible();
+    await userEvent.type(input, "Hello NOVA");
+    await expect(input).toHaveValue("Hello NOVA");
+  },
 };
 
 export const WithLabel: Story = {
@@ -37,6 +45,10 @@ export const WithError: Story = {
     type: "password",
     error: "Password must be at least 8 characters",
     defaultValue: "short",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("Password must be at least 8 characters")).toBeVisible();
   },
 };
 

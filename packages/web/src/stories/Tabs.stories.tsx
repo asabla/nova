@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent, within } from "storybook/test";
 import { Tabs } from "@/components/ui/Tabs";
 import { MessageSquare, Settings, Users, BarChart3, Shield, Bell } from "lucide-react";
 
@@ -25,6 +26,15 @@ export const Default: Story = {
         Content for <span className="font-semibold text-text">{activeTab}</span> tab
       </div>
     ),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // Click on "Security" tab
+    await userEvent.click(canvas.getByText("Security"));
+    await expect(canvas.getByText("security")).toBeVisible();
+    // Click on "Notifications" tab
+    await userEvent.click(canvas.getByText("Notifications"));
+    await expect(canvas.getByText("notifications")).toBeVisible();
   },
 };
 
