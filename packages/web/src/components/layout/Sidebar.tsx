@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { clsx } from "clsx";
 import {
-  MessageSquarePlus, Archive, Pin, Trash2, ChevronLeft, BookOpen,
+  Archive, Pin, Trash2, ChevronLeft, BookOpen,
   FolderKanban, Settings, ShieldCheck,
   Microscope, Compass, HelpCircle, Filter,
   CheckSquare, Square, FolderOpen, MessageSquare, Zap,
@@ -131,17 +131,8 @@ export function Sidebar() {
 
         <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mx-4" />
 
-        {/* New Conversation + controls */}
+        {/* Conversation controls */}
         <div className="px-3 pt-3 flex gap-1.5">
-          <Button
-            variant="primary"
-            size="sm"
-            className="flex-1"
-            onClick={() => navigate({ to: "/conversations/new" })}
-          >
-            <MessageSquarePlus className="h-4 w-4" aria-hidden="true" />
-            {t("conversations.new")}
-          </Button>
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={clsx(

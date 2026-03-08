@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { Menu, Sun, Moon, Monitor } from "lucide-react";
+import { Menu, Sun, Moon, Monitor, Plus } from "lucide-react";
 import { authClient } from "../../hooks/useAuth";
 import { useUIStore } from "../../stores/ui.store";
 import { Avatar } from "../ui/Avatar";
@@ -36,8 +36,15 @@ export function Header() {
         )}
       </div>
 
-      {/* Center: OmniBar search */}
-      <div className="flex-1 flex justify-center min-w-0">
+      {/* Center: New conversation + OmniBar search */}
+      <div className="flex-1 flex items-center justify-center gap-2 min-w-0">
+        <button
+          onClick={() => navigate({ to: "/" })}
+          aria-label={t("conversations.new", { defaultValue: "New conversation" })}
+          className="shrink-0 h-10 w-10 flex items-center justify-center rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors focus-visible:outline-2 focus-visible:outline-primary"
+        >
+          <Plus className="h-5 w-5" aria-hidden="true" />
+        </button>
         <OmniBarTrigger />
       </div>
 
