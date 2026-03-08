@@ -79,7 +79,7 @@ export function MessageList({ messages, artifactsByMessageId, streamingContent, 
       role="log"
       aria-live="polite"
     >
-      <div className="max-w-3xl mx-auto py-4">
+      <div className="max-w-5xl mx-auto py-4 px-4">
         {messages.length === 0 && !isStreaming && (
           <div className="text-center py-16 text-sm text-text-tertiary">
             {t("messages.empty", { defaultValue: "No messages yet. Start the conversation below." })}

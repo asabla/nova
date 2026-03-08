@@ -194,7 +194,7 @@ export function MessageBubble({ message, artifacts, userName, onRate, onEdit, on
         )}
       </div>
 
-      <div className={clsx("flex flex-col max-w-[80%]", isUser ? "items-end" : "items-start")}>
+      <div className={clsx("flex flex-col", isUser ? "max-w-[80%] items-end" : "flex-1 min-w-0")}>
         {isEditing ? (
           <div className="w-full min-w-[300px]">
             <textarea
@@ -239,7 +239,7 @@ export function MessageBubble({ message, artifacts, userName, onRate, onEdit, on
               "rounded-2xl px-4 py-2.5",
               isUser
                 ? "bg-primary text-primary-foreground rounded-tr-sm"
-                : "bg-surface-secondary border border-border rounded-tl-sm",
+                : "bg-surface-secondary border border-border rounded-tl-sm w-full",
               message.status === "failed" && "border-danger/50",
             )}
           >
@@ -263,7 +263,7 @@ export function MessageBubble({ message, artifacts, userName, onRate, onEdit, on
 
         {/* Artifacts (including dynamic widgets) */}
         {artifacts && artifacts.length > 0 && (
-          <div className={clsx("w-full max-w-[80%] mt-1.5", isUser ? "ml-auto" : "")}>
+          <div className={clsx("w-full mt-1.5", isUser ? "max-w-[80%] ml-auto" : "")}>
             {artifacts.map((a: any) =>
               a.type === "widget" && a.metadata ? (
                 <DynamicWidget key={a.id} config={a.metadata} />
