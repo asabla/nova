@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { fn } from "storybook/test";
+import { expect, fn, userEvent, within } from "storybook/test";
 import { Dropdown, DropdownItem } from "@/components/ui/Dropdown";
 import { Settings, User, LogOut, Trash2, Copy, Share2, MoreVertical, ChevronDown, Edit } from "lucide-react";
 
@@ -38,6 +38,17 @@ export const Default: Story = {
       </DropdownItem>
     </Dropdown>
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // Open the dropdown
+    const trigger = canvas.getByRole("button", { expanded: false });
+    await userEvent.click(trigger);
+    // Menu should appear with menu items
+    const menu = canvasElement.querySelector("[role='menu']");
+    await expect(menu).not.toBeNull();
+    const items = canvasElement.querySelectorAll("[role='menuitem']");
+    await expect(items.length).toBe(4);
+  },
 };
 
 export const AlignLeft: Story = {
