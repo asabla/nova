@@ -3,7 +3,7 @@
  *
  * Tests the full user journey:
  * - Navigate to knowledge page
- * - Create a new collection via the dialog
+ * - Create a new collection via the /knowledge/new page
  * - Verify navigation to collection detail
  * - Delete the collection
  * - Verify return to knowledge list
@@ -29,19 +29,21 @@ async function loginAndGoToKnowledge(page: Page) {
   await expect(page.getByRole("heading", { name: "Knowledge Base" })).toBeVisible({ timeout: 10_000 });
 }
 
-/** Helper: create a collection via the UI dialog */
+/** Helper: create a collection via the /knowledge/new page */
 async function createCollection(page: Page, name: string, description?: string) {
   await page.getByRole("button", { name: "New Collection" }).click();
-  const dialog = page.getByRole("dialog", { name: "Create Knowledge Collection" });
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole("textbox", { name: "Name" }).fill(name);
+  // Should navigate to the creation page
+  await expect(page).toHaveURL(/\/knowledge\/new/);
+  await expect(page.getByRole("heading", { name: "Create Knowledge Collection" })).toBeVisible();
+
+  await page.getByRole("textbox", { name: "Name" }).fill(name);
   if (description) {
-    await dialog.getByRole("textbox", { name: /description/i }).fill(description);
+    await page.getByRole("textbox", { name: /description/i }).fill(description);
   }
   // Click Create and wait for the API response
   const [response] = await Promise.all([
     page.waitForResponse((res) => res.url().includes("/api/knowledge") && res.request().method() === "POST"),
-    dialog.getByRole("button", { name: "Create" }).click(),
+    page.getByRole("button", { name: "Create" }).click(),
   ]);
   expect(response.status()).toBe(201);
   // Wait for the detail page to load by checking the heading
@@ -67,27 +69,27 @@ test.describe("Knowledge Collection UI", () => {
   test("creates a new knowledge collection and verifies detail page", async ({ page }) => {
     await loginAndGoToKnowledge(page);
 
-    // Click "New Collection" button
+    // Click "New Collection" button — navigates to /knowledge/new
     await page.getByRole("button", { name: "New Collection" }).click();
+    await expect(page).toHaveURL(/\/knowledge\/new/);
 
-    // Verify dialog appears
-    const dialog = page.getByRole("dialog", { name: "Create Knowledge Collection" });
-    await expect(dialog).toBeVisible();
+    // Verify the creation page
+    await expect(page.getByRole("heading", { name: "Create Knowledge Collection" })).toBeVisible();
 
     // Verify Create button is disabled when name is empty
-    await expect(dialog.getByRole("button", { name: "Create" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Create" })).toBeDisabled();
 
     // Fill in the form
-    await dialog.getByRole("textbox", { name: "Name" }).fill("E2E UI Test Collection");
-    await dialog.getByRole("textbox", { name: /description/i }).fill("Created via E2E UI test");
+    await page.getByRole("textbox", { name: "Name" }).fill("E2E UI Test Collection");
+    await page.getByRole("textbox", { name: /description/i }).fill("Created via E2E UI test");
 
     // Create button should now be enabled
-    await expect(dialog.getByRole("button", { name: "Create" })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Create" })).toBeEnabled();
 
     // Submit and wait for API response
     const [createResponse] = await Promise.all([
       page.waitForResponse((res) => res.url().includes("/api/knowledge") && res.request().method() === "POST"),
-      dialog.getByRole("button", { name: "Create" }).click(),
+      page.getByRole("button", { name: "Create" }).click(),
     ]);
     expect(createResponse.status()).toBe(201);
 
@@ -105,25 +107,19 @@ test.describe("Knowledge Collection UI", () => {
     await deleteCurrentCollection(page);
   });
 
-  test("cancels collection creation via the dialog", async ({ page }) => {
+  test("cancels collection creation and returns to list", async ({ page }) => {
     await loginAndGoToKnowledge(page);
 
-    // Open dialog
+    // Navigate to creation page
     await page.getByRole("button", { name: "New Collection" }).click();
-    const dialog = page.getByRole("dialog", { name: "Create Knowledge Collection" });
-    await expect(dialog).toBeVisible();
+    await expect(page).toHaveURL(/\/knowledge\/new/);
 
     // Fill in name
-    await dialog.getByRole("textbox", { name: "Name" }).fill("Should Not Be Created");
+    await page.getByRole("textbox", { name: "Name" }).fill("Should Not Be Created");
 
-    // Cancel
-    await dialog.getByRole("button", { name: "Cancel" }).click();
-
-    // Dialog should close
-    await expect(dialog).not.toBeVisible();
-
-    // Should still be on knowledge list page
-    await expect(page.getByRole("heading", { name: "Knowledge Base" })).toBeVisible();
+    // Cancel — should navigate back to knowledge list
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await expect(page.getByRole("heading", { name: "Knowledge Base" })).toBeVisible({ timeout: 10_000 });
   });
 
   test("creates and then deletes a collection", async ({ page }) => {
@@ -141,17 +137,5 @@ test.describe("Knowledge Collection UI", () => {
 
     // The deleted collection should not appear in the list
     await expect(page.getByText("E2E Deletable Collection")).not.toBeVisible();
-  });
-
-  test("closes dialog with close button", async ({ page }) => {
-    await loginAndGoToKnowledge(page);
-
-    await page.getByRole("button", { name: "New Collection" }).click();
-    const dialog = page.getByRole("dialog", { name: "Create Knowledge Collection" });
-    await expect(dialog).toBeVisible();
-
-    // Close via X button
-    await dialog.getByRole("button", { name: "Close" }).click();
-    await expect(dialog).not.toBeVisible();
   });
 });
