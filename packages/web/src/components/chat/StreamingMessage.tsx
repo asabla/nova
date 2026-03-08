@@ -6,7 +6,7 @@ interface StreamingMessageProps {
 
 export function StreamingMessage({ content }: StreamingMessageProps) {
   return (
-    <div className="flex gap-3 px-4 py-4" aria-live="polite">
+    <div className="flex gap-3 px-4 py-4">
       <div className="shrink-0 mt-0.5">
         <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center">
           <svg className="h-4 w-4 text-primary" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

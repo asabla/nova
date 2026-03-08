@@ -16,16 +16,17 @@ interface MessageInputProps {
   disabled?: boolean;
   onFileUpload?: (files: File[]) => void;
   onTyping?: () => void;
+  conversationId?: string;
 }
 
-export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, isPaused, disabled, onFileUpload, onTyping }: MessageInputProps) {
+export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, isPaused, disabled, onFileUpload, onTyping, conversationId }: MessageInputProps) {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   // Auto-save draft on disconnect / page unload (story #202)
-  const draftKey = "nova:message-draft";
+  const draftKey = conversationId ? `nova:message-draft:${conversationId}` : "nova:message-draft";
   const [content, setContent] = useState(() => {
     try { return localStorage.getItem(draftKey) ?? ""; } catch { return ""; }
   });

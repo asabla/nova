@@ -58,12 +58,13 @@ const colors = {
 function ToastEntry({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }) {
   const Icon = icons[toast.type];
   const [paused, setPaused] = useState(false);
+  const onDismissRef = useCallback(onDismiss, [toast.id]);
 
   useEffect(() => {
     if (paused) return;
-    const timer = setTimeout(onDismiss, toast.duration ?? 4000);
+    const timer = setTimeout(onDismissRef, toast.duration ?? 4000);
     return () => clearTimeout(timer);
-  }, [onDismiss, toast.duration, paused]);
+  }, [onDismissRef, toast.duration, paused]);
 
   return (
     <div

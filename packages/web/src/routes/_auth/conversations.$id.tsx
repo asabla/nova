@@ -349,6 +349,7 @@ function ConversationPage() {
         onFileUpload={handleFileUpload}
         onTyping={onKeystroke}
         disabled={isLoading}
+        conversationId={id}
       />
     </div>
   );

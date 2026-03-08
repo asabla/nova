@@ -74,7 +74,9 @@ function MermaidArtifact({ code }: { code: string }) {
     (async () => {
       try {
         const mermaid = (await import("mermaid")).default;
-        mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "strict" });
+        const isDark = document.documentElement.getAttribute("data-theme") === "dark" ||
+          (!document.documentElement.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        mermaid.initialize({ startOnLoad: false, theme: isDark ? "dark" : "default", securityLevel: "strict" });
         const { svg } = await mermaid.render(id, code);
         if (!cancelled && ref.current) {
           ref.current.innerHTML = svg;
@@ -204,7 +206,7 @@ function HtmlPreview({ html }: { html: string }) {
     <iframe
       ref={iframeRef}
       sandbox="allow-scripts"
-      className="w-full h-64 bg-white border-0"
+      className="w-full h-64 bg-surface border-0"
       title="HTML Preview"
     />
   );
@@ -283,12 +285,23 @@ export function ArtifactDisplay({ artifact, onSave }: ArtifactDisplayProps) {
     }
   };
 
+  // Close fullscreen on Escape
+  useEffect(() => {
+    if (!fullscreen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFullscreen(false);
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [fullscreen]);
+
   return (
     <div
       className={clsx(
         "rounded-xl border border-border overflow-hidden bg-surface-secondary my-2",
         fullscreen && "fixed inset-4 z-50 shadow-2xl flex flex-col",
       )}
+      {...(fullscreen ? { role: "dialog", "aria-modal": true, "aria-label": artifact.title } : {})}
     >
       {/* Title bar */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-surface-tertiary/50">
@@ -312,14 +325,14 @@ export function ArtifactDisplay({ artifact, onSave }: ArtifactDisplayProps) {
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <button onClick={handleCopy} className="text-text-tertiary hover:text-text-secondary p-1 rounded" title="Copy">
-            {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+          <button onClick={handleCopy} className="text-text-tertiary hover:text-text-secondary p-1 rounded" aria-label="Copy" title="Copy">
+            {copied ? <Check className="h-3.5 w-3.5 text-success" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}
           </button>
-          <button onClick={handleSave} className="text-text-tertiary hover:text-text-secondary p-1 rounded" title="Save to library" disabled={saveMutation.isPending}>
-            <Save className="h-3.5 w-3.5" />
+          <button onClick={handleSave} className="text-text-tertiary hover:text-text-secondary p-1 rounded" aria-label="Save to library" title="Save to library" disabled={saveMutation.isPending}>
+            <Save className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
-          <button onClick={handleDownload} className="text-text-tertiary hover:text-text-secondary p-1 rounded" title="Download">
-            <Download className="h-3.5 w-3.5" />
+          <button onClick={handleDownload} className="text-text-tertiary hover:text-text-secondary p-1 rounded" aria-label="Download" title="Download">
+            <Download className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
           <button
             onClick={() => setCollapsed(!collapsed)}

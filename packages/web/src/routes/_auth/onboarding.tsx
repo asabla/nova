@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import {
   Sparkles, MessageSquare, Bot, BookOpen, Settings, ArrowRight, ArrowLeft,
-  Check, Palette, Bell, Shield, Zap,
+  Check, Palette, Bell, Shield, Zap, Loader2,
 } from "lucide-react";
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
+import { toast } from "../../components/ui/Toast";
 
 export const Route = createFileRoute("/_auth/onboarding")({
   component: OnboardingPage,
@@ -22,6 +24,7 @@ interface Step {
 }
 
 function OnboardingPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
   const [preferences, setPreferences] = useState({
@@ -34,13 +37,16 @@ function OnboardingPage() {
   const completeOnboarding = useMutation({
     mutationFn: () => api.post("/api/users/me/onboarding-complete", preferences),
     onSuccess: () => navigate({ to: "/" }),
+    onError: () => {
+      toast(t("onboarding.completeFailed", "Failed to complete onboarding. Please try again."), "error");
+    },
   });
 
   const steps: Step[] = [
     {
       id: "welcome",
-      title: "Welcome to NOVA",
-      description: "Your self-hosted AI platform for teams",
+      title: t("onboarding.welcomeTitle", "Welcome to NOVA"),
+      description: t("onboarding.welcomeDesc", "Your self-hosted AI platform for teams"),
       icon: Sparkles,
       color: "text-primary",
       content: (
@@ -49,29 +55,28 @@ function OnboardingPage() {
             <Sparkles className="h-10 w-10 text-primary" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-text">Welcome to NOVA</h2>
+            <h2 className="text-2xl font-bold text-text">{t("onboarding.welcomeTitle", "Welcome to NOVA")}</h2>
             <p className="text-sm text-text-secondary mt-2 max-w-md mx-auto">
-              NOVA is a powerful AI platform that gives you and your team access to
-              multiple AI models, custom agents, knowledge bases, and more.
+              {t("onboarding.welcomeBody", "NOVA is a powerful AI platform that gives you and your team access to multiple AI models, custom agents, knowledge bases, and more.")}
             </p>
           </div>
           <div className="grid grid-cols-3 gap-4 max-w-lg mx-auto">
-            <FeatureCard icon={MessageSquare} title="Conversations" desc="Chat with AI models" />
-            <FeatureCard icon={Bot} title="Agents" desc="Custom AI assistants" />
-            <FeatureCard icon={BookOpen} title="Knowledge" desc="RAG-powered search" />
+            <FeatureCard icon={MessageSquare} title={t("onboarding.featureConversations", "Conversations")} desc={t("onboarding.featureConversationsDesc", "Chat with AI models")} />
+            <FeatureCard icon={Bot} title={t("onboarding.featureAgents", "Agents")} desc={t("onboarding.featureAgentsDesc", "Custom AI assistants")} />
+            <FeatureCard icon={BookOpen} title={t("onboarding.featureKnowledge", "Knowledge")} desc={t("onboarding.featureKnowledgeDesc", "RAG-powered search")} />
           </div>
         </div>
       ),
     },
     {
       id: "appearance",
-      title: "Customize Appearance",
-      description: "Choose your preferred theme and display settings",
+      title: t("onboarding.appearanceTitle", "Customize Appearance"),
+      description: t("onboarding.appearanceDesc", "Choose your preferred theme and display settings"),
       icon: Palette,
       color: "text-purple-400",
       content: (
         <div className="space-y-6 max-w-md mx-auto">
-          <h3 className="text-lg font-semibold text-text text-center">Choose Your Theme</h3>
+          <h3 className="text-lg font-semibold text-text text-center">{t("onboarding.chooseTheme", "Choose Your Theme")}</h3>
           <div className="grid grid-cols-3 gap-4">
             {(["light", "dark", "system"] as const).map((theme) => (
               <button
@@ -95,23 +100,23 @@ function OnboardingPage() {
     },
     {
       id: "notifications",
-      title: "Notification Preferences",
-      description: "Choose how you'd like to be notified",
+      title: t("onboarding.notificationsTitle", "Notification Preferences"),
+      description: t("onboarding.notificationsDesc", "Choose how you'd like to be notified"),
       icon: Bell,
       color: "text-warning",
       content: (
         <div className="space-y-4 max-w-md mx-auto">
-          <h3 className="text-lg font-semibold text-text text-center">Stay Informed</h3>
+          <h3 className="text-lg font-semibold text-text text-center">{t("onboarding.stayInformed", "Stay Informed")}</h3>
           <div className="space-y-3">
             <NotifToggle
-              label="In-app Notifications"
-              desc="Get notified about mentions, replies, and agent completions"
+              label={t("onboarding.inAppNotifications", "In-app Notifications")}
+              desc={t("onboarding.inAppNotificationsDesc", "Get notified about mentions, replies, and agent completions")}
               checked={preferences.enableNotifications}
               onChange={(v) => setPreferences((p) => ({ ...p, enableNotifications: v }))}
             />
             <NotifToggle
-              label="Desktop Notifications"
-              desc="Show browser notifications for important events"
+              label={t("onboarding.desktopNotifications", "Desktop Notifications")}
+              desc={t("onboarding.desktopNotificationsDesc", "Show browser notifications for important events")}
               checked={false}
               onChange={() => {
                 if ("Notification" in window) {
@@ -125,25 +130,25 @@ function OnboardingPage() {
     },
     {
       id: "security",
-      title: "Security Setup",
-      description: "Protect your account",
+      title: t("onboarding.securityTitle", "Security Setup"),
+      description: t("onboarding.securityDesc", "Protect your account"),
       icon: Shield,
       color: "text-success",
       content: (
         <div className="space-y-6 max-w-md mx-auto text-center">
-          <h3 className="text-lg font-semibold text-text">Security Tips</h3>
+          <h3 className="text-lg font-semibold text-text">{t("onboarding.securityTips", "Security Tips")}</h3>
           <div className="space-y-3 text-left">
-            <Tip icon={Shield} text="Enable two-factor authentication in Settings > Security" />
-            <Tip icon={Zap} text="API keys are scoped to your organization and can be rotated anytime" />
-            <Tip icon={Settings} text="Review your active sessions periodically" />
+            <Tip icon={Shield} text={t("onboarding.tip2fa", "Enable two-factor authentication in Settings > Security")} />
+            <Tip icon={Zap} text={t("onboarding.tipApiKeys", "API keys are scoped to your organization and can be rotated anytime")} />
+            <Tip icon={Settings} text={t("onboarding.tipSessions", "Review your active sessions periodically")} />
           </div>
         </div>
       ),
     },
     {
       id: "ready",
-      title: "You're All Set!",
-      description: "Start exploring NOVA",
+      title: t("onboarding.readyTitle", "You're All Set!"),
+      description: t("onboarding.readyDesc", "Start exploring NOVA"),
       icon: Check,
       color: "text-success",
       content: (
@@ -152,18 +157,22 @@ function OnboardingPage() {
             <Check className="h-10 w-10 text-success" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-text">You're Ready!</h2>
+            <h2 className="text-2xl font-bold text-text">{t("onboarding.readyHeading", "You're Ready!")}</h2>
             <p className="text-sm text-text-secondary mt-2 max-w-md mx-auto">
-              Start a conversation, create an agent, or explore sample conversations
-              to see what NOVA can do.
+              {t("onboarding.readyBody", "Start a conversation, create an agent, or explore sample conversations to see what NOVA can do.")}
             </p>
           </div>
           <div className="flex gap-3 justify-center">
             <Button variant="secondary" onClick={() => navigate({ to: "/explore" })}>
-              Explore Examples
+              {t("onboarding.exploreExamples", "Explore Examples")}
             </Button>
-            <Button variant="primary" onClick={() => completeOnboarding.mutate()}>
-              <MessageSquare className="h-4 w-4" /> Start Chatting
+            <Button variant="primary" onClick={() => completeOnboarding.mutate()} loading={completeOnboarding.isPending}>
+              {completeOnboarding.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <MessageSquare className="h-4 w-4" aria-hidden="true" />
+              )}
+              {t("onboarding.startChatting", "Start Chatting")}
             </Button>
           </div>
         </div>
@@ -200,18 +209,18 @@ function OnboardingPage() {
         <div className="flex items-center gap-4 mt-8">
           {!isFirst && (
             <Button variant="ghost" onClick={() => setCurrentStep((s) => s - 1)}>
-              <ArrowLeft className="h-4 w-4" /> Back
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" /> {t("onboarding.back", "Back")}
             </Button>
           )}
           <Button variant="primary" onClick={() => setCurrentStep((s) => s + 1)}>
-            {isFirst ? "Get Started" : "Next"} <ArrowRight className="h-4 w-4" />
+            {isFirst ? t("onboarding.getStarted", "Get Started") : t("onboarding.next", "Next")} <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Button>
           {isFirst && (
             <button
               onClick={() => completeOnboarding.mutate()}
               className="text-xs text-text-tertiary hover:text-text-secondary"
             >
-              Skip tutorial
+              {t("onboarding.skipTutorial", "Skip tutorial")}
             </button>
           )}
         </div>
@@ -240,6 +249,8 @@ function NotifToggle({ label, desc, checked, onChange }: {
         <p className="text-xs text-text-tertiary">{desc}</p>
       </div>
       <button
+        role="switch"
+        aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={`w-10 h-5 rounded-full transition-colors ${checked ? "bg-primary" : "bg-border"}`}
       >

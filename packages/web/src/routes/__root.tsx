@@ -45,7 +45,7 @@ function BrandingInjector() {
     // Inject primary color as CSS variable
     const primaryColor = branding.primaryColor ?? branding.primary_color;
     if (primaryColor) {
-      document.documentElement.style.setProperty("--color-primary-brand", primaryColor);
+      document.documentElement.style.setProperty("--color-primary", primaryColor);
     }
 
     // Inject favicon

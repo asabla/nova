@@ -50,7 +50,7 @@ function applyFontSizeToDOM(size: FontSize) {
 export const useUIStore = create<UIState>()(
   persist(
     (set, get) => ({
-      sidebarOpen: true,
+      sidebarOpen: typeof window !== "undefined" ? window.innerWidth >= 768 : true,
       sidebarWidth: 280,
       omniBarOpen: false,
       omniBarQuery: "",

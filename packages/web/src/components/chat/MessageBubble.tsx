@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, memo } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Copy, Check, ThumbsUp, ThumbsDown, Pencil, RotateCcw, History, X, Send, StickyNote, ChevronDown, GitBranch, Volume2, VolumeX, Paperclip, FileText, Download } from "lucide-react";
@@ -50,7 +50,7 @@ interface MessageBubbleProps {
   onFork?: (messageId: string) => void;
 }
 
-export function MessageBubble({ message, artifacts, userName, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message, artifacts, userName, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork }: MessageBubbleProps) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -399,7 +399,7 @@ export function MessageBubble({ message, artifacts, userName, onRate, onEdit, on
 
         {/* Actions - visible by default on touch devices, hover-reveal on desktop */}
         {!isEditing && (
-          <div className="flex items-center gap-1 mt-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1 mt-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
             <button
               onClick={handleCopy}
               className="text-text-tertiary hover:text-text-secondary p-1 rounded"
@@ -565,4 +565,4 @@ export function MessageBubble({ message, artifacts, userName, onRate, onEdit, on
       </div>
     </div>
   );
-}
+});

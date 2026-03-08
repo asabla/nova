@@ -53,7 +53,9 @@ interface AgentResult {
 // Platform detection
 // ---------------------------------------------------------------------------
 
-const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+const isMac =
+  typeof navigator !== "undefined" &&
+  /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
 const modKey = isMac ? "\u2318" : "Ctrl+";
 const shiftKey = isMac ? "\u21E7" : "Shift+";
 
@@ -357,7 +359,7 @@ export function CommandPalette() {
   let runningIndex = 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]" role="dialog" aria-modal="true" aria-label={t("commandPalette.title", { defaultValue: "Command palette" })}>
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={close} />
 

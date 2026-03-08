@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useMatchRoute } from "@tanstack/react-router";
+import { useNavigate, useMatchRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { clsx } from "clsx";
@@ -277,17 +277,17 @@ export function Sidebar() {
 }
 
 function SidebarLink({ icon: Icon, label, to, exact }: { icon: any; label: string; to: string; exact?: boolean }) {
-  const navigate = useNavigate();
   const matchRoute = useMatchRoute();
   const isActive = exact
     ? matchRoute({ to, fuzzy: false }) || (to === "/" && matchRoute({ to: "/", fuzzy: false }))
     : matchRoute({ to, fuzzy: true });
 
   return (
-    <button
-      onClick={() => navigate({ to })}
+    <Link
+      to={to}
+      aria-current={isActive ? "page" : undefined}
       className={clsx(
-        "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all duration-150 relative",
+        "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all duration-150 relative no-underline",
         isActive
           ? "bg-primary/10 text-primary font-medium nav-active"
           : "text-text-secondary hover:bg-surface-tertiary hover:text-text hover:translate-x-0.5",
@@ -295,6 +295,6 @@ function SidebarLink({ icon: Icon, label, to, exact }: { icon: any; label: strin
     >
       <Icon className="h-4 w-4" aria-hidden="true" />
       {label}
-    </button>
+    </Link>
   );
 }

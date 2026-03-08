@@ -27,11 +27,13 @@ function MembersPage() {
   const { data: membersData, isLoading: membersLoading } = useQuery({
     queryKey: ["org-members"],
     queryFn: () => api.get<any>("/api/org/members"),
+    staleTime: 30_000,
   });
 
   const { data: invitationsData, isLoading: invitationsLoading } = useQuery({
     queryKey: ["org-invitations"],
     queryFn: () => api.get<any>("/api/org/invitations"),
+    staleTime: 30_000,
   });
 
   const invite = useMutation({
@@ -101,7 +103,16 @@ function MembersPage() {
                   </Badge>
                   <select
                     value={role}
-                    onChange={(e) => updateRole.mutate({ userId, role: e.target.value })}
+                    onChange={(e) => {
+                      const newRole = e.target.value;
+                      if (newRole === "org-admin" && role !== "org-admin") {
+                        if (!window.confirm(t("admin.confirmRoleElevation", { defaultValue: "Are you sure you want to grant admin privileges to {{name}}?", name }))) {
+                          e.target.value = role;
+                          return;
+                        }
+                      }
+                      updateRole.mutate({ userId, role: newRole });
+                    }}
                     className="text-xs bg-surface border border-border rounded px-2 py-1 text-text"
                     aria-label={t("admin.changeRole", { defaultValue: "Change role for {{name}}", name })}
                   >

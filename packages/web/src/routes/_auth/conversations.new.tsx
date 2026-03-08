@@ -59,20 +59,6 @@ function NewConversationPage() {
     return presign.fileId;
   }, []);
 
-  // Check for starter message from explore page or session storage
-  useEffect(() => {
-    try {
-      const starterMessage = sessionStorage.getItem("nova:starter-message");
-      if (starterMessage) {
-        sessionStorage.removeItem("nova:starter-message");
-        const files = consumePendingFiles();
-        createAndSend(starterMessage, undefined, files.length > 0 ? files : undefined);
-      }
-    } catch {
-      // sessionStorage unavailable
-    }
-  }, []);
-
   const createAndSend = useCallback(async (content: string, systemPrompt?: string, files?: File[]) => {
     if (isCreating) return;
     setIsCreating(true);
@@ -110,6 +96,20 @@ function NewConversationPage() {
       setIsCreating(false);
     }
   }, [navigate, queryClient, selectedModel, selectedWorkspace, isCreating, t, uploadSingleFile]);
+
+  // Check for starter message from explore page or session storage
+  useEffect(() => {
+    try {
+      const starterMessage = sessionStorage.getItem("nova:starter-message");
+      if (starterMessage) {
+        sessionStorage.removeItem("nova:starter-message");
+        const files = consumePendingFiles();
+        createAndSend(starterMessage, undefined, files.length > 0 ? files : undefined);
+      }
+    } catch {
+      // sessionStorage unavailable
+    }
+  }, [createAndSend]);
 
   // Default starters if no templates exist
   const defaultStarters = [

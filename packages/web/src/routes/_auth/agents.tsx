@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate, Outlet, useMatchRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { Bot, Plus, Star, MoreHorizontal, RefreshCw } from "lucide-react";
+import { Bot, Plus, Star, RefreshCw } from "lucide-react";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { Button } from "../../components/ui/Button";
@@ -31,6 +31,7 @@ function AgentsListPage() {
   const { data: agentsData, isLoading, isError, refetch } = useQuery({
     queryKey: queryKeys.agents.list(),
     queryFn: () => api.get<any>("/api/agents"),
+    staleTime: 30_000,
   });
 
   const agents = (agentsData as any)?.data ?? [];

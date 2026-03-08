@@ -1,6 +1,6 @@
 import React from "react";
 import { definePreview, type Renderer } from "@storybook/react-vite";
-import addonThemes, { withThemeByDataAttribute } from "@storybook/addon-themes";
+import { withThemeByDataAttribute } from "@storybook/addon-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import "../src/styles/app.css";
@@ -16,7 +16,6 @@ const queryClient = new QueryClient({
 });
 
 export default definePreview({
-  addons: [addonThemes()],
   parameters: {
     controls: {
       matchers: {

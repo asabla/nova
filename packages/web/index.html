@@ -9,6 +9,18 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <title>NOVA</title>
+    <script>
+      // FOUC prevention: apply theme before first paint
+      (function() {
+        try {
+          var stored = JSON.parse(localStorage.getItem('nova-ui') || '{}');
+          var theme = (stored.state && stored.state.theme) || 'system';
+          if (theme !== 'system') {
+            document.documentElement.setAttribute('data-theme', theme);
+          }
+        } catch(e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -11,7 +11,7 @@ import { CardSkeleton } from "../../components/ui/Skeleton";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { useAuthStore } from "../../stores/auth.store";
-import { setPendingFiles } from "../../lib/pending-files";
+import { setPendingFiles as storePendingFiles } from "../../lib/pending-files";
 import { ALLOWED_MIME_TYPES } from "@nova/shared/constants";
 
 export const Route = createFileRoute("/_auth/")({
@@ -88,7 +88,7 @@ function HomePage() {
     const text = message.trim();
     if (!text && pendingFiles.length === 0) return;
     if (pendingFiles.length > 0) {
-      setPendingFiles(pendingFiles);
+      storePendingFiles(pendingFiles);
     }
     handleStartConversation(text || "Attached files");
   };

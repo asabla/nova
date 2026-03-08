@@ -91,6 +91,13 @@
 :root[data-theme="light"] {
   color-scheme: light;
 
+  --color-primary: oklch(0.55 0.22 268);
+  --color-primary-light: oklch(0.68 0.18 268);
+  --color-primary-dark: oklch(0.42 0.24 268);
+
+  --color-accent: oklch(0.78 0.14 65);
+  --color-accent-muted: oklch(0.78 0.08 65);
+
   --color-surface: oklch(0.995 0.003 90);
   --color-surface-secondary: oklch(0.975 0.004 85);
   --color-surface-tertiary: oklch(0.95 0.005 80);
@@ -101,6 +108,10 @@
   --color-text: oklch(0.16 0.015 280);
   --color-text-secondary: oklch(0.44 0.01 270);
   --color-text-tertiary: oklch(0.60 0.008 265);
+
+  --color-success: oklch(0.627 0.194 149.214);
+  --color-warning: oklch(0.769 0.188 70.08);
+  --color-danger: oklch(0.577 0.245 27.325);
 }
 
 /* --- Typography --- */
@@ -193,6 +204,26 @@ body {
   to { transform: scale(1); opacity: 1; }
 }
 
+@keyframes slide-in-from-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes zoom-in-95 {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes slide-in-from-bottom-4 {
+  from { transform: translateY(1rem); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slide-in-from-top-4 {
+  from { transform: translateY(-1rem); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
 @keyframes glow-pulse {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-primary) 0%, transparent); }
   50% { box-shadow: 0 0 20px 2px color-mix(in oklch, var(--color-primary) 15%, transparent); }
@@ -218,7 +249,7 @@ body {
 }
 
 .slide-in-from-top-4 {
-  animation-name: slide-in-from-top-2;
+  animation-name: slide-in-from-top-4;
 }
 
 .slide-up-fade {
@@ -227,6 +258,18 @@ body {
 
 .scale-in {
   animation-name: scale-in;
+}
+
+.slide-in-from-right {
+  animation-name: slide-in-from-right;
+}
+
+.zoom-in-95 {
+  animation-name: zoom-in-95;
+}
+
+.slide-in-from-bottom-4 {
+  animation-name: slide-in-from-bottom-4;
 }
 
 /* Page content entrance */
@@ -258,9 +301,10 @@ body {
     0 4px 16px -2px color-mix(in oklch, var(--color-primary) 8%, transparent);
 }
 
-/* Suppress inner focus-visible outline; the container glow handles it */
+/* Visible focus ring inside the glowing container */
 .input-glow *:focus-visible {
-  outline: none;
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 /* OmniBar backdrop */
@@ -276,7 +320,7 @@ body {
 }
 .hover-lift:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px -2px color-mix(in oklch, var(--color-text) 8%, transparent);
+  box-shadow: 0 4px 12px -2px oklch(0 0 0 / 0.08);
 }
 
 /* Sidebar nav item active indicator */
