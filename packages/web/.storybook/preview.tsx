@@ -1,7 +1,19 @@
+import React from "react";
 import { definePreview, type Renderer } from "@storybook/react-vite";
 import addonThemes, { withThemeByDataAttribute } from "@storybook/addon-themes";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import "../src/styles/app.css";
+import "../src/i18n";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 export default definePreview({
   addons: [addonThemes()],
@@ -25,5 +37,10 @@ export default definePreview({
       parentSelector: "html",
       attributeName: "data-theme",
     }),
+    (Story) => (
+      <QueryClientProvider client={queryClient}>
+        <Story />
+      </QueryClientProvider>
+    ),
   ],
 });
