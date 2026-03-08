@@ -5,6 +5,7 @@ import { ErrorMessage } from "@/components/chat/ErrorMessage";
 const meta: Meta<typeof ErrorMessage> = {
   title: "Chat/ErrorMessage",
   component: ErrorMessage,
+  tags: ["autodocs"],
   args: {
     onRetry: fn(),
   },

@@ -8,6 +8,7 @@ import { MentionPopup } from "@/components/chat/MentionPopup";
 const meta: Meta<typeof SlashCommand> = {
   title: "Chat/SlashCommand",
   component: SlashCommand,
+  tags: ["autodocs"],
   parameters: { layout: "padded" },
   args: {
     onSelect: fn(),

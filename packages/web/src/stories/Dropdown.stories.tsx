@@ -6,6 +6,7 @@ import { Settings, User, LogOut, Trash2, Copy, Share2, MoreVertical, ChevronDown
 const meta: Meta<typeof Dropdown> = {
   title: "Components/Dropdown",
   component: Dropdown,
+  tags: ["autodocs"],
   parameters: {
     layout: "centered",
   },

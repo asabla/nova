@@ -24,6 +24,7 @@ const mockFiles = {
 const filePreviewMeta: Meta<typeof FilePreview> = {
   title: "Chat/FilePreview",
   component: FilePreview,
+  tags: ["autodocs"],
   args: {
     onRemove: fn(),
   },

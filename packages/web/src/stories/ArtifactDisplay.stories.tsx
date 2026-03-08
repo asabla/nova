@@ -81,6 +81,7 @@ const mermaidArtifact = {
 const meta: Meta<typeof ArtifactDisplay> = {
   title: "Chat/ArtifactDisplay",
   component: ArtifactDisplay,
+  tags: ["autodocs"],
   parameters: { layout: "padded" },
   args: {
     onSave: fn(),

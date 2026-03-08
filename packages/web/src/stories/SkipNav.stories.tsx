@@ -4,6 +4,7 @@ import { SkipNav } from "@/components/ui/SkipNav";
 const meta: Meta<typeof SkipNav> = {
   title: "Components/SkipNav",
   component: SkipNav,
+  tags: ["autodocs"],
   parameters: { layout: "padded" },
 };
 

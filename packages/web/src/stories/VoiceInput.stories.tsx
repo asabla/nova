@@ -5,6 +5,7 @@ import { VoiceInput } from "@/components/chat/VoiceInput";
 const meta: Meta<typeof VoiceInput> = {
   title: "Chat/VoiceInput",
   component: VoiceInput,
+  tags: ["autodocs"],
   parameters: { layout: "centered" },
   args: {
     onTranscript: fn(),

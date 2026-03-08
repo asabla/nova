@@ -54,6 +54,7 @@ const youtubeData = {
 const meta: Meta<typeof URLPreviewCard> = {
   title: "Chat/URLPreviewCard",
   component: URLPreviewCard,
+  tags: ["autodocs"],
   parameters: { layout: "padded" },
   decorators: [
     (Story) => (

@@ -5,6 +5,7 @@ import { StreamingMessage } from "@/components/chat/StreamingMessage";
 const meta: Meta<typeof StreamingMessage> = {
   title: "Chat/StreamingMessage",
   component: StreamingMessage,
+  tags: ["autodocs"],
   parameters: {
     layout: "padded",
   },

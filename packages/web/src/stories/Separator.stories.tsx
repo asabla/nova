@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 const meta: Meta<typeof Separator> = {
   title: "Components/Separator",
   component: Separator,
+  tags: ["autodocs"],
   argTypes: {
     orientation: { control: "select", options: ["horizontal", "vertical"] },
     label: { control: "text" },

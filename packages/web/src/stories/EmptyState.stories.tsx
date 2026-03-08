@@ -8,6 +8,7 @@ import { MessageSquare, Bot, Search, FolderOpen, Upload, Plus } from "lucide-rea
 const meta: Meta<typeof EmptyState> = {
   title: "Components/EmptyState",
   component: EmptyState,
+  tags: ["autodocs"],
   argTypes: {
     title: { control: "text" },
     description: { control: "text" },

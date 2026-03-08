@@ -6,6 +6,7 @@ import { Search, Mail, Lock, Globe } from "lucide-react";
 const meta: Meta<typeof Input> = {
   title: "Components/Input",
   component: Input,
+  tags: ["autodocs"],
   argTypes: {
     label: { control: "text", description: "Label text above the input" },
     error: { control: "text", description: "Error message displayed below" },

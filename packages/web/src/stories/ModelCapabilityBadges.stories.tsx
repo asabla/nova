@@ -4,6 +4,7 @@ import { ModelCapabilityBadges } from "@/components/ui/ModelCapabilityBadges";
 const meta: Meta<typeof ModelCapabilityBadges> = {
   title: "Components/ModelCapabilityBadges",
   component: ModelCapabilityBadges,
+  tags: ["autodocs"],
   argTypes: {
     compact: {
       control: "boolean",

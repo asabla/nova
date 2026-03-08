@@ -4,6 +4,7 @@ import { Kbd, KbdCombo } from "@/components/ui/Kbd";
 const meta: Meta<typeof Kbd> = {
   title: "Components/Kbd",
   component: Kbd,
+  tags: ["autodocs"],
   argTypes: {
     size: { control: "select", options: ["sm", "md"] },
   },

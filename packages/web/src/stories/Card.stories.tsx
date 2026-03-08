@@ -15,6 +15,7 @@ import { Bot, MessageSquare, Zap, TrendingUp, Users, Clock } from "lucide-react"
 const meta: Meta<typeof Card> = {
   title: "Components/Card",
   component: Card,
+  tags: ["autodocs"],
   argTypes: {
     variant: { control: "select", options: ["default", "outline", "elevated"] },
     hover: { control: "boolean" },

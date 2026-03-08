@@ -4,6 +4,7 @@ import { DynamicWidget, type WidgetConfig } from "@/components/chat/DynamicWidge
 const meta: Meta<typeof DynamicWidget> = {
   title: "Chat/DynamicWidget",
   component: DynamicWidget,
+  tags: ["autodocs"],
   parameters: { layout: "padded" },
   decorators: [
     (Story) => (

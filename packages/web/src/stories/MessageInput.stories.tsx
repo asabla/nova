@@ -5,6 +5,7 @@ import { MessageInput } from "@/components/chat/MessageInput";
 const meta: Meta<typeof MessageInput> = {
   title: "Chat/MessageInput",
   component: MessageInput,
+  tags: ["autodocs"],
   parameters: {
     layout: "padded",
   },

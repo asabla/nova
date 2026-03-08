@@ -30,6 +30,7 @@ const mockCallbacks = {
 const meta: Meta<typeof MessageBubble> = {
   title: "Chat/MessageBubble",
   component: MessageBubble,
+  tags: ["autodocs"],
   parameters: {
     layout: "padded",
   },

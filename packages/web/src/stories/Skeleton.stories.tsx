@@ -9,6 +9,7 @@ import {
 const meta: Meta<typeof Skeleton> = {
   title: "Components/Skeleton",
   component: Skeleton,
+  tags: ["autodocs"],
   parameters: {
     layout: "padded",
   },

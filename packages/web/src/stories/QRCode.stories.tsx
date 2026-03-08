@@ -7,6 +7,7 @@ import { Shield } from "lucide-react";
 const meta: Meta<typeof QRCode> = {
   title: "Components/QRCode",
   component: QRCode,
+  tags: ["autodocs"],
   argTypes: {
     data: { control: "text" },
     size: { control: { type: "range", min: 64, max: 384, step: 16 } },

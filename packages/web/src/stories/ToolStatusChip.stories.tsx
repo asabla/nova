@@ -4,6 +4,7 @@ import { ToolStatusChip, ToolStatusBar } from "@/components/chat/ToolStatusChip"
 const meta: Meta<typeof ToolStatusChip> = {
   title: "Chat/ToolStatusChip",
   component: ToolStatusChip,
+  tags: ["autodocs"],
   parameters: {
     layout: "padded",
   },

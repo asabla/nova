@@ -7,6 +7,7 @@ import { Shield } from "lucide-react";
 const meta: Meta<typeof Alert> = {
   title: "Components/Alert",
   component: Alert,
+  tags: ["autodocs"],
   argTypes: {
     variant: { control: "select", options: ["info", "success", "warning", "danger"] },
     dismissible: { control: "boolean" },

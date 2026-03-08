@@ -4,6 +4,7 @@ import { Textarea } from "@/components/ui/Textarea";
 const meta: Meta<typeof Textarea> = {
   title: "Components/Textarea",
   component: Textarea,
+  tags: ["autodocs"],
   argTypes: {
     label: { control: "text" },
     error: { control: "text" },

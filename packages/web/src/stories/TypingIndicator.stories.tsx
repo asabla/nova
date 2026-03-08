@@ -4,6 +4,7 @@ import { TypingIndicator } from "@/components/chat/TypingIndicator";
 const meta: Meta<typeof TypingIndicator> = {
   title: "Chat/TypingIndicator",
   component: TypingIndicator,
+  tags: ["autodocs"],
   parameters: {
     layout: "padded",
   },

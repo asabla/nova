@@ -170,6 +170,7 @@ const waitingInputSteps = [
 const meta: Meta<typeof AgentReasoningTrace> = {
   title: "Chat/AgentReasoningTrace",
   component: AgentReasoningTrace,
+  tags: ["autodocs"],
   parameters: { layout: "padded" },
   decorators: [
     (Story) => (

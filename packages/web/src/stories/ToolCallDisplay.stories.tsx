@@ -50,6 +50,7 @@ const approvalTool = {
 const displayMeta: Meta<typeof ToolCallDisplay> = {
   title: "Chat/ToolCallDisplay",
   component: ToolCallDisplay,
+  tags: ["autodocs"],
   parameters: { layout: "padded" },
   args: {
     onApprove: fn(),

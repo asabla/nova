@@ -15,6 +15,7 @@ import { Pencil, Trash2, Download, ArrowUpDown } from "lucide-react";
 const meta: Meta<typeof Table> = {
   title: "Components/Table",
   component: Table,
+  tags: ["autodocs"],
 };
 
 export default meta;

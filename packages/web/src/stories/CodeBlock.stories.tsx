@@ -4,6 +4,7 @@ import { CodeBlock } from "@/components/markdown/CodeBlock";
 const meta: Meta<typeof CodeBlock> = {
   title: "Content/CodeBlock",
   component: CodeBlock,
+  tags: ["autodocs"],
   argTypes: {
     language: {
       control: "select",

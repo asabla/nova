@@ -5,6 +5,7 @@ import { Select, type SelectOption } from "@/components/ui/Select";
 const meta: Meta<typeof Select> = {
   title: "Components/Select",
   component: Select,
+  tags: ["autodocs"],
   argTypes: {
     size: { control: "select", options: ["sm", "md"] },
     disabled: { control: "boolean" },

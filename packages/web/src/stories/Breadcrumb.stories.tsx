@@ -5,6 +5,7 @@ import { Home, Settings, Users, FolderOpen, FileText } from "lucide-react";
 const meta: Meta<typeof Breadcrumb> = {
   title: "Components/Breadcrumb",
   component: Breadcrumb,
+  tags: ["autodocs"],
 };
 
 export default meta;

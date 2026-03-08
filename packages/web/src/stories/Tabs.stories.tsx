@@ -6,6 +6,7 @@ import { MessageSquare, Settings, Users, BarChart3, Shield, Bell } from "lucide-
 const meta: Meta<typeof Tabs> = {
   title: "Components/Tabs",
   component: Tabs,
+  tags: ["autodocs"],
   parameters: {
     layout: "padded",
   },

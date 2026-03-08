@@ -5,6 +5,7 @@ import { RateLimitWarning } from "@/components/chat/RateLimitWarning";
 const meta: Meta<typeof RateLimitWarning> = {
   title: "Chat/RateLimitWarning",
   component: RateLimitWarning,
+  tags: ["autodocs"],
   args: {
     onDismiss: fn(),
   },

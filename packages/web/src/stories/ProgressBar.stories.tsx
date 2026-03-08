@@ -5,6 +5,7 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 const meta: Meta<typeof ProgressBar> = {
   title: "Components/ProgressBar",
   component: ProgressBar,
+  tags: ["autodocs"],
   argTypes: {
     value: { control: { type: "range", min: 0, max: 100 } },
     size: { control: "select", options: ["sm", "md", "lg"] },

@@ -6,6 +6,7 @@ import { Settings, Trash2, Copy, Info } from "lucide-react";
 const meta: Meta<typeof Tooltip> = {
   title: "Components/Tooltip",
   component: Tooltip,
+  tags: ["autodocs"],
   argTypes: {
     content: { control: "text" },
     side: { control: "select", options: ["top", "bottom", "left", "right"] },

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 const meta: Meta<typeof Dialog> = {
   title: "Components/Dialog",
   component: Dialog,
+  tags: ["autodocs"],
   argTypes: {
     size: {
       control: "select",
