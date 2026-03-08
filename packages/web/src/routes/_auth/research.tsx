@@ -72,7 +72,7 @@ interface ResearchReport {
   query: string;
   status: "pending" | "running" | "completed" | "failed";
   config: ResearchConfig;
-  report?: string;
+  reportContent?: string;
   structuredReport?: {
     title: string;
     summary: string;
@@ -503,17 +503,17 @@ function ReportDetail({
   };
 
   const handleCopyReport = useCallback(() => {
-    const text = report.report ?? "";
+    const text = report.reportContent ?? "";
     navigator.clipboard.writeText(text).then(() => {
       setCopiedReport(true);
       setTimeout(() => setCopiedReport(false), 2000);
     });
-  }, [report.report]);
+  }, [report.reportContent]);
 
   const handleExport = useCallback(
     (format: "pdf" | "docx" | "json" | "markdown") => {
       if (format === "markdown") {
-        downloadBlob(report.report ?? "", `research-${report.id}.md`, "text/markdown");
+        downloadBlob(report.reportContent ?? "", `research-${report.id}.md`, "text/markdown");
         return;
       }
 
@@ -524,7 +524,7 @@ function ReportDetail({
             query: report.query,
             status: report.status,
             config: report.config,
-            report: report.report,
+            report: report.reportContent,
             structuredReport: report.structuredReport,
             sources: report.sources,
             createdAt: report.createdAt,
@@ -565,7 +565,7 @@ function ReportDetail({
                 .source { padding: 0.5rem; border-left: 3px solid #ddd; margin: 0.5rem 0; }
                 </style></head><body>
                 <h1>${escapeHtml(report.query)}</h1>
-                <div>${markdownToBasicHtml(report.report ?? "")}</div>
+                <div>${markdownToBasicHtml(report.reportContent ?? "")}</div>
                 ${
                   report.sources?.length
                     ? `<h2>Sources</h2>${report.sources
@@ -645,7 +645,7 @@ function ReportDetail({
       )}
 
       {/* ---- Report content (#79) ---- */}
-      {report.report && (
+      {report.reportContent && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-text">Report</h3>
@@ -659,7 +659,7 @@ function ReportDetail({
           </div>
           <div className="rounded-xl bg-surface border border-border overflow-hidden">
             <div className="px-5 py-4 text-sm text-text leading-relaxed">
-              <RenderedMarkdown content={report.report} />
+              <RenderedMarkdown content={report.reportContent} />
             </div>
           </div>
         </div>
