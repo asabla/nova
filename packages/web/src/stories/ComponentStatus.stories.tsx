@@ -31,7 +31,7 @@ const components: ComponentEntry[] = [
   { name: "Card", category: "ui", hasStory: true, hasPlayTest: false, hasDarkMode: true },
   { name: "Checkbox", category: "ui", hasStory: true, hasPlayTest: false, hasDarkMode: true },
   { name: "Dialog", category: "ui", hasStory: true, hasPlayTest: true, hasDarkMode: true },
-  { name: "Dropdown", category: "ui", hasStory: true, hasPlayTest: false, hasDarkMode: true },
+  { name: "Dropdown", category: "ui", hasStory: true, hasPlayTest: true, hasDarkMode: true },
   { name: "EmptyState", category: "ui", hasStory: true, hasPlayTest: false, hasDarkMode: true },
   { name: "Input", category: "ui", hasStory: true, hasPlayTest: true, hasDarkMode: true },
   { name: "Kbd", category: "ui", hasStory: true, hasPlayTest: false, hasDarkMode: true },
