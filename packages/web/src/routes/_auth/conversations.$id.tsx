@@ -64,13 +64,23 @@ function ConversationPage() {
     };
   }, [conversation]);
 
-  const handleSend = useCallback(async (content: string) => {
+  const handleSend = useCallback(async (content: string, files?: File[]) => {
     stopTyping();
 
     try {
+      // Upload files first if provided
+      let attachments: { fileId: string; attachmentType: "file" }[] | undefined;
+      if (files && files.length > 0) {
+        const results = await Promise.allSettled(files.map(uploadSingleFile));
+        attachments = results
+          .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
+          .map((r) => ({ fileId: r.value, attachmentType: "file" as const }));
+      }
+
       await api.post(`/api/conversations/${id}/messages`, {
         content,
         senderType: "user",
+        ...(attachments?.length ? { attachments } : {}),
       });
 
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
@@ -207,7 +217,7 @@ function ConversationPage() {
   const uploadSingleFile = useCallback(async (file: File) => {
     const presign = await api.post<{ uploadUrl: string; fileId: string }>(
       "/api/files/presign",
-      { fileName: file.name, mimeType: file.type, size: file.size },
+      { filename: file.name, contentType: file.type, size: file.size },
     );
 
     await fetch(presign.uploadUrl, {
@@ -216,7 +226,7 @@ function ConversationPage() {
       headers: { "Content-Type": file.type },
     });
 
-    await api.post("/api/files/confirm", { fileId: presign.fileId });
+    await api.post(`/api/files/${presign.fileId}/confirm`);
     return presign.fileId;
   }, []);
 

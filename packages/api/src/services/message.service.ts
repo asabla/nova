@@ -1,6 +1,6 @@
 import { db } from "../lib/db";
-import { messages, messageAttachments, messageRatings, messageNotes, conversations } from "@nova/shared/schemas";
-import { eq, and, isNull, asc, sql } from "drizzle-orm";
+import { messages, messageAttachments, messageRatings, messageNotes, conversations, files } from "@nova/shared/schemas";
+import { eq, and, isNull, asc, sql, inArray } from "drizzle-orm";
 import { parsePagination, buildPaginatedResponse, type PaginationInput } from "@nova/shared/utils";
 
 export async function listMessages(orgId: string, conversationId: string, pagination: PaginationInput) {
@@ -26,7 +26,39 @@ export async function listMessages(orgId: string, conversationId: string, pagina
       .where(where),
   ]);
 
-  return buildPaginatedResponse(data, countResult[0]?.count ?? 0, { offset, limit, page, pageSize });
+  // Fetch attachments with file info for all messages in one query
+  const messageIds = data.map((m) => m.id);
+  let attachmentsByMessage: Record<string, any[]> = {};
+  if (messageIds.length > 0) {
+    const allAttachments = await db
+      .select({
+        id: messageAttachments.id,
+        messageId: messageAttachments.messageId,
+        fileId: messageAttachments.fileId,
+        url: messageAttachments.url,
+        attachmentType: messageAttachments.attachmentType,
+        filename: files.filename,
+        contentType: files.contentType,
+        sizeBytes: files.sizeBytes,
+      })
+      .from(messageAttachments)
+      .leftJoin(files, eq(messageAttachments.fileId, files.id))
+      .where(and(
+        inArray(messageAttachments.messageId, messageIds),
+        isNull(messageAttachments.deletedAt),
+      ));
+
+    for (const a of allAttachments) {
+      (attachmentsByMessage[a.messageId] ??= []).push(a);
+    }
+  }
+
+  const enriched = data.map((m) => ({
+    ...m,
+    attachments: attachmentsByMessage[m.id] ?? [],
+  }));
+
+  return buildPaginatedResponse(enriched, countResult[0]?.count ?? 0, { offset, limit, page, pageSize });
 }
 
 export async function getMessage(orgId: string, messageId: string) {

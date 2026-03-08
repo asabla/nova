@@ -73,9 +73,6 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
     const trimmed = content.trim();
     if ((!trimmed && pendingFiles.length === 0) || disabled) return;
     onSend(trimmed, pendingFiles.length > 0 ? pendingFiles : undefined);
-    if (pendingFiles.length > 0 && onFileUpload) {
-      onFileUpload(pendingFiles);
-    }
     setContent("");
     setPendingFiles([]);
     try { localStorage.removeItem(draftKey); } catch { /* ignore */ }

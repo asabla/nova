@@ -11,8 +11,9 @@ import { DEFAULTS } from "@nova/shared/constants";
 import { notificationService } from "../services/notification.service";
 import { getTemporalClient } from "../lib/temporal";
 import { db } from "../lib/db";
-import { userProfiles, users, agents, orgSettings } from "@nova/shared/schemas";
-import { eq, and, isNull } from "drizzle-orm";
+import { userProfiles, users, agents, orgSettings, files } from "@nova/shared/schemas";
+import { eq, and, isNull, inArray } from "drizzle-orm";
+import { extractFileContent } from "../lib/file-extract";
 
 // --- Mention helpers (stories #45, #46) ---
 
@@ -223,6 +224,62 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
     resolvedModel = setting?.value ?? body.model;
   }
 
+  // Enrich messages with file content so the LLM can read uploaded files
+  const dbMessages = await messageService.listMessages(orgId, conversationId, { page: 1, pageSize: 1000 });
+  const dbMsgList: any[] = (dbMessages as any).data ?? dbMessages;
+  const attachmentsByContent = new Map<string, any[]>();
+  const fileIdsNeeded: string[] = [];
+  for (const m of dbMsgList) {
+    if (m.attachments?.length && m.content) {
+      attachmentsByContent.set(m.content, m.attachments);
+      for (const a of m.attachments) {
+        if (a.fileId) fileIdsNeeded.push(a.fileId);
+      }
+    }
+  }
+
+  // Fetch storagePath for all attached files
+  let fileRecords: Record<string, { storagePath: string; contentType: string }> = {};
+  if (fileIdsNeeded.length > 0) {
+    const rows = await db.select({ id: files.id, storagePath: files.storagePath, contentType: files.contentType }).from(files).where(inArray(files.id, fileIdsNeeded));
+    for (const r of rows) {
+      fileRecords[r.id] = { storagePath: r.storagePath, contentType: r.contentType };
+    }
+  }
+
+  // Extract file contents and build enriched messages
+  const enrichedMessages: any[] = [];
+  for (const msg of body.messages) {
+    if (msg.role !== "user" || !msg.content) {
+      enrichedMessages.push(msg);
+      continue;
+    }
+    const atts = attachmentsByContent.get(msg.content);
+    if (!atts || atts.length === 0) {
+      enrichedMessages.push(msg);
+      continue;
+    }
+
+    const fileSections: string[] = [];
+    for (const a of atts) {
+      const file = a.fileId ? fileRecords[a.fileId] : null;
+      if (file) {
+        const text = await extractFileContent(file.storagePath, file.contentType);
+        if (text) {
+          fileSections.push(`--- File: ${a.filename ?? "attachment"} ---\n${text}\n--- End of file ---`);
+        } else {
+          fileSections.push(`[Attached file: ${a.filename ?? "unknown"} (${file.contentType}) — content could not be extracted]`);
+        }
+      }
+    }
+
+    if (fileSections.length > 0) {
+      enrichedMessages.push({ ...msg, content: `${msg.content}\n\n${fileSections.join("\n\n")}` });
+    } else {
+      enrichedMessages.push(msg);
+    }
+  }
+
   return streamSSE(c, async (stream) => {
     const heartbeat = setInterval(() => {
       stream.writeSSE({ event: "heartbeat", data: "" });
@@ -232,7 +289,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
       const startTime = Date.now();
       const completionParams: Record<string, unknown> = {
         model: resolvedModel,
-        messages: body.messages,
+        messages: enrichedMessages,
         stream: true,
         temperature: body.temperature,
         top_p: body.topP,

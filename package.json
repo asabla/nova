@@ -19,5 +19,8 @@
     "db:migrate": "bun run --filter @nova/api db:migrate",
     "db:push": "bun run --filter @nova/api db:push",
     "db:studio": "bun run --filter @nova/api db:studio"
+  },
+  "dependencies": {
+    "pdf-parse": "1.1.1"
   }
 }

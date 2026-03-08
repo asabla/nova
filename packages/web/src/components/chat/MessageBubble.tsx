@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { Copy, Check, ThumbsUp, ThumbsDown, Pencil, RotateCcw, History, X, Send, StickyNote, ChevronDown, GitBranch, Volume2, VolumeX } from "lucide-react";
+import { Copy, Check, ThumbsUp, ThumbsDown, Pencil, RotateCcw, History, X, Send, StickyNote, ChevronDown, GitBranch, Volume2, VolumeX, Paperclip, FileText, Download } from "lucide-react";
 import { clsx } from "clsx";
 import { MarkdownRenderer } from "../markdown/MarkdownRenderer";
 import { Avatar } from "../ui/Avatar";
@@ -29,6 +29,14 @@ interface MessageBubbleProps {
     costCents?: number | null;
     modelId?: string | null;
     rating?: "up" | "down" | null;
+    attachments?: {
+      id: string;
+      fileId?: string | null;
+      filename?: string | null;
+      contentType?: string | null;
+      sizeBytes?: number | null;
+      attachmentType: string;
+    }[];
   };
   userName?: string;
   onRate?: (messageId: string, rating: 1 | -1) => void;
@@ -247,6 +255,51 @@ export function MessageBubble({ message, userName, onRate, onEdit, onEditAndReru
             ) : message.status === "failed" ? (
               <p className="text-sm text-danger" role="alert">{message.content ?? t("errors.messageFailed", { defaultValue: "Message failed to send." })}</p>
             ) : null}
+          </div>
+        )}
+
+        {/* Attachments */}
+        {message.attachments && message.attachments.length > 0 && (
+          <div className={clsx("flex flex-wrap gap-2 mt-1.5", isUser ? "justify-end" : "justify-start")}>
+            {message.attachments.map((att) => {
+              const isImage = att.contentType?.startsWith("image/");
+              const sizeLabel = att.sizeBytes
+                ? att.sizeBytes < 1024
+                  ? `${att.sizeBytes} B`
+                  : att.sizeBytes < 1024 * 1024
+                    ? `${(att.sizeBytes / 1024).toFixed(1)} KB`
+                    : `${(att.sizeBytes / (1024 * 1024)).toFixed(1)} MB`
+                : null;
+
+              return (
+                <button
+                  key={att.id}
+                  onClick={async () => {
+                    if (!att.fileId) return;
+                    try {
+                      const res = await api.get<{ url: string }>(`/api/files/${att.fileId}/download`);
+                      window.open((res as any).url, "_blank");
+                    } catch { /* ignore */ }
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface border border-border hover:bg-surface-secondary transition-colors text-left max-w-[240px]"
+                >
+                  {isImage ? (
+                    <Paperclip className="h-4 w-4 text-text-tertiary shrink-0" aria-hidden="true" />
+                  ) : (
+                    <FileText className="h-4 w-4 text-text-tertiary shrink-0" aria-hidden="true" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-text truncate">
+                      {att.filename ?? "Attachment"}
+                    </p>
+                    {sizeLabel && (
+                      <p className="text-[10px] text-text-tertiary">{sizeLabel}</p>
+                    )}
+                  </div>
+                  <Download className="h-3.5 w-3.5 text-text-tertiary shrink-0" aria-hidden="true" />
+                </button>
+              );
+            })}
           </div>
         )}
 

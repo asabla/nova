@@ -8,6 +8,7 @@ const envSchema = z.object({
   REDIS_URL: z.string().url(),
 
   MINIO_ENDPOINT: z.string(),
+  MINIO_PUBLIC_URL: z.string().optional(),
   MINIO_ROOT_USER: z.string(),
   MINIO_ROOT_PASSWORD: z.string(),
   MINIO_BUCKET: z.string().default("nova-files"),
