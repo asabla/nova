@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Avatar } from "@/components/ui/Avatar";
 
+/** User avatar with initials fallback and multiple sizes. */
 const meta: Meta<typeof Avatar> = {
   title: "Components/Avatar",
   component: Avatar,

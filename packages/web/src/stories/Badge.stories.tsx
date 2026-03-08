@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Badge } from "@/components/ui/Badge";
 
+/** Status and category badges in multiple color variants. */
 const meta: Meta<typeof Badge> = {
   title: "Components/Badge",
   component: Badge,

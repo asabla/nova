@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Switch } from "@/components/ui/Switch";
 
+/** Toggle switch for boolean settings with optional label. */
 const meta: Meta<typeof Switch> = {
   title: "Components/Switch",
   component: Switch,

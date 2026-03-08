@@ -3,6 +3,7 @@ import { expect, fn, userEvent, within } from "storybook/test";
 import { Dropdown, DropdownItem } from "@/components/ui/Dropdown";
 import { Settings, User, LogOut, Trash2, Copy, Share2, MoreVertical, ChevronDown, Edit } from "lucide-react";
 
+/** Accessible dropdown menu with keyboard navigation and item variants. */
 const meta: Meta<typeof Dropdown> = {
   title: "Components/Dropdown",
   component: Dropdown,

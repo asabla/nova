@@ -3,6 +3,7 @@ import { expect, userEvent, within } from "storybook/test";
 import { Input } from "@/components/ui/Input";
 import { Search, Mail, Lock, Globe } from "lucide-react";
 
+/** Text input field with label, error state, and icon support. */
 const meta: Meta<typeof Input> = {
   title: "Components/Input",
   component: Input,

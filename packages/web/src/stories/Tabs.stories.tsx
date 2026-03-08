@@ -3,6 +3,7 @@ import { expect, userEvent, within } from "storybook/test";
 import { Tabs } from "@/components/ui/Tabs";
 import { MessageSquare, Settings, Users, BarChart3, Shield, Bell } from "lucide-react";
 
+/** Tabbed content navigation with variant styles. */
 const meta: Meta<typeof Tabs> = {
   title: "Components/Tabs",
   component: Tabs,

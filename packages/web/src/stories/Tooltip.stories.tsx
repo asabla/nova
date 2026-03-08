@@ -3,6 +3,7 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import { Button } from "@/components/ui/Button";
 import { Settings, Trash2, Copy, Info } from "lucide-react";
 
+/** Contextual tooltip shown on hover with configurable placement. */
 const meta: Meta<typeof Tooltip> = {
   title: "Components/Tooltip",
   component: Tooltip,

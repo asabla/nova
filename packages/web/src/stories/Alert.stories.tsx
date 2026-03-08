@@ -4,6 +4,7 @@ import { Alert, AlertTitle, AlertDescription, AlertActions } from "@/components/
 import { Button } from "@/components/ui/Button";
 import { Shield } from "lucide-react";
 
+/** Contextual feedback alert for info, success, warning, and danger messages. */
 const meta: Meta<typeof Alert> = {
   title: "Components/Alert",
   component: Alert,

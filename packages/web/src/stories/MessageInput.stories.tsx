@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
 import { MessageInput } from "@/components/chat/MessageInput";
 
+/** Composable message input with attachment support and slash commands. */
 const meta: Meta<typeof MessageInput> = {
   title: "Chat/MessageInput",
   component: MessageInput,

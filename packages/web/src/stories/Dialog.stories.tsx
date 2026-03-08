@@ -5,6 +5,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
+/** Modal dialog overlay for confirmations, forms, and focused tasks. */
 const meta: Meta<typeof Dialog> = {
   title: "Components/Dialog",
   component: Dialog,

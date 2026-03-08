@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Select, type SelectOption } from "@/components/ui/Select";
 
+/** Styled select dropdown for choosing from predefined options. */
 const meta: Meta<typeof Select> = {
   title: "Components/Select",
   component: Select,

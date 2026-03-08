@@ -27,6 +27,7 @@ const mockCallbacks = {
 
 // ── Meta ─────────────────────────────────────────────────────────────────
 
+/** Chat message bubble for user and assistant messages with rich content. */
 const meta: Meta<typeof MessageBubble> = {
   title: "Chat/MessageBubble",
   component: MessageBubble,

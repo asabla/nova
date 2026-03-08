@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
 import { Pencil, Trash2, Download, ArrowUpDown } from "lucide-react";
 
+/** Data table with sortable columns, selection, and pagination. */
 const meta: Meta<typeof Table> = {
   title: "Components/Table",
   component: Table,

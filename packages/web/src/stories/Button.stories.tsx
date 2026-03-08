@@ -3,6 +3,7 @@ import { fn, expect, userEvent, within } from "storybook/test";
 import { Button } from "@/components/ui/Button";
 import { Plus, Send, Trash2, Download, Settings, Sparkles } from "lucide-react";
 
+/** Interactive button component with multiple variants, sizes, and states. */
 const meta: Meta<typeof Button> = {
   title: "Components/Button",
   component: Button,

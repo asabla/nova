@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { Bot, MessageSquare, Zap, TrendingUp, Users, Clock } from "lucide-react";
 
+/** Versatile container component for grouping related content. */
 const meta: Meta<typeof Card> = {
   title: "Components/Card",
   component: Card,

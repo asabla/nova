@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Textarea } from "@/components/ui/Textarea";
 
+/** Multi-line text input for longer-form content. */
 const meta: Meta<typeof Textarea> = {
   title: "Components/Textarea",
   component: Textarea,
