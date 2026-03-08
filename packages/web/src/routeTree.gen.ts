@@ -44,6 +44,7 @@ import { Route as AuthSettingsNotificationsRouteImport } from './routes/_auth/se
 import { Route as AuthSettingsImportExportRouteImport } from './routes/_auth/settings.import-export'
 import { Route as AuthSettingsAppearanceRouteImport } from './routes/_auth/settings.appearance'
 import { Route as AuthSettingsApiKeysRouteImport } from './routes/_auth/settings.api-keys'
+import { Route as AuthKnowledgeNewRouteImport } from './routes/_auth/knowledge.new'
 import { Route as AuthKnowledgeIdRouteImport } from './routes/_auth/knowledge.$id'
 import { Route as AuthConversationsNewRouteImport } from './routes/_auth/conversations.new'
 import { Route as AuthConversationsIdRouteImport } from './routes/_auth/conversations.$id'
@@ -242,6 +243,11 @@ const AuthSettingsApiKeysRoute = AuthSettingsApiKeysRouteImport.update({
   path: '/api-keys',
   getParentRoute: () => AuthSettingsRoute,
 } as any)
+const AuthKnowledgeNewRoute = AuthKnowledgeNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AuthKnowledgeRoute,
+} as any)
 const AuthKnowledgeIdRoute = AuthKnowledgeIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -394,6 +400,7 @@ export interface FileRoutesByFullPath {
   '/conversations/$id': typeof AuthConversationsIdRoute
   '/conversations/new': typeof AuthConversationsNewRoute
   '/knowledge/$id': typeof AuthKnowledgeIdRoute
+  '/knowledge/new': typeof AuthKnowledgeNewRoute
   '/settings/api-keys': typeof AuthSettingsApiKeysRoute
   '/settings/appearance': typeof AuthSettingsAppearanceRoute
   '/settings/import-export': typeof AuthSettingsImportExportRoute
@@ -449,6 +456,7 @@ export interface FileRoutesByTo {
   '/conversations/$id': typeof AuthConversationsIdRoute
   '/conversations/new': typeof AuthConversationsNewRoute
   '/knowledge/$id': typeof AuthKnowledgeIdRoute
+  '/knowledge/new': typeof AuthKnowledgeNewRoute
   '/settings/api-keys': typeof AuthSettingsApiKeysRoute
   '/settings/appearance': typeof AuthSettingsAppearanceRoute
   '/settings/import-export': typeof AuthSettingsImportExportRoute
@@ -508,6 +516,7 @@ export interface FileRoutesById {
   '/_auth/conversations/$id': typeof AuthConversationsIdRoute
   '/_auth/conversations/new': typeof AuthConversationsNewRoute
   '/_auth/knowledge/$id': typeof AuthKnowledgeIdRoute
+  '/_auth/knowledge/new': typeof AuthKnowledgeNewRoute
   '/_auth/settings/api-keys': typeof AuthSettingsApiKeysRoute
   '/_auth/settings/appearance': typeof AuthSettingsAppearanceRoute
   '/_auth/settings/import-export': typeof AuthSettingsImportExportRoute
@@ -567,6 +576,7 @@ export interface FileRouteTypes {
     | '/conversations/$id'
     | '/conversations/new'
     | '/knowledge/$id'
+    | '/knowledge/new'
     | '/settings/api-keys'
     | '/settings/appearance'
     | '/settings/import-export'
@@ -622,6 +632,7 @@ export interface FileRouteTypes {
     | '/conversations/$id'
     | '/conversations/new'
     | '/knowledge/$id'
+    | '/knowledge/new'
     | '/settings/api-keys'
     | '/settings/appearance'
     | '/settings/import-export'
@@ -680,6 +691,7 @@ export interface FileRouteTypes {
     | '/_auth/conversations/$id'
     | '/_auth/conversations/new'
     | '/_auth/knowledge/$id'
+    | '/_auth/knowledge/new'
     | '/_auth/settings/api-keys'
     | '/_auth/settings/appearance'
     | '/_auth/settings/import-export'
@@ -946,6 +958,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSettingsApiKeysRouteImport
       parentRoute: typeof AuthSettingsRoute
     }
+    '/_auth/knowledge/new': {
+      id: '/_auth/knowledge/new'
+      path: '/new'
+      fullPath: '/knowledge/new'
+      preLoaderRoute: typeof AuthKnowledgeNewRouteImport
+      parentRoute: typeof AuthKnowledgeRoute
+    }
     '/_auth/knowledge/$id': {
       id: '/_auth/knowledge/$id'
       path: '/$id'
@@ -1156,10 +1175,12 @@ const AuthAgentsRouteWithChildren = AuthAgentsRoute._addFileChildren(
 
 interface AuthKnowledgeRouteChildren {
   AuthKnowledgeIdRoute: typeof AuthKnowledgeIdRoute
+  AuthKnowledgeNewRoute: typeof AuthKnowledgeNewRoute
 }
 
 const AuthKnowledgeRouteChildren: AuthKnowledgeRouteChildren = {
   AuthKnowledgeIdRoute: AuthKnowledgeIdRoute,
+  AuthKnowledgeNewRoute: AuthKnowledgeNewRoute,
 }
 
 const AuthKnowledgeRouteWithChildren = AuthKnowledgeRoute._addFileChildren(
