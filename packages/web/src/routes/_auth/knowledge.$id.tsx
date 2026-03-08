@@ -208,8 +208,9 @@ function KnowledgeDetailPage() {
     mutationFn: () => api.delete(`/api/knowledge/${id}`),
     onSuccess: () => {
       toast.success(t("knowledge.deleted", { defaultValue: "Collection deleted" }));
-      queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.list() });
+      // Navigate away first, then invalidate to avoid refetching deleted collection data
       navigate({ to: "/knowledge" });
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.all });
     },
     onError: (err: any) => toast.error(err.message ?? t("knowledge.deleteFailed", { defaultValue: "Delete failed" })),
   });
