@@ -32,10 +32,11 @@ export async function chunkDocument(documentId: string, content: string): Promis
 
 export async function generateEmbeddings(
   chunks: { text: string; index: number }[],
-): Promise<{ text: string; index: number; embedding: number[] }[]> {
+): Promise<{ text: string; index: number; embedding: number[] | null }[]> {
   const litellmUrl = process.env.LITELLM_URL ?? "http://localhost:4000";
+  const embeddingModel = process.env.EMBEDDING_MODEL ?? "text-embedding-3-small";
   const batchSize = 20;
-  const results: { text: string; index: number; embedding: number[] }[] = [];
+  const results: { text: string; index: number; embedding: number[] | null }[] = [];
 
   for (let i = 0; i < chunks.length; i += batchSize) {
     const batch = chunks.slice(i, i + batchSize);
@@ -46,17 +47,14 @@ export async function generateEmbeddings(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: process.env.EMBEDDING_MODEL ?? "text-embedding-3-small",
+          model: embeddingModel,
           input: texts,
         }),
       });
 
       if (!resp.ok) {
-        console.warn(`[EMBED] LiteLLM returned ${resp.status}, falling back to zero vectors`);
-        results.push(...batch.map((c) => ({
-          ...c,
-          embedding: new Array(1536).fill(0),
-        })));
+        console.warn(`[EMBED] LiteLLM returned ${resp.status}, skipping embeddings for batch`);
+        results.push(...batch.map((c) => ({ ...c, embedding: null })));
         continue;
       }
 
@@ -68,11 +66,8 @@ export async function generateEmbeddings(
         });
       }
     } catch (err) {
-      console.warn(`[EMBED] Failed to call embedding API, using zero vectors:`, err);
-      results.push(...batch.map((c) => ({
-        ...c,
-        embedding: new Array(1536).fill(0),
-      })));
+      console.warn(`[EMBED] Failed to call embedding API, skipping embeddings:`, err);
+      results.push(...batch.map((c) => ({ ...c, embedding: null })));
     }
   }
 
@@ -82,14 +77,18 @@ export async function generateEmbeddings(
 export async function storeChunks(
   documentId: string,
   collectionId: string,
-  chunks: { text: string; index: number; embedding: number[] }[],
+  chunks: { text: string; index: number; embedding: number[] | null }[],
 ): Promise<void> {
+  const [doc] = await db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.id, documentId));
+  const orgId = doc?.orgId ?? "";
+
   for (const chunk of chunks) {
     await db.insert(knowledgeChunks).values({
       knowledgeDocumentId: documentId,
       knowledgeCollectionId: collectionId,
-      orgId: (await db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.id, documentId)))[0]?.orgId ?? "",
+      orgId,
       content: chunk.text,
+      embedding: chunk.embedding,
       chunkIndex: chunk.index,
       tokenCount: Math.ceil(chunk.text.length / 4),
       metadata: {},

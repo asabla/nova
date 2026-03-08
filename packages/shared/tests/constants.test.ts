@@ -56,8 +56,7 @@ describe("Defaults", () => {
     expect(DEFAULTS.AGENT_MAX_STEPS).toBeLessThanOrEqual(100);
   });
 
-  it("has reasonable embedding defaults", () => {
-    expect(DEFAULTS.EMBEDDING_DIMENSIONS).toBe(1536);
+  it("has reasonable chunk defaults", () => {
     expect(DEFAULTS.CHUNK_SIZE).toBeGreaterThan(0);
     expect(DEFAULTS.CHUNK_OVERLAP).toBeLessThan(DEFAULTS.CHUNK_SIZE);
   });

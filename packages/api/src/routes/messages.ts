@@ -11,7 +11,7 @@ import { DEFAULTS } from "@nova/shared/constants";
 import { notificationService } from "../services/notification.service";
 import { getTemporalClient } from "../lib/temporal";
 import { db } from "../lib/db";
-import { userProfiles, users, agents } from "@nova/shared/schemas";
+import { userProfiles, users, agents, orgSettings } from "@nova/shared/schemas";
 import { eq, and, isNull } from "drizzle-orm";
 
 // --- Mention helpers (stories #45, #46) ---
@@ -216,6 +216,13 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
   const conversation = await conversationService.getConversation(orgId, conversationId);
   if (!conversation) throw AppError.notFound("Conversation");
 
+  // Resolve "default" to the org's configured default model
+  let resolvedModel = body.model;
+  if (!resolvedModel || resolvedModel === "default") {
+    const [setting] = await db.select().from(orgSettings).where(and(eq(orgSettings.orgId, orgId), eq(orgSettings.key, "defaultModel")));
+    resolvedModel = setting?.value ?? body.model;
+  }
+
   return streamSSE(c, async (stream) => {
     const heartbeat = setInterval(() => {
       stream.writeSSE({ event: "heartbeat", data: "" });
@@ -224,7 +231,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
     try {
       const startTime = Date.now();
       const completionParams: Record<string, unknown> = {
-        model: body.model,
+        model: resolvedModel,
         messages: body.messages,
         stream: true,
         temperature: body.temperature,

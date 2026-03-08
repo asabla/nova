@@ -801,9 +801,9 @@ function KnowledgeDetailPage() {
                     onChange={(e) => setForm({ ...form, embeddingModel: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm"
                   >
-                    <option value="text-embedding-3-small">text-embedding-3-small (1536d, fast)</option>
-                    <option value="text-embedding-3-large">text-embedding-3-large (3072d, accurate)</option>
-                    <option value="text-embedding-ada-002">text-embedding-ada-002 (1536d, legacy)</option>
+                    <option value="lmstudio/text-embedding-nomic-embed-text-v1.5">nomic-embed-text-v1.5 (768d, local)</option>
+                    <option value="text-embedding-3-small">text-embedding-3-small (1536d, OpenAI)</option>
+                    <option value="text-embedding-3-large">text-embedding-3-large (3072d, OpenAI)</option>
                     <option value="nomic-embed-text">nomic-embed-text (768d, open-source)</option>
                     <option value="mxbai-embed-large">mxbai-embed-large (1024d, open-source)</option>
                   </select>

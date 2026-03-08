@@ -33,7 +33,7 @@ async function seed() {
 
   // Org settings
   const settings: Record<string, string> = {
-    defaultModel: "gpt-4o",
+    defaultModel: "lmstudio/gpt-oss:20b",
     maxTokensPerMessage: "4096",
     maxMessagesPerConversation: "1000",
     maxFileSizeMb: "50",
@@ -120,11 +120,8 @@ async function seed() {
   const providerId = provider?.id ?? (await db.select().from(modelProviders).where(eq(modelProviders.orgId, orgId)).then((r) => r[0]!.id));
 
   const modelDefs = [
-    { name: "GPT-4o", modelIdExternal: "gpt-4o", capabilities: ["chat", "tools", "vision"], contextWindow: 128000, isDefault: true },
-    { name: "GPT-4o Mini", modelIdExternal: "gpt-4o-mini", capabilities: ["chat", "tools"], contextWindow: 128000 },
-    { name: "Claude Sonnet 4", modelIdExternal: "claude-sonnet-4-20250514", capabilities: ["chat", "tools", "vision"], contextWindow: 200000 },
-    { name: "Claude Haiku 3.5", modelIdExternal: "claude-haiku-3.5", capabilities: ["chat", "tools"], contextWindow: 200000 },
-    { name: "Local (LM Studio)", modelIdExternal: "local", capabilities: ["chat"], contextWindow: 32000 },
+    { name: "LM Studio (gpt-oss:20b)", modelIdExternal: "lmstudio/gpt-oss:20b", capabilities: ["chat"], contextWindow: 32000, isDefault: true },
+    { name: "LM Studio Embeddings", modelIdExternal: "lmstudio/text-embedding-nomic-embed-text-v1.5", capabilities: ["embeddings"], contextWindow: 8192 },
   ];
 
   for (const m of modelDefs) {

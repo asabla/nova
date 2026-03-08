@@ -14,6 +14,7 @@ const envSchema = z.object({
 
   LITELLM_API_URL: z.string().url(),
   LITELLM_MASTER_KEY: z.string(),
+  EMBEDDING_MODEL: z.string().optional(),
 
   TEMPORAL_ADDRESS: z.string().default("localhost:7233"),
 

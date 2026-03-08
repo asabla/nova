@@ -175,20 +175,8 @@ export const knowledgeService = {
     // Generate embedding for the query text via LiteLLM
     let queryEmbedding: number[] | null = null;
     try {
-      const { env } = await import("../lib/env");
-      const litellmUrl = env.LITELLM_API_URL;
-      const resp = await fetch(`${litellmUrl}/v1/embeddings`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "text-embedding-3-small",
-          input: [query],
-        }),
-      });
-      if (resp.ok) {
-        const data = await resp.json() as { data: { embedding: number[] }[] };
-        queryEmbedding = data.data[0]?.embedding ?? null;
-      }
+      const { generateEmbedding } = await import("../lib/litellm");
+      queryEmbedding = await generateEmbedding(query);
     } catch {
       // Fallback to text similarity if embedding API is unavailable
     }

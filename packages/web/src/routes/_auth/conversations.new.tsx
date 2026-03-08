@@ -118,7 +118,7 @@ function NewConversationPage() {
                 >
                   <option value="">{t("conversations.autoModel", "Auto (default model)")}</option>
                   {models.map((m: any) => (
-                    <option key={m.id} value={m.modelId}>{m.name}</option>
+                    <option key={m.id} value={m.modelIdExternal}>{m.name}</option>
                   ))}
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-text-tertiary pointer-events-none" aria-hidden="true" />
@@ -145,7 +145,7 @@ function NewConversationPage() {
 
             {/* Show capability badges for selected model */}
             {(() => {
-              const selected = models.find((m: any) => m.modelId === selectedModel);
+              const selected = models.find((m: any) => m.modelIdExternal === selectedModel);
               const caps: string[] = selected?.capabilities ?? [];
               return caps.length > 0 ? (
                 <ModelCapabilityBadges capabilities={caps} compact className="justify-center" />

@@ -8,10 +8,17 @@ litellm_settings:
     port: 6379
 
 model_list:
-  # LM Studio example
+  # LM Studio (OpenAI-compatible local server)
   - model_name: lmstudio/gpt-oss:20b
     litellm_params:
-      model: gpt-oss:20b
+      model: openai/gpt-oss:20b
+      api_base: http://host.docker.internal:1234/v1
+      api_key: "not-needed"
+
+  # LM Studio embeddings
+  - model_name: lmstudio/text-embedding-nomic-embed-text-v1.5
+    litellm_params:
+      model: openai/text-embedding-nomic-embed-text-v1.5
       api_base: http://host.docker.internal:1234/v1
       api_key: "not-needed"
 
