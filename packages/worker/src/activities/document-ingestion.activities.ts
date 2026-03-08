@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "../lib/db";
+import { getDefaultEmbeddingModel } from "../lib/models";
 import { knowledgeDocuments, knowledgeChunks } from "@nova/shared/schemas";
 import type { DocumentIngestionInput } from "../workflows/document-ingestion";
 
@@ -34,7 +35,7 @@ export async function generateEmbeddings(
   chunks: { text: string; index: number }[],
 ): Promise<{ text: string; index: number; embedding: number[] | null }[]> {
   const litellmUrl = process.env.LITELLM_URL ?? "http://localhost:4000";
-  const embeddingModel = process.env.EMBEDDING_MODEL ?? "text-embedding-3-small";
+  const embeddingModel = process.env.EMBEDDING_MODEL ?? await getDefaultEmbeddingModel();
   const batchSize = 20;
   const results: { text: string; index: number; embedding: number[] | null }[] = [];
 

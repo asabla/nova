@@ -6,7 +6,7 @@ import { eq, and, isNotNull, isNull } from "drizzle-orm";
 
 const TASK_QUEUE = "nova-main";
 
-async function setupSchedules() {
+export async function setupSchedules() {
   const connection = await Connection.connect({
     address: process.env.TEMPORAL_ADDRESS ?? "localhost:7233",
   });
@@ -127,7 +127,3 @@ async function syncAgentSchedules(client: Client) {
   console.log(`Synced ${scheduledAgents.length} agent cron schedule(s)`);
 }
 
-setupSchedules().catch((err) => {
-  console.error("Scheduler failed:", err);
-  process.exit(1);
-});

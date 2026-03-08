@@ -1,5 +1,6 @@
 import { Worker, NativeConnection } from "@temporalio/worker";
 import * as activities from "./activities";
+import { setupSchedules } from "./scheduler";
 
 async function run() {
   const connection = await NativeConnection.connect({
@@ -15,6 +16,10 @@ async function run() {
   });
 
   console.log("Temporal worker started on task queue: nova-main");
+
+  // Register schedules before starting the worker poll loop
+  await setupSchedules();
+
   await worker.run();
 }
 

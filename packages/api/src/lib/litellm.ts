@@ -161,7 +161,7 @@ export async function listModels(): Promise<unknown> {
   return response.json();
 }
 
-export async function generateEmbedding(text: string, model = env.EMBEDDING_MODEL ?? "text-embedding-3-small"): Promise<number[] | null> {
+export async function generateEmbedding(text: string, model = env.EMBEDDING_MODEL ?? "lmstudio/text-embedding-nomic-embed-text-v1.5"): Promise<number[] | null> {
   try {
     const response = await fetch(`${env.LITELLM_API_URL}/embeddings`, {
       method: "POST",

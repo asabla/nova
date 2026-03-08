@@ -1,5 +1,6 @@
 import { eq, and, isNull } from "drizzle-orm";
 import { db } from "../lib/db";
+import { getDefaultChatModel } from "../lib/models";
 import { agents, agentMemoryEntries, conversations, messages } from "@nova/shared/schemas";
 
 export async function getAgentConfig(orgId: string, agentId: string) {
@@ -70,7 +71,7 @@ export async function executeAgentStep(
   stepNumber: number,
 ) {
   const litellmUrl = process.env.LITELLM_URL ?? "http://localhost:4000";
-  const model = agentConfig.modelId ?? "gpt-4o";
+  const model = agentConfig.modelId ?? await getDefaultChatModel();
 
   const msgs = [
     ...(agentConfig.systemPrompt
