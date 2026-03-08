@@ -17,12 +17,19 @@ export const auth = betterAuth({
   basePath: "/api/auth",
   trustedOrigins: env.CORS_ORIGINS.split(","),
   session: {
-    cookieName: "nova_session",
     expiresIn: 60 * 60 * 24,
-    cookie: {
-      httpOnly: true,
-      sameSite: "strict" as const,
-      secure: env.NODE_ENV === "production",
+  },
+  advanced: {
+    cookiePrefix: "nova",
+    cookies: {
+      session_token: {
+        name: "nova_session",
+        attributes: {
+          httpOnly: true,
+          sameSite: "lax" as const,
+          secure: env.NODE_ENV === "production",
+        },
+      },
     },
   },
   emailAndPassword: {

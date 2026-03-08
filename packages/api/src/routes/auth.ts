@@ -370,7 +370,6 @@ authRoutes.post("/init", async (c) => {
 // Better Auth catch-all handler (handles login, register, session, etc.)
 // Must be last so specific routes above take priority
 authRoutes.all("/*", async (c) => {
-  // Clone the request to ensure the body is available for Better Auth
   return auth.handler(c.req.raw.clone());
 });
 

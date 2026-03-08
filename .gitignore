@@ -1,13 +1,25 @@
+# Node / bun specific files
 node_modules/
 dist/
-.env
-.env.local
-.env.*.local
-*.log
-.DS_Store
 .vite/
 bun.lock
 *.tsbuildinfo
-coverage/
 .turbo/
+
+# Env files
+.env
+.env.local
+.env.*.local
+
+# Other
+*.log
+.DS_Store
+
+# Testing related directories
+.playwright-cli/
+coverage/
+
+# Agentic specific directories
 .claude/
+.codex/
+.opencode/

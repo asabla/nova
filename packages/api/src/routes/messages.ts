@@ -176,7 +176,36 @@ const streamSchema = z.object({
   temperature: z.number().min(0).max(2).optional(),
   topP: z.number().min(0).max(1).optional(),
   maxTokens: z.number().int().positive().optional(),
+  enableTools: z.boolean().optional().default(true),
 });
+
+// Default tool definitions included in chat completions when tools are enabled
+const DEFAULT_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "web_search",
+      description: "Search the web for current information. Use when the user asks about recent events, facts you're unsure about, or anything requiring up-to-date information.",
+      parameters: {
+        type: "object",
+        properties: { query: { type: "string", description: "The search query" } },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "fetch_url",
+      description: "Fetch the content of a web page. Use when the user provides a URL or when you need to read a specific page.",
+      parameters: {
+        type: "object",
+        properties: { url: { type: "string", description: "The URL to fetch" } },
+        required: ["url"],
+      },
+    },
+  },
+];
 
 messagesRouter.post("/:conversationId/messages/stream", zValidator("json", streamSchema), async (c) => {
   const orgId = c.get("orgId");
@@ -194,14 +223,20 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
 
     try {
       const startTime = Date.now();
-      const response = await chatCompletion({
+      const completionParams: Record<string, unknown> = {
         model: body.model,
         messages: body.messages,
         stream: true,
         temperature: body.temperature,
         top_p: body.topP,
         max_tokens: body.maxTokens,
-      });
+      };
+
+      if (body.enableTools) {
+        completionParams.tools = DEFAULT_TOOLS;
+      }
+
+      const response = await chatCompletion(completionParams as any);
 
       if (!response.ok) {
         const errBody = await response.text().catch(() => "Unknown error");
@@ -216,6 +251,8 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
       const decoder = new TextDecoder();
       let fullContent = "";
       let usageData: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null = null;
+      let toolCalls: { id: string; function: { name: string; arguments: string } }[] = [];
+      let finishReason = "stop";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -226,7 +263,10 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
           if (line.startsWith("data: ") && line !== "data: [DONE]") {
             try {
               const data = JSON.parse(line.slice(6));
-              const token = data.choices?.[0]?.delta?.content;
+              const delta = data.choices?.[0]?.delta;
+              const choiceFinish = data.choices?.[0]?.finish_reason;
+
+              const token = delta?.content;
               if (token) {
                 fullContent += token;
                 await stream.writeSSE({
@@ -234,6 +274,24 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
                   data: JSON.stringify({ content: token }),
                 });
               }
+
+              // Accumulate tool calls from streaming deltas
+              if (delta?.tool_calls) {
+                for (const tc of delta.tool_calls) {
+                  const idx = tc.index ?? 0;
+                  if (!toolCalls[idx]) {
+                    toolCalls[idx] = { id: tc.id ?? "", function: { name: "", arguments: "" } };
+                  }
+                  if (tc.id) toolCalls[idx].id = tc.id;
+                  if (tc.function?.name) toolCalls[idx].function.name += tc.function.name;
+                  if (tc.function?.arguments) toolCalls[idx].function.arguments += tc.function.arguments;
+                }
+              }
+
+              if (choiceFinish) {
+                finishReason = choiceFinish;
+              }
+
               if (data.usage) {
                 usageData = data.usage;
               }
@@ -244,10 +302,113 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         }
       }
 
+      // Filter out any sparse entries from tool_calls accumulation
+      toolCalls = toolCalls.filter(Boolean);
+
       const latencyMs = Date.now() - startTime;
       const promptTokens = usageData?.prompt_tokens ?? Math.ceil(JSON.stringify(body.messages).length / 4);
       const completionTokens = usageData?.completion_tokens ?? Math.ceil(fullContent.length / 4);
 
+      // --- Smart routing: if tool calls detected, hand off to Temporal ---
+      if (finishReason === "tool_calls" && toolCalls.length > 0) {
+        // Send tool status events to the client
+        for (const tc of toolCalls) {
+          await stream.writeSSE({
+            event: "tool_status",
+            data: JSON.stringify({ tool: tc.function.name, status: "running" }),
+          });
+        }
+
+        const streamChannelId = `stream:${conversationId}:${crypto.randomUUID()}`;
+
+        try {
+          const client = await getTemporalClient();
+          const workflowId = `smart-chat-${conversationId}-${Date.now()}`;
+
+          await client.workflow.start("smartChatWorkflow", {
+            taskQueue: "nova-main",
+            workflowId,
+            args: [{
+              orgId,
+              conversationId,
+              streamChannelId,
+              messageHistory: body.messages,
+              pendingToolCalls: toolCalls,
+              model: body.model,
+              modelParams: { temperature: body.temperature, maxTokens: body.maxTokens },
+              tools: body.enableTools ? DEFAULT_TOOLS : undefined,
+              maxSteps: 5,
+            }],
+          });
+
+          // Relay worker output from Redis back to the SSE stream
+          const { relayRedisToSSE } = await import("../lib/stream-relay");
+          const relayResult = await relayRedisToSSE(stream, streamChannelId, { timeoutMs: 120_000 });
+
+          // Combine initial content + relay content for the final message
+          const totalContent = fullContent + (relayResult?.content ?? "");
+          const totalPromptTokens = promptTokens + (relayResult?.usage?.prompt_tokens ?? 0);
+          const totalCompletionTokens = completionTokens + (relayResult?.usage?.completion_tokens ?? 0);
+
+          const assistantMessage = await messageService.createMessage(orgId, {
+            conversationId,
+            senderType: "assistant",
+            content: totalContent,
+            modelId: conversation.modelId ?? undefined,
+            tokenCountPrompt: totalPromptTokens,
+            tokenCountCompletion: totalCompletionTokens,
+            metadata: { latencyMs: Date.now() - startTime, model: body.model, smartRouted: true },
+          });
+
+          await stream.writeSSE({
+            event: "done",
+            data: JSON.stringify({
+              messageId: assistantMessage.id,
+              tokenCountPrompt: totalPromptTokens,
+              tokenCountCompletion: totalCompletionTokens,
+              latencyMs: Date.now() - startTime,
+            }),
+          });
+        } catch (temporalErr) {
+          // Temporal unavailable — save partial response and return error
+          console.error("[smart-chat] Temporal workflow failed:", temporalErr);
+
+          if (fullContent) {
+            const partialMessage = await messageService.createMessage(orgId, {
+              conversationId,
+              senderType: "assistant",
+              content: fullContent,
+              modelId: conversation.modelId ?? undefined,
+              tokenCountPrompt: promptTokens,
+              tokenCountCompletion: completionTokens,
+              metadata: { latencyMs, model: body.model, partial: true },
+            });
+
+            await stream.writeSSE({
+              event: "done",
+              data: JSON.stringify({
+                messageId: partialMessage.id,
+                tokenCountPrompt: promptTokens,
+                tokenCountCompletion: completionTokens,
+                latencyMs,
+                partial: true,
+              }),
+            });
+          }
+
+          await stream.writeSSE({
+            event: "error",
+            data: JSON.stringify({
+              message: "Tool execution unavailable — showing partial response",
+              code: "temporal_unavailable",
+            }),
+          });
+        }
+
+        return;
+      }
+
+      // --- Normal path: no tool calls, save message as before ---
       const assistantMessage = await messageService.createMessage(orgId, {
         conversationId,
         senderType: "assistant",

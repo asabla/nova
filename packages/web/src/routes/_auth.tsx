@@ -7,12 +7,19 @@ import { useAuthStore } from "../stores/auth.store";
 import { useUIStore } from "../stores/ui.store";
 import { useTheme } from "../hooks/useTheme";
 import { useWebSocket } from "../hooks/useWebSocket";
+import { authClient } from "../hooks/useAuth";
 
 export const Route = createFileRoute("/_auth")({
   beforeLoad: async () => {
-    const { session, activeOrgId, initOrg } = useAuthStore.getState();
+    const { session, setSession, activeOrgId, initOrg } = useAuthStore.getState();
     if (!session) {
-      throw redirect({ to: "/login" });
+      // Try to restore session from cookie
+      const { data } = await authClient.getSession();
+      if (data?.session) {
+        setSession(data);
+      } else {
+        throw redirect({ to: "/login" });
+      }
     }
     // Ensure user has an org set up
     if (!activeOrgId) {

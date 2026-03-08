@@ -1,40 +1,3 @@
-model_list:
-  - model_name: gpt-4o
-    litellm_params:
-      model: openai/openai/gpt-oss-20b
-      api_base: http://host.docker.internal:1234/v1
-      api_key: "not-needed"
-
-  - model_name: gpt-4o-mini
-    litellm_params:
-      model: openai/openai/gpt-oss-20b
-      api_base: http://host.docker.internal:1234/v1
-      api_key: "not-needed"
-
-  - model_name: claude-sonnet-4-20250514
-    litellm_params:
-      model: openai/openai/gpt-oss-20b
-      api_base: http://host.docker.internal:1234/v1
-      api_key: "not-needed"
-
-  - model_name: claude-haiku-3.5
-    litellm_params:
-      model: openai/openai/gpt-oss-20b
-      api_base: http://host.docker.internal:1234/v1
-      api_key: "not-needed"
-
-  - model_name: default
-    litellm_params:
-      model: openai/openai/gpt-oss-20b
-      api_base: http://host.docker.internal:1234/v1
-      api_key: "not-needed"
-
-  - model_name: text-embedding-3-small
-    litellm_params:
-      model: openai/text-embedding-nomic-embed-text-v1.5
-      api_base: http://host.docker.internal:1234/v1
-      api_key: "not-needed"
-
 litellm_settings:
   drop_params: true
   set_verbose: false
@@ -43,3 +6,18 @@ litellm_settings:
     type: redis
     host: redis
     port: 6379
+
+model_list:
+  # LM Studio example
+  - model_name: lmstudio/gpt-oss:20b
+    litellm_params:
+      model: gpt-oss:20b
+      api_base: http://host.docker.internal:1234/v1
+      api_key: "not-needed"
+
+  # Ollama example
+  # - model_name: ollama/gpt-oss:20b
+  #   litellm_params:
+  #     model: gpt-oss:20b
+  #     api_base: http://host.docker.internal:11434/v1
+  #     api_key: "not-needed"
