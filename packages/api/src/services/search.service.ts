@@ -7,12 +7,14 @@ import {
   agents,
   knowledgeCollections,
   files,
+  workspaces,
+  researchReports,
 } from "@nova/shared/schemas";
 
 interface SearchOptions {
   limit?: number;
   offset?: number;
-  type?: "all" | "conversations" | "messages" | "agents" | "knowledge" | "files";
+  type?: "all" | "conversations" | "messages" | "agents" | "knowledge" | "files" | "workspaces" | "research";
   mode?: "keyword" | "semantic";
   dateFrom?: Date;
   dateTo?: Date;
@@ -63,7 +65,7 @@ export const searchService = {
       }
     }
 
-    const [convResults, msgResults, agentResults, kbResults, fileResults] = await Promise.all([
+    const [convResults, msgResults, agentResults, kbResults, fileResults, wsResults, researchResults] = await Promise.all([
       // --- Conversations ---
       shouldSearch("conversations")
         ? db
@@ -244,6 +246,59 @@ export const searchService = {
             .limit(limit)
             .offset(offset)
         : Promise.resolve([]),
+
+      // --- Workspaces ---
+      shouldSearch("workspaces")
+        ? db
+            .select({
+              id: workspaces.id,
+              name: workspaces.name,
+              description: workspaces.description,
+              createdAt: workspaces.createdAt,
+              type: sql<string>`'workspace'`,
+            })
+            .from(workspaces)
+            .where(
+              and(
+                eq(workspaces.orgId, orgId),
+                isNull(workspaces.deletedAt),
+                eq(workspaces.isArchived, false),
+                or(
+                  ilike(workspaces.name, pattern),
+                  ilike(workspaces.description, pattern),
+                ),
+                ...dateConditions(workspaces),
+              ),
+            )
+            .orderBy(desc(workspaces.createdAt))
+            .limit(limit)
+            .offset(offset)
+        : Promise.resolve([]),
+
+      // --- Research reports ---
+      shouldSearch("research")
+        ? db
+            .select({
+              id: researchReports.id,
+              query: researchReports.query,
+              status: researchReports.status,
+              conversationId: researchReports.conversationId,
+              createdAt: researchReports.createdAt,
+              type: sql<string>`'research'`,
+            })
+            .from(researchReports)
+            .where(
+              and(
+                eq(researchReports.orgId, orgId),
+                isNull(researchReports.deletedAt),
+                ilike(researchReports.query, pattern),
+                ...dateConditions(researchReports),
+              ),
+            )
+            .orderBy(desc(researchReports.createdAt))
+            .limit(limit)
+            .offset(offset)
+        : Promise.resolve([]),
     ]);
 
     // Add context snippets with match highlighting to message results
@@ -263,18 +318,33 @@ export const searchService = {
       snippet: k.description ? extractSnippet(k.description, query, 200) : null,
     }));
 
+    const workspacesWithSnippets = wsResults.map((w: any) => ({
+      ...w,
+      snippet: w.description ? extractSnippet(w.description, query, 200) : null,
+    }));
+
+    const researchWithSnippets = researchResults.map((r: any) => ({
+      ...r,
+      title: r.query,
+      snippet: r.query ? extractSnippet(r.query, query, 200) : null,
+    }));
+
     return {
       conversations: convResults,
       messages: messagesWithSnippets,
       agents: agentsWithSnippets,
       knowledge: knowledgeWithSnippets,
       files: fileResults,
+      workspaces: workspacesWithSnippets,
+      research: researchWithSnippets,
       total:
         convResults.length +
         msgResults.length +
         agentResults.length +
         kbResults.length +
-        fileResults.length,
+        fileResults.length +
+        wsResults.length +
+        researchResults.length,
       query,
       mode,
     };

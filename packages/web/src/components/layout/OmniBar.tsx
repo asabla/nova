@@ -21,6 +21,7 @@ import {
   BarChart3,
   ShieldCheck,
   Hash,
+  FlaskConical,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useUIStore } from "../../stores/ui.store";
@@ -38,6 +39,8 @@ type ResultSection =
   | "messages"
   | "agents"
   | "knowledge"
+  | "workspaces"
+  | "research"
   | "navigation"
   | "settings";
 
@@ -72,6 +75,8 @@ const SECTION_ORDER: ResultSection[] = [
   "messages",
   "agents",
   "knowledge",
+  "workspaces",
+  "research",
   "navigation",
   "settings",
 ];
@@ -83,6 +88,8 @@ const SECTION_COLORS: Record<ResultSection, string> = {
   messages: "border-l-sky-400",
   agents: "border-l-violet-400",
   knowledge: "border-l-emerald-400",
+  workspaces: "border-l-amber-400",
+  research: "border-l-rose-400",
   navigation: "border-l-text-tertiary",
   settings: "border-l-text-tertiary",
 };
@@ -121,6 +128,8 @@ export function OmniBar() {
       messages: t("omnibar.messages", { defaultValue: "Messages" }),
       agents: t("omnibar.agents", { defaultValue: "Agents" }),
       knowledge: t("omnibar.knowledge", { defaultValue: "Knowledge" }),
+      workspaces: t("omnibar.workspaces", { defaultValue: "Workspaces" }),
+      research: t("omnibar.research", { defaultValue: "Research" }),
       navigation: t("omnibar.navigation", { defaultValue: "Go to" }),
       settings: t("omnibar.settings", { defaultValue: "Settings & Theme" }),
     }),
@@ -363,42 +372,87 @@ export function OmniBar() {
       }
     }
 
-    if (hasSearch && searchResults?.data) {
-      const results = Array.isArray(searchResults.data) ? searchResults.data : [];
-      for (const r of results) {
-        const type = r.type || "conversation";
-        let section: ResultSection = "conversations";
-        let icon = <MessageSquare className="h-4 w-4" aria-hidden="true" />;
+    if (hasSearch && searchResults) {
+      const sr = searchResults as any;
 
-        if (type === "message") {
-          section = "messages";
-          icon = <Hash className="h-4 w-4" aria-hidden="true" />;
-        } else if (type === "agent") {
-          section = "agents";
-          icon = <Bot className="h-4 w-4" aria-hidden="true" />;
-        } else if (type === "knowledge") {
-          section = "knowledge";
-          icon = <BookOpen className="h-4 w-4" aria-hidden="true" />;
-        } else if (type === "file") {
-          section = "knowledge";
-          icon = <FileText className="h-4 w-4" aria-hidden="true" />;
-        }
-
+      // Conversations
+      for (const r of sr.conversations ?? []) {
         items.push({
-          id: `search-${r.id || r.type + Math.random()}`,
-          label: r.title || r.name || "Untitled",
+          id: `search-conv-${r.id}`,
+          label: r.title || t("omnibar.untitled", { defaultValue: "Untitled Conversation" }),
+          icon: <MessageSquare className="h-4 w-4" aria-hidden="true" />,
+          section: "conversations",
+          action: runAndClose(() => navigate({ to: "/conversations/$id", params: { id: r.id } })),
+        });
+      }
+
+      // Messages
+      for (const r of sr.messages ?? []) {
+        items.push({
+          id: `search-msg-${r.id}`,
+          label: r.snippet || r.content?.slice(0, 80) || "Message",
+          icon: <Hash className="h-4 w-4" aria-hidden="true" />,
+          section: "messages",
+          action: runAndClose(() => navigate({ to: "/conversations/$id", params: { id: r.conversationId } })),
+        });
+      }
+
+      // Agents
+      for (const r of sr.agents ?? []) {
+        items.push({
+          id: `search-agent-${r.id}`,
+          label: r.name,
           description: r.snippet || r.description,
-          icon,
-          section,
-          action: runAndClose(() => {
-            if (type === "conversation" || type === "message") {
-              navigate({ to: "/conversations/$id", params: { id: r.conversationId || r.id } });
-            } else if (type === "agent") {
-              navigate({ to: "/agents/$id", params: { id: r.id } });
-            } else if (type === "knowledge") {
-              navigate({ to: "/knowledge/$id", params: { id: r.id } });
-            }
-          }),
+          icon: <Bot className="h-4 w-4" aria-hidden="true" />,
+          section: "agents",
+          action: runAndClose(() => navigate({ to: "/agents/$id", params: { id: r.id } })),
+        });
+      }
+
+      // Knowledge collections
+      for (const r of sr.knowledge ?? []) {
+        items.push({
+          id: `search-kb-${r.id}`,
+          label: r.name,
+          description: r.snippet || r.description,
+          icon: <BookOpen className="h-4 w-4" aria-hidden="true" />,
+          section: "knowledge",
+          action: runAndClose(() => navigate({ to: "/knowledge/$id", params: { id: r.id } })),
+        });
+      }
+
+      // Files
+      for (const r of sr.files ?? []) {
+        items.push({
+          id: `search-file-${r.id}`,
+          label: r.filename,
+          icon: <FileText className="h-4 w-4" aria-hidden="true" />,
+          section: "knowledge",
+          action: runAndClose(() => navigate({ to: "/knowledge" })),
+        });
+      }
+
+      // Workspaces
+      for (const r of sr.workspaces ?? []) {
+        items.push({
+          id: `search-ws-${r.id}`,
+          label: r.name,
+          description: r.snippet || r.description,
+          icon: <FolderKanban className="h-4 w-4" aria-hidden="true" />,
+          section: "workspaces",
+          action: runAndClose(() => navigate({ to: "/workspaces/$id", params: { id: r.id } })),
+        });
+      }
+
+      // Research reports
+      for (const r of sr.research ?? []) {
+        items.push({
+          id: `search-research-${r.id}`,
+          label: r.title || r.query,
+          description: r.status,
+          icon: <FlaskConical className="h-4 w-4" aria-hidden="true" />,
+          section: "research",
+          action: runAndClose(() => navigate({ to: "/research" })),
         });
       }
     }
@@ -490,7 +544,7 @@ export function OmniBar() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t("omnibar.placeholder", {
-              defaultValue: "Search conversations, knowledge, agents, commands...",
+              defaultValue: "Search conversations, knowledge, workspaces, commands...",
             })}
             className="flex-1 bg-transparent text-sm text-text placeholder:text-text-tertiary focus:outline-none"
             aria-label={t("omnibar.label", { defaultValue: "Universal search" })}
@@ -622,7 +676,7 @@ export function OmniBarTrigger() {
       <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
       <span className="flex-1 text-left truncate">
         {t("omnibar.placeholder", {
-          defaultValue: "Search conversations, knowledge, agents, commands...",
+          defaultValue: "Search conversations, knowledge, workspaces, commands...",
         })}
       </span>
       <kbd className="hidden sm:inline text-[10px] font-mono bg-surface-tertiary/80 px-1.5 py-0.5 rounded-md border border-border text-text-tertiary">

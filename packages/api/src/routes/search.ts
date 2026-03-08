@@ -8,7 +8,7 @@ const searchRoutes = new Hono<AppContext>();
 
 const searchQuerySchema = z.object({
   q: z.string().min(2),
-  type: z.enum(["all", "conversations", "messages", "agents", "knowledge", "files"]).optional(),
+  type: z.enum(["all", "conversations", "messages", "agents", "knowledge", "files", "workspaces", "research"]).optional(),
   mode: z.enum(["keyword", "semantic"]).optional(),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
@@ -50,7 +50,7 @@ searchRoutes.post(
     "json",
     z.object({
       q: z.string().min(2),
-      type: z.enum(["all", "conversations", "messages", "agents", "knowledge", "files"]).optional(),
+      type: z.enum(["all", "conversations", "messages", "agents", "knowledge", "files", "workspaces", "research"]).optional(),
       dateFrom: z.string().optional(),
       dateTo: z.string().optional(),
       workspaceId: z.string().uuid().optional(),

@@ -12,6 +12,8 @@ import {
   X,
   Sparkles,
   Loader2,
+  FolderKanban,
+  FlaskConical,
 } from "lucide-react";
 import { api } from "../../lib/api";
 import { Badge } from "../../components/ui/Badge";
@@ -38,7 +40,7 @@ function highlightMatches(text: string, query: string): string {
   return escapeHtml(text).replace(regex, "<mark>$1</mark>");
 }
 
-type ResultType = "all" | "conversations" | "messages" | "agents" | "knowledge" | "files";
+type ResultType = "all" | "conversations" | "messages" | "agents" | "knowledge" | "files" | "workspaces" | "research";
 
 const TABS: { id: ResultType; label: string; icon: React.ReactNode }[] = [
   { id: "all", label: "All", icon: null },
@@ -47,6 +49,8 @@ const TABS: { id: ResultType; label: string; icon: React.ReactNode }[] = [
   { id: "agents", label: "Agents", icon: <Bot className="h-3.5 w-3.5" /> },
   { id: "knowledge", label: "Knowledge", icon: <BookOpen className="h-3.5 w-3.5" /> },
   { id: "files", label: "Files", icon: <FileText className="h-3.5 w-3.5" /> },
+  { id: "workspaces", label: "Workspaces", icon: <FolderKanban className="h-3.5 w-3.5" /> },
+  { id: "research", label: "Research", icon: <FlaskConical className="h-3.5 w-3.5" /> },
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -130,6 +134,8 @@ function SearchPage() {
         ...(results.agents ?? []),
         ...(results.knowledge ?? []),
         ...(results.files ?? []),
+        ...(results.workspaces ?? []),
+        ...(results.research ?? []),
       ].sort(
         (a: any, b: any) =>
           new Date(b.updatedAt ?? b.createdAt).getTime() -
@@ -148,6 +154,8 @@ function SearchPage() {
     agents: results?.agents?.length ?? 0,
     knowledge: results?.knowledge?.length ?? 0,
     files: results?.files?.length ?? 0,
+    workspaces: results?.workspaces?.length ?? 0,
+    research: results?.research?.length ?? 0,
   };
 
   const typeIcon = (t: string) => {
@@ -162,6 +170,10 @@ function SearchPage() {
         return <BookOpen className="h-4 w-4 text-green-400" />;
       case "file":
         return <FileText className="h-4 w-4 text-orange-400" />;
+      case "workspace":
+        return <FolderKanban className="h-4 w-4 text-amber-400" />;
+      case "research":
+        return <FlaskConical className="h-4 w-4 text-rose-400" />;
       default:
         return null;
     }
@@ -180,6 +192,12 @@ function SearchPage() {
         break;
       case "knowledge":
         navigate({ to: `/knowledge/${result.id}` });
+        break;
+      case "workspace":
+        navigate({ to: `/workspaces/${result.id}` });
+        break;
+      case "research":
+        navigate({ to: "/research" });
         break;
     }
   };

@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { clsx } from "clsx";
 import {
-  MessageSquarePlus, Search, Archive, Pin, Trash2, ChevronLeft, BookOpen,
+  MessageSquarePlus, Archive, Pin, Trash2, ChevronLeft, BookOpen,
   FolderKanban, Settings, ShieldCheck,
   Microscope, Compass, HelpCircle, Filter,
   CheckSquare, Square, FolderOpen, MessageSquare, Zap,
@@ -25,7 +25,6 @@ export function Sidebar() {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const user = useAuthStore((s) => s.user);
-  const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [filterWorkspace, setFilterWorkspace] = useState("");
   const [bulkMode, setBulkMode] = useState(false);
@@ -76,7 +75,6 @@ export function Sidebar() {
   const workspaces = (workspacesData as any)?.data ?? [];
 
   const filteredConversations = conversations.filter((c: any) => {
-    if (searchQuery && !c.title?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     if (filterWorkspace && c.workspaceId !== filterWorkspace) return false;
     return true;
   });
@@ -208,20 +206,6 @@ export function Sidebar() {
             </button>
           </div>
         )}
-
-        {/* Conversation search */}
-        <div className="px-3 pt-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary" aria-hidden="true" />
-            <input
-              type="text"
-              placeholder={t("conversations.search")}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-8 pl-8 pr-3 text-xs rounded-lg bg-surface border border-border text-text placeholder:text-text-tertiary focus-visible:outline-2 focus-visible:outline-primary transition-colors"
-            />
-          </div>
-        </div>
 
         {/* Conversation List */}
         <nav aria-label={t("nav.conversations", { defaultValue: "Conversations" })} className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
