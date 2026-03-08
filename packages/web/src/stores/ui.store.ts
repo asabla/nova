@@ -13,14 +13,22 @@ export const FONT_SIZE_MAP: Record<FontSize, number> = {
 interface UIState {
   sidebarOpen: boolean;
   sidebarWidth: number;
-  commandPaletteOpen: boolean;
+  omniBarOpen: boolean;
+  omniBarQuery: string;
   shortcutsHelpOpen: boolean;
   theme: ThemeMode;
   fontSize: FontSize;
   toggleSidebar: () => void;
   setSidebarWidth: (width: number) => void;
+  setOmniBarOpen: (open: boolean) => void;
+  setOmniBarQuery: (query: string) => void;
+  toggleOmniBar: () => void;
+  /** @deprecated Use toggleOmniBar instead */
   toggleCommandPalette: () => void;
+  /** @deprecated Use setOmniBarOpen instead */
   setCommandPaletteOpen: (open: boolean) => void;
+  /** @deprecated Use omniBarOpen instead */
+  commandPaletteOpen: boolean;
   toggleShortcutsHelp: () => void;
   setTheme: (theme: ThemeMode) => void;
   setFontSize: (size: FontSize) => void;
@@ -41,17 +49,25 @@ function applyFontSizeToDOM(size: FontSize) {
 
 export const useUIStore = create<UIState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       sidebarOpen: true,
       sidebarWidth: 280,
-      commandPaletteOpen: false,
+      omniBarOpen: false,
+      omniBarQuery: "",
       shortcutsHelpOpen: false,
       theme: "system",
       fontSize: "medium",
+      // Backward compat getter
+      get commandPaletteOpen() {
+        return get().omniBarOpen;
+      },
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       setSidebarWidth: (width) => set({ sidebarWidth: width }),
-      toggleCommandPalette: () => set((s) => ({ commandPaletteOpen: !s.commandPaletteOpen })),
-      setCommandPaletteOpen: (open) => set({ commandPaletteOpen: open }),
+      setOmniBarOpen: (open) => set({ omniBarOpen: open, omniBarQuery: open ? get().omniBarQuery : "" }),
+      setOmniBarQuery: (query) => set({ omniBarQuery: query }),
+      toggleOmniBar: () => set((s) => ({ omniBarOpen: !s.omniBarOpen, omniBarQuery: s.omniBarOpen ? "" : s.omniBarQuery })),
+      toggleCommandPalette: () => set((s) => ({ omniBarOpen: !s.omniBarOpen, omniBarQuery: s.omniBarOpen ? "" : s.omniBarQuery })),
+      setCommandPaletteOpen: (open) => set({ omniBarOpen: open, omniBarQuery: open ? get().omniBarQuery : "" }),
       toggleShortcutsHelp: () => set((s) => ({ shortcutsHelpOpen: !s.shortcutsHelpOpen })),
       setTheme: (theme) => {
         applyThemeToDOM(theme);
@@ -64,6 +80,12 @@ export const useUIStore = create<UIState>()(
     }),
     {
       name: "nova-ui",
+      partialize: (state) => ({
+        sidebarOpen: state.sidebarOpen,
+        sidebarWidth: state.sidebarWidth,
+        theme: state.theme,
+        fontSize: state.fontSize,
+      }),
       onRehydrateStorage: () => (state) => {
         if (state) {
           applyThemeToDOM(state.theme);

@@ -1,46 +1,60 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: oklch(0.585 0.233 277.117);
-  --color-primary-light: oklch(0.704 0.191 277.117);
-  --color-primary-dark: oklch(0.457 0.24 277.117);
+  /* Primary — a rich warm indigo that nods to "nova" (luminous, stellar) */
+  --color-primary: oklch(0.55 0.22 268);
+  --color-primary-light: oklch(0.68 0.18 268);
+  --color-primary-dark: oklch(0.42 0.24 268);
   --color-primary-foreground: oklch(0.985 0 0);
 
-  --color-surface: oklch(1 0 0);
-  --color-surface-secondary: oklch(0.97 0 0);
-  --color-surface-tertiary: oklch(0.94 0 0);
+  /* Accent — a subtle warm glow for highlights and signature moments */
+  --color-accent: oklch(0.78 0.14 65);
+  --color-accent-muted: oklch(0.78 0.08 65);
 
-  --color-border: oklch(0.9 0 0);
-  --color-border-strong: oklch(0.82 0 0);
+  /* Surfaces — warm-tinted whites instead of clinical gray */
+  --color-surface: oklch(0.995 0.003 90);
+  --color-surface-secondary: oklch(0.975 0.004 85);
+  --color-surface-tertiary: oklch(0.95 0.005 80);
 
-  --color-text: oklch(0.14 0 0);
-  --color-text-secondary: oklch(0.45 0 0);
-  --color-text-tertiary: oklch(0.62 0 0);
+  /* Borders — warm undertone */
+  --color-border: oklch(0.91 0.006 80);
+  --color-border-strong: oklch(0.83 0.01 75);
 
+  /* Text */
+  --color-text: oklch(0.16 0.015 280);
+  --color-text-secondary: oklch(0.44 0.01 270);
+  --color-text-tertiary: oklch(0.60 0.008 265);
+
+  /* Status */
   --color-success: oklch(0.627 0.194 149.214);
   --color-warning: oklch(0.769 0.188 70.08);
   --color-danger: oklch(0.577 0.245 27.325);
 
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  /* Typography — DM Sans: geometric, warm, distinctive but professional */
+  --font-sans: "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-display: "DM Sans", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   @theme {
-    --color-primary: oklch(0.704 0.191 277.117);
-    --color-primary-light: oklch(0.78 0.15 277.117);
-    --color-primary-dark: oklch(0.585 0.233 277.117);
+    --color-primary: oklch(0.70 0.18 268);
+    --color-primary-light: oklch(0.78 0.14 268);
+    --color-primary-dark: oklch(0.55 0.22 268);
 
-    --color-surface: oklch(0.17 0.01 285);
-    --color-surface-secondary: oklch(0.21 0.01 285);
-    --color-surface-tertiary: oklch(0.25 0.01 285);
+    --color-accent: oklch(0.72 0.12 65);
+    --color-accent-muted: oklch(0.60 0.06 65);
 
-    --color-border: oklch(0.3 0.01 285);
-    --color-border-strong: oklch(0.4 0.01 285);
+    --color-surface: oklch(0.155 0.012 275);
+    --color-surface-secondary: oklch(0.195 0.014 275);
+    --color-surface-tertiary: oklch(0.235 0.016 275);
 
-    --color-text: oklch(0.95 0 0);
-    --color-text-secondary: oklch(0.7 0 0);
-    --color-text-tertiary: oklch(0.55 0 0);
+    --color-border: oklch(0.29 0.015 275);
+    --color-border-strong: oklch(0.38 0.018 275);
+
+    --color-text: oklch(0.94 0.005 80);
+    --color-text-secondary: oklch(0.68 0.006 70);
+    --color-text-tertiary: oklch(0.52 0.005 60);
 
     --color-success: oklch(0.72 0.194 149.214);
     --color-warning: oklch(0.82 0.16 70.08);
@@ -51,20 +65,23 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --color-primary: oklch(0.704 0.191 277.117);
-  --color-primary-light: oklch(0.78 0.15 277.117);
-  --color-primary-dark: oklch(0.585 0.233 277.117);
+  --color-primary: oklch(0.70 0.18 268);
+  --color-primary-light: oklch(0.78 0.14 268);
+  --color-primary-dark: oklch(0.55 0.22 268);
 
-  --color-surface: oklch(0.17 0.01 285);
-  --color-surface-secondary: oklch(0.21 0.01 285);
-  --color-surface-tertiary: oklch(0.25 0.01 285);
+  --color-accent: oklch(0.72 0.12 65);
+  --color-accent-muted: oklch(0.60 0.06 65);
 
-  --color-border: oklch(0.3 0.01 285);
-  --color-border-strong: oklch(0.4 0.01 285);
+  --color-surface: oklch(0.155 0.012 275);
+  --color-surface-secondary: oklch(0.195 0.014 275);
+  --color-surface-tertiary: oklch(0.235 0.016 275);
 
-  --color-text: oklch(0.95 0 0);
-  --color-text-secondary: oklch(0.7 0 0);
-  --color-text-tertiary: oklch(0.55 0 0);
+  --color-border: oklch(0.29 0.015 275);
+  --color-border-strong: oklch(0.38 0.018 275);
+
+  --color-text: oklch(0.94 0.005 80);
+  --color-text-secondary: oklch(0.68 0.006 70);
+  --color-text-tertiary: oklch(0.52 0.005 60);
 
   --color-success: oklch(0.72 0.194 149.214);
   --color-warning: oklch(0.82 0.16 70.08);
@@ -74,23 +91,25 @@
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --color-surface: oklch(1 0 0);
-  --color-surface-secondary: oklch(0.97 0 0);
-  --color-surface-tertiary: oklch(0.94 0 0);
+  --color-surface: oklch(0.995 0.003 90);
+  --color-surface-secondary: oklch(0.975 0.004 85);
+  --color-surface-tertiary: oklch(0.95 0.005 80);
 
-  --color-border: oklch(0.9 0 0);
-  --color-border-strong: oklch(0.82 0 0);
+  --color-border: oklch(0.91 0.006 80);
+  --color-border-strong: oklch(0.83 0.01 75);
 
-  --color-text: oklch(0.14 0 0);
-  --color-text-secondary: oklch(0.45 0 0);
-  --color-text-tertiary: oklch(0.62 0 0);
+  --color-text: oklch(0.16 0.015 280);
+  --color-text-secondary: oklch(0.44 0.01 270);
+  --color-text-tertiary: oklch(0.60 0.008 265);
 }
 
+/* --- Typography --- */
 html {
   font-family: var(--font-sans);
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.011em;
 }
 
 /* Screen-reader only utility */
@@ -129,7 +148,7 @@ body {
   color: var(--color-text);
 }
 
-/* Scrollbar styling */
+/* --- Scrollbar --- */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -148,7 +167,124 @@ body {
   background: var(--color-text-tertiary);
 }
 
-/* Selection */
+/* --- Selection --- */
 ::selection {
   background-color: color-mix(in oklch, var(--color-primary) 30%, transparent);
+}
+
+/* --- Animations --- */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-in-from-top-2 {
+  from { transform: translateY(-0.5rem); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slide-up-fade {
+  from { transform: translateY(0.75rem); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes scale-in {
+  from { transform: scale(0.97); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-primary) 0%, transparent); }
+  50% { box-shadow: 0 0 20px 2px color-mix(in oklch, var(--color-primary) 15%, transparent); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-in {
+  animation-duration: 200ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation-name: fade-in;
+}
+
+.slide-in-from-top-2 {
+  animation-name: slide-in-from-top-2;
+}
+
+.slide-in-from-top-4 {
+  animation-name: slide-in-from-top-2;
+}
+
+.slide-up-fade {
+  animation-name: slide-up-fade;
+}
+
+.scale-in {
+  animation-name: scale-in;
+}
+
+/* Page content entrance */
+.page-enter {
+  animation: slide-up-fade 350ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Staggered children animation */
+.stagger-children > * {
+  animation: slide-up-fade 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 100ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 150ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 200ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 250ms; }
+
+/* Signature glow effect for NOVA branding */
+.nova-glow {
+  text-shadow: 0 0 30px color-mix(in oklch, var(--color-primary) 40%, transparent);
+}
+
+/* Chat input signature glow on focus */
+.input-glow:focus-within {
+  box-shadow:
+    0 0 0 1px var(--color-border-strong),
+    0 0 20px -4px color-mix(in oklch, var(--color-primary) 20%, transparent),
+    0 4px 16px -2px color-mix(in oklch, var(--color-primary) 8%, transparent);
+}
+
+/* OmniBar backdrop */
+.omni-backdrop {
+  background: color-mix(in oklch, var(--color-surface) 60%, transparent);
+  backdrop-filter: blur(8px) saturate(1.4);
+  -webkit-backdrop-filter: blur(8px) saturate(1.4);
+}
+
+/* Subtle hover lift for interactive cards */
+.hover-lift {
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 200ms ease;
+}
+.hover-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -2px color-mix(in oklch, var(--color-text) 8%, transparent);
+}
+
+/* Sidebar nav item active indicator */
+.nav-active {
+  position: relative;
+}
+.nav-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 25%;
+  bottom: 25%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--color-primary);
 }

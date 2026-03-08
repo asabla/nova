@@ -1,13 +1,12 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { Menu, Search, Sun, Moon, Monitor } from "lucide-react";
+import { Menu, Sun, Moon, Monitor } from "lucide-react";
 import { authClient } from "../../hooks/useAuth";
 import { useUIStore } from "../../stores/ui.store";
 import { Avatar } from "../ui/Avatar";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { NotificationCenter } from "../notifications/NotificationCenter";
-
-const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+import { OmniBarTrigger } from "./OmniBar";
 
 export function Header() {
   const { t } = useTranslation();
@@ -15,7 +14,6 @@ export function Header() {
   const { data: session } = authClient.useSession();
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
-  const toggleCommandPalette = useUIStore((s) => s.toggleCommandPalette);
   const theme = useUIStore((s) => s.theme);
   const setTheme = useUIStore((s) => s.setTheme);
 
@@ -23,8 +21,9 @@ export function Header() {
   const nextTheme = theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
 
   return (
-    <header className="h-14 border-b border-border bg-surface flex items-center justify-between px-4 shrink-0">
-      <div className="flex items-center gap-3">
+    <header className="h-14 border-b border-border bg-surface flex items-center gap-3 px-4 shrink-0">
+      {/* Left: Menu toggle */}
+      <div className="flex items-center shrink-0">
         {!sidebarOpen && (
           <button
             onClick={toggleSidebar}
@@ -37,22 +36,14 @@ export function Header() {
         )}
       </div>
 
-      <div className="flex items-center gap-2">
-        {/* Connection status */}
-        <ConnectionStatus />
+      {/* Center: OmniBar search */}
+      <div className="flex-1 flex justify-center min-w-0">
+        <OmniBarTrigger />
+      </div>
 
-        {/* Search / Command Palette */}
-        <button
-          onClick={toggleCommandPalette}
-          aria-label={t("search.openPalette", { defaultValue: "Search or run a command" })}
-          className="flex items-center gap-2 h-8 px-3 rounded-lg bg-surface-secondary border border-border text-xs text-text-tertiary hover:text-text-secondary transition-colors focus-visible:outline-2 focus-visible:outline-primary"
-        >
-          <Search className="h-3.5 w-3.5" aria-hidden="true" />
-          <span className="hidden sm:inline">{t("search.placeholder", { defaultValue: "Search..." })}</span>
-          <kbd className="hidden sm:inline ml-2 text-[10px] font-mono bg-surface-tertiary px-1.5 py-0.5 rounded">
-            {isMac ? "\u2318" : "Ctrl+"}K
-          </kbd>
-        </button>
+      {/* Right: Utilities */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <ConnectionStatus />
 
         {/* Theme toggle */}
         <button
@@ -65,7 +56,6 @@ export function Header() {
           {theme === "system" && <Monitor className="h-4 w-4" aria-hidden="true" />}
         </button>
 
-        {/* Notifications */}
         <NotificationCenter />
 
         {/* User avatar */}

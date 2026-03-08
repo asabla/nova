@@ -4,10 +4,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { clsx } from "clsx";
 import {
-  MessageSquarePlus, Search, Archive, Pin, Trash2, ChevronLeft, Bot, BookOpen,
-  FolderKanban, Settings, Sparkles, FileText, ShieldCheck, BarChart3, Code2,
-  Microscope, Wrench, Compass, HelpCircle, GitCompare, Puzzle, Filter,
-  CheckSquare, Square, FolderOpen, ChevronDown,
+  MessageSquarePlus, Search, Archive, Pin, Trash2, ChevronLeft, BookOpen,
+  FolderKanban, Settings, ShieldCheck,
+  Microscope, Compass, HelpCircle, Filter,
+  CheckSquare, Square, FolderOpen, MessageSquare, Zap,
 } from "lucide-react";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
@@ -30,7 +30,6 @@ export function Sidebar() {
   const [filterWorkspace, setFilterWorkspace] = useState("");
   const [bulkMode, setBulkMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const { data: conversationsData, isLoading: loadingConversations } = useQuery({
@@ -91,15 +90,6 @@ export function Sidebar() {
     });
   };
 
-  const toggleSection = (section: string) => {
-    setCollapsedSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(section)) next.delete(section);
-      else next.add(section);
-      return next;
-    });
-  };
-
   const isAdmin = user?.role === "org-admin" || user?.role === "admin";
 
   return (
@@ -112,22 +102,38 @@ export function Sidebar() {
         aria-hidden={!sidebarOpen}
         {...(!sidebarOpen && { inert: "" as any })}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" aria-hidden="true" />
-            <span className="font-bold text-sm tracking-tight">NOVA</span>
-          </div>
+        {/* Brand header */}
+        <div className="flex items-center justify-between px-4 py-3.5 border-b border-border">
+          <button
+            onClick={() => navigate({ to: "/" })}
+            className="flex items-center gap-2.5 group"
+          >
+            <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
+              <Zap className="h-4 w-4 text-primary" aria-hidden="true" />
+            </div>
+            <span className="font-bold text-sm tracking-tight text-text nova-glow">NOVA</span>
+          </button>
           <button
             onClick={toggleSidebar}
             aria-label={t("nav.collapseSidebar", { defaultValue: "Collapse sidebar" })}
-            className="text-text-tertiary hover:text-text p-1 rounded-lg hover:bg-surface-tertiary focus-visible:outline-2 focus-visible:outline-primary"
+            className="text-text-tertiary hover:text-text p-1.5 rounded-lg hover:bg-surface-tertiary focus-visible:outline-2 focus-visible:outline-primary transition-colors"
           >
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
 
-        {/* New Conversation */}
+        {/* Primary Navigation */}
+        <nav className="px-2 pt-3 pb-2 space-y-0.5" aria-label={t("nav.main", { defaultValue: "Main navigation" })}>
+          <SidebarLink icon={MessageSquare} label={t("nav.conversations", { defaultValue: "Conversations" })} to="/" exact />
+          <SidebarLink icon={Microscope} label={t("nav.research", { defaultValue: "Research" })} to="/research" />
+          <SidebarLink icon={BookOpen} label={t("nav.knowledge", { defaultValue: "Knowledge" })} to="/knowledge" />
+          <SidebarLink icon={Compass} label={t("nav.explore", { defaultValue: "Explore" })} to="/explore" />
+          <SidebarLink icon={FolderKanban} label={t("nav.workspaces", { defaultValue: "Workspaces" })} to="/workspaces" />
+        </nav>
+
+        <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mx-4" />
+
+        {/* New Conversation + controls */}
         <div className="px-3 pt-3 flex gap-1.5">
           <Button
             variant="primary"
@@ -170,7 +176,7 @@ export function Sidebar() {
                 value={filterWorkspace}
                 onChange={(e) => setFilterWorkspace(e.target.value)}
                 aria-label={t("search.filter.workspace", { defaultValue: "Filter by workspace" })}
-                className="w-full h-7 px-2 text-[11px] bg-surface border border-border rounded text-text"
+                className="w-full h-7 px-2 text-[11px] bg-surface border border-border rounded-lg text-text"
               >
                 <option value="">{t("search.filter.allWorkspaces", { defaultValue: "All workspaces" })}</option>
                 {workspaces.map((w: any) => (
@@ -187,7 +193,7 @@ export function Sidebar() {
             <button
               onClick={() => bulkArchive.mutate(Array.from(selected))}
               disabled={bulkArchive.isPending}
-              className="flex-1 flex items-center justify-center gap-1 h-7 text-[11px] bg-surface border border-border rounded text-text-secondary hover:text-text disabled:opacity-50"
+              className="flex-1 flex items-center justify-center gap-1 h-7 text-[11px] bg-surface border border-border rounded-lg text-text-secondary hover:text-text disabled:opacity-50 transition-colors"
             >
               <Archive className="h-3 w-3" aria-hidden="true" />
               {t("common.archive", { defaultValue: "Archive" })} ({selected.size})
@@ -195,7 +201,7 @@ export function Sidebar() {
             <button
               onClick={() => setShowDeleteConfirm(true)}
               disabled={bulkDelete.isPending}
-              className="flex-1 flex items-center justify-center gap-1 h-7 text-[11px] bg-surface border border-danger/30 rounded text-danger hover:bg-danger/5 disabled:opacity-50"
+              className="flex-1 flex items-center justify-center gap-1 h-7 text-[11px] bg-surface border border-danger/30 rounded-lg text-danger hover:bg-danger/5 disabled:opacity-50 transition-colors"
             >
               <Trash2 className="h-3 w-3" aria-hidden="true" />
               {t("common.delete", { defaultValue: "Delete" })}
@@ -203,7 +209,7 @@ export function Sidebar() {
           </div>
         )}
 
-        {/* Search */}
+        {/* Conversation search */}
         <div className="px-3 pt-2">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary" aria-hidden="true" />
@@ -212,7 +218,7 @@ export function Sidebar() {
               placeholder={t("conversations.search")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-8 pl-8 pr-3 text-xs rounded-lg bg-surface border border-border text-text placeholder:text-text-tertiary focus-visible:outline-2 focus-visible:outline-primary"
+              className="w-full h-8 pl-8 pr-3 text-xs rounded-lg bg-surface border border-border text-text placeholder:text-text-tertiary focus-visible:outline-2 focus-visible:outline-primary transition-colors"
             />
           </div>
         </div>
@@ -246,55 +252,17 @@ export function Sidebar() {
                 )}
                 {!bulkMode && conv.isPinned && <Pin className="h-3 w-3 text-primary shrink-0" aria-hidden="true" />}
                 <span className="truncate flex-1">{conv.title ?? t("conversations.untitled", { defaultValue: "Untitled" })}</span>
-                {conv.workspaceId && <FolderOpen className="h-3 w-3 text-text-tertiary shrink-0 opacity-0 group-hover:opacity-100" aria-hidden="true" />}
+                {conv.workspaceId && <FolderOpen className="h-3 w-3 text-text-tertiary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" />}
               </button>
             ))
           )}
         </nav>
 
-        {/* Bottom Navigation - Grouped */}
-        <div className="border-t border-border px-2 py-2 space-y-1 overflow-y-auto flex-1 min-h-[200px]">
-          {/* Build section */}
-          <NavSection
-            label={t("nav.sectionBuild")}
-            collapsed={collapsedSections.has("build")}
-            onToggle={() => toggleSection("build")}
-          >
-            <SidebarLink icon={Bot} label={t("nav.agents")} to="/agents" />
-            <SidebarLink icon={BookOpen} label={t("nav.knowledge")} to="/knowledge" />
-            <SidebarLink icon={Wrench} label={t("nav.tools")} to="/tools" />
-            <SidebarLink icon={FileText} label={t("nav.prompts")} to="/prompts" />
-            <SidebarLink icon={FolderKanban} label={t("nav.workspaces")} to="/workspaces" />
-          </NavSection>
-
-          {/* Discover section */}
-          <NavSection
-            label={t("nav.sectionDiscover")}
-            collapsed={collapsedSections.has("discover")}
-            onToggle={() => toggleSection("discover")}
-          >
-            <SidebarLink icon={Compass} label={t("nav.explore")} to="/explore" />
-            <SidebarLink icon={Microscope} label={t("nav.research")} to="/research" />
-          </NavSection>
-
-          {/* Developer section */}
-          <NavSection
-            label={t("nav.sectionDeveloper")}
-            collapsed={collapsedSections.has("developer")}
-            onToggle={() => toggleSection("developer")}
-          >
-            <SidebarLink icon={Code2} label={t("nav.playground")} to="/playground" />
-            <SidebarLink icon={GitCompare} label={t("nav.compare")} to="/model-compare" />
-            <SidebarLink icon={Puzzle} label={t("nav.mcp")} to="/mcp" />
-          </NavSection>
-
-          {/* System - always visible, no collapse */}
-          <div className="pt-1 border-t border-border/50 space-y-0.5">
-            <SidebarLink icon={BarChart3} label={t("nav.usage")} to="/usage" />
-            <SidebarLink icon={Settings} label={t("nav.settings")} to="/settings" />
-            {isAdmin && <SidebarLink icon={ShieldCheck} label={t("nav.admin")} to="/admin" />}
-            <SidebarLink icon={HelpCircle} label={t("nav.help")} to="/help" />
-          </div>
+        {/* Bottom Navigation */}
+        <div className="border-t border-border px-2 py-2 space-y-0.5">
+          <SidebarLink icon={Settings} label={t("nav.settings")} to="/settings" />
+          <SidebarLink icon={HelpCircle} label={t("nav.help")} to="/help" />
+          {isAdmin && <SidebarLink icon={ShieldCheck} label={t("nav.admin")} to="/admin" />}
         </div>
       </aside>
 
@@ -332,45 +300,21 @@ export function Sidebar() {
   );
 }
 
-function NavSection({
-  label,
-  collapsed,
-  onToggle,
-  children,
-}: {
-  label: string;
-  collapsed: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <button
-        onClick={onToggle}
-        aria-expanded={!collapsed}
-        className="w-full flex items-center justify-between px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary hover:text-text-secondary transition-colors"
-      >
-        {label}
-        <ChevronDown className={clsx("h-3 w-3 transition-transform", collapsed && "-rotate-90")} aria-hidden="true" />
-      </button>
-      {!collapsed && <div className="space-y-0.5">{children}</div>}
-    </div>
-  );
-}
-
-function SidebarLink({ icon: Icon, label, to }: { icon: any; label: string; to: string }) {
+function SidebarLink({ icon: Icon, label, to, exact }: { icon: any; label: string; to: string; exact?: boolean }) {
   const navigate = useNavigate();
   const matchRoute = useMatchRoute();
-  const isActive = matchRoute({ to, fuzzy: true });
+  const isActive = exact
+    ? matchRoute({ to, fuzzy: false }) || (to === "/" && matchRoute({ to: "/", fuzzy: false }))
+    : matchRoute({ to, fuzzy: true });
 
   return (
     <button
       onClick={() => navigate({ to })}
       className={clsx(
-        "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors",
+        "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all duration-150 relative",
         isActive
-          ? "bg-primary/10 text-primary font-medium"
-          : "text-text-secondary hover:bg-surface-tertiary hover:text-text",
+          ? "bg-primary/10 text-primary font-medium nav-active"
+          : "text-text-secondary hover:bg-surface-tertiary hover:text-text hover:translate-x-0.5",
       )}
     >
       <Icon className="h-4 w-4" aria-hidden="true" />

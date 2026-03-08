@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   Users, BarChart3, Shield, Settings, Activity, Heart, Gauge, AlertTriangle,
   Database, CreditCard, Palette, Link2, FileSearch, UserCog,
+  Code2, GitCompare, Puzzle, Wrench, FileText, Bot,
 } from "lucide-react";
 import { clsx } from "clsx";
 
@@ -54,6 +55,17 @@ const tabGroups: TabGroup[] = [
       { to: "/admin/billing", icon: CreditCard, label: "admin.billing" },
       { to: "/admin/integrations", icon: Link2, label: "admin.integrations" },
       { to: "/admin/data-retention", icon: Database, label: "admin.dataRetention" },
+    ],
+  },
+  {
+    label: "Developer Tools",
+    tabs: [
+      { to: "/agents", icon: Bot, label: "nav.agents" },
+      { to: "/tools", icon: Wrench, label: "nav.tools" },
+      { to: "/prompts", icon: FileText, label: "nav.prompts" },
+      { to: "/playground", icon: Code2, label: "nav.playground" },
+      { to: "/model-compare", icon: GitCompare, label: "nav.compare" },
+      { to: "/mcp", icon: Puzzle, label: "nav.mcp" },
     ],
   },
 ];

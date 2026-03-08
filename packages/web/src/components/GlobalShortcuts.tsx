@@ -10,18 +10,15 @@ import { useGlobalShortcuts } from "../hooks/useKeyboardShortcuts";
  */
 export function GlobalShortcuts() {
   const navigate = useNavigate();
-  const toggleCommandPalette = useUIStore((s) => s.toggleCommandPalette);
+  const toggleOmniBar = useUIStore((s) => s.toggleOmniBar);
   const toggleShortcutsHelp = useUIStore((s) => s.toggleShortcutsHelp);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
 
-  const onCommandPalette = useCallback(() => toggleCommandPalette(), [toggleCommandPalette]);
+  const onCommandPalette = useCallback(() => toggleOmniBar(), [toggleOmniBar]);
   const onNewChat = useCallback(() => navigate({ to: "/conversations/new" }), [navigate]);
   const onShortcutsHelp = useCallback(() => toggleShortcutsHelp(), [toggleShortcutsHelp]);
   const onSettings = useCallback(() => navigate({ to: "/settings/profile" }), [navigate]);
-  const onSearch = useCallback(() => {
-    // Open command palette with search focus — same UX, but could be extended
-    toggleCommandPalette();
-  }, [toggleCommandPalette]);
+  const onSearch = useCallback(() => toggleOmniBar(), [toggleOmniBar]);
   const onToggleSidebar = useCallback(() => toggleSidebar(), [toggleSidebar]);
   const onGoHome = useCallback(() => navigate({ to: "/" }), [navigate]);
 

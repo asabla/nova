@@ -2,7 +2,6 @@ import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
 import type { QueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { CommandPalette } from "../components/chat/CommandPalette";
 import { GlobalShortcuts } from "../components/GlobalShortcuts";
 import { ShortcutsHelpOverlay } from "../components/ui/ShortcutsHelpOverlay";
 import { ErrorBoundary } from "../components/ErrorBoundary";
@@ -71,7 +70,6 @@ function RootLayout() {
       <BrandingInjector />
       <GlobalShortcuts />
       <Outlet />
-      <CommandPalette />
       <ShortcutsHelpOverlay />
       <ToastContainer />
     </ErrorBoundary>
