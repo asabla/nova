@@ -1,16 +1,18 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowUp, Lightbulb, Code2, Palette, BarChart3,
-  ArrowRight, RefreshCw, MessageSquare, Paperclip,
+  ArrowRight, RefreshCw, MessageSquare, Paperclip, X, FileText,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { CardSkeleton } from "../../components/ui/Skeleton";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { useAuthStore } from "../../stores/auth.store";
+import { setPendingFiles } from "../../lib/pending-files";
+import { ALLOWED_MIME_TYPES } from "@nova/shared/constants";
 
 export const Route = createFileRoute("/_auth/")({
   component: HomePage,
@@ -28,7 +30,9 @@ function HomePage() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const [message, setMessage] = useState("");
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const greeting = getGreeting(t);
   const firstName = user?.name?.split(" ")[0] || "";
@@ -82,9 +86,24 @@ function HomePage() {
 
   const handleSend = () => {
     const text = message.trim();
-    if (!text) return;
-    handleStartConversation(text);
+    if (!text && pendingFiles.length === 0) return;
+    if (pendingFiles.length > 0) {
+      setPendingFiles(pendingFiles);
+    }
+    handleStartConversation(text || "Attached files");
   };
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length > 0) {
+      setPendingFiles((prev) => [...prev, ...files]);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
+
+  const removeFile = useCallback((index: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -122,6 +141,19 @@ function HomePage() {
         {/* Chat Input — hero element with signature glow */}
         <div className="relative mb-10">
           <div className="rounded-2xl border border-border bg-surface shadow-sm input-glow transition-all duration-200">
+            {pendingFiles.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 px-4 pt-3">
+                {pendingFiles.map((f, i) => (
+                  <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-secondary border border-border text-xs text-text-secondary max-w-[200px]">
+                    <FileText className="h-3 w-3 shrink-0 text-text-tertiary" aria-hidden="true" />
+                    <span className="truncate">{f.name}</span>
+                    <button onClick={() => removeFile(i)} className="shrink-0 text-text-tertiary hover:text-text" aria-label="Remove">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
             <textarea
               ref={textareaRef}
               value={message}
@@ -133,7 +165,16 @@ function HomePage() {
             />
             <div className="flex items-center justify-between px-4 pb-3.5">
               <div className="flex items-center gap-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept={ALLOWED_MIME_TYPES.join(",")}
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
                 <button
+                  onClick={() => fileInputRef.current?.click()}
                   className="p-2 rounded-lg text-text-tertiary hover:text-text-secondary hover:bg-surface-secondary transition-colors"
                   aria-label={t("home.attach", "Attach file")}
                 >
@@ -142,7 +183,7 @@ function HomePage() {
               </div>
               <button
                 onClick={handleSend}
-                disabled={!message.trim()}
+                disabled={!message.trim() && pendingFiles.length === 0}
                 className="h-9 w-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground disabled:opacity-25 disabled:cursor-not-allowed hover:bg-primary-dark active:scale-95 transition-all duration-150"
                 aria-label={t("home.send", "Send message")}
               >

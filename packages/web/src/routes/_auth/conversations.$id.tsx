@@ -64,17 +64,22 @@ function ConversationPage() {
     };
   }, [conversation]);
 
-  const handleSend = useCallback(async (content: string, files?: File[]) => {
+  const handleSend = useCallback(async (content: string, files?: File[], preUploadedAttachments?: { fileId: string; attachmentType: string }[]) => {
     stopTyping();
 
     try {
       // Upload files first if provided
-      let attachments: { fileId: string; attachmentType: "file" }[] | undefined;
+      let attachments: { fileId: string; attachmentType: string }[] | undefined;
       if (files && files.length > 0) {
         const results = await Promise.allSettled(files.map(uploadSingleFile));
         attachments = results
           .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
           .map((r) => ({ fileId: r.value, attachmentType: "file" as const }));
+      }
+
+      // Merge pre-uploaded attachments (e.g. from home page)
+      if (preUploadedAttachments?.length) {
+        attachments = [...(attachments ?? []), ...preUploadedAttachments];
       }
 
       await api.post(`/api/conversations/${id}/messages`, {
@@ -115,7 +120,18 @@ function ConversationPage() {
       if (initial) {
         sessionStorage.removeItem("nova:initial-message");
         initialMessageSent.current = true;
-        handleSend(initial);
+
+        // Read pre-uploaded attachments from home page flow
+        let preUploaded: { fileId: string; attachmentType: string }[] | undefined;
+        try {
+          const raw = sessionStorage.getItem("nova:initial-attachments");
+          if (raw) {
+            sessionStorage.removeItem("nova:initial-attachments");
+            preUploaded = JSON.parse(raw);
+          }
+        } catch { /* ignore parse errors */ }
+
+        handleSend(initial, undefined, preUploaded);
       }
     } catch { /* sessionStorage unavailable */ }
   }, [handleSend, conversation]);

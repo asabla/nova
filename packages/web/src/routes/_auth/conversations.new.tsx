@@ -8,6 +8,7 @@ import { queryKeys } from "../../lib/query-keys";
 import { MessageInput } from "../../components/chat/MessageInput";
 import { ModelCapabilityBadges } from "../../components/ui/ModelCapabilityBadges";
 import { toast } from "../../components/ui/Toast";
+import { consumePendingFiles } from "../../lib/pending-files";
 
 export const Route = createFileRoute("/_auth/conversations/new")({
   component: NewConversationPage,
@@ -44,20 +45,35 @@ function NewConversationPage() {
   const workspaces = (workspacesData as any)?.data ?? [];
   const starters = (starterTemplates as any)?.data ?? [];
 
+  const uploadSingleFile = useCallback(async (file: File) => {
+    const presign = await api.post<{ uploadUrl: string; fileId: string }>(
+      "/api/files/presign",
+      { filename: file.name, contentType: file.type, size: file.size },
+    );
+    await fetch(presign.uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type },
+      body: file,
+    });
+    await api.post(`/api/files/${presign.fileId}/confirm`);
+    return presign.fileId;
+  }, []);
+
   // Check for starter message from explore page or session storage
   useEffect(() => {
     try {
       const starterMessage = sessionStorage.getItem("nova:starter-message");
       if (starterMessage) {
         sessionStorage.removeItem("nova:starter-message");
-        createAndSend(starterMessage);
+        const files = consumePendingFiles();
+        createAndSend(starterMessage, undefined, files.length > 0 ? files : undefined);
       }
     } catch {
       // sessionStorage unavailable
     }
   }, []);
 
-  const createAndSend = useCallback(async (content: string, systemPrompt?: string) => {
+  const createAndSend = useCallback(async (content: string, systemPrompt?: string, files?: File[]) => {
     if (isCreating) return;
     setIsCreating(true);
 
@@ -71,9 +87,21 @@ function NewConversationPage() {
 
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
 
-      // Store the initial message so the conversation page can auto-send it
+      // Upload files and build attachment list
+      let attachmentMeta: { fileId: string; attachmentType: string }[] | undefined;
+      if (files && files.length > 0) {
+        const results = await Promise.allSettled(files.map(uploadSingleFile));
+        attachmentMeta = results
+          .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
+          .map((fid) => ({ fileId: fid.value, attachmentType: "file" }));
+      }
+
+      // Store the initial message (and attachment info) so the conversation page can auto-send it
       try {
         sessionStorage.setItem("nova:initial-message", content);
+        if (attachmentMeta?.length) {
+          sessionStorage.setItem("nova:initial-attachments", JSON.stringify(attachmentMeta));
+        }
       } catch { /* sessionStorage unavailable */ }
 
       navigate({ to: `/conversations/${conversation.id}`, replace: true });
@@ -81,7 +109,7 @@ function NewConversationPage() {
       toast(t("conversations.createFailed", "Failed to create conversation"), "error");
       setIsCreating(false);
     }
-  }, [navigate, queryClient, selectedModel, selectedWorkspace, isCreating, t]);
+  }, [navigate, queryClient, selectedModel, selectedWorkspace, isCreating, t, uploadSingleFile]);
 
   // Default starters if no templates exist
   const defaultStarters = [
@@ -205,7 +233,7 @@ function NewConversationPage() {
         </div>
       </div>
 
-      <MessageInput onSend={(content) => createAndSend(content)} disabled={isCreating} />
+      <MessageInput onSend={(content, files) => createAndSend(content, undefined, files)} disabled={isCreating} />
     </div>
   );
 }
