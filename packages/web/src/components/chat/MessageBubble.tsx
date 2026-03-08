@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Copy, Check, ThumbsUp, ThumbsDown, Pencil, RotateCcw, History, X, Send, StickyNote, ChevronDown, GitBranch, Volume2, VolumeX, Paperclip, FileText, Download } from "lucide-react";
 import { clsx } from "clsx";
 import { MarkdownRenderer } from "../markdown/MarkdownRenderer";
+import { ArtifactRenderer } from "./ArtifactRenderer";
+import { DynamicWidget } from "./DynamicWidget";
 import { Avatar } from "../ui/Avatar";
 import { api } from "../../lib/api";
 import { formatDistanceToNow } from "date-fns";
@@ -38,6 +40,7 @@ interface MessageBubbleProps {
       attachmentType: string;
     }[];
   };
+  artifacts?: any[];
   userName?: string;
   onRate?: (messageId: string, rating: 1 | -1) => void;
   onEdit?: (messageId: string, content: string) => void;
@@ -47,7 +50,7 @@ interface MessageBubbleProps {
   onFork?: (messageId: string) => void;
 }
 
-export function MessageBubble({ message, userName, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork }: MessageBubbleProps) {
+export function MessageBubble({ message, artifacts, userName, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork }: MessageBubbleProps) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -255,6 +258,29 @@ export function MessageBubble({ message, userName, onRate, onEdit, onEditAndReru
             ) : message.status === "failed" ? (
               <p className="text-sm text-danger" role="alert">{message.content ?? t("errors.messageFailed", { defaultValue: "Message failed to send." })}</p>
             ) : null}
+          </div>
+        )}
+
+        {/* Artifacts (including dynamic widgets) */}
+        {artifacts && artifacts.length > 0 && (
+          <div className={clsx("w-full max-w-[80%] mt-1.5", isUser ? "ml-auto" : "")}>
+            {artifacts.map((a: any) =>
+              a.type === "widget" && a.metadata ? (
+                <DynamicWidget key={a.id} config={a.metadata} />
+              ) : (
+                <ArtifactRenderer
+                  key={a.id}
+                  artifact={{
+                    id: a.id,
+                    type: a.type,
+                    title: a.title ?? a.type,
+                    content: a.content ?? "",
+                    language: a.language,
+                    metadata: a.metadata,
+                  }}
+                />
+              ),
+            )}
           </div>
         )}
 

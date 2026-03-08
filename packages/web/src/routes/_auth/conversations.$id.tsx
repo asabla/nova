@@ -4,7 +4,7 @@ import React, { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshCw } from "lucide-react";
 import { api } from "../../lib/api";
-import { queryKeys, messagesOptions, conversationDetailOptions } from "../../lib/query-keys";
+import { queryKeys, messagesOptions, conversationDetailOptions, artifactsOptions } from "../../lib/query-keys";
 import { MessageList } from "../../components/chat/MessageList";
 import { MessageInput } from "../../components/chat/MessageInput";
 import { ConversationHeader } from "../../components/chat/ConversationHeader";
@@ -33,14 +33,28 @@ function ConversationPage() {
 
   const { data: conversation, isLoading: isConversationLoading } = useQuery(conversationDetailOptions(id));
   const { data: messagesData, isLoading: isMessagesLoading } = useQuery(messagesOptions(id));
+  const { data: artifactsData } = useQuery(artifactsOptions(id));
 
   const messages = (messagesData as any)?.data ?? [];
+  const allArtifacts: any[] = (artifactsData as any)?.data ?? [];
   const isLoading = isConversationLoading || isMessagesLoading;
+
+  // Group artifacts by messageId for efficient lookup
+  const artifactsByMessageId = React.useMemo(() => {
+    const map = new Map<string, any[]>();
+    for (const a of allArtifacts) {
+      const list = map.get(a.messageId) ?? [];
+      list.push(a);
+      map.set(a.messageId, list);
+    }
+    return map;
+  }, [allArtifacts]);
 
   useEffect(() => {
     if (status === "done" && tokens) {
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.artifacts(id) });
       resetStream();
     }
   }, [status, tokens, id, queryClient, resetStream]);
@@ -292,6 +306,7 @@ function ConversationPage() {
         <>
           <MessageList
             messages={messages}
+            artifactsByMessageId={artifactsByMessageId}
             streamingContent={(status === "streaming" || status === "paused") ? tokens : undefined}
             isStreaming={status === "streaming" || status === "paused"}
             userName={user?.name}

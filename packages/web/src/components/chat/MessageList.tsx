@@ -7,6 +7,7 @@ import { TypingIndicator } from "./TypingIndicator";
 
 interface MessageListProps {
   messages: any[];
+  artifactsByMessageId?: Map<string, any[]>;
   streamingContent?: string;
   isStreaming?: boolean;
   userName?: string;
@@ -19,7 +20,7 @@ interface MessageListProps {
   onFork?: (messageId: string) => void;
 }
 
-export function MessageList({ messages, streamingContent, isStreaming, userName, conversationId, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork }: MessageListProps) {
+export function MessageList({ messages, artifactsByMessageId, streamingContent, isStreaming, userName, conversationId, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork }: MessageListProps) {
   const { t } = useTranslation();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -89,6 +90,7 @@ export function MessageList({ messages, streamingContent, isStreaming, userName,
           <MessageBubble
             key={msg.id}
             message={msg}
+            artifacts={artifactsByMessageId?.get(msg.id)}
             userName={userName}
             onRate={onRate}
             onEdit={onEdit}

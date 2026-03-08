@@ -291,7 +291,16 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
       "When citing sources or references, use inline Markdown links: [title](url).",
       "For multiple references, collect them in a **References** section at the end using a numbered list with links.",
       "Keep the formatting clean and readable — do not use HTML tags.",
-    ].join(" "),
+      "",
+      "You can embed interactive widgets in your responses using fenced code blocks with the language `widget`.",
+      "The content must be valid JSON matching one of these types:",
+      '- Weather: ```widget\n{"type":"weather","title":"Weather","params":{"location":"CityName"}}\n```',
+      '- Countdown: ```widget\n{"type":"countdown","title":"Countdown","params":{"date":"2027-01-01T00:00:00Z","label":"Event"}}\n```',
+      '- Poll: ```widget\n{"type":"poll","title":"Poll","params":{"question":"Your question?","options":"Option1,Option2,Option3"}}\n```',
+      "Use widgets when they add genuine value: weather when asked about weather, countdowns for dates, polls when the user wants to vote or decide.",
+      "Do not overuse widgets — only include them when they enhance the response.",
+      "IMPORTANT: When you can answer a question directly or use a widget, do NOT call tools. Only use tools (web_search, fetch_url) when you genuinely need external information you don't have.",
+    ].join("\n"),
   };
 
   if (hasSystemPrompt) {
@@ -398,7 +407,9 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
       const completionTokens = usageData?.completion_tokens ?? Math.ceil(fullContent.length / 4);
 
       // --- Smart routing: if tool calls detected, hand off to Temporal ---
+      console.log(`[stream] finishReason=${finishReason} toolCalls=${toolCalls.length} contentLen=${fullContent.length}`);
       if (finishReason === "tool_calls" && toolCalls.length > 0) {
+        console.log(`[stream] tool calls:`, toolCalls.map(tc => `${tc.function.name}(${tc.function.arguments.slice(0, 50)})`));
         // Send tool status events to the client
         for (const tc of toolCalls) {
           await stream.writeSSE({
@@ -410,6 +421,10 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         const streamChannelId = `stream:${conversationId}:${crypto.randomUUID()}`;
 
         try {
+          // Subscribe to Redis BEFORE starting workflow to avoid race condition
+          const { relayRedisToSSE } = await import("../lib/stream-relay");
+          const relayPromise = relayRedisToSSE(stream, streamChannelId, { timeoutMs: 120_000 });
+
           const client = await getTemporalClient();
           const workflowId = `smart-chat-${conversationId}-${Date.now()}`;
 
@@ -429,9 +444,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
             }],
           });
 
-          // Relay worker output from Redis back to the SSE stream
-          const { relayRedisToSSE } = await import("../lib/stream-relay");
-          const relayResult = await relayRedisToSSE(stream, streamChannelId, { timeoutMs: 120_000 });
+          const relayResult = await relayPromise;
 
           // Combine initial content + relay content for the final message
           const totalContent = fullContent + (relayResult?.content ?? "");
@@ -457,6 +470,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
               latencyMs: Date.now() - startTime,
             }),
           });
+          console.log(`[stream] relay done, relayContent=${(relayResult?.content ?? "").length} chars`);
         } catch (temporalErr) {
           // Temporal unavailable — save partial response and return error
           console.error("[smart-chat] Temporal workflow failed:", temporalErr);
@@ -517,6 +531,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         }),
       });
     } catch (err) {
+      console.error("[stream] outer error:", err);
       await stream.writeSSE({
         event: "error",
         data: JSON.stringify({ message: "Stream error", code: "stream_error" }),

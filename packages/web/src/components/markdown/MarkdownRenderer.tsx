@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { CodeBlock } from "./CodeBlock";
+import { DynamicWidget, type WidgetConfig } from "../chat/DynamicWidget";
 
 interface MarkdownRendererProps {
   content: string;
@@ -207,6 +208,17 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
 
               if (lang === "csv") {
                 return <CsvTable csv={codeString} />;
+              }
+
+              if (lang === "widget") {
+                try {
+                  const config = JSON.parse(codeString) as WidgetConfig;
+                  if (config.type) {
+                    return <DynamicWidget config={config} />;
+                  }
+                } catch {
+                  // Fall through to code block if JSON is invalid
+                }
               }
 
               return <CodeBlock code={codeString} language={lang} />;

@@ -16,13 +16,15 @@ import {
   Table2,
   Music,
   Video,
+  Blocks,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { CodeBlock } from "../markdown/CodeBlock";
+import { DynamicWidget, type WidgetConfig } from "./DynamicWidget";
 
 // --- Types ---
 
-export type ArtifactType = "code" | "csv" | "chart" | "image" | "audio" | "video" | "table";
+export type ArtifactType = "code" | "csv" | "chart" | "image" | "audio" | "video" | "table" | "widget";
 
 export interface ChartDataset {
   label: string;
@@ -71,6 +73,7 @@ const typeConfig: Record<ArtifactType, { icon: typeof Code; label: string; color
   audio: { icon: Music, label: "Audio", color: "bg-teal-500/10 text-teal-400 border-teal-500/20" },
   video: { icon: Video, label: "Video", color: "bg-red-500/10 text-red-400 border-red-500/20" },
   table: { icon: Table2, label: "Table", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
+  widget: { icon: Blocks, label: "Widget", color: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20" },
 };
 
 // --- CSV Table ---
@@ -852,6 +855,11 @@ export function ArtifactRenderer({ artifact, className }: ArtifactRendererProps)
               Your browser does not support the video element.
             </video>
           </div>
+        )}
+
+        {/* Dynamic widget */}
+        {artifact.type === "widget" && artifact.metadata && (
+          <DynamicWidget config={artifact.metadata as WidgetConfig} />
         )}
       </div>
 

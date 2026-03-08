@@ -7,6 +7,7 @@ export const queryKeys = {
     list: (filters?: Record<string, unknown>) => [...queryKeys.conversations.all, "list", filters] as const,
     detail: (id: string) => [...queryKeys.conversations.all, "detail", id] as const,
     messages: (id: string) => [...queryKeys.conversations.all, "messages", id] as const,
+    artifacts: (id: string) => [...queryKeys.conversations.all, "artifacts", id] as const,
   },
   agents: {
     all: ["agents"] as const,
@@ -62,6 +63,14 @@ export function messagesOptions(conversationId: string) {
   return queryOptions({
     queryKey: queryKeys.conversations.messages(conversationId),
     queryFn: () => api.get<any>(`/api/conversations/${conversationId}/messages`),
+    staleTime: 10_000,
+  });
+}
+
+export function artifactsOptions(conversationId: string) {
+  return queryOptions({
+    queryKey: queryKeys.conversations.artifacts(conversationId),
+    queryFn: () => api.get<any>(`/api/conversations/${conversationId}/artifacts`),
     staleTime: 10_000,
   });
 }

@@ -30,6 +30,7 @@ import { Route as AuthKnowledgeRouteImport } from './routes/_auth/knowledge'
 import { Route as AuthHelpRouteImport } from './routes/_auth/help'
 import { Route as AuthFoldersRouteImport } from './routes/_auth/folders'
 import { Route as AuthExploreRouteImport } from './routes/_auth/explore'
+import { Route as AuthDevWidgetsRouteImport } from './routes/_auth/dev-widgets'
 import { Route as AuthAgentsRouteImport } from './routes/_auth/agents'
 import { Route as AuthAdminRouteImport } from './routes/_auth/admin'
 import { Route as AuthSettingsIndexRouteImport } from './routes/_auth/settings.index'
@@ -166,6 +167,11 @@ const AuthFoldersRoute = AuthFoldersRouteImport.update({
 const AuthExploreRoute = AuthExploreRouteImport.update({
   id: '/explore',
   path: '/explore',
+  getParentRoute: () => AuthRoute,
+} as any)
+const AuthDevWidgetsRoute = AuthDevWidgetsRouteImport.update({
+  id: '/dev-widgets',
+  path: '/dev-widgets',
   getParentRoute: () => AuthRoute,
 } as any)
 const AuthAgentsRoute = AuthAgentsRouteImport.update({
@@ -342,6 +348,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/admin': typeof AuthAdminRouteWithChildren
   '/agents': typeof AuthAgentsRouteWithChildren
+  '/dev-widgets': typeof AuthDevWidgetsRoute
   '/explore': typeof AuthExploreRoute
   '/folders': typeof AuthFoldersRoute
   '/help': typeof AuthHelpRoute
@@ -395,6 +402,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/agents': typeof AuthAgentsRouteWithChildren
+  '/dev-widgets': typeof AuthDevWidgetsRoute
   '/explore': typeof AuthExploreRoute
   '/folders': typeof AuthFoldersRoute
   '/help': typeof AuthHelpRoute
@@ -451,6 +459,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_auth/admin': typeof AuthAdminRouteWithChildren
   '/_auth/agents': typeof AuthAgentsRouteWithChildren
+  '/_auth/dev-widgets': typeof AuthDevWidgetsRoute
   '/_auth/explore': typeof AuthExploreRoute
   '/_auth/folders': typeof AuthFoldersRoute
   '/_auth/help': typeof AuthHelpRoute
@@ -509,6 +518,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin'
     | '/agents'
+    | '/dev-widgets'
     | '/explore'
     | '/folders'
     | '/help'
@@ -562,6 +572,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/signup'
     | '/agents'
+    | '/dev-widgets'
     | '/explore'
     | '/folders'
     | '/help'
@@ -617,6 +628,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/_auth/admin'
     | '/_auth/agents'
+    | '/_auth/dev-widgets'
     | '/_auth/explore'
     | '/_auth/folders'
     | '/_auth/help'
@@ -822,6 +834,13 @@ declare module '@tanstack/react-router' {
       path: '/explore'
       fullPath: '/explore'
       preLoaderRoute: typeof AuthExploreRouteImport
+      parentRoute: typeof AuthRoute
+    }
+    '/_auth/dev-widgets': {
+      id: '/_auth/dev-widgets'
+      path: '/dev-widgets'
+      fullPath: '/dev-widgets'
+      preLoaderRoute: typeof AuthDevWidgetsRouteImport
       parentRoute: typeof AuthRoute
     }
     '/_auth/agents': {
@@ -1169,6 +1188,7 @@ const AuthWorkspacesRouteWithChildren = AuthWorkspacesRoute._addFileChildren(
 interface AuthRouteChildren {
   AuthAdminRoute: typeof AuthAdminRouteWithChildren
   AuthAgentsRoute: typeof AuthAgentsRouteWithChildren
+  AuthDevWidgetsRoute: typeof AuthDevWidgetsRoute
   AuthExploreRoute: typeof AuthExploreRoute
   AuthFoldersRoute: typeof AuthFoldersRoute
   AuthHelpRoute: typeof AuthHelpRoute
@@ -1193,6 +1213,7 @@ interface AuthRouteChildren {
 const AuthRouteChildren: AuthRouteChildren = {
   AuthAdminRoute: AuthAdminRouteWithChildren,
   AuthAgentsRoute: AuthAgentsRouteWithChildren,
+  AuthDevWidgetsRoute: AuthDevWidgetsRoute,
   AuthExploreRoute: AuthExploreRoute,
   AuthFoldersRoute: AuthFoldersRoute,
   AuthHelpRoute: AuthHelpRoute,
