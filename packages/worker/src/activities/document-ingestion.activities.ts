@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "../lib/db";
+import { LITELLM_URL, litellmHeaders } from "../lib/litellm";
 import { getDefaultEmbeddingModel } from "../lib/models";
 import { knowledgeDocuments, knowledgeChunks } from "@nova/shared/schemas";
 import type { DocumentIngestionInput } from "../workflows/document-ingestion";
@@ -34,7 +35,6 @@ export async function chunkDocument(documentId: string, content: string): Promis
 export async function generateEmbeddings(
   chunks: { text: string; index: number }[],
 ): Promise<{ text: string; index: number; embedding: number[] | null }[]> {
-  const litellmUrl = process.env.LITELLM_URL ?? "http://localhost:4000";
   const embeddingModel = process.env.EMBEDDING_MODEL ?? await getDefaultEmbeddingModel();
   const batchSize = 20;
   const results: { text: string; index: number; embedding: number[] | null }[] = [];
@@ -44,9 +44,9 @@ export async function generateEmbeddings(
     const texts = batch.map((c) => c.text);
 
     try {
-      const resp = await fetch(`${litellmUrl}/v1/embeddings`, {
+      const resp = await fetch(`${LITELLM_URL}/v1/embeddings`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: litellmHeaders(),
         body: JSON.stringify({
           model: embeddingModel,
           input: texts,

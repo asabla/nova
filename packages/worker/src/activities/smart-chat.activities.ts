@@ -1,4 +1,5 @@
 import { publishToken, publishToolStatus as pubToolStatus, publishDone as pubDone, publishError } from "../lib/stream-publisher";
+import { LITELLM_URL, litellmHeaders } from "../lib/litellm";
 
 // Re-export stream-publisher functions as activities so the workflow can call them
 export async function publishToolStatus(
@@ -33,8 +34,6 @@ export async function streamingLLMStep(input: {
   finishReason: string;
   usage: { prompt_tokens?: number; completion_tokens?: number };
 }> {
-  const litellmUrl = process.env.LITELLM_URL ?? "http://localhost:4000";
-
   const body: Record<string, unknown> = {
     model: input.model,
     messages: input.messages,
@@ -47,9 +46,9 @@ export async function streamingLLMStep(input: {
     body.tools = input.tools;
   }
 
-  const resp = await fetch(`${litellmUrl}/v1/chat/completions`, {
+  const resp = await fetch(`${LITELLM_URL}/v1/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: litellmHeaders(),
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(120_000),
   });

@@ -1,5 +1,6 @@
 import { eq, asc } from "drizzle-orm";
 import { db } from "../lib/db";
+import { LITELLM_URL, litellmHeaders } from "../lib/litellm";
 import { getDefaultChatModel } from "../lib/models";
 import { messages, conversations } from "@nova/shared/schemas";
 
@@ -18,12 +19,11 @@ export async function getConversationMessages(conversationId: string): Promise<{
 }
 
 export async function generateSummary(msgs: { role: string; content: string }[]): Promise<string> {
-  const litellmUrl = process.env.LITELLM_URL ?? "http://localhost:4000";
   const model = process.env.SUMMARY_MODEL ?? await getDefaultChatModel();
 
-  const resp = await fetch(`${litellmUrl}/v1/chat/completions`, {
+  const resp = await fetch(`${LITELLM_URL}/v1/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: litellmHeaders(),
     body: JSON.stringify({
       model,
       messages: [

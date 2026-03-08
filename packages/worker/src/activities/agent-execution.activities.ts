@@ -1,5 +1,6 @@
 import { eq, and, isNull } from "drizzle-orm";
 import { db } from "../lib/db";
+import { LITELLM_URL, litellmHeaders } from "../lib/litellm";
 import { getDefaultChatModel } from "../lib/models";
 import { agents, agentMemoryEntries, conversations, messages } from "@nova/shared/schemas";
 
@@ -70,7 +71,6 @@ export async function executeAgentStep(
   tools: { name: string; description: string; parameters: unknown }[],
   stepNumber: number,
 ) {
-  const litellmUrl = process.env.LITELLM_URL ?? "http://localhost:4000";
   const model = agentConfig.modelId ?? await getDefaultChatModel();
 
   const msgs = [
@@ -94,9 +94,9 @@ export async function executeAgentStep(
     }));
   }
 
-  const resp = await fetch(`${litellmUrl}/v1/chat/completions`, {
+  const resp = await fetch(`${LITELLM_URL}/v1/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: litellmHeaders(),
     body: JSON.stringify(body),
   });
 

@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "../lib/db";
+import { LITELLM_URL, litellmHeaders } from "../lib/litellm";
 import { getDefaultChatModel } from "../lib/models";
 import { researchReports } from "@nova/shared/schemas";
 
@@ -86,12 +87,11 @@ export async function fetchPageContent(url: string): Promise<string> {
 }
 
 export async function analyzeSource(query: string, content: string): Promise<{ summary: string; relevance: number }> {
-  const litellmUrl = process.env.LITELLM_URL ?? "http://localhost:4000";
   const model = process.env.RESEARCH_MODEL ?? await getDefaultChatModel();
 
-  const resp = await fetch(`${litellmUrl}/v1/chat/completions`, {
+  const resp = await fetch(`${LITELLM_URL}/v1/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: litellmHeaders(),
     body: JSON.stringify({
       model,
       messages: [
@@ -117,14 +117,13 @@ export async function generateResearchReport(
   query: string,
   sources: { url: string; title: string; content: string; relevance: number }[],
 ): Promise<void> {
-  const litellmUrl = process.env.LITELLM_URL ?? "http://localhost:4000";
   const model = process.env.RESEARCH_MODEL ?? await getDefaultChatModel();
 
   const sourceSummaries = sources.map((s, i) => `[${i + 1}] ${s.title}\n${s.content}`).join("\n\n");
 
-  const resp = await fetch(`${litellmUrl}/v1/chat/completions`, {
+  const resp = await fetch(`${LITELLM_URL}/v1/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: litellmHeaders(),
     body: JSON.stringify({
       model,
       messages: [
