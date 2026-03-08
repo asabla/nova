@@ -1039,6 +1039,15 @@ function RenderedMarkdown({ content }: { content: string }) {
 
   const processInline = (text: string): React.ReactNode[] => {
     const parts: React.ReactNode[] = [];
+    // Normalize HTML line breaks to newlines, then split on them
+    const normalized = text.replace(/<br\s*\/?>/gi, "\n");
+    if (normalized.includes("\n")) {
+      const segments = normalized.split("\n");
+      return segments.flatMap((seg, idx) => [
+        ...(idx > 0 ? [<br key={`br-${idx}`} />] : []),
+        ...processInline(seg),
+      ]);
+    }
     // Bold, italic, inline code, links, citation references
     const regex = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)|(\[([^\]]+)\]\(([^)]+)\))|(\[(\d+)\])/g;
     let lastIndex = 0;
@@ -1158,6 +1167,47 @@ function RenderedMarkdown({ content }: { content: string }) {
         <blockquote key={i} className="border-l-2 border-primary/40 pl-3 my-2 text-text-secondary italic">
           {processInline(line.slice(2))}
         </blockquote>,
+      );
+    } else if (line.trim().startsWith("|") && line.trim().endsWith("|")) {
+      // Markdown table: collect consecutive pipe-delimited rows
+      const tableRows: string[] = [line];
+      while (i + 1 < lines.length && lines[i + 1].trim().startsWith("|") && lines[i + 1].trim().endsWith("|")) {
+        i++;
+        tableRows.push(lines[i]);
+      }
+      const parsedRows = tableRows
+        .filter((r) => !/^\|[\s\-:|]+\|$/.test(r.trim())) // skip separator rows
+        .map((r) =>
+          r.split("|").slice(1, -1).map((cell) => cell.trim()),
+        );
+      const [header, ...body] = parsedRows;
+      elements.push(
+        <div key={i} className="overflow-x-auto my-3">
+          <table className="w-full text-sm border-collapse">
+            {header && (
+              <thead>
+                <tr className="border-b border-border">
+                  {header.map((cell, ci) => (
+                    <th key={ci} className="px-3 py-2 text-left font-semibold text-text">
+                      {processInline(cell)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+            )}
+            <tbody>
+              {body.map((row, ri) => (
+                <tr key={ri} className="border-b border-border/50">
+                  {row.map((cell, ci) => (
+                    <td key={ci} className="px-3 py-2 text-text-secondary">
+                      {processInline(cell)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
       );
     } else if (line.startsWith("---") || line.startsWith("***")) {
       elements.push(<hr key={i} className="my-4 border-border" />);

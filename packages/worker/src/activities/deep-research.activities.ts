@@ -127,7 +127,7 @@ export async function generateResearchReport(
     body: JSON.stringify({
       model,
       messages: [
-        { role: "system", content: "Generate a comprehensive research report with citations. Use [n] format for citations. Include an executive summary, key findings, detailed analysis, and conclusion." },
+        { role: "system", content: "Generate a comprehensive research report in standard markdown format. Use ## headings for sections (Executive Summary, Key Findings, Detailed Analysis, Conclusion, References). Use paragraphs, bullet points, and numbered lists for content — do NOT use markdown tables. Use [n] format for inline citations that reference the numbered sources." },
         { role: "user", content: `Research query: ${query}\n\nSources:\n${sourceSummaries}` },
       ],
       max_tokens: 4096,
