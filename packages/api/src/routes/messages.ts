@@ -280,6 +280,30 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
     }
   }
 
+  // Prepend a default formatting system instruction unless the conversation
+  // already starts with a user-provided system prompt.
+  const hasSystemPrompt = enrichedMessages.length > 0 && enrichedMessages[0].role === "system";
+  const formattingInstruction = {
+    role: "system",
+    content: [
+      "Format all responses using standard Markdown.",
+      "Use headings (##, ###), bullet/numbered lists, bold, italic, code blocks, and blockquotes where appropriate.",
+      "When citing sources or references, use inline Markdown links: [title](url).",
+      "For multiple references, collect them in a **References** section at the end using a numbered list with links.",
+      "Keep the formatting clean and readable — do not use HTML tags.",
+    ].join(" "),
+  };
+
+  if (hasSystemPrompt) {
+    // Append formatting guidance to the existing system prompt
+    enrichedMessages[0] = {
+      ...enrichedMessages[0],
+      content: `${enrichedMessages[0].content}\n\n${formattingInstruction.content}`,
+    };
+  } else {
+    enrichedMessages.unshift(formattingInstruction);
+  }
+
   return streamSSE(c, async (stream) => {
     const heartbeat = setInterval(() => {
       stream.writeSSE({ event: "heartbeat", data: "" });
@@ -607,6 +631,15 @@ messagesRouter.post("/:conversationId/messages/:messageId/replay", zValidator("j
   // If the target is an assistant message, remove it and keep messages up to the user message before it
   if (msgList[targetIndex].senderType === "assistant") {
     history.pop();
+  }
+
+  // Prepend formatting instruction (same as streaming endpoint)
+  const hasReplaySystemPrompt = history.length > 0 && history[0].role === "system";
+  const replayFormatting = "Format all responses using standard Markdown. Use headings (##, ###), bullet/numbered lists, bold, italic, code blocks, and blockquotes where appropriate. When citing sources or references, use inline Markdown links: [title](url). For multiple references, collect them in a **References** section at the end using a numbered list with links. Keep the formatting clean and readable — do not use HTML tags.";
+  if (hasReplaySystemPrompt) {
+    history[0] = { ...history[0], content: `${history[0].content}\n\n${replayFormatting}` };
+  } else {
+    history.unshift({ role: "system", content: replayFormatting });
   }
 
   // Call the new model
