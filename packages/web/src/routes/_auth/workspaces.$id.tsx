@@ -708,10 +708,12 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
     });
   }, [workspace]);
 
-  const { data: agents } = useQuery({
+  const { data: agentsData } = useQuery({
     queryKey: ["agents"],
-    queryFn: () => api.get<any[]>("/api/agents"),
+    queryFn: () => api.get<any>("/api/agents"),
   });
+
+  const agents = (agentsData as any)?.data ?? [];
 
   const { data: modelsData } = useQuery({
     queryKey: ["models"],
@@ -915,10 +917,12 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
 
 function ActivityTab({ workspaceId }: { workspaceId: string }) {
   const { t } = useTranslation();
-  const { data: activities, isLoading, isError, refetch } = useQuery({
+  const { data: activitiesData, isLoading, isError, refetch } = useQuery({
     queryKey: ["workspaces", workspaceId, "activity"],
-    queryFn: () => api.get<any[]>(`/api/workspaces/${workspaceId}/activity`),
+    queryFn: () => api.get<any>(`/api/workspaces/${workspaceId}/activity`),
   });
+
+  const activities = (activitiesData as any)?.data ?? [];
 
   const activityIcon = (type: string) => {
     switch (type) {

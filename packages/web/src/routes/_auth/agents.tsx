@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, Outlet, useMatchRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Bot, Plus, Star, MoreHorizontal, RefreshCw } from "lucide-react";
@@ -14,6 +14,17 @@ export const Route = createFileRoute("/_auth/agents")({
 });
 
 function AgentsPage() {
+  const matchRoute = useMatchRoute();
+  const isChildRoute = matchRoute({ to: "/agents/$id", fuzzy: true });
+
+  if (isChildRoute) {
+    return <Outlet />;
+  }
+
+  return <AgentsListPage />;
+}
+
+function AgentsListPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
