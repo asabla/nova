@@ -9,41 +9,62 @@ export async function searchWeb(query: string, iteration: number): Promise<{ url
   // Try SearxNG first (self-hosted search)
   if (searxngUrl) {
     try {
-      const resp = await fetch(
-        `${searxngUrl}/search?q=${encodeURIComponent(query)}&format=json&categories=general&pageno=${iteration}`,
-        { signal: AbortSignal.timeout(10_000) },
-      );
+      const url = `${searxngUrl}/search?q=${encodeURIComponent(query)}&format=json&categories=general&pageno=${iteration + 1}`;
+      console.log(`[RESEARCH] SearxNG search: ${url}`);
+      const resp = await fetch(url, { signal: AbortSignal.timeout(10_000) });
       if (resp.ok) {
         const data = await resp.json() as { results: { url: string; title: string }[] };
-        return (data.results ?? []).slice(0, 10).map((r) => ({ url: r.url, title: r.title }));
+        const results = (data.results ?? []).slice(0, 10).map((r) => ({ url: r.url, title: r.title }));
+        console.log(`[RESEARCH] SearxNG returned ${results.length} results`);
+        return results;
       }
-    } catch {
-      // Fall through to DuckDuckGo
+      console.warn(`[RESEARCH] SearxNG returned ${resp.status}`);
+    } catch (err) {
+      console.warn(`[RESEARCH] SearxNG failed, falling back to DuckDuckGo:`, (err as Error).message);
     }
+  } else {
+    console.warn("[RESEARCH] SEARXNG_URL not set, using DuckDuckGo fallback");
   }
 
-  // Fallback: DuckDuckGo Instant Answer API + HTML search
+  // Fallback: DuckDuckGo Lite (plain HTML, more bot-friendly than html.duckduckgo.com)
   try {
     const resp = await fetch(
-      `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
+      `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`,
       {
-        headers: { "User-Agent": "NovaBot/1.0" },
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; NovaResearch/1.0)",
+          Accept: "text/html",
+        },
         signal: AbortSignal.timeout(10_000),
       },
     );
+    if (!resp.ok) return [];
     const html = await resp.text();
 
-    // Parse result links from DDG HTML response
+    // DDG Lite uses simple <a> tags with class="result-link"
     const results: { url: string; title: string }[] = [];
-    const linkRegex = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([^<]+)<\/a>/gi;
+    const linkRegex = /<a[^>]+class="result-link"[^>]+href="([^"]+)"[^>]*>([^<]*)<\/a>/gi;
     let match: RegExpExecArray | null;
     while ((match = linkRegex.exec(html)) !== null && results.length < 10) {
-      let url = match[1];
-      // DDG wraps URLs in a redirect
-      const udMatch = url.match(/uddg=([^&]+)/);
-      if (udMatch) url = decodeURIComponent(udMatch[1]);
-      results.push({ url, title: match[2].trim() });
+      const url = match[1].trim();
+      const title = match[2].trim();
+      if (url.startsWith("http")) {
+        results.push({ url, title: title || url });
+      }
     }
+
+    // If result-link class didn't match, try broader extraction of external links
+    if (results.length === 0) {
+      const broadRegex = /<a[^>]+href="(https?:\/\/(?!duckduckgo\.com)[^"]+)"[^>]*>([^<]+)<\/a>/gi;
+      while ((match = broadRegex.exec(html)) !== null && results.length < 10) {
+        const url = match[1].trim();
+        const title = match[2].trim();
+        if (title.length > 3) {
+          results.push({ url, title });
+        }
+      }
+    }
+
     return results;
   } catch {
     return [];

@@ -121,6 +121,24 @@ services:
     environment:
       TEMPORAL_ADDRESS: temporal:7233
 
+  # ─── SearxNG (self-hosted web search) ────────────
+  searxng:
+    image: searxng/searxng:latest
+    container_name: nova-searxng
+    restart: unless-stopped
+    ports:
+      - "8888:8080"
+    environment:
+      SEARXNG_BASE_URL: http://localhost:8888
+    volumes:
+      - ./infra/docker/searxng-settings.yaml:/etc/searxng/settings.yml:ro
+      - searxng_data:/etc/searxng/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ─── NOVA API ────────────────────────────────────
   api:
     build:
@@ -167,7 +185,7 @@ services:
       REDIS_URL: redis://redis:6379
       TEMPORAL_ADDRESS: temporal:7233
       LITELLM_URL: http://litellm:4000
-      SEARXNG_URL: ""
+      SEARXNG_URL: http://searxng:8080
     depends_on:
       postgres:
         condition: service_healthy
@@ -175,6 +193,8 @@ services:
         condition: service_healthy
       temporal:
         condition: service_started
+      searxng:
+        condition: service_healthy
 
   # ─── NOVA Web ────────────────────────────────────
   web:
@@ -193,3 +213,4 @@ volumes:
   redis_data:
   minio_data:
   temporal_db_data:
+  searxng_data:

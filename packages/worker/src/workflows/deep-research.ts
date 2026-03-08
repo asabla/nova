@@ -54,6 +54,13 @@ export async function deepResearchWorkflow(input: DeepResearchInput): Promise<vo
     if (sources.length >= input.maxSources) break;
   }
 
+  if (sources.length === 0) {
+    await updateResearchStatus(input.reportId, "failed", {
+      error: "No search results found. Check that SearxNG is configured and reachable.",
+    });
+    return;
+  }
+
   await updateResearchStatus(input.reportId, "generating", {
     totalSources: sources.length,
   });
