@@ -15,19 +15,22 @@ type Story = StoryObj<typeof ToolStatusChip>;
 
 export const Running: Story = {
   args: {
-    tool: { name: "web_search", status: "running" },
+    name: "web_search",
+    status: "running",
   },
 };
 
 export const Completed: Story = {
   args: {
-    tool: { name: "web_search", status: "completed" },
+    name: "web_search",
+    status: "completed",
   },
 };
 
 export const Error: Story = {
   args: {
-    tool: { name: "code_execute", status: "error" },
+    name: "code_execute",
+    status: "error",
   },
 };
 
@@ -51,9 +54,9 @@ export const AllStates: Story = {
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary mb-3">Individual Chips</p>
         <div className="flex items-center gap-2 flex-wrap">
-          <ToolStatusChip tool={{ name: "web_search", status: "running" }} />
-          <ToolStatusChip tool={{ name: "code_execute", status: "completed" }} />
-          <ToolStatusChip tool={{ name: "file_read", status: "error" }} />
+          <ToolStatusChip name="web_search" status="running" />
+          <ToolStatusChip name="code_execute" status="completed" />
+          <ToolStatusChip name="file_read" status="error" />
         </div>
       </div>
 

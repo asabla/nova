@@ -36,7 +36,7 @@ export function Select({
   const [open, setOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [typeahead, setTypeahead] = useState("");
-  const typeaheadTimer = useRef<ReturnType<typeof setTimeout>>();
+  const typeaheadTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const generatedId = useId();
   const labelId = `${generatedId}-label`;

@@ -859,7 +859,7 @@ export function ArtifactRenderer({ artifact, className }: ArtifactRendererProps)
 
         {/* Dynamic widget */}
         {artifact.type === "widget" && artifact.metadata && (
-          <DynamicWidget config={artifact.metadata as WidgetConfig} />
+          <DynamicWidget config={artifact.metadata as unknown as WidgetConfig} />
         )}
       </div>
 

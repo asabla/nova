@@ -16,14 +16,14 @@ const meta: Meta<typeof Pagination> = {
 export default meta;
 type Story = StoryObj<typeof Pagination>;
 
-function InteractivePagination(props: Partial<React.ComponentProps<typeof Pagination>> & { totalPages: number }) {
-  const [page, setPage] = useState(props.page ?? 1);
+function InteractivePagination({ totalPages, ...rest }: Partial<React.ComponentProps<typeof Pagination>> & { totalPages: number }) {
+  const [page, setPage] = useState(rest.page ?? 1);
   return (
     <Pagination
       page={page}
-      totalPages={props.totalPages}
+      totalPages={totalPages}
       onPageChange={setPage}
-      {...props}
+      {...rest}
     />
   );
 }

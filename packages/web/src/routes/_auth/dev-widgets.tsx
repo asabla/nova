@@ -75,7 +75,7 @@ function widgetToArtifact(config: WidgetConfig, index: number): ArtifactData {
     type: "widget",
     title: config.title ?? config.type,
     content: "",
-    metadata: config,
+    metadata: config as unknown as Record<string, unknown>,
   };
 }
 
