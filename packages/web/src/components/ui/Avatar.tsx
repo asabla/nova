@@ -35,7 +35,7 @@ export function Avatar({ src, name, size = "md", className }: AvatarProps) {
   const [imgError, setImgError] = useState(false);
 
   const sizeClasses = {
-    xs: "h-5 w-5 text-[8px]",
+    xs: "h-5 w-5 text-[10px]",
     sm: "h-7 w-7 text-xs",
     md: "h-9 w-9 text-sm",
     lg: "h-12 w-12 text-base",

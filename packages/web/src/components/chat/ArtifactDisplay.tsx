@@ -103,9 +103,33 @@ function SortableTable({ csv }: { csv: string }) {
 
   const rows = useMemo(() => {
     const lines = csv.trim().split("\n").filter(Boolean);
-    return lines.map((line) =>
-      line.split(",").map((cell) => cell.trim().replace(/^"|"$/g, "")),
-    );
+    return lines.map((line) => {
+      const cells: string[] = [];
+      let current = "";
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inQuotes) {
+          if (ch === '"' && line[i + 1] === '"') {
+            current += '"';
+            i++; // skip escaped quote
+          } else if (ch === '"') {
+            inQuotes = false;
+          } else {
+            current += ch;
+          }
+        } else if (ch === '"') {
+          inQuotes = true;
+        } else if (ch === ",") {
+          cells.push(current.trim());
+          current = "";
+        } else {
+          current += ch;
+        }
+      }
+      cells.push(current.trim());
+      return cells;
+    });
   }, [csv]);
 
   const [header, ...body] = rows;

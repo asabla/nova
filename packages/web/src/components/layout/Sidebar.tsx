@@ -23,6 +23,7 @@ export function Sidebar() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
+  const sidebarWidth = useUIStore((s) => s.sidebarWidth);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const user = useAuthStore((s) => s.user);
   const [showFilters, setShowFilters] = useState(false);
@@ -38,7 +39,7 @@ export function Sidebar() {
   });
 
   const { data: workspacesData } = useQuery({
-    queryKey: ["workspaces"],
+    queryKey: queryKeys.workspaces.all,
     queryFn: () => api.get<any>("/api/workspaces"),
     staleTime: 60_000,
   });
@@ -95,8 +96,9 @@ export function Sidebar() {
       <aside
         className={clsx(
           "flex flex-col h-full bg-surface-secondary border-r border-border transition-all duration-200",
-          sidebarOpen ? "w-[280px]" : "w-0 overflow-hidden",
+          !sidebarOpen && "w-0 overflow-hidden",
         )}
+        style={sidebarOpen ? { width: `${sidebarWidth}px` } : undefined}
         aria-hidden={!sidebarOpen}
         {...(!sidebarOpen && { inert: "" as any })}
       >
@@ -205,8 +207,8 @@ export function Sidebar() {
             <ConversationListSkeleton />
           ) : filteredConversations.length === 0 ? (
             <div className="px-3 py-8 text-center">
-              <p className="text-xs text-text-tertiary">{t("conversations.empty")}</p>
-              <p className="text-xs text-text-tertiary mt-1">{t("conversations.startPrompt")}</p>
+              <p className="text-xs text-text-tertiary">{t("conversations.empty", "No conversations yet")}</p>
+              <p className="text-xs text-text-tertiary mt-1">{t("conversations.startPrompt", "Start a new conversation")}</p>
             </div>
           ) : (
             filteredConversations.map((conv: any) => (
@@ -236,9 +238,9 @@ export function Sidebar() {
 
         {/* Bottom Navigation */}
         <div className="border-t border-border px-2 py-2 space-y-0.5">
-          <SidebarLink icon={Settings} label={t("nav.settings")} to="/settings" />
-          <SidebarLink icon={HelpCircle} label={t("nav.help")} to="/help" />
-          {isAdmin && <SidebarLink icon={ShieldCheck} label={t("nav.admin")} to="/admin" />}
+          <SidebarLink icon={Settings} label={t("nav.settings", "Settings")} to="/settings" />
+          <SidebarLink icon={HelpCircle} label={t("nav.help", "Help")} to="/help" />
+          {isAdmin && <SidebarLink icon={ShieldCheck} label={t("nav.admin", "Admin")} to="/admin" />}
         </div>
       </aside>
 

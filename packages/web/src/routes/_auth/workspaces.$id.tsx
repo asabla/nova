@@ -32,6 +32,7 @@ import { Dialog } from "../../components/ui/Dialog";
 import { toast } from "../../components/ui/Toast";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { api, apiHeaders } from "../../lib/api";
+import { queryKeys } from "../../lib/query-keys";
 
 export const Route = createFileRoute("/_auth/workspaces/$id")({
   component: WorkspaceDetailPage,
@@ -716,7 +717,7 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
   const agents = (agentsData as any)?.data ?? [];
 
   const { data: modelsData } = useQuery({
-    queryKey: ["models"],
+    queryKey: queryKeys.models.all,
     queryFn: () => api.get<any>("/api/models"),
   });
 
@@ -725,7 +726,7 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
   const updateMutation = useMutation({
     mutationFn: (data: typeof form) => api.patch(`/api/workspaces/${workspaceId}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.all });
       toast.success(t("workspaces.updated", { defaultValue: "Workspace updated" }));
     },
     onError: (err: any) => toast.error(err.message ?? t("workspaces.updateFailed", { defaultValue: "Update failed" })),
@@ -735,7 +736,7 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
     mutationFn: () =>
       api.patch(`/api/workspaces/${workspaceId}`, { archived: !workspace.archived }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.all });
       toast.success(workspace.archived ? t("workspaces.restored", { defaultValue: "Workspace restored" }) : t("workspaces.archivedSuccess", { defaultValue: "Workspace archived" }));
     },
     onError: (err: any) => toast.error(err.message ?? t("workspaces.actionFailed", { defaultValue: "Action failed" })),

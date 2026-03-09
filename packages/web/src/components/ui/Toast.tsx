@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { X, CheckCircle, AlertTriangle, Info, XCircle } from "lucide-react";
 import { create } from "zustand";
 import { clsx } from "clsx";
@@ -56,6 +57,7 @@ const colors = {
 };
 
 function ToastEntry({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }) {
+  const { t } = useTranslation();
   const Icon = icons[toast.type];
   const [paused, setPaused] = useState(false);
   const onDismissRef = useCallback(onDismiss, [toast.id]);
@@ -72,7 +74,8 @@ function ToastEntry({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => v
         "flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg backdrop-blur-sm animate-in slide-in-from-right",
         colors[toast.type],
       )}
-      role="status"
+      role={toast.type === "error" ? "alert" : "status"}
+      aria-live={toast.type === "error" ? "assertive" : "polite"}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
@@ -82,7 +85,7 @@ function ToastEntry({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => v
       <p className="text-sm flex-1">{toast.message}</p>
       <button
         onClick={onDismiss}
-        aria-label="Dismiss"
+        aria-label={t("common.dismiss", "Dismiss")}
         className="shrink-0 opacity-60 hover:opacity-100 focus-visible:outline-2 focus-visible:outline-primary rounded"
       >
         <X className="h-3.5 w-3.5" aria-hidden="true" />

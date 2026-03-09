@@ -30,10 +30,25 @@
   --color-warning: oklch(0.769 0.188 70.08);
   --color-danger: oklch(0.577 0.245 27.325);
 
+  /* Overlay / scrim — for modal backdrops */
+  --color-overlay: oklch(0 0 0 / 0.5);
+
   /* Typography — DM Sans: geometric, warm, distinctive but professional */
   --font-sans: "DM Sans", system-ui, -apple-system, sans-serif;
   --font-display: "DM Sans", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+
+  /* Font-size scale — tokens for recurring small sizes */
+  --font-size-micro: 0.625rem; /* 10px — labels, badges, timestamps */
+  --font-size-mini: 0.6875rem; /* 11px — secondary metadata */
+
+  /* Z-index layers — named stacking order contract */
+  --z-dropdown: 10;
+  --z-sticky: 20;
+  --z-overlay: 30;
+  --z-modal: 40;
+  --z-popover: 50;
+  --z-toast: 60;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -59,6 +74,8 @@
     --color-success: oklch(0.72 0.194 149.214);
     --color-warning: oklch(0.82 0.16 70.08);
     --color-danger: oklch(0.68 0.2 27.325);
+
+    --color-overlay: oklch(0 0 0 / 0.7);
   }
 }
 
@@ -86,6 +103,8 @@
   --color-success: oklch(0.72 0.194 149.214);
   --color-warning: oklch(0.82 0.16 70.08);
   --color-danger: oklch(0.68 0.2 27.325);
+
+  --color-overlay: oklch(0 0 0 / 0.7);
 }
 
 :root[data-theme="light"] {
@@ -151,6 +170,30 @@ html {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast preference */
+@media (prefers-contrast: more) {
+  :root {
+    --color-border: oklch(0.70 0.01 80);
+    --color-border-strong: oklch(0.55 0.015 75);
+    --color-text-tertiary: oklch(0.40 0.01 265);
+  }
+  :root[data-theme="dark"] {
+    --color-border: oklch(0.50 0.02 275);
+    --color-border-strong: oklch(0.60 0.025 275);
+    --color-text-tertiary: oklch(0.70 0.008 60);
+  }
+}
+
+/* Forced colors (Windows High Contrast) */
+@media (forced-colors: active) {
+  * {
+    border-color: ButtonText;
+  }
+  :focus-visible {
+    outline: 2px solid Highlight;
   }
 }
 

@@ -23,20 +23,20 @@ function NewConversationPage() {
   const [isCreating, setIsCreating] = useState(false);
 
   const { data: modelsData } = useQuery({
-    queryKey: ["models"],
+    queryKey: queryKeys.models.all,
     queryFn: () => api.get<any>("/api/models"),
     staleTime: 60_000,
   });
 
   const { data: workspacesData } = useQuery({
-    queryKey: ["workspaces"],
+    queryKey: queryKeys.workspaces.all,
     queryFn: () => api.get<any>("/api/workspaces"),
     staleTime: 60_000,
   });
 
   // Load conversation starters from prompt templates (story #182)
   const { data: starterTemplates } = useQuery({
-    queryKey: ["prompts", "starters"],
+    queryKey: queryKeys.prompts.starters(),
     queryFn: () => api.get<any>("/api/prompts?category=starter&limit=8"),
     staleTime: 60_000,
   });
@@ -130,8 +130,8 @@ function NewConversationPage() {
               <Sparkles className="h-6 w-6 text-primary" />
             </div>
           </div>
-          <h2 className="text-xl font-semibold text-text mb-2">{t("conversations.newTitle")}</h2>
-          <p className="text-sm text-text-secondary mb-4">{t("conversations.newDescription")}</p>
+          <h2 className="text-xl font-semibold text-text mb-2">{t("conversations.newTitle", "New Conversation")}</h2>
+          <p className="text-sm text-text-secondary mb-4">{t("conversations.newDescription", "Start a conversation with an AI assistant")}</p>
 
           {/* Model & Workspace selectors */}
           <div className="flex flex-col items-center gap-2 mb-6">

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
@@ -110,6 +110,12 @@ function ProfileSettings() {
     }
   }, [profile]);
 
+  const savedTimerRef = React.useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => {
+    return () => { if (savedTimerRef.current) clearTimeout(savedTimerRef.current); };
+  }, []);
+
   const updateProfile = useMutation({
     mutationFn: (data: {
       displayName?: string;
@@ -120,7 +126,8 @@ function ProfileSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.user.profile() });
       setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = setTimeout(() => setSaved(false), 2000);
     },
     onError: () => {
       toast(t("settings.profileUpdateFailed", "Failed to update profile. Please try again."), "error");
@@ -153,13 +160,13 @@ function ProfileSettings() {
 
       <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
         <Input
-          label={t("settings.displayName")}
+          label={t("settings.displayName", "Display Name")}
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
 
         <Input
-          label={t("auth.email")}
+          label={t("auth.email", "Email")}
           value={profile?.email ?? ""}
           disabled
         />
@@ -212,11 +219,11 @@ function ProfileSettings() {
 
         <div className="flex items-center gap-3">
           <Button type="submit" variant="primary" loading={updateProfile.isPending}>
-            {t("settings.save")}
+            {t("settings.save", "Save")}
           </Button>
           {saved && (
             <span className="text-sm text-success" role="status" aria-live="polite">
-              {t("settings.saved")}
+              {t("settings.saved", "Saved")}
             </span>
           )}
         </div>

@@ -15,96 +15,67 @@ const THEME_OPTIONS: Array<{
   value: ThemeMode;
   icon: typeof Sun;
   labelKey: string;
+  labelDefault: string;
   descriptionKey: string;
+  descriptionDefault: string;
 }> = [
-  { value: "light", icon: Sun, labelKey: "settings.light", descriptionKey: "settings.lightDescription" },
-  { value: "dark", icon: Moon, labelKey: "settings.dark", descriptionKey: "settings.darkDescription" },
-  { value: "system", icon: Monitor, labelKey: "settings.system", descriptionKey: "settings.systemDescription" },
+  { value: "light", icon: Sun, labelKey: "settings.light", labelDefault: "Light", descriptionKey: "settings.lightDescription", descriptionDefault: "Bright and clean" },
+  { value: "dark", icon: Moon, labelKey: "settings.dark", labelDefault: "Dark", descriptionKey: "settings.darkDescription", descriptionDefault: "Easy on the eyes" },
+  { value: "system", icon: Monitor, labelKey: "settings.system", labelDefault: "System", descriptionKey: "settings.systemDescription", descriptionDefault: "Match your OS" },
 ];
 
 const FONT_SIZE_OPTIONS: Array<{
   value: FontSize;
   labelKey: string;
+  labelDefault: string;
 }> = [
-  { value: "small", labelKey: "settings.fontSmall" },
-  { value: "medium", labelKey: "settings.fontMedium" },
-  { value: "large", labelKey: "settings.fontLarge" },
+  { value: "small", labelKey: "settings.fontSmall", labelDefault: "Small" },
+  { value: "medium", labelKey: "settings.fontMedium", labelDefault: "Medium" },
+  { value: "large", labelKey: "settings.fontLarge", labelDefault: "Large" },
 ];
 
-/** Color swatches used in the theme preview */
+/** Color swatches used in the theme preview — references CSS custom properties */
 const PREVIEW_SWATCHES = [
-  { nameKey: "settings.colorPrimary", name: "Primary", varLight: "oklch(0.585 0.233 277.117)", varDark: "oklch(0.704 0.191 277.117)" },
-  { nameKey: "settings.colorSurface", name: "Surface", varLight: "oklch(1 0 0)", varDark: "oklch(0.17 0.01 285)" },
-  { nameKey: "settings.colorText", name: "Text", varLight: "oklch(0.14 0 0)", varDark: "oklch(0.95 0 0)" },
-  { nameKey: "settings.colorBorder", name: "Border", varLight: "oklch(0.9 0 0)", varDark: "oklch(0.3 0.01 285)" },
-  { nameKey: "settings.colorSuccess", name: "Success", varLight: "oklch(0.627 0.194 149.214)", varDark: "oklch(0.627 0.194 149.214)" },
-  { nameKey: "settings.colorDanger", name: "Danger", varLight: "oklch(0.577 0.245 27.325)", varDark: "oklch(0.577 0.245 27.325)" },
+  { nameKey: "settings.colorPrimary", name: "Primary", cssVar: "--color-primary" },
+  { nameKey: "settings.colorSurface", name: "Surface", cssVar: "--color-surface" },
+  { nameKey: "settings.colorText", name: "Text", cssVar: "--color-text" },
+  { nameKey: "settings.colorBorder", name: "Border", cssVar: "--color-border" },
+  { nameKey: "settings.colorSuccess", name: "Success", cssVar: "--color-success" },
+  { nameKey: "settings.colorDanger", name: "Danger", cssVar: "--color-danger" },
 ];
 
-function ThemePreview({ effectiveTheme }: { effectiveTheme: "light" | "dark" }) {
-  const isDark = effectiveTheme === "dark";
-
+function ThemePreview() {
   return (
     <div
-      className={clsx(
-        "rounded-xl border-2 border-border p-4 transition-colors",
-        isDark ? "bg-[oklch(0.17_0.01_285)]" : "bg-white",
-      )}
+      className="rounded-xl border-2 border-border p-4 transition-colors bg-surface"
       aria-hidden="true"
     >
-      {/* Mock UI preview */}
+      {/* Mock UI preview — uses live CSS custom properties */}
       <div className="flex items-center gap-2 mb-3">
-        <div
-          className="w-3 h-3 rounded-full"
-          style={{ backgroundColor: isDark ? "oklch(0.577 0.245 27.325)" : "oklch(0.577 0.245 27.325)" }}
-        />
-        <div
-          className="w-3 h-3 rounded-full"
-          style={{ backgroundColor: isDark ? "oklch(0.769 0.188 70.08)" : "oklch(0.769 0.188 70.08)" }}
-        />
-        <div
-          className="w-3 h-3 rounded-full"
-          style={{ backgroundColor: isDark ? "oklch(0.627 0.194 149.214)" : "oklch(0.627 0.194 149.214)" }}
-        />
+        <div className="w-3 h-3 rounded-full bg-danger" />
+        <div className="w-3 h-3 rounded-full bg-warning" />
+        <div className="w-3 h-3 rounded-full bg-success" />
       </div>
       <div className="space-y-2">
-        <div
-          className="h-2 rounded"
-          style={{
-            backgroundColor: isDark ? "oklch(0.95 0 0)" : "oklch(0.14 0 0)",
-            width: "75%",
-            opacity: 0.7,
-          }}
-        />
-        <div
-          className="h-2 rounded"
-          style={{
-            backgroundColor: isDark ? "oklch(0.7 0 0)" : "oklch(0.45 0 0)",
-            width: "50%",
-            opacity: 0.5,
-          }}
-        />
-        <div
-          className="h-6 rounded mt-3"
-          style={{ backgroundColor: "oklch(0.585 0.233 277.117)", width: "40%" }}
-        />
+        <div className="h-2 rounded bg-text opacity-70" style={{ width: "75%" }} />
+        <div className="h-2 rounded bg-text-secondary opacity-50" style={{ width: "50%" }} />
+        <div className="h-6 rounded mt-3 bg-primary" style={{ width: "40%" }} />
       </div>
     </div>
   );
 }
 
-function ColorSwatches({ effectiveTheme }: { effectiveTheme: "light" | "dark" }) {
+function ColorSwatches() {
   const { t } = useTranslation();
-  const isDark = effectiveTheme === "dark";
 
   return (
-    <div role="group" aria-label={t("settings.colorSchemePreview")}>
+    <div role="group" aria-label={t("settings.colorSchemePreview", "Color scheme preview")}>
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
         {PREVIEW_SWATCHES.map((swatch) => (
           <div key={swatch.name} className="flex flex-col items-center gap-1">
             <div
               className="w-10 h-10 rounded-lg border border-border shadow-sm transition-colors"
-              style={{ backgroundColor: isDark ? swatch.varDark : swatch.varLight }}
+              style={{ backgroundColor: `var(${swatch.cssVar})` }}
               title={t(swatch.nameKey, swatch.name)}
             />
             <span className="text-xs text-text-tertiary">{t(swatch.nameKey, swatch.name)}</span>
@@ -117,7 +88,7 @@ function ColorSwatches({ effectiveTheme }: { effectiveTheme: "light" | "dark" })
 
 function AppearanceSettings() {
   const { t } = useTranslation();
-  const { theme, effectiveTheme, setTheme, fontSize, fontSizePx, setFontSize } = useTheme();
+  const { theme, setTheme, fontSize, fontSizePx, setFontSize } = useTheme();
 
   const handleThemeKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -148,10 +119,10 @@ function AppearanceSettings() {
       {/* Theme Selection */}
       <fieldset>
         <legend id="theme-legend" className="text-sm font-medium text-text mb-1">
-          {t("settings.theme")}
+          {t("settings.theme", "Theme")}
         </legend>
         <p className="text-sm text-text-secondary mb-3" id="theme-description">
-          {t("settings.themeDescription")}
+          {t("settings.themeDescription", "Choose how NOVA looks for you")}
         </p>
         <div
           className="grid grid-cols-3 gap-3 max-w-md"
@@ -160,12 +131,12 @@ function AppearanceSettings() {
           aria-describedby="theme-description"
           onKeyDown={handleThemeKeyDown}
         >
-          {THEME_OPTIONS.map(({ value, icon: Icon, labelKey, descriptionKey }) => (
+          {THEME_OPTIONS.map(({ value, icon: Icon, labelKey, labelDefault, descriptionKey, descriptionDefault }) => (
             <button
               key={value}
               role="radio"
               aria-checked={theme === value}
-              aria-label={t(labelKey)}
+              aria-label={t(labelKey, labelDefault)}
               tabIndex={theme === value ? 0 : -1}
               onClick={() => setTheme(value)}
               className={clsx(
@@ -189,10 +160,10 @@ function AppearanceSettings() {
                   theme === value ? "text-primary font-medium" : "text-text-secondary",
                 )}
               >
-                {t(labelKey)}
+                {t(labelKey, labelDefault)}
               </span>
               <span className="text-xs text-text-tertiary text-center">
-                {t(descriptionKey)}
+                {t(descriptionKey, descriptionDefault)}
               </span>
             </button>
           ))}
@@ -202,10 +173,10 @@ function AppearanceSettings() {
       {/* Theme Preview */}
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-text">
-          {t("settings.preview")}
+          {t("settings.preview", "Preview")}
         </h3>
-        <ThemePreview effectiveTheme={effectiveTheme} />
-        <ColorSwatches effectiveTheme={effectiveTheme} />
+        <ThemePreview />
+        <ColorSwatches />
       </div>
 
       {/* Font Size */}
@@ -213,18 +184,18 @@ function AppearanceSettings() {
         <legend className="text-sm font-medium text-text mb-1">
           <span className="flex items-center gap-2">
             <Type className="h-4 w-4" aria-hidden="true" />
-            {t("settings.fontSize")}
+            {t("settings.fontSize", "Font Size")}
           </span>
         </legend>
         <p className="text-sm text-text-secondary mb-3" id="fontsize-description">
-          {t("settings.fontSizeDescription")}
+          {t("settings.fontSizeDescription", "Adjust the base text size across the interface")}
         </p>
 
         <div className="max-w-md space-y-4">
           {/* Slider */}
           <div className="flex items-center gap-4">
             <label htmlFor="font-size-slider" className="sr-only">
-              {t("settings.fontSize")}
+              {t("settings.fontSize", "Font Size")}
             </label>
             <span className="text-xs text-text-secondary w-6 text-right" aria-hidden="true">
               A
@@ -238,7 +209,7 @@ function AppearanceSettings() {
               value={FONT_SIZE_OPTIONS.findIndex((o) => o.value === fontSize)}
               onChange={(e) => setFontSize(FONT_SIZE_OPTIONS[Number(e.target.value)].value)}
               className="flex-1 accent-primary h-2 cursor-pointer"
-              aria-valuetext={`${t(FONT_SIZE_OPTIONS.find((o) => o.value === fontSize)?.labelKey ?? "settings.fontMedium")} (${fontSizePx}px)`}
+              aria-valuetext={`${t(FONT_SIZE_OPTIONS.find((o) => o.value === fontSize)?.labelKey ?? "settings.fontMedium", FONT_SIZE_OPTIONS.find((o) => o.value === fontSize)?.labelDefault ?? "Medium")} (${fontSizePx}px)`}
               aria-describedby="fontsize-description"
             />
             <span className="text-lg text-text-secondary w-6" aria-hidden="true">
@@ -250,9 +221,9 @@ function AppearanceSettings() {
           <div
             className="flex gap-2"
             role="radiogroup"
-            aria-label={t("settings.fontSize")}
+            aria-label={t("settings.fontSize", "Font Size")}
           >
-            {FONT_SIZE_OPTIONS.map(({ value, labelKey }) => (
+            {FONT_SIZE_OPTIONS.map(({ value, labelKey, labelDefault }) => (
               <button
                 key={value}
                 role="radio"
@@ -266,7 +237,7 @@ function AppearanceSettings() {
                     : "border-border hover:border-border-strong bg-surface-secondary text-text-secondary",
                 )}
               >
-                {t(labelKey)} ({FONT_SIZE_MAP[value]}px)
+                {t(labelKey, labelDefault)} ({FONT_SIZE_MAP[value]}px)
               </button>
             ))}
           </div>
@@ -274,19 +245,19 @@ function AppearanceSettings() {
           {/* Live preview text */}
           <div
             className="p-4 rounded-lg bg-surface-secondary border border-border"
-            aria-label={t("settings.fontSizePreview")}
+            aria-label={t("settings.fontSizePreview", "Font size preview")}
           >
             <p
               className="text-text transition-all"
               style={{ fontSize: `${fontSizePx}px` }}
             >
-              {t("settings.fontSizePreviewText")}
+              {t("settings.fontSizePreviewText", "The quick brown fox jumps over the lazy dog.")}
             </p>
             <p
               className="text-text-secondary mt-1 transition-all"
               style={{ fontSize: `${fontSizePx - 2}px` }}
             >
-              {t("settings.fontSizePreviewSecondary")}
+              {t("settings.fontSizePreviewSecondary", "This is how secondary text will appear at this size.")}
             </p>
           </div>
         </div>

@@ -23,6 +23,7 @@ import {
   Square,
 } from "lucide-react";
 import { api, apiHeaders } from "../../lib/api";
+import { queryKeys } from "../../lib/query-keys";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { toast } from "../../components/ui/Toast";
@@ -120,7 +121,7 @@ function PlaygroundPage() {
 
   // --- Model data ---
   const { data: modelsData } = useQuery({
-    queryKey: ["models"],
+    queryKey: queryKeys.models.all,
     queryFn: () => api.get<any>("/api/models"),
     staleTime: 60_000,
   });
@@ -378,8 +379,10 @@ function PlaygroundPage() {
   const handleCopyResponse = useCallback(() => {
     const text = result?.content || streamContent;
     if (text) {
-      navigator.clipboard.writeText(text);
-      toast.success(t("playground.copiedResponse", "Copied to clipboard"));
+      navigator.clipboard.writeText(text).then(
+        () => toast.success(t("playground.copiedResponse", "Copied to clipboard")),
+        () => toast.error(t("playground.copyFailed", "Failed to copy")),
+      );
     }
   }, [result, streamContent, t]);
 
@@ -396,8 +399,10 @@ function PlaygroundPage() {
       ...(responseFormat !== "text" ? { response_format: { type: responseFormat } } : {}),
     };
     const curl = buildCurl(baseUrl, model, reqMessages, params);
-    navigator.clipboard.writeText(curl);
-    toast.success(t("playground.copiedCurl", "cURL copied to clipboard"));
+    navigator.clipboard.writeText(curl).then(
+      () => toast.success(t("playground.copiedCurl", "cURL copied to clipboard")),
+      () => toast.error(t("playground.copyFailed", "Failed to copy")),
+    );
   }, [model, buildRequestMessages, temperature, topP, maxTokens, frequencyPenalty, presencePenalty, stream, responseFormat, t]);
 
   const handleCopyRaw = useCallback(() => {
@@ -537,6 +542,7 @@ function PlaygroundPage() {
               type="button"
               onClick={() => setStream((s) => !s)}
               disabled={running}
+              aria-pressed={stream}
               className="flex items-center gap-2 text-sm text-text"
             >
               {stream ? (
@@ -904,7 +910,7 @@ function PlaygroundPage() {
       {/* Save Preset Dialog                                             */}
       {/* ============================================================= */}
       {showPresetDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay" role="dialog" aria-modal="true" aria-label={t("playground.savePreset", "Save Preset")} onKeyDown={(e) => { if (e.key === "Escape") setShowPresetDialog(false); }}>
           <div className="bg-surface border border-border rounded-xl shadow-xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-text">
@@ -947,7 +953,7 @@ function PlaygroundPage() {
       {/* Load Preset Dialog                                             */}
       {/* ============================================================= */}
       {showLoadDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay" role="dialog" aria-modal="true" aria-label={t("playground.loadPreset", "Load Preset")} onKeyDown={(e) => { if (e.key === "Escape") setShowLoadDialog(false); }}>
           <div className="bg-surface border border-border rounded-xl shadow-xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-text">

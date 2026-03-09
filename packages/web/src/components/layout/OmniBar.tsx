@@ -585,7 +585,7 @@ export function OmniBar() {
             )}
 
             {grouped.map((group) => (
-              <div key={group.section} className={clsx("border-l-2 ml-3 mb-1", SECTION_COLORS[group.section])}>
+              <div key={group.section} role="group" aria-label={group.label} className={clsx("border-l-2 ml-3 mb-1", SECTION_COLORS[group.section])}>
                 <div className="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
                   {group.label}
                 </div>

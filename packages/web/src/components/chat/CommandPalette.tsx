@@ -361,7 +361,7 @@ export function CommandPalette() {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]" role="dialog" aria-modal="true" aria-label={t("commandPalette.title", { defaultValue: "Command palette" })}>
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={close} />
+      <div className="fixed inset-0 bg-overlay backdrop-blur-sm" onClick={close} />
 
       {/* Palette container */}
       <div className="relative w-full max-w-lg bg-surface border border-border rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-4 duration-150">
@@ -411,7 +411,7 @@ export function CommandPalette() {
 
           {grouped.map((group) => {
             const groupEl = (
-              <div key={group.section}>
+              <div key={group.section} role="group" aria-label={group.label}>
                 {/* Section header */}
                 <div className="px-4 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
                   {group.label}

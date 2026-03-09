@@ -98,7 +98,7 @@ export const FocusTrapDemo: Story = {
           <Button onClick={() => setTrapped(true)}>Open trapped dialog</Button>
           {trapped && (
             <div className="fixed inset-0 z-50 flex items-center justify-center">
-              <div className="fixed inset-0 bg-black/50" onClick={() => setTrapped(false)} />
+              <div className="fixed inset-0 bg-overlay" onClick={() => setTrapped(false)} />
               <FocusTrap active onEscape={() => setTrapped(false)} restoreFocus>
                 <div className="relative bg-surface border border-border rounded-xl shadow-2xl p-5 w-80 space-y-4">
                   <h3 className="text-sm font-semibold text-text">Focus is trapped here</h3>

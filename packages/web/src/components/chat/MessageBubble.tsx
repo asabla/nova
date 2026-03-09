@@ -8,6 +8,7 @@ import { ArtifactRenderer } from "./ArtifactRenderer";
 import { DynamicWidget } from "./DynamicWidget";
 import { Avatar } from "../ui/Avatar";
 import { api } from "../../lib/api";
+import { queryKeys } from "../../lib/query-keys";
 import { formatDistanceToNow } from "date-fns";
 
 interface EditHistoryEntry {
@@ -64,7 +65,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
   const isAssistant = message.senderType === "assistant";
 
   const { data: modelsData } = useQuery({
-    queryKey: ["models"],
+    queryKey: queryKeys.models.all,
     queryFn: () => api.get<any>("/api/models"),
     enabled: showModelSelector,
   });
@@ -558,7 +559,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
               }}
               className="text-xs text-primary hover:text-primary-dark font-medium"
             >
-              Save
+              {t("common.save")}
             </button>
           </div>
         )}

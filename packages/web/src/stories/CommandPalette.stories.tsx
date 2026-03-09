@@ -23,9 +23,9 @@ const router = createRouter({
 
 function CommandPaletteOpen() {
   useEffect(() => {
-    useUIStore.setState({ omniBarOpen: true });
+    useUIStore.setState({ commandPaletteOpen: true });
     return () => {
-      useUIStore.setState({ omniBarOpen: false });
+      useUIStore.setState({ commandPaletteOpen: false });
     };
   }, []);
 

@@ -98,7 +98,7 @@ export function SkipLink({ targetId, children = "Skip to main content" }: SkipLi
         handleClick();
       }}
       className={clsx(
-        "fixed top-0 left-0 z-[9999]",
+        "fixed top-0 left-0 z-toast",
         "bg-primary text-primary-foreground",
         "px-4 py-2 text-sm font-medium",
         "rounded-br-lg shadow-lg",

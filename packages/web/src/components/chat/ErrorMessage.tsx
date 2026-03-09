@@ -67,6 +67,7 @@ const categoryConfig: Record<
     borderClass: string;
     iconClass: string;
     titleKey: string;
+    titleDefault: string;
   }
 > = {
   "rate-limit": {
@@ -75,6 +76,7 @@ const categoryConfig: Record<
     borderClass: "border-warning/30",
     iconClass: "text-warning",
     titleKey: "errors.rateLimitTitle",
+    titleDefault: "Rate Limit Exceeded",
   },
   server: {
     icon: ServerCrash,
@@ -82,6 +84,7 @@ const categoryConfig: Record<
     borderClass: "border-danger/30",
     iconClass: "text-danger",
     titleKey: "errors.serverTitle",
+    titleDefault: "Server Error",
   },
   network: {
     icon: WifiOff,
@@ -89,6 +92,7 @@ const categoryConfig: Record<
     borderClass: "border-danger/30",
     iconClass: "text-danger",
     titleKey: "errors.networkTitle",
+    titleDefault: "Network Error",
   },
   unknown: {
     icon: AlertTriangle,
@@ -96,6 +100,7 @@ const categoryConfig: Record<
     borderClass: "border-danger/30",
     iconClass: "text-danger",
     titleKey: "errors.unknownTitle",
+    titleDefault: "Something Went Wrong",
   },
 };
 
@@ -177,7 +182,7 @@ export function ErrorMessage({
         <Icon className={clsx("h-5 w-5 shrink-0 mt-0.5", config.iconClass)} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-text">
-            {t(config.titleKey)}
+            {t(config.titleKey, config.titleDefault)}
           </p>
           <p className="text-xs text-text-secondary mt-0.5 break-words">
             {errorMessage}

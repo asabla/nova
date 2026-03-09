@@ -4,6 +4,7 @@ import { useState, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeftRight, Send, Clock, Hash, Diff, XCircle } from "lucide-react";
 import { api, apiHeaders } from "../../lib/api";
+import { queryKeys } from "../../lib/query-keys";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { ModelCapabilityBadges } from "../../components/ui/ModelCapabilityBadges";
@@ -47,7 +48,7 @@ function ModelComparePage() {
   const abortRef = useRef<AbortController | null>(null);
 
   const { data: modelsData, isError } = useQuery({
-    queryKey: ["models"],
+    queryKey: queryKeys.models.all,
     queryFn: () => api.get<any>("/api/models"),
   });
 

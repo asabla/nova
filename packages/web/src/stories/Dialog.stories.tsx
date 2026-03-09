@@ -49,8 +49,8 @@ export const Default: Story = {
     const canvas = within(canvasElement);
     const openButton = canvas.getByRole("button", { name: "Open Dialog" });
     await userEvent.click(openButton);
-    // Dialog renders in a portal, so query from document body
-    await expect(document.body.querySelector("[role='dialog']")).not.toBeNull();
+    // Native <dialog> element opened via showModal() — query the element directly
+    await expect(document.querySelector("dialog[open]")).not.toBeNull();
   },
 };
 

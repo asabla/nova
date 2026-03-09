@@ -17,9 +17,14 @@ import { useDragDrop } from "../../hooks/useDragDrop";
 import { useClipboardPaste } from "../../hooks/useClipboardPaste";
 import { useTypingIndicator } from "../../hooks/useTypingIndicator";
 import { toast } from "../../components/ui/Toast";
+import { ErrorBoundary } from "../../components/ErrorBoundary";
 
 export const Route = createFileRoute("/_auth/conversations/$id")({
-  component: ConversationPage,
+  component: () => (
+    <ErrorBoundary>
+      <ConversationPage />
+    </ErrorBoundary>
+  ),
 });
 
 function ConversationPage() {
@@ -326,7 +331,7 @@ function ConversationPage() {
 
           {/* SSE error state */}
           {status === "error" && (
-            <div className="px-4 py-3 bg-danger/10 border-t border-danger/20 flex items-center justify-between">
+            <div role="alert" className="px-4 py-3 bg-danger/10 border-t border-danger/20 flex items-center justify-between">
               <p className="text-sm text-danger">
                 {t("conversations.streamError", "Something went wrong while generating a response.")}
               </p>

@@ -22,6 +22,13 @@ export function Header() {
 
   return (
     <header className="h-14 border-b border-border bg-surface flex items-center gap-3 px-4 shrink-0">
+      {/* Skip to main content link (visible on focus only) */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:text-sm focus:font-medium"
+      >
+        {t("nav.skipToContent", { defaultValue: "Skip to content" })}
+      </a>
       {/* Left: Menu toggle */}
       <div className="flex items-center shrink-0">
         {!sidebarOpen && (

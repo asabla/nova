@@ -1,4 +1,5 @@
 import { useEffect, useRef, useId } from "react";
+import { useTranslation } from "react-i18next";
 import { clsx } from "clsx";
 
 interface DialogProps {
@@ -11,6 +12,7 @@ interface DialogProps {
 }
 
 export function Dialog({ open, onClose, title, children, className, size = "md" }: DialogProps) {
+  const { t } = useTranslation();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -37,7 +39,7 @@ export function Dialog({ open, onClose, title, children, className, size = "md" 
       onClose={onClose}
       aria-labelledby={title ? titleId : undefined}
       className={clsx(
-        "rounded-xl bg-surface border border-border p-0 shadow-2xl backdrop:bg-black/50",
+        "rounded-xl bg-surface border border-border p-0 shadow-2xl backdrop:bg-overlay",
         sizeClasses[size],
         "w-full",
         className,
@@ -49,7 +51,7 @@ export function Dialog({ open, onClose, title, children, className, size = "md" 
             <h2 id={titleId} className="text-lg font-semibold text-text">{title}</h2>
             <button
               onClick={onClose}
-              aria-label="Close"
+              aria-label={t("common.close", "Close")}
               className="text-text-tertiary hover:text-text p-1 rounded-lg hover:bg-surface-secondary focus-visible:outline-2 focus-visible:outline-primary"
             >
               <svg className="h-5 w-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

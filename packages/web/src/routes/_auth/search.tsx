@@ -16,6 +16,7 @@ import {
   FlaskConical,
 } from "lucide-react";
 import { api } from "../../lib/api";
+import { queryKeys } from "../../lib/query-keys";
 import { Badge } from "../../components/ui/Badge";
 import { formatDistanceToNow } from "date-fns";
 
@@ -42,15 +43,15 @@ function highlightMatches(text: string, query: string): string {
 
 type ResultType = "all" | "conversations" | "messages" | "agents" | "knowledge" | "files" | "workspaces" | "research";
 
-const TABS: { id: ResultType; label: string; icon: React.ReactNode }[] = [
-  { id: "all", label: "All", icon: null },
-  { id: "conversations", label: "Conversations", icon: <MessageSquare className="h-3.5 w-3.5" /> },
-  { id: "messages", label: "Messages", icon: <MessageSquare className="h-3.5 w-3.5" /> },
-  { id: "agents", label: "Agents", icon: <Bot className="h-3.5 w-3.5" /> },
-  { id: "knowledge", label: "Knowledge", icon: <BookOpen className="h-3.5 w-3.5" /> },
-  { id: "files", label: "Files", icon: <FileText className="h-3.5 w-3.5" /> },
-  { id: "workspaces", label: "Workspaces", icon: <FolderKanban className="h-3.5 w-3.5" /> },
-  { id: "research", label: "Research", icon: <FlaskConical className="h-3.5 w-3.5" /> },
+const TABS: { id: ResultType; labelKey: string; labelDefault: string; icon: React.ReactNode }[] = [
+  { id: "all", labelKey: "search.tab.all", labelDefault: "All", icon: null },
+  { id: "conversations", labelKey: "search.tab.conversations", labelDefault: "Conversations", icon: <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" /> },
+  { id: "messages", labelKey: "search.tab.messages", labelDefault: "Messages", icon: <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" /> },
+  { id: "agents", labelKey: "search.tab.agents", labelDefault: "Agents", icon: <Bot className="h-3.5 w-3.5" aria-hidden="true" /> },
+  { id: "knowledge", labelKey: "search.tab.knowledge", labelDefault: "Knowledge", icon: <BookOpen className="h-3.5 w-3.5" aria-hidden="true" /> },
+  { id: "files", labelKey: "search.tab.files", labelDefault: "Files", icon: <FileText className="h-3.5 w-3.5" aria-hidden="true" /> },
+  { id: "workspaces", labelKey: "search.tab.workspaces", labelDefault: "Workspaces", icon: <FolderKanban className="h-3.5 w-3.5" aria-hidden="true" /> },
+  { id: "research", labelKey: "search.tab.research", labelDefault: "Research", icon: <FlaskConical className="h-3.5 w-3.5" aria-hidden="true" /> },
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -82,7 +83,7 @@ function SearchPage() {
 
   // Fetch workspaces for filter dropdown
   const { data: workspacesData } = useQuery({
-    queryKey: ["workspaces"],
+    queryKey: queryKeys.workspaces.all,
     queryFn: () => api.get<any>("/api/workspaces"),
     staleTime: 60_000,
   });
@@ -222,6 +223,7 @@ function SearchPage() {
               "search.placeholder",
               "Search conversations, messages, agents, knowledge, files...",
             )}
+            aria-label={t("search.placeholder", "Search conversations, messages, agents, knowledge, files...")}
             autoFocus
             className="w-full pl-12 pr-24 py-3 rounded-xl border border-border bg-surface text-text placeholder:text-text-tertiary text-sm focus:border-primary focus:outline-none"
           />
@@ -344,22 +346,25 @@ function SearchPage() {
 
         {/* Result Type Tabs */}
         {results && (
-          <div className="flex gap-1 overflow-x-auto border-b border-border">
+          <div className="flex gap-1 overflow-x-auto border-b border-border" role="tablist" aria-label={t("search.resultTabs", "Result types")}>
             {TABS.map((tab) => {
               const count = tabCounts[tab.id] ?? 0;
               if (tab.id !== "all" && count === 0) return null;
+              const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
+                  role="tab"
+                  aria-selected={isActive}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
-                    activeTab === tab.id
+                    isActive
                       ? "border-primary text-primary"
                       : "border-transparent text-text-secondary hover:text-text"
                   }`}
                 >
                   {tab.icon}
-                  {tab.label}
+                  {t(tab.labelKey, tab.labelDefault)}
                   {count > 0 && (
                     <span className="text-[10px] text-text-tertiary ml-0.5">({count})</span>
                   )}

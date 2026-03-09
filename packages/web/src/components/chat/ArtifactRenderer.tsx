@@ -866,7 +866,7 @@ export function ArtifactRenderer({ artifact, className }: ArtifactRendererProps)
       {/* Fullscreen backdrop */}
       {fullscreen && (
         <div
-          className="fixed inset-0 bg-black/50 -z-10"
+          className="fixed inset-0 bg-overlay -z-10"
           onClick={() => setFullscreen(false)}
         />
       )}

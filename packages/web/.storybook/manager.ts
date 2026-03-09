@@ -8,11 +8,14 @@ const novaTheme = create({
   brandTitle: "NOVA Design System",
   brandUrl: "/",
 
-  // Colors — derived from NOVA's oklch palette
+  // Colors — hex equivalents of NOVA's oklch palette
+  // oklch(0.55 0.22 268) → #5B4BDB (primary)
+  // oklch(0.58 0.20 268) → #6C5CE7 (primary variant)
   colorPrimary: "#5B4BDB",
   colorSecondary: "#6C5CE7",
 
-  // UI
+  // UI — approximations of dark-mode surface tokens
+  // oklch(0.155 0.012 275) → #1a1a2e
   appBg: "#1a1a2e",
   appContentBg: "#16162a",
   appPreviewBg: "#0f0f1e",

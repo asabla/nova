@@ -41,7 +41,7 @@ function AuthLayout() {
         <Header />
         <SystemStatusBanner />
         <StatusBanner />
-        <main className="flex flex-col flex-1 min-h-0">
+        <main id="main-content" className="flex flex-col flex-1 min-h-0">
           <Outlet />
         </main>
       </div>

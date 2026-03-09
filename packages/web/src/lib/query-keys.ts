@@ -37,6 +37,18 @@ export const queryKeys = {
     all: ["domains"] as const,
     list: () => [...queryKeys.domains.all, "list"] as const,
   },
+  models: {
+    all: ["models"] as const,
+    list: () => [...queryKeys.models.all, "list"] as const,
+  },
+  search: {
+    all: ["search"] as const,
+    query: (...args: unknown[]) => [...queryKeys.search.all, ...args] as const,
+  },
+  prompts: {
+    all: ["prompts"] as const,
+    starters: () => [...queryKeys.prompts.all, "starters"] as const,
+  },
   user: {
     profile: () => ["user", "profile"] as const,
     sessions: () => ["user", "sessions"] as const,

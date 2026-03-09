@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight, Wrench, Check, X, Loader2 } from "lucide-react";
 import { clsx } from "clsx";
 import { Button } from "../ui/Button";
@@ -34,6 +35,7 @@ function ToolCallItem({ call, onApprove, onReject }: {
   onApprove?: (id: string) => void;
   onReject?: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
   const statusIcon = {
@@ -62,14 +64,14 @@ function ToolCallItem({ call, onApprove, onReject }: {
           call.status === "approval_required" && "bg-warning/10 text-warning",
           call.status === "pending" && "bg-surface-tertiary text-text-tertiary",
         )}>
-          {call.status}
+          {t(`tools.status.${call.status}`, call.status)}
         </span>
       </button>
 
       {expanded && (
         <div className="px-3 py-2 border-t border-border space-y-2">
           <div>
-            <p className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1">Arguments</p>
+            <p className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1">{t("tools.arguments", "Arguments")}</p>
             <pre className="text-xs font-mono bg-surface rounded p-2 overflow-x-auto text-text-secondary">
               {JSON.stringify(call.arguments, null, 2)}
             </pre>
@@ -77,7 +79,7 @@ function ToolCallItem({ call, onApprove, onReject }: {
 
           {call.result && (
             <div>
-              <p className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1">Result</p>
+              <p className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1">{t("tools.result", "Result")}</p>
               <pre className="text-xs font-mono bg-surface rounded p-2 overflow-x-auto text-text-secondary max-h-40">
                 {call.result}
               </pre>
@@ -87,10 +89,10 @@ function ToolCallItem({ call, onApprove, onReject }: {
           {call.status === "approval_required" && onApprove && onReject && (
             <div className="flex items-center gap-2 pt-1">
               <Button size="sm" variant="primary" onClick={() => onApprove(call.id)}>
-                <Check className="h-3 w-3" aria-hidden="true" /> Approve
+                <Check className="h-3 w-3" aria-hidden="true" /> {t("tools.approve", "Approve")}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => onReject(call.id)}>
-                <X className="h-3 w-3" aria-hidden="true" /> Reject
+                <X className="h-3 w-3" aria-hidden="true" /> {t("tools.reject", "Reject")}
               </Button>
             </div>
           )}

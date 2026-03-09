@@ -10,28 +10,36 @@ const statusConfig = {
     ringColor: "ring-success/30",
     icon: Wifi,
     labelKey: "connection.connected",
+    labelDefault: "Connected",
     descriptionKey: "connection.connectedDesc",
+    descriptionDefault: "All systems operational",
   },
   connecting: {
     color: "bg-warning",
     ringColor: "ring-warning/30",
     icon: RefreshCw,
     labelKey: "connection.connecting",
+    labelDefault: "Connecting",
     descriptionKey: "connection.connectingDesc",
+    descriptionDefault: "Establishing connection...",
   },
   reconnecting: {
     color: "bg-warning",
     ringColor: "ring-warning/30",
     icon: RefreshCw,
     labelKey: "connection.reconnecting",
+    labelDefault: "Reconnecting",
     descriptionKey: "connection.reconnectingDesc",
+    descriptionDefault: "Attempting to restore connection...",
   },
   disconnected: {
     color: "bg-danger",
     ringColor: "ring-danger/30",
     icon: WifiOff,
     labelKey: "connection.disconnected",
+    labelDefault: "Disconnected",
     descriptionKey: "connection.disconnectedDesc",
+    descriptionDefault: "Unable to reach the server",
   },
 } as const;
 
@@ -69,7 +77,7 @@ export function ConnectionStatus() {
           "flex items-center justify-center p-2 rounded-lg transition-colors",
           "hover:bg-surface-secondary text-text-secondary hover:text-text focus-visible:outline-2 focus-visible:outline-primary",
         )}
-        aria-label={t(config.labelKey)}
+        aria-label={t(config.labelKey, config.labelDefault)}
         aria-describedby={showTooltip ? tooltipId : undefined}
         onFocus={() => setShowTooltip(true)}
         onBlur={() => setShowTooltip(false)}
@@ -117,11 +125,11 @@ export function ConnectionStatus() {
               aria-hidden="true"
             />
             <span className="text-sm font-medium text-text">
-              {t(config.labelKey)}
+              {t(config.labelKey, config.labelDefault)}
             </span>
           </div>
           <p className="text-xs text-text-tertiary leading-relaxed">
-            {t(config.descriptionKey)}
+            {t(config.descriptionKey, config.descriptionDefault)}
           </p>
 
           {/* Detailed connectivity info */}

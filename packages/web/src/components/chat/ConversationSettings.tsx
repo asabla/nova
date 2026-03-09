@@ -19,6 +19,16 @@ interface ConversationSettingsProps {
 export function ConversationSettings({ conversationId, conversation, open, onClose }: ConversationSettingsProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
+
   const [systemPrompt, setSystemPrompt] = useState(conversation?.systemPrompt ?? "");
   const [model, setModel] = useState(conversation?.modelId ?? "");
   const [visibility, setVisibility] = useState(conversation?.visibility ?? "private");
@@ -43,7 +53,7 @@ export function ConversationSettings({ conversationId, conversation, open, onClo
   }, [conversation]);
 
   const { data: modelsData } = useQuery({
-    queryKey: ["models"],
+    queryKey: queryKeys.models.all,
     queryFn: () => api.get<any>("/api/models"),
     staleTime: 60_000,
   });
@@ -80,7 +90,7 @@ export function ConversationSettings({ conversationId, conversation, open, onClo
   return (
     <div
       className={clsx(
-        "fixed right-0 top-0 h-full w-80 bg-surface border-l border-border shadow-lg z-40 transition-transform duration-200",
+        "fixed right-0 top-0 h-full w-full sm:w-80 bg-surface border-l border-border shadow-lg z-40 transition-transform duration-200",
         open ? "translate-x-0" : "translate-x-full",
       )}
       role="dialog"

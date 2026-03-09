@@ -116,7 +116,7 @@ function FoldersPage() {
   });
 
   const { data: workspacesData } = useQuery({
-    queryKey: ["workspaces"],
+    queryKey: queryKeys.workspaces.all,
     queryFn: () => api.get<any>("/api/workspaces"),
     staleTime: 60_000,
   });
