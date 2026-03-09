@@ -157,14 +157,14 @@ export const Default: Story = {
 
         {/* Search + Filters */}
         <div className="flex items-center gap-3 mb-4">
-          <div className="relative flex-1 max-w-sm">
+          <div className="relative flex-1 max-w-sm input-glow rounded-lg">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary" />
             <input
               type="text"
               placeholder="Search agents..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="w-full h-9 pl-9 pr-3 text-sm rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary field-glow"
+              className="w-full h-9 pl-9 pr-3 text-sm rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary"
             />
           </div>
           <div className="flex gap-1">

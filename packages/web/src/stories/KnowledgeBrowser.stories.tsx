@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
 
 const meta: Meta = {
   title: "Patterns/KnowledgeBrowser",
@@ -103,13 +105,13 @@ export const CollectionList: Story = {
         </div>
 
         <div className="relative max-w-xs mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary" />
-          <input
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary z-10" />
+          <Input
             type="text"
             placeholder="Search collections..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-9 pl-9 pr-3 text-sm rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary field-glow"
+            className="h-9 pl-9 pr-3 text-sm"
           />
         </div>
 
@@ -166,45 +168,45 @@ export const DocumentList: Story = {
         </div>
       </div>
 
-      <div className="rounded-xl border border-border overflow-hidden">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="bg-surface-tertiary/50 border-b border-border">
-              <th className="text-left px-4 py-2.5 font-medium text-text-tertiary">Name</th>
-              <th className="text-left px-4 py-2.5 font-medium text-text-tertiary">Size</th>
-              <th className="text-center px-4 py-2.5 font-medium text-text-tertiary">Chunks</th>
-              <th className="text-center px-4 py-2.5 font-medium text-text-tertiary">Status</th>
-              <th className="text-right px-4 py-2.5 font-medium text-text-tertiary">Uploaded</th>
-              <th className="w-10" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
+      <div className="rounded-xl border border-border">
+        <Table className="text-xs">
+          <TableHeader>
+            <TableRow className="bg-surface-tertiary/50">
+              <TableHead className="px-4 py-2.5 text-xs font-medium text-text-tertiary">Name</TableHead>
+              <TableHead className="px-4 py-2.5 text-xs font-medium text-text-tertiary">Size</TableHead>
+              <TableHead className="px-4 py-2.5 text-center text-xs font-medium text-text-tertiary">Chunks</TableHead>
+              <TableHead className="px-4 py-2.5 text-center text-xs font-medium text-text-tertiary">Status</TableHead>
+              <TableHead className="px-4 py-2.5 text-right text-xs font-medium text-text-tertiary">Uploaded</TableHead>
+              <TableHead className="w-10" />
+            </TableRow>
+          </TableHeader>
+          <TableBody className="divide-y divide-border">
             {documents.map((doc) => {
               const Icon = typeIcons[doc.type] ?? File;
               return (
-                <tr key={doc.id} className="hover:bg-surface-secondary/50 transition-colors">
-                  <td className="px-4 py-2.5">
+                <TableRow key={doc.id}>
+                  <TableCell className="px-4 py-2.5">
                     <div className="flex items-center gap-2">
                       <Icon className="h-4 w-4 text-text-tertiary shrink-0" />
                       <span className="text-text font-medium truncate">{doc.name}</span>
                     </div>
-                  </td>
-                  <td className="px-4 py-2.5 text-text-secondary">{formatSize(doc.size)}</td>
-                  <td className="px-4 py-2.5 text-center text-text-secondary">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5 text-text-secondary">{formatSize(doc.size)}</TableCell>
+                  <TableCell className="px-4 py-2.5 text-center text-text-secondary">
                     {doc.chunks > 0 ? doc.chunks : "—"}
-                  </td>
-                  <td className="px-4 py-2.5 text-center"><StatusBadge status={doc.status} /></td>
-                  <td className="px-4 py-2.5 text-right text-text-tertiary">{doc.uploadedAt}</td>
-                  <td className="px-2 py-2.5">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5 text-center"><StatusBadge status={doc.status} /></TableCell>
+                  <TableCell className="px-4 py-2.5 text-right text-text-tertiary">{doc.uploadedAt}</TableCell>
+                  <TableCell className="px-2 py-2.5">
                     <button className="p-1 rounded hover:bg-surface-tertiary text-text-tertiary hover:text-text transition-colors">
                       <MoreHorizontal className="h-3.5 w-3.5" />
                     </button>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               );
             })}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   ),

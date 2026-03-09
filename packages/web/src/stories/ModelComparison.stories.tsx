@@ -5,6 +5,7 @@ import { Check, Zap, Brain, Gauge, DollarSign, Clock, Sparkles } from "lucide-re
 import { ModelCapabilityBadges } from "@/components/ui/ModelCapabilityBadges";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
 
 const meta: Meta = {
   title: "Patterns/ModelComparison",
@@ -247,66 +248,66 @@ export const ComparisonTable: Story = {
         </div>
 
         {compared.length >= 2 && (
-          <div className="rounded-xl border border-border overflow-hidden">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="bg-surface-tertiary/50">
-                  <th className="text-left px-4 py-2.5 font-medium text-text-tertiary w-36" />
+          <div className="rounded-xl border border-border">
+            <Table className="text-xs">
+              <TableHeader>
+                <TableRow className="bg-surface-tertiary/50">
+                  <TableHead className="px-4 py-2.5 text-xs font-medium text-text-tertiary w-36" />
                   {compared.map((m) => (
-                    <th key={m.id} className="text-left px-4 py-2.5 font-medium text-text">
+                    <TableHead key={m.id} className="px-4 py-2.5 text-xs font-medium text-text">
                       <div>{m.name}</div>
                       <div className="font-normal text-text-tertiary">{m.provider}</div>
-                    </th>
+                    </TableHead>
                   ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                <tr>
-                  <td className="px-4 py-2.5 text-text-tertiary font-medium">Quality</td>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="divide-y divide-border">
+                <TableRow>
+                  <TableCell className="px-4 py-2.5 text-text-tertiary font-medium">Quality</TableCell>
                   {compared.map((m) => (
-                    <td key={m.id} className="px-4 py-2.5"><QualityIndicator quality={m.quality} /></td>
+                    <TableCell key={m.id} className="px-4 py-2.5"><QualityIndicator quality={m.quality} /></TableCell>
                   ))}
-                </tr>
-                <tr>
-                  <td className="px-4 py-2.5 text-text-tertiary font-medium">Speed</td>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="px-4 py-2.5 text-text-tertiary font-medium">Speed</TableCell>
                   {compared.map((m) => (
-                    <td key={m.id} className="px-4 py-2.5"><SpeedIndicator speed={m.speed} /></td>
+                    <TableCell key={m.id} className="px-4 py-2.5"><SpeedIndicator speed={m.speed} /></TableCell>
                   ))}
-                </tr>
-                <tr>
-                  <td className="px-4 py-2.5 text-text-tertiary font-medium">Context Window</td>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="px-4 py-2.5 text-text-tertiary font-medium">Context Window</TableCell>
                   {compared.map((m) => (
-                    <td key={m.id} className="px-4 py-2.5 text-text">{formatNumber(m.contextWindow)} tokens</td>
+                    <TableCell key={m.id} className="px-4 py-2.5 text-text">{formatNumber(m.contextWindow)} tokens</TableCell>
                   ))}
-                </tr>
-                <tr>
-                  <td className="px-4 py-2.5 text-text-tertiary font-medium">Max Output</td>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="px-4 py-2.5 text-text-tertiary font-medium">Max Output</TableCell>
                   {compared.map((m) => (
-                    <td key={m.id} className="px-4 py-2.5 text-text">{formatNumber(m.maxOutput)} tokens</td>
+                    <TableCell key={m.id} className="px-4 py-2.5 text-text">{formatNumber(m.maxOutput)} tokens</TableCell>
                   ))}
-                </tr>
-                <tr>
-                  <td className="px-4 py-2.5 text-text-tertiary font-medium">Input Cost</td>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="px-4 py-2.5 text-text-tertiary font-medium">Input Cost</TableCell>
                   {compared.map((m) => (
-                    <td key={m.id} className="px-4 py-2.5 text-text">${m.inputCostPer1M} / 1M tokens</td>
+                    <TableCell key={m.id} className="px-4 py-2.5 text-text">${m.inputCostPer1M} / 1M tokens</TableCell>
                   ))}
-                </tr>
-                <tr>
-                  <td className="px-4 py-2.5 text-text-tertiary font-medium">Output Cost</td>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="px-4 py-2.5 text-text-tertiary font-medium">Output Cost</TableCell>
                   {compared.map((m) => (
-                    <td key={m.id} className="px-4 py-2.5 text-text">${m.outputCostPer1M} / 1M tokens</td>
+                    <TableCell key={m.id} className="px-4 py-2.5 text-text">${m.outputCostPer1M} / 1M tokens</TableCell>
                   ))}
-                </tr>
-                <tr>
-                  <td className="px-4 py-2.5 text-text-tertiary font-medium">Capabilities</td>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="px-4 py-2.5 text-text-tertiary font-medium">Capabilities</TableCell>
                   {compared.map((m) => (
-                    <td key={m.id} className="px-4 py-2.5">
+                    <TableCell key={m.id} className="px-4 py-2.5">
                       <ModelCapabilityBadges capabilities={m.capabilities} />
-                    </td>
+                    </TableCell>
                   ))}
-                </tr>
-              </tbody>
-            </table>
+                </TableRow>
+              </TableBody>
+            </Table>
           </div>
         )}
 

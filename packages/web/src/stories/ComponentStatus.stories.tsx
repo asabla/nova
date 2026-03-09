@@ -2,6 +2,9 @@ import { useState, useMemo } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Check, X, Minus, Search } from "lucide-react";
 import { clsx } from "clsx";
+import { Input } from "@/components/ui/Input";
+import { Select, type SelectOption } from "@/components/ui/Select";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
 
 const meta: Meta = {
   title: "NOVA/ComponentStatus",
@@ -136,52 +139,52 @@ export const Default: Story = {
 
         <div className="flex items-center gap-3 mb-4">
           <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary" />
-            <input
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary z-10" />
+            <Input
               type="text"
               placeholder="Filter components..."
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="w-full h-8 pl-9 pr-3 text-xs rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary field-glow"
+              className="h-8 pl-9 pr-3 text-xs"
             />
           </div>
-          <select
+          <Select
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="h-8 px-3 text-xs rounded-lg border border-border bg-surface text-text"
-          >
-            <option value="all">All categories</option>
-            <option value="ui">UI</option>
-            <option value="chat">Chat</option>
-            <option value="layout">Layout</option>
-            <option value="markdown">Markdown</option>
-            <option value="other">Other</option>
-          </select>
+            onChange={(value) => setCategoryFilter(value)}
+            size="sm"
+            options={[
+              { value: "all", label: "All categories" },
+              { value: "ui", label: "UI" },
+              { value: "chat", label: "Chat" },
+              { value: "layout", label: "Layout" },
+              { value: "markdown", label: "Markdown" },
+              { value: "other", label: "Other" },
+            ]}
+          />
         </div>
 
-        <div className="rounded-xl border border-border overflow-hidden">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-surface-tertiary/50">
-                <th className="text-left px-3 py-2 font-medium text-text">Component</th>
-                <th className="text-left px-3 py-2 font-medium text-text">Category</th>
-                <th className="text-center px-3 py-2 font-medium text-text">Story</th>
-                <th className="text-center px-3 py-2 font-medium text-text">Play Test</th>
-                <th className="text-center px-3 py-2 font-medium text-text">Dark Mode</th>
-                <th className="text-left px-3 py-2 font-medium text-text">Notes</th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="rounded-xl border border-border">
+          <Table className="text-xs">
+            <TableHeader>
+              <TableRow className="bg-surface-tertiary/50">
+                <TableHead className="px-3 py-2 text-xs font-medium text-text">Component</TableHead>
+                <TableHead className="px-3 py-2 text-xs font-medium text-text">Category</TableHead>
+                <TableHead className="px-3 py-2 text-center text-xs font-medium text-text">Story</TableHead>
+                <TableHead className="px-3 py-2 text-center text-xs font-medium text-text">Play Test</TableHead>
+                <TableHead className="px-3 py-2 text-center text-xs font-medium text-text">Dark Mode</TableHead>
+                <TableHead className="px-3 py-2 text-xs font-medium text-text">Notes</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filtered.map((c) => (
-                <tr
+                <TableRow
                   key={c.name}
                   className={clsx(
-                    "border-t border-border hover:bg-surface-secondary/50",
                     !c.hasStory && "opacity-70",
                   )}
                 >
-                  <td className="px-3 py-2 font-mono text-text">{c.name}</td>
-                  <td className="px-3 py-2">
+                  <TableCell className="px-3 py-2 font-mono text-text">{c.name}</TableCell>
+                  <TableCell className="px-3 py-2">
                     <span
                       className={clsx(
                         "px-1.5 py-0.5 rounded text-[10px] font-medium",
@@ -194,15 +197,15 @@ export const Default: Story = {
                     >
                       {c.category}
                     </span>
-                  </td>
-                  <td className="px-3 py-2 text-center"><StatusIcon value={c.hasStory} /></td>
-                  <td className="px-3 py-2 text-center"><StatusIcon value={c.hasPlayTest} /></td>
-                  <td className="px-3 py-2 text-center"><StatusIcon value={c.hasDarkMode} /></td>
-                  <td className="px-3 py-2 text-text-tertiary">{c.notes}</td>
-                </tr>
+                  </TableCell>
+                  <TableCell className="px-3 py-2 text-center"><StatusIcon value={c.hasStory} /></TableCell>
+                  <TableCell className="px-3 py-2 text-center"><StatusIcon value={c.hasPlayTest} /></TableCell>
+                  <TableCell className="px-3 py-2 text-center"><StatusIcon value={c.hasDarkMode} /></TableCell>
+                  <TableCell className="px-3 py-2 text-text-tertiary">{c.notes}</TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </div>
     );

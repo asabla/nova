@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { Input } from "@/components/ui/Input";
 import {
   // Chat & messaging
   MessageSquare, Send, Paperclip, Mic, MicOff, Volume2, VolumeX, AudioLines,
@@ -201,12 +202,12 @@ export const Default: Story = {
           All lucide-react icons used across the application. Click to copy the import name.
         </p>
 
-        <input
+        <Input
           type="text"
           placeholder="Filter icons..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="w-full max-w-sm h-9 px-3 mb-6 text-sm rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary field-glow"
+          className="max-w-sm h-9 mb-6"
         />
 
         <div className="space-y-8">

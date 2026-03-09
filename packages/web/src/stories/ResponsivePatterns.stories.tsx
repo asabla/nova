@@ -9,6 +9,7 @@ import {
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Input } from "@/components/ui/Input";
 
 const meta: Meta = {
   title: "Patterns/ResponsivePatterns",
@@ -91,10 +92,10 @@ export const MobileChat: Story = {
         <div className="border-t border-border px-3 py-2">
           <div className="flex items-center gap-2 rounded-xl border border-border bg-surface-secondary px-3 py-2">
             <button className="text-text-tertiary"><Paperclip className="h-4 w-4" /></button>
-            <input
+            <Input
               type="text"
               placeholder="Message..."
-              className="flex-1 text-sm bg-transparent text-text placeholder:text-text-tertiary outline-none"
+              className="flex-1 text-sm bg-transparent border-0 h-auto p-0 outline-none"
               readOnly
             />
             <button className="text-primary"><Send className="h-4 w-4" /></button>
@@ -124,8 +125,8 @@ export const DesktopChat: Story = {
 
           <div className="px-2 py-2">
             <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-text-tertiary" />
-              <input className="w-full h-7 pl-7 pr-2 text-[10px] rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary" placeholder="Search..." readOnly />
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-text-tertiary z-10" />
+              <Input className="w-full h-7 pl-7 pr-2 text-[10px]" placeholder="Search..." readOnly />
             </div>
           </div>
 
@@ -194,10 +195,10 @@ export const DesktopChat: Story = {
           <div className="border-t border-border px-4 py-3">
             <div className="flex items-center gap-2 rounded-xl border border-border bg-surface-secondary px-3 py-2.5">
               <button className="text-text-tertiary"><Paperclip className="h-4 w-4" /></button>
-              <input
+              <Input
                 type="text"
                 placeholder="Send a message... (⌘ Enter)"
-                className="flex-1 text-xs bg-transparent text-text placeholder:text-text-tertiary outline-none"
+                className="flex-1 text-xs bg-transparent border-0 h-auto p-0 outline-none"
                 readOnly
               />
               <button className="text-primary"><Send className="h-4 w-4" /></button>

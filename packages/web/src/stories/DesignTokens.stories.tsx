@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { clsx } from "clsx";
 import { Copy, Check } from "lucide-react";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
 
 const meta: Meta = {
   title: "NOVA/DesignTokens",
@@ -234,41 +235,41 @@ export const LightDarkComparison: Story = {
           Side-by-side oklch values for each token in both themes.
         </p>
 
-        <div className="rounded-xl border border-border overflow-hidden">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-surface-tertiary/50">
-                <th className="text-left px-4 py-2.5 font-medium text-text-tertiary">Token</th>
-                <th className="text-left px-4 py-2.5 font-medium text-text-tertiary">Light Swatch</th>
-                <th className="text-left px-4 py-2.5 font-medium text-text-tertiary">Light Value</th>
-                <th className="text-left px-4 py-2.5 font-medium text-text-tertiary">Dark Swatch</th>
-                <th className="text-left px-4 py-2.5 font-medium text-text-tertiary">Dark Value</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
+        <div className="rounded-xl border border-border">
+          <Table className="text-xs">
+            <TableHeader>
+              <TableRow className="bg-surface-tertiary/50">
+                <TableHead className="px-4 py-2.5 text-xs font-medium text-text-tertiary">Token</TableHead>
+                <TableHead className="px-4 py-2.5 text-xs font-medium text-text-tertiary">Light Swatch</TableHead>
+                <TableHead className="px-4 py-2.5 text-xs font-medium text-text-tertiary">Light Value</TableHead>
+                <TableHead className="px-4 py-2.5 text-xs font-medium text-text-tertiary">Dark Swatch</TableHead>
+                <TableHead className="px-4 py-2.5 text-xs font-medium text-text-tertiary">Dark Value</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-border">
               {tokens.map((t) => (
-                <tr key={t.name}>
-                  <td className="px-4 py-2.5 font-medium text-text">{t.name}</td>
-                  <td className="px-4 py-2.5">
+                <TableRow key={t.name}>
+                  <TableCell className="px-4 py-2.5 font-medium text-text">{t.name}</TableCell>
+                  <TableCell className="px-4 py-2.5">
                     <div data-theme="light" className="inline-block">
                       <div className={clsx("h-6 w-12 rounded border border-neutral-200", t.class)} />
                     </div>
-                  </td>
-                  <td className="px-4 py-2.5">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5">
                     <code className="text-[10px] font-mono text-text-tertiary">{t.light}</code>
-                  </td>
-                  <td className="px-4 py-2.5">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5">
                     <div data-theme="dark" className="inline-block">
                       <div className={clsx("h-6 w-12 rounded border border-neutral-700", t.class)} />
                     </div>
-                  </td>
-                  <td className="px-4 py-2.5">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5">
                     <code className="text-[10px] font-mono text-text-tertiary">{t.dark}</code>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </div>
     );

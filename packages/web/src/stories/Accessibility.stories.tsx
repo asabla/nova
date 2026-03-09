@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { Input } from "@/components/ui/Input";
 import { VisuallyHidden, SkipLink, FocusTrap, Announce } from "@/components/ui/AccessibleLabel";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
@@ -106,8 +107,8 @@ export const FocusTrapDemo: Story = {
                     Tab cycles only through the focusable elements within this dialog.
                     Press Escape to close.
                   </p>
-                  <input
-                    className="w-full h-9 rounded-lg border border-border bg-surface px-3 text-sm text-text placeholder:text-text-tertiary field-glow"
+                  <Input
+                    className="h-9"
                     placeholder="Try tabbing..."
                   />
                   <div className="flex gap-2 justify-end">

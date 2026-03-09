@@ -180,14 +180,14 @@ export const Default: Story = {
 
           {/* Search */}
           <div className="px-3 pt-3 pb-1">
-            <div className="relative">
+            <div className="relative input-glow rounded-lg">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary" />
               <input
                 type="text"
                 placeholder="Search conversations..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full h-8 pl-8 pr-3 text-xs rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary field-glow"
+                className="w-full h-8 pl-8 pr-3 text-xs rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary"
               />
             </div>
           </div>
@@ -398,7 +398,7 @@ export const FilteredByWorkspace: Story = {
     return (
       <div className="w-[280px] h-[400px] flex flex-col bg-surface-secondary border border-border rounded-xl overflow-hidden">
         <div className="px-3 pt-3 pb-1 space-y-2">
-          <div className="relative">
+          <div className="relative input-glow rounded-lg">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary" />
             <input
               type="text"

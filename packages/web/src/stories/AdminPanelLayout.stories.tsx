@@ -11,6 +11,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Switch } from "@/components/ui/Switch";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/Table";
 
 const meta: Meta = {
   title: "Layouts/AdminPanel",
@@ -147,31 +148,31 @@ export const MemberManagement: Story = {
             </div>
 
             <div className="relative max-w-xs mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary" />
-              <input
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary z-10" />
+              <Input
                 type="text"
                 placeholder="Search members..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full h-8 pl-9 pr-3 text-xs rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary field-glow"
+                className="h-8 pl-9 pr-3 text-xs"
               />
             </div>
 
-            <div className="rounded-xl border border-border overflow-hidden">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="bg-surface-tertiary/50 border-b border-border">
-                    <th className="text-left px-4 py-2.5 font-medium text-text-tertiary">Member</th>
-                    <th className="text-left px-4 py-2.5 font-medium text-text-tertiary">Role</th>
-                    <th className="text-left px-4 py-2.5 font-medium text-text-tertiary">Status</th>
-                    <th className="text-left px-4 py-2.5 font-medium text-text-tertiary">Last Seen</th>
-                    <th className="w-10" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
+            <div className="rounded-xl border border-border">
+              <Table className="text-xs">
+                <TableHeader>
+                  <TableRow className="bg-surface-tertiary/50">
+                    <TableHead className="px-4 py-2.5 text-xs font-medium text-text-tertiary">Member</TableHead>
+                    <TableHead className="px-4 py-2.5 text-xs font-medium text-text-tertiary">Role</TableHead>
+                    <TableHead className="px-4 py-2.5 text-xs font-medium text-text-tertiary">Status</TableHead>
+                    <TableHead className="px-4 py-2.5 text-xs font-medium text-text-tertiary">Last Seen</TableHead>
+                    <TableHead className="w-10" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-border">
                   {filtered.map((m) => (
-                    <tr key={m.id} className="hover:bg-surface-secondary/50 transition-colors">
-                      <td className="px-4 py-2.5">
+                    <TableRow key={m.id}>
+                      <TableCell className="px-4 py-2.5">
                         <div className="flex items-center gap-2.5">
                           <Avatar name={m.name} size="sm" />
                           <div>
@@ -179,25 +180,25 @@ export const MemberManagement: Story = {
                             <p className="text-text-tertiary">{m.email}</p>
                           </div>
                         </div>
-                      </td>
-                      <td className="px-4 py-2.5">
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5">
                         <Badge variant={m.role === "Admin" ? "primary" : "default"}>{m.role}</Badge>
-                      </td>
-                      <td className="px-4 py-2.5">
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5">
                         <Badge variant={m.status === "active" ? "success" : m.status === "invited" ? "warning" : "danger"}>
                           {m.status}
                         </Badge>
-                      </td>
-                      <td className="px-4 py-2.5 text-text-tertiary">{m.lastSeen}</td>
-                      <td className="px-2 py-2.5">
+                      </TableCell>
+                      <TableCell className="px-4 py-2.5 text-text-tertiary">{m.lastSeen}</TableCell>
+                      <TableCell className="px-2 py-2.5">
                         <button className="p-1 rounded hover:bg-surface-tertiary text-text-tertiary hover:text-text transition-colors">
                           <MoreHorizontal className="h-3.5 w-3.5" />
                         </button>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           </div>
         </div>
