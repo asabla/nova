@@ -12,6 +12,7 @@ import {
 import { isToday, isYesterday, isThisWeek } from "date-fns";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
+import { Select } from "../ui/Select";
 import { useUIStore } from "../../stores/ui.store";
 import { useAuthStore } from "../../stores/auth.store";
 import { Button } from "../ui/Button";
@@ -194,17 +195,16 @@ export function Sidebar() {
         {showFilters && (
           <div className="px-3 pt-2 space-y-1.5">
             {workspaces.length > 0 && (
-              <select
+              <Select
                 value={filterWorkspace}
-                onChange={(e) => setFilterWorkspace(e.target.value)}
-                aria-label={t("search.filter.workspace", { defaultValue: "Filter by workspace" })}
-                className="w-full h-7 px-2 text-[11px] bg-surface border border-border rounded-lg text-text"
-              >
-                <option value="">{t("search.filter.allWorkspaces", { defaultValue: "All workspaces" })}</option>
-                {workspaces.map((w: any) => (
-                  <option key={w.id} value={w.id}>{w.name}</option>
-                ))}
-              </select>
+                onChange={(value) => setFilterWorkspace(value)}
+                placeholder={t("search.filter.allWorkspaces", { defaultValue: "All workspaces" })}
+                options={[
+                  { value: "", label: t("search.filter.allWorkspaces", { defaultValue: "All workspaces" }) },
+                  ...workspaces.map((w: any) => ({ value: w.id, label: w.name })),
+                ]}
+                size="sm"
+              />
             )}
           </div>
         )}

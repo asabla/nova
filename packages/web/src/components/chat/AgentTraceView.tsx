@@ -17,6 +17,7 @@ import {
   Zap,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { Input } from "../ui/Input";
 
 interface TraceStep {
   id: string;
@@ -161,7 +162,7 @@ function TraceStepItem({
 
             {step.status === "waiting_input" && onRespond && (
               <div className="flex items-center gap-2">
-                <input
+                <Input
                   type="text"
                   value={inputResponse}
                   onChange={(e) => setInputResponse(e.target.value)}
@@ -172,7 +173,7 @@ function TraceStepItem({
                     }
                   }}
                   placeholder="Type your response..."
-                  className="flex-1 h-8 px-3 text-xs rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary field-glow"
+                  className="flex-1 h-8 px-3 text-xs bg-surface"
                 />
                 <button
                   onClick={() => {

@@ -5,6 +5,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { CodeBlock } from "./CodeBlock";
 import { DynamicWidget, type WidgetConfig } from "../chat/DynamicWidget";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../ui/Table";
 
 interface MarkdownRendererProps {
   content: string;
@@ -50,25 +51,25 @@ function CsvTable({ csv }: { csv: string }) {
   const [header, ...body] = rows;
 
   return (
-    <div className="my-3 overflow-x-auto rounded-xl border border-border">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="bg-surface-secondary">
+    <div className="my-3 rounded-xl border border-border">
+      <Table className="text-xs">
+        <TableHeader>
+          <TableRow className="border-b border-border">
             {header.map((cell, i) => (
-              <th key={i} className="px-3 py-2 text-left font-medium text-text border-b border-border">{cell}</th>
+              <TableHead key={i} className="px-3 py-2 text-left font-medium text-text normal-case tracking-normal">{cell}</TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {body.map((row, i) => (
-            <tr key={i} className="hover:bg-surface-secondary/50">
+            <TableRow key={i}>
               {row.map((cell, j) => (
-                <td key={j} className="px-3 py-1.5 text-text-secondary border-b border-border">{cell}</td>
+                <TableCell key={j} className="px-3 py-1.5 text-text-secondary">{cell}</TableCell>
               ))}
-            </tr>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -166,30 +167,30 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           },
           table({ children }) {
             return (
-              <div className="my-3 overflow-x-auto rounded-lg border border-border/60">
-                <table className="w-full text-xs border-collapse">
+              <div className="my-3 rounded-lg border border-border/60">
+                <Table className="text-xs">
                   {children}
-                </table>
+                </Table>
               </div>
             );
           },
           thead({ children }) {
             return (
-              <thead className="bg-surface-tertiary/50">{children}</thead>
+              <TableHeader className="bg-surface-tertiary/50">{children}</TableHeader>
             );
           },
           th({ children }) {
             return (
-              <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wider text-text-tertiary border-b border-border/60">
+              <TableHead className="px-3 py-2 text-[11px] border-b border-border/60">
                 {children}
-              </th>
+              </TableHead>
             );
           },
           td({ children }) {
             return (
-              <td className="px-3 py-2 text-text-secondary border-b border-border/30">
+              <TableCell className="px-3 py-2 text-text-secondary border-b border-border/30">
                 {children}
-              </td>
+              </TableCell>
             );
           },
           pre({ children }) {

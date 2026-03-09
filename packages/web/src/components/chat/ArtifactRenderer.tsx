@@ -21,6 +21,8 @@ import {
 import { clsx } from "clsx";
 import { CodeBlock } from "../markdown/CodeBlock";
 import { DynamicWidget, type WidgetConfig } from "./DynamicWidget";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../ui/Table";
+import { Input } from "../ui/Input";
 
 // --- Types ---
 
@@ -134,37 +136,35 @@ function SortableCSVTable({ csv }: { csv: string }) {
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="bg-surface-tertiary/50">
-            {header.map((cell, i) => (
-              <th
-                key={i}
-                onClick={() => handleSort(i)}
-                className="px-3 py-2 text-left font-medium text-text border-b border-border cursor-pointer hover:bg-surface-tertiary select-none"
-              >
-                <span className="flex items-center gap-1">
-                  {cell}
-                  <ArrowUpDown className="h-3 w-3 text-text-tertiary" />
-                </span>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {sortedBody.map((row, i) => (
-            <tr key={i} className="hover:bg-surface-secondary/50">
-              {row.map((cell, j) => (
-                <td key={j} className="px-3 py-1.5 text-text-secondary border-b border-border">
-                  {cell}
-                </td>
-              ))}
-            </tr>
+    <Table className="text-xs">
+      <TableHeader className="bg-surface-tertiary/50">
+        <TableRow className="border-b border-border">
+          {header.map((cell, i) => (
+            <TableHead
+              key={i}
+              onClick={() => handleSort(i)}
+              className="px-3 py-2 text-left font-medium text-text normal-case tracking-normal cursor-pointer hover:bg-surface-tertiary select-none"
+            >
+              <span className="flex items-center gap-1">
+                {cell}
+                <ArrowUpDown className="h-3 w-3 text-text-tertiary" />
+              </span>
+            </TableHead>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {sortedBody.map((row, i) => (
+          <TableRow key={i}>
+            {row.map((cell, j) => (
+              <TableCell key={j} className="px-3 py-1.5 text-text-secondary">
+                {cell}
+              </TableCell>
+            ))}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 
@@ -628,61 +628,59 @@ function DataTable({ tableData }: { tableData: TableData }) {
     <div>
       {/* Filter input */}
       <div className="px-3 py-2 border-b border-border">
-        <input
+        <Input
           type="text"
           placeholder="Filter rows\u2026"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="w-full max-w-xs text-xs px-2 py-1 rounded border border-border bg-surface text-text placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-primary/50"
+          className="h-auto max-w-xs text-xs px-2 py-1"
         />
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="bg-surface-tertiary/50">
-              {tableData.headers.map((header, i) => (
-                <th
-                  key={i}
-                  onClick={() => handleSort(i)}
-                  className="px-3 py-2 text-left font-medium text-text border-b border-border cursor-pointer hover:bg-surface-tertiary select-none"
-                >
-                  <span className="flex items-center gap-1">
-                    {header}
-                    <ArrowUpDown
-                      className={clsx(
-                        "h-3 w-3",
-                        sortCol === i ? "text-primary" : "text-text-tertiary",
-                      )}
-                    />
-                    {sortCol === i && (
-                      <span className="text-[9px] text-primary">{sortAsc ? "\u25B2" : "\u25BC"}</span>
+      <Table className="text-xs">
+        <TableHeader className="bg-surface-tertiary/50">
+          <TableRow className="border-b border-border">
+            {tableData.headers.map((header, i) => (
+              <TableHead
+                key={i}
+                onClick={() => handleSort(i)}
+                className="px-3 py-2 text-left font-medium text-text normal-case tracking-normal cursor-pointer hover:bg-surface-tertiary select-none"
+              >
+                <span className="flex items-center gap-1">
+                  {header}
+                  <ArrowUpDown
+                    className={clsx(
+                      "h-3 w-3",
+                      sortCol === i ? "text-primary" : "text-text-tertiary",
                     )}
-                  </span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {sortedRows.length === 0 ? (
-              <tr>
-                <td colSpan={tableData.headers.length} className="px-3 py-4 text-center text-text-tertiary">
-                  No matching rows
-                </td>
-              </tr>
-            ) : (
-              sortedRows.map((row, i) => (
-                <tr key={i} className="hover:bg-surface-secondary/50">
-                  {row.map((cell, j) => (
-                    <td key={j} className="px-3 py-1.5 text-text-secondary border-b border-border">
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+                  />
+                  {sortCol === i && (
+                    <span className="text-[9px] text-primary">{sortAsc ? "\u25B2" : "\u25BC"}</span>
+                  )}
+                </span>
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {sortedRows.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={tableData.headers.length} className="px-3 py-4 text-center text-text-tertiary">
+                No matching rows
+              </TableCell>
+            </TableRow>
+          ) : (
+            sortedRows.map((row, i) => (
+              <TableRow key={i}>
+                {row.map((cell, j) => (
+                  <TableCell key={j} className="px-3 py-1.5 text-text-secondary">
+                    {cell}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
       {/* Row count */}
       <div className="px-3 py-1.5 text-[10px] text-text-tertiary border-t border-border">
         {sortedRows.length} of {tableData.rows.length} row{tableData.rows.length !== 1 ? "s" : ""}

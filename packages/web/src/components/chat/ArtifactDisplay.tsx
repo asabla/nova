@@ -24,6 +24,7 @@ import { useMutation } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { toast } from "../ui/Toast";
 import { CodeBlock } from "../markdown/CodeBlock";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../ui/Table";
 
 interface Artifact {
   id: string;
@@ -170,7 +171,7 @@ function SortableTable({ csv }: { csv: string }) {
   if (!header || header.length === 0) return null;
 
   return (
-    <div className="overflow-x-auto">
+    <div>
       <div className="flex justify-end px-3 py-1 border-b border-border">
         <button
           onClick={handleDownloadCsv}
@@ -179,35 +180,35 @@ function SortableTable({ csv }: { csv: string }) {
           <Download className="h-3 w-3" /> CSV
         </button>
       </div>
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="bg-surface-tertiary/50">
+      <Table className="text-xs">
+        <TableHeader className="bg-surface-tertiary/50">
+          <TableRow className="border-b border-border">
             {header.map((cell, i) => (
-              <th
+              <TableHead
                 key={i}
                 onClick={() => handleSort(i)}
-                className="px-3 py-2 text-left font-medium text-text border-b border-border cursor-pointer hover:bg-surface-tertiary select-none"
+                className="px-3 py-2 text-left font-medium text-text normal-case tracking-normal cursor-pointer hover:bg-surface-tertiary select-none"
               >
                 <span className="flex items-center gap-1">
                   {cell}
                   <ArrowUpDown className="h-3 w-3 text-text-tertiary" />
                 </span>
-              </th>
+              </TableHead>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {sortedBody.map((row, i) => (
-            <tr key={i} className="hover:bg-surface-secondary/50">
+            <TableRow key={i}>
               {row.map((cell, j) => (
-                <td key={j} className="px-3 py-1.5 text-text-secondary border-b border-border">
+                <TableCell key={j} className="px-3 py-1.5 text-text-secondary">
                   {cell}
-                </td>
+                </TableCell>
               ))}
-            </tr>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }

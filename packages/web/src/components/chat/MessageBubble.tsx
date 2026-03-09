@@ -8,6 +8,8 @@ import { ArtifactRenderer } from "./ArtifactRenderer";
 import { DynamicWidget } from "./DynamicWidget";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/Badge";
+import { Input } from "../ui/Input";
+import { Textarea } from "../ui/Textarea";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { formatDistanceToNow } from "date-fns";
@@ -215,7 +217,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
 
         {isEditing ? (
           <div className="w-full min-w-[300px]">
-            <textarea
+            <Textarea
               autoFocus
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
@@ -226,7 +228,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
                 }
                 if (e.key === "Escape") handleEditCancel();
               }}
-              className="w-full min-h-[80px] p-3 rounded-xl bg-surface border border-border text-sm text-text resize-y field-glow"
+              className="w-full min-h-[80px] rounded-xl"
             />
             <div className="flex items-center gap-2 mt-2">
               <button
@@ -558,7 +560,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
         {/* Note input */}
         {showNoteInput && onNote && (
           <div className="mt-2 flex items-center gap-2 w-full max-w-[400px]">
-            <input
+            <Input
               autoFocus
               type="text"
               value={noteContent}
@@ -572,7 +574,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
                 if (e.key === "Escape") setShowNoteInput(false);
               }}
               placeholder={t("messages.notePlaceholder")}
-              className="flex-1 h-7 px-2 text-xs bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary"
+              className="flex-1 h-7 px-2 text-xs bg-surface"
             />
             <button
               onClick={() => {

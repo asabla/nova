@@ -6,6 +6,9 @@ import { clsx } from "clsx";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { Button } from "../ui/Button";
+import { Input } from "../ui/Input";
+import { Select, type SelectOption } from "../ui/Select";
+import { Textarea } from "../ui/Textarea";
 import { ModelCapabilityBadges } from "../ui/ModelCapabilityBadges";
 import { toast } from "../ui/Toast";
 
@@ -132,17 +135,17 @@ export function ConversationSettings({ conversationId, conversation, open, onClo
 
         {/* Model */}
         <div>
-          <label className="block text-xs font-medium text-text mb-1.5">{t("settings.model", { defaultValue: "Model" })}</label>
-          <select
+          <Select
+            label={t("settings.model", { defaultValue: "Model" })}
             value={model}
-            onChange={(e) => setModel(e.target.value)}
-            className="w-full h-9 px-3 text-sm bg-surface-secondary border border-border rounded-lg text-text"
-          >
-            <option value="">{t("settings.orgDefault", { defaultValue: "Organization default" })}</option>
-            {models.map((m: any) => (
-              <option key={m.id} value={m.modelId}>{m.name}</option>
-            ))}
-          </select>
+            onChange={(val) => setModel(val)}
+            placeholder={t("settings.orgDefault", { defaultValue: "Organization default" })}
+            size="sm"
+            options={[
+              { value: "", label: t("settings.orgDefault", { defaultValue: "Organization default" }) },
+              ...models.map((m: any): SelectOption => ({ value: m.modelId, label: m.name })),
+            ]}
+          />
           {(() => {
             const selected = models.find((m: any) => m.modelId === model);
             const caps: string[] = selected?.capabilities ?? [];
@@ -153,16 +156,14 @@ export function ConversationSettings({ conversationId, conversation, open, onClo
         </div>
 
         {/* System Prompt */}
-        <div>
-          <label className="block text-xs font-medium text-text mb-1.5">{t("settings.systemPrompt", { defaultValue: "System Prompt" })}</label>
-          <textarea
-            value={systemPrompt}
-            onChange={(e) => setSystemPrompt(e.target.value)}
-            rows={5}
-            placeholder={t("settings.systemPromptPlaceholder", { defaultValue: "You are a helpful assistant..." })}
-            className="w-full px-3 py-2 text-sm bg-surface-secondary border border-border rounded-lg text-text placeholder:text-text-tertiary field-glow resize-none"
-          />
-        </div>
+        <Textarea
+          label={t("settings.systemPrompt", { defaultValue: "System Prompt" })}
+          value={systemPrompt}
+          onChange={(e) => setSystemPrompt(e.target.value)}
+          rows={5}
+          placeholder={t("settings.systemPromptPlaceholder", { defaultValue: "You are a helpful assistant..." })}
+          className="w-full bg-surface-secondary resize-none"
+        />
 
         {/* Temperature */}
         <div>
@@ -203,17 +204,15 @@ export function ConversationSettings({ conversationId, conversation, open, onClo
         </div>
 
         {/* Max Tokens */}
-        <div>
-          <label className="block text-xs font-medium text-text mb-1.5">{t("settings.maxTokens", { defaultValue: "Max Tokens" })}</label>
-          <input
-            type="number"
-            value={maxTokens}
-            onChange={(e) => setMaxTokens(parseInt(e.target.value) || 4096)}
-            min={1}
-            max={200000}
-            className="w-full h-9 px-3 text-sm bg-surface-secondary border border-border rounded-lg text-text"
-          />
-        </div>
+        <Input
+          label={t("settings.maxTokens", { defaultValue: "Max Tokens" })}
+          type="number"
+          value={maxTokens}
+          onChange={(e) => setMaxTokens(parseInt(e.target.value) || 4096)}
+          min={1}
+          max={200000}
+          className="w-full h-9 bg-surface-secondary"
+        />
 
         {/* Frequency Penalty */}
         <div>

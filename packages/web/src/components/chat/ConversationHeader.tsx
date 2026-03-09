@@ -9,6 +9,7 @@ import { Dropdown, DropdownItem } from "../ui/Dropdown";
 import { Dialog } from "../ui/Dialog";
 import { Button } from "../ui/Button";
 import { Badge } from "../ui/Badge";
+import { Input } from "../ui/Input";
 import { toast } from "../ui/Toast";
 import { ConversationSettings } from "./ConversationSettings";
 
@@ -125,13 +126,13 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
             <Star className="h-4 w-4 text-primary shrink-0 fill-primary/20" aria-hidden="true" />
           )}
           {isEditing ? (
-            <input
+            <Input
               autoFocus
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onBlur={handleRename}
               onKeyDown={(e) => e.key === "Enter" && handleRename()}
-              className="text-sm font-medium text-text bg-surface-secondary border border-border rounded-lg px-2.5 py-1"
+              className="text-sm font-medium bg-surface-secondary h-8 px-2.5"
               aria-label={t("conversation.renameInput", { defaultValue: "Conversation title" })}
             />
           ) : (
