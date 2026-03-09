@@ -1,0 +1,89 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project
+
+NOVA — self-hosted-first AI chat platform (multi-tenant SaaS). License: FSL-1.1-Apache-2.0.
+
+## Monorepo Structure
+
+Bun workspace monorepo with 4 packages:
+
+- **@nova/shared** — Drizzle schemas (62 tables), types, constants, utils. Exports: `./schema`, `./schemas`, `./types`, `./constants`, `./utils`
+- **@nova/api** — Hono REST API on Bun runtime. Routes in `src/routes/`, services in `src/services/`, middleware in `src/middleware/`
+- **@nova/web** — React 19 + Vite + TanStack Router + TanStack Query + Zustand + Tailwind v4. Path alias `@/*` → `src/*`
+- **@nova/worker** — Temporal workflows on **Node.js** (not Bun — Temporal requires it). Uses `tsx` for dev
+
+## Commands
+
+```bash
+# Development
+bun run dev              # All packages
+bun run dev:api          # API only (localhost:3000)
+bun run dev:web          # Web only (localhost:5173)
+bun run dev:worker       # Worker only
+
+# Build & typecheck
+bun run build            # Build all packages
+bun run typecheck        # tsc --noEmit across all packages
+
+# Database (Drizzle)
+bun run db:generate      # Generate migration files
+bun run db:migrate       # Apply migrations
+bun run db:push          # Sync schema directly (dev shortcut)
+bun run db:studio        # Drizzle Studio UI
+bun run --filter @nova/api db:seed  # Seed database
+
+# Testing
+bun test                           # All tests (Bun unit + Playwright e2e)
+bun test packages/api/tests/       # Tests in one package
+bun test packages/api/tests/lib/stream-relay.test.ts  # Single test file
+
+# Storybook
+bun run storybook        # Dev server on port 6006
+
+# Docker
+docker compose build api web
+docker compose up -d api web
+```
+
+**Unit tests** use `bun:test` (`describe`, `it`, `expect`). Test files live in `packages/*/tests/`.
+
+**E2E tests** use Playwright (config at root `playwright.config.ts`), files in `packages/web/tests/e2e/*.e2e.test.ts`.
+
+## Architecture
+
+### API middleware chain (order matters)
+
+Error handler → Security headers → CORS → Request ID → Logger → **Public routes** (auth, health, webhooks) → Rate limit → **Auth** → Org scope → MFA guard → Content filter → Budget guard (LLM routes)
+
+### Key patterns
+
+- **Services**: Named exports of async functions, no default exports. Located in `packages/api/src/services/`
+- **Errors**: Use `AppError` from `@nova/shared/utils` — `AppError.notFound()`, `AppError.unauthorized()`, `AppError.badRequest()`
+- **Shared imports**: `import { conversations } from "@nova/shared/schema"`, `import type { User } from "@nova/shared/types"`
+- **Temporal workflows**: Orchestrate via `proxyActivities()`. Activities are side-effect functions (LLM calls, DB writes). Worker registers both in `src/index.ts`
+- **Auth**: Better Auth v1.5.4. Session restored in `_auth.tsx` `beforeLoad` via `authClient.getSession()`. Cookie config uses `advanced.cookiePrefix` / `advanced.cookies.session_token.name` (NOT `session.cookieName` — silently ignored)
+- **Frontend state**: Zustand for client state (auth, UI), TanStack Query for server state
+- **Route generation**: TanStack Router file-based routing, auto-generates `routeTree.gen.ts`
+
+### Infrastructure services
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| PostgreSQL | 5432 | Main database (pgvector + pg_trgm) |
+| Redis | 6379 | Cache, pub/sub, rate limiting |
+| MinIO | 9000/9001 | S3-compatible file storage |
+| LiteLLM | 4000 | LLM proxy (needs OPENAI_API_KEY or ANTHROPIC_API_KEY) |
+| Temporal | 7233 | Workflow orchestration (separate DB) |
+| Temporal UI | 8233 | Workflow dashboard |
+| SearxNG | 8888 | Web search |
+
+## Gotchas
+
+- **Worker runtime**: Temporal requires Node.js — the worker package uses `tsx` (dev) and compiled JS (Docker), not Bun
+- **Hot reload limitation**: `bun --hot` doesn't reliably reload transitive dependency changes — rebuild Docker container
+- **Env propagation**: `bun run --filter` doesn't propagate root `.env` — use `docker compose up` or set vars manually
+- **DB config**: Drizzle config is at `packages/api/drizzle.config.ts`, schemas are in `packages/shared/src/schemas/`
+- **No lint script**: `bun run lint` is defined but individual packages don't have lint scripts yet
