@@ -94,7 +94,7 @@ function LoginFormDemo() {
                 type="password"
                 placeholder="Enter password"
                 defaultValue="mysecretpassword"
-                className="h-10 w-full rounded-lg border border-border bg-surface px-3 pr-10 text-sm text-text placeholder:text-text-tertiary focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary focus-visible:border-primary transition-colors hover:border-border-strong"
+                className="h-10 w-full rounded-lg border border-border bg-surface px-3 pr-10 text-sm text-text placeholder:text-text-tertiary field-glow transition-colors hover:border-border-strong"
               />
               <button className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-text-tertiary hover:text-text transition-colors rounded">
                 <Eye className="h-4 w-4" />
@@ -351,7 +351,7 @@ function SearchWithFiltersDemo() {
           type="text"
           placeholder="Search conversations, agents, knowledge..."
           defaultValue="vector database"
-          className="w-full h-10 rounded-lg border border-border bg-surface pl-9 pr-3 text-sm text-text placeholder:text-text-tertiary focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary focus-visible:border-primary transition-colors"
+          className="w-full h-10 rounded-lg border border-border bg-surface pl-9 pr-3 text-sm text-text placeholder:text-text-tertiary field-glow transition-colors"
         />
       </div>
 

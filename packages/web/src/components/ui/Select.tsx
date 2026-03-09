@@ -203,7 +203,7 @@ export function Select({
         onKeyDown={handleKeyDown}
         className={clsx(
           "relative w-full flex items-center justify-between rounded-lg border bg-surface text-left text-sm transition-colors",
-          "focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary focus-visible:border-primary",
+          "field-glow",
           "disabled:opacity-50 disabled:cursor-not-allowed",
           error ? "border-danger" : "border-border hover:border-border-strong",
           size === "sm" ? "h-8 px-2.5" : "h-10 px-3",

@@ -26,7 +26,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           id={textareaId}
           className={clsx(
             "min-h-[80px] rounded-lg border bg-surface px-3 py-2 text-sm text-text placeholder:text-text-tertiary transition-colors resize-y",
-            "focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary focus-visible:border-primary",
+            "field-glow",
             "disabled:opacity-50 disabled:cursor-not-allowed disabled:resize-none",
             error ? "border-danger" : "border-border hover:border-border-strong",
             className,

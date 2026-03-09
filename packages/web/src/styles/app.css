@@ -349,10 +349,22 @@ body {
     0 4px 16px -2px color-mix(in oklch, var(--color-primary) 8%, transparent);
 }
 
-/* Visible focus ring inside the glowing container */
+/* Suppress the default focus ring inside glowing containers —
+   the outer glow already provides the visual focus indicator. */
+.input-glow *:focus,
 .input-glow *:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
+  outline: none;
+}
+
+/* Diffused glow for standalone form fields (Input, Textarea, Select).
+   Mirrors the .input-glow effect but triggered by the element's own focus. */
+.field-glow:focus-visible {
+  outline: none;
+  border-color: var(--color-border-strong);
+  box-shadow:
+    0 0 0 1px var(--color-border-strong),
+    0 0 20px -4px color-mix(in oklch, var(--color-primary) 20%, transparent),
+    0 4px 16px -2px color-mix(in oklch, var(--color-primary) 8%, transparent);
 }
 
 /* OmniBar backdrop */

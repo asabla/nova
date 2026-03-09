@@ -24,7 +24,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           id={inputId}
           className={clsx(
             "h-10 rounded-lg border bg-surface px-3 text-sm text-text placeholder:text-text-tertiary transition-colors",
-            "focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary focus-visible:border-primary",
+            "field-glow",
             "disabled:opacity-50 disabled:cursor-not-allowed",
             error ? "border-danger" : "border-border hover:border-border-strong",
             className,
