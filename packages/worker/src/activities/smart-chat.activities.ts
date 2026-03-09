@@ -18,6 +18,42 @@ export async function publishDone(
 }
 
 /**
+ * Truncate message content to stay within model context limits.
+ * Tool results can be very large; cap each message to avoid KV cache crashes.
+ */
+function truncateMessages(
+  messages: { role: string; content: string; [k: string]: unknown }[],
+  maxCharsPerMessage = 3000,
+  maxTotalChars = 24000,
+): { role: string; content: string; [k: string]: unknown }[] {
+  const truncated = messages.map((m) => {
+    if (typeof m.content === "string" && m.content.length > maxCharsPerMessage) {
+      return { ...m, content: m.content.slice(0, maxCharsPerMessage) + "\n...[truncated]" };
+    }
+    return m;
+  });
+
+  // If total is still too large, drop older non-system/non-tool messages
+  let total = truncated.reduce((sum, m) => sum + (typeof m.content === "string" ? m.content.length : 0), 0);
+  if (total > maxTotalChars) {
+    // Keep system (first), last 2 user messages, and all tool messages; trim the rest
+    const result: typeof truncated = [];
+    for (let i = truncated.length - 1; i >= 0; i--) {
+      result.unshift(truncated[i]);
+      total = result.reduce((sum, m) => sum + (typeof m.content === "string" ? m.content.length : 0), 0);
+      if (total >= maxTotalChars && i > 0) {
+        // Drop this message
+        result.shift();
+        break;
+      }
+    }
+    return result;
+  }
+
+  return truncated;
+}
+
+/**
  * Streaming LLM step: calls LiteLLM with streaming, publishes each token
  * to Redis, and returns the accumulated response with any tool calls.
  */
@@ -34,12 +70,14 @@ export async function streamingLLMStep(input: {
   finishReason: string;
   usage: { prompt_tokens?: number; completion_tokens?: number };
 }> {
+  const safeMessages = truncateMessages(input.messages);
+
   const body: Record<string, unknown> = {
     model: input.model,
-    messages: input.messages,
+    messages: safeMessages,
     stream: true,
     temperature: input.temperature ?? 0.7,
-    max_tokens: input.maxTokens ?? 4096,
+    max_tokens: input.maxTokens ?? 16384,
   };
 
   if (input.tools && input.tools.length > 0) {

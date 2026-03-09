@@ -11,7 +11,7 @@ model_list:
   # LM Studio (OpenAI-compatible local server)
   - model_name: lmstudio/gpt-oss:20b
     litellm_params:
-      model: openai/gpt-oss:20b
+      model: openai/gpt-oss-20b
       api_base: http://host.docker.internal:1234/v1
       api_key: "not-needed"
 

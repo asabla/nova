@@ -56,13 +56,13 @@ function ConversationPage() {
   }, [allArtifacts]);
 
   useEffect(() => {
-    if (status === "done" && tokens) {
+    if (status === "done" || status === "error") {
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.artifacts(id) });
       resetStream();
     }
-  }, [status, tokens, id, queryClient, resetStream]);
+  }, [status, id, queryClient, resetStream]);
 
 
   const editMessage = useMutation({
@@ -119,7 +119,9 @@ function ConversationPage() {
         enableTools: true,
         messages: [
           ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
-          ...messages.map((m: any) => ({ role: m.senderType === "user" ? "user" : "assistant", content: m.content })),
+          ...messages
+            .filter((m: any) => m.content != null && m.content !== "")
+            .map((m: any) => ({ role: m.senderType === "user" ? "user" : "assistant", content: m.content })),
           { role: "user", content },
         ],
       });
@@ -197,10 +199,12 @@ function ConversationPage() {
         ...modelParams,
         messages: [
           ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
-          ...previousMessages.map((m: any) => ({
-            role: m.senderType === "user" ? "user" : "assistant",
-            content: m.content,
-          })),
+          ...previousMessages
+            .filter((m: any) => m.content != null && m.content !== "")
+            .map((m: any) => ({
+              role: m.senderType === "user" ? "user" : "assistant",
+              content: m.content,
+            })),
           { role: "user", content },
         ],
       });
@@ -225,10 +229,12 @@ function ConversationPage() {
       ...modelParams,
       messages: [
         ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
-        ...previousMessages.map((m: any) => ({
-          role: m.senderType === "user" ? "user" : "assistant",
-          content: m.content,
-        })),
+        ...previousMessages
+          .filter((m: any) => m.content != null && m.content !== "")
+          .map((m: any) => ({
+            role: m.senderType === "user" ? "user" : "assistant",
+            content: m.content,
+          })),
       ],
     });
   }, [id, messages, conversation, startStream, getModelParams]);
@@ -283,14 +289,28 @@ function ConversationPage() {
 
   useClipboardPaste((file) => handleFileUpload([file]));
 
-  // Handle SSE error status
+  // Handle SSE error status — re-stream the last user message without creating a duplicate
   const handleRetryLastMessage = useCallback(() => {
     resetStream();
     const lastUserMessage = [...messages].reverse().find((m: any) => m.senderType === "user");
-    if (lastUserMessage) {
-      handleSend(lastUserMessage.content);
-    }
-  }, [messages, handleSend, resetStream]);
+    if (!lastUserMessage) return;
+
+    const model = conversation?.modelId;
+    const modelParams = getModelParams();
+    const apiUrl = import.meta.env.VITE_API_URL ?? "";
+    startStream(`${apiUrl}/api/conversations/${id}/messages/stream`, {
+      content: lastUserMessage.content,
+      model: model ?? "default",
+      ...modelParams,
+      enableTools: true,
+      messages: [
+        ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
+        ...messages
+          .filter((m: any) => m.content != null && m.content !== "")
+          .map((m: any) => ({ role: m.senderType === "user" ? "user" : "assistant", content: m.content })),
+      ],
+    });
+  }, [messages, resetStream, conversation, getModelParams, startStream, id]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 relative" {...dragHandlers}>

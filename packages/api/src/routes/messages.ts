@@ -172,7 +172,7 @@ const streamSchema = z.object({
   model: z.string(),
   messages: z.array(z.object({
     role: z.enum(["user", "assistant", "system"]),
-    content: z.string(),
+    content: z.string().default(""),
   })),
   temperature: z.number().min(0).max(2).optional(),
   topP: z.number().min(0).max(1).optional(),

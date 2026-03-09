@@ -84,7 +84,7 @@ export async function executeAgentStep(
     model,
     messages: msgs,
     temperature: (agentConfig.modelParams as any)?.temperature ?? 0.7,
-    max_tokens: (agentConfig.modelParams as any)?.maxTokens ?? 4096,
+    max_tokens: (agentConfig.modelParams as any)?.maxTokens ?? 16384,
   };
 
   if (tools.length > 0) {
@@ -151,15 +151,58 @@ export async function executeToolCall(
     switch (toolName) {
       case "web_search": {
         const query = args.query ?? args.q ?? "";
-        const resp = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`);
-        const data = await resp.json();
-        return { tool_call_id: toolCallId, result: data };
+        const searxngUrl = process.env.SEARXNG_URL;
+
+        // Use SearxNG (self-hosted) if available, fall back to DuckDuckGo
+        if (searxngUrl) {
+          try {
+            const resp = await fetch(
+              `${searxngUrl}/search?q=${encodeURIComponent(query)}&format=json&categories=general`,
+              { signal: AbortSignal.timeout(10_000) },
+            );
+            if (resp.ok) {
+              const data = await resp.json() as { results: { url: string; title: string; content: string }[] };
+              const results = (data.results ?? []).slice(0, 5).map((r) => ({
+                title: r.title,
+                url: r.url,
+                snippet: (r.content ?? "").slice(0, 300),
+              }));
+              return { tool_call_id: toolCallId, result: results };
+            }
+          } catch {
+            // Fall through to DuckDuckGo
+          }
+        }
+
+        // Fallback: DuckDuckGo instant answer API (compact result)
+        const resp = await fetch(
+          `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`,
+          { signal: AbortSignal.timeout(10_000) },
+        );
+        const data = await resp.json() as Record<string, unknown>;
+        // Extract only the useful fields to keep context small
+        return {
+          tool_call_id: toolCallId,
+          result: {
+            abstract: (data.Abstract as string ?? "").slice(0, 500),
+            abstractSource: data.AbstractSource,
+            abstractURL: data.AbstractURL,
+            relatedTopics: ((data.RelatedTopics as any[]) ?? []).slice(0, 5).map((t: any) => ({
+              text: (t.Text ?? "").slice(0, 200),
+              url: t.FirstURL,
+            })),
+          },
+        };
       }
       case "fetch_url": {
         const url = args.url ?? "";
-        const resp = await fetch(url, { headers: { "User-Agent": "NOVA-Agent/1.0" } });
+        const resp = await fetch(url, {
+          headers: { "User-Agent": "NOVA-Agent/1.0" },
+          signal: AbortSignal.timeout(15_000),
+        });
         const text = await resp.text();
-        return { tool_call_id: toolCallId, result: text.slice(0, 10000) };
+        // Truncate to keep context within model limits
+        return { tool_call_id: toolCallId, result: text.slice(0, 4000) };
       }
       case "code_execute": {
         // Sandbox execution would be handled by the sandbox service
