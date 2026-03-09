@@ -495,7 +495,7 @@ function KnowledgeDetailPage() {
             {/* URL input */}
             {showUrlInput && (
               <div className="flex items-center gap-2">
-                <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-surface">
+                <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-surface input-glow">
                   <Link className="h-4 w-4 text-text-tertiary shrink-0" aria-hidden="true" />
                   <input
                     type="url"
@@ -694,7 +694,7 @@ function KnowledgeDetailPage() {
                 {t("knowledge.testQueryDesc", { defaultValue: "Enter a natural language query to test retrieval against this collection. Results show the most relevant chunks with similarity scores." })}
               </p>
               <div className="flex gap-2">
-                <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-surface">
+                <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-surface input-glow">
                   <Search className="h-4 w-4 text-text-tertiary shrink-0" aria-hidden="true" />
                   <input
                     type="text"
