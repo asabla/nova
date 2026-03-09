@@ -15,6 +15,9 @@ bun.lock
 *.log
 .DS_Store
 
+# Screenshots / images dropped in repo root
+*.png
+
 # Testing related directories
 .playwright-cli/
 coverage/
