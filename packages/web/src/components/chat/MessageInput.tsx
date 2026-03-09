@@ -242,12 +242,18 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
             </button>
           )}
         </div>
-        <p className="text-[10px] text-text-tertiary text-center mt-1">
-          {t("messages.shiftEnterHint", { defaultValue: "Shift+Enter for new line" })}
-        </p>
-        <p className="text-[10px] text-text-tertiary text-center mt-0.5">
-          {t("messages.disclaimer")}
-        </p>
+        <div className="flex items-center justify-between mt-2 text-[10px] text-text-tertiary">
+          <div className="flex items-center gap-3">
+            <span>
+              <kbd className="font-mono">Enter</kbd> {t("messages.toSend", { defaultValue: "to send" })}
+            </span>
+            <span className="text-border-strong">|</span>
+            <span>
+              <kbd className="font-mono">Shift+Enter</kbd> {t("messages.forNewLine", { defaultValue: "for new line" })}
+            </span>
+          </div>
+          <span>{t("messages.disclaimer")}</span>
+        </div>
       </div>
     </div>
   );

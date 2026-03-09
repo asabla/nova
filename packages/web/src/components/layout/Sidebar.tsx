@@ -7,8 +7,9 @@ import {
   Archive, Pin, Trash2, ChevronLeft, BookOpen,
   FolderKanban, Settings, ShieldCheck,
   Microscope, Compass, HelpCircle, Filter,
-  CheckSquare, Square, FolderOpen, MessageSquare, Zap, HardDrive,
+  CheckSquare, Square, FolderOpen, MessageSquare, Zap, HardDrive, Plus,
 } from "lucide-react";
+import { isToday, isYesterday, isThisWeek } from "date-fns";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { useUIStore } from "../../stores/ui.store";
@@ -90,6 +91,35 @@ export function Sidebar() {
   };
 
   const isAdmin = user?.role === "org-admin" || user?.role === "admin";
+
+  // Group conversations by date sections (matching ConversationList story)
+  const groupedConversations = (() => {
+    const pinned: any[] = [];
+    const today: any[] = [];
+    const yesterday: any[] = [];
+    const thisWeek: any[] = [];
+    const older: any[] = [];
+
+    for (const conv of filteredConversations) {
+      if (conv.isPinned) {
+        pinned.push(conv);
+        continue;
+      }
+      const date = new Date(conv.updatedAt ?? conv.createdAt);
+      if (isToday(date)) today.push(conv);
+      else if (isYesterday(date)) yesterday.push(conv);
+      else if (isThisWeek(date)) thisWeek.push(conv);
+      else older.push(conv);
+    }
+
+    const groups: { label: string; conversations: any[] }[] = [];
+    if (pinned.length > 0) groups.push({ label: t("conversations.pinned", { defaultValue: "Pinned" }), conversations: pinned });
+    if (today.length > 0) groups.push({ label: t("conversations.today", { defaultValue: "Today" }), conversations: today });
+    if (yesterday.length > 0) groups.push({ label: t("conversations.yesterday", { defaultValue: "Yesterday" }), conversations: yesterday });
+    if (thisWeek.length > 0) groups.push({ label: t("conversations.thisWeek", { defaultValue: "This Week" }), conversations: thisWeek });
+    if (older.length > 0) groups.push({ label: t("conversations.older", { defaultValue: "Older" }), conversations: older });
+    return groups;
+  })();
 
   return (
     <>
@@ -179,9 +209,9 @@ export function Sidebar() {
           </div>
         )}
 
-        {/* Bulk Actions */}
+        {/* Bulk Actions — styled bar matching ConversationList story */}
         {bulkMode && selected.size > 0 && (
-          <div className="px-3 pt-2 flex gap-1.5">
+          <div className="px-3 py-2 border-b border-border bg-surface-secondary flex gap-1.5">
             <button
               onClick={() => bulkArchive.mutate(Array.from(selected))}
               disabled={bulkArchive.isPending}
@@ -201,37 +231,54 @@ export function Sidebar() {
           </div>
         )}
 
-        {/* Conversation List */}
-        <nav aria-label={t("nav.conversations", { defaultValue: "Conversations" })} className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
+        {/* Conversation List — date-grouped matching ConversationList story */}
+        <nav aria-label={t("nav.conversations", { defaultValue: "Conversations" })} className="flex-1 overflow-y-auto px-2 py-2">
           {loadingConversations ? (
             <ConversationListSkeleton />
           ) : filteredConversations.length === 0 ? (
-            <div className="px-3 py-8 text-center">
-              <p className="text-xs text-text-tertiary">{t("conversations.empty", "No conversations yet")}</p>
-              <p className="text-xs text-text-tertiary mt-1">{t("conversations.startPrompt", "Start a new conversation")}</p>
+            <div className="px-3 py-10 text-center">
+              <MessageSquare className="h-8 w-8 text-text-tertiary mx-auto mb-2 opacity-30" aria-hidden="true" />
+              <p className="text-xs font-medium text-text-secondary">{t("conversations.empty", "No conversations yet")}</p>
+              <p className="text-[10px] text-text-tertiary mt-1">{t("conversations.startPrompt", "Start a new conversation")}</p>
+              <button
+                onClick={() => navigate({ to: "/" })}
+                className="mt-3 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 rounded-lg hover:bg-primary/15 transition-colors"
+              >
+                <Plus className="h-3 w-3" aria-hidden="true" />
+                {t("conversations.new", { defaultValue: "New Conversation" })}
+              </button>
             </div>
           ) : (
-            filteredConversations.map((conv: any) => (
-              <button
-                key={conv.id}
-                onClick={() => {
-                  if (bulkMode) {
-                    toggleSelect(conv.id);
-                  } else {
-                    navigate({ to: `/conversations/${conv.id}` });
-                  }
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm text-text-secondary hover:bg-surface-tertiary hover:text-text transition-colors group"
-              >
-                {bulkMode && (
-                  selected.has(conv.id)
-                    ? <CheckSquare className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden="true" />
-                    : <Square className="h-3.5 w-3.5 text-text-tertiary shrink-0" aria-hidden="true" />
-                )}
-                {!bulkMode && conv.isPinned && <Pin className="h-3 w-3 text-primary shrink-0" aria-hidden="true" />}
-                <span className="truncate flex-1">{conv.title ?? t("conversations.untitled", { defaultValue: "Untitled" })}</span>
-                {conv.workspaceId && <FolderOpen className="h-3 w-3 text-text-tertiary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" />}
-              </button>
+            groupedConversations.map((group) => (
+              <div key={group.label} className="mb-1">
+                <p className="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+                  {group.label}
+                </p>
+                <div className="space-y-0.5">
+                  {group.conversations.map((conv: any) => (
+                    <button
+                      key={conv.id}
+                      onClick={() => {
+                        if (bulkMode) {
+                          toggleSelect(conv.id);
+                        } else {
+                          navigate({ to: `/conversations/${conv.id}` });
+                        }
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm text-text-secondary hover:bg-surface-tertiary hover:text-text transition-colors group"
+                    >
+                      {bulkMode && (
+                        selected.has(conv.id)
+                          ? <CheckSquare className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden="true" />
+                          : <Square className="h-3.5 w-3.5 text-text-tertiary shrink-0" aria-hidden="true" />
+                      )}
+                      {!bulkMode && conv.isPinned && <Pin className="h-3 w-3 text-primary shrink-0" aria-hidden="true" />}
+                      <span className="truncate flex-1">{conv.title ?? t("conversations.untitled", { defaultValue: "Untitled" })}</span>
+                      {conv.workspaceId && <FolderOpen className="h-3 w-3 text-text-tertiary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))
           )}
         </nav>

@@ -2,12 +2,13 @@ import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings, Share, GitBranch, Archive, Download, Trash2, MoreHorizontal, Pencil, Pin, PinOff, FileJson, FileText, FileSpreadsheet, Globe } from "lucide-react";
+import { Settings, Share, GitBranch, Archive, Download, Trash2, MoreHorizontal, Pencil, Pin, PinOff, FileJson, FileText, FileSpreadsheet, Globe, Star } from "lucide-react";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { Dropdown, DropdownItem } from "../ui/Dropdown";
 import { Dialog } from "../ui/Dialog";
 import { Button } from "../ui/Button";
+import { Badge } from "../ui/Badge";
 import { toast } from "../ui/Toast";
 import { ConversationSettings } from "./ConversationSettings";
 
@@ -118,9 +119,11 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
 
   return (
     <>
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-surface">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-border bg-surface">
         <div className="flex items-center gap-2 min-w-0">
-          {conversation.isPinned && <Pin className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden="true" />}
+          {conversation.isPinned && (
+            <Star className="h-4 w-4 text-primary shrink-0 fill-primary/20" aria-hidden="true" />
+          )}
           {isEditing ? (
             <input
               autoFocus
@@ -128,7 +131,7 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
               onChange={(e) => setTitle(e.target.value)}
               onBlur={handleRename}
               onKeyDown={(e) => e.key === "Enter" && handleRename()}
-              className="text-sm font-medium text-text bg-surface-secondary border border-border rounded px-2 py-0.5"
+              className="text-sm font-medium text-text bg-surface-secondary border border-border rounded-lg px-2.5 py-1"
               aria-label={t("conversation.renameInput", { defaultValue: "Conversation title" })}
             />
           ) : (
@@ -141,9 +144,7 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
           )}
 
           {conversation.model && (
-            <span className="text-[10px] text-text-tertiary bg-surface-secondary px-1.5 py-0.5 rounded border border-border shrink-0">
-              {conversation.model}
-            </span>
+            <Badge variant="primary">{conversation.model}</Badge>
           )}
 
           {(conversation.totalTokens ?? 0) > 0 && (
@@ -154,10 +155,10 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
           )}
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setShowSettings(true)}
-            className="text-text-tertiary hover:text-text-secondary p-1.5 rounded-lg hover:bg-surface-secondary"
+            className="p-1.5 rounded-lg text-text-tertiary hover:text-text hover:bg-surface-secondary transition-colors"
             aria-label={t("conversation.settings", { defaultValue: "Conversation settings" })}
           >
             <Settings className="h-4 w-4" aria-hidden="true" />
@@ -166,7 +167,7 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
           <Dropdown
             trigger={
               <button
-                className="text-text-tertiary hover:text-text-secondary p-1.5 rounded-lg hover:bg-surface-secondary"
+                className="p-1.5 rounded-lg text-text-tertiary hover:text-text hover:bg-surface-secondary transition-colors"
                 aria-label={t("conversation.moreActions", { defaultValue: "More actions" })}
               >
                 <MoreHorizontal className="h-4 w-4" aria-hidden="true" />

@@ -1,3 +1,4 @@
+import { Sparkles } from "lucide-react";
 import { MarkdownRenderer } from "../markdown/MarkdownRenderer";
 
 interface StreamingMessageProps {
@@ -6,24 +7,37 @@ interface StreamingMessageProps {
 
 export function StreamingMessage({ content }: StreamingMessageProps) {
   return (
-    <div className="flex gap-3 px-4 py-4">
+    <div className="flex gap-3 py-3 bg-surface-secondary/50 -mx-2 px-5 rounded-xl">
       <div className="shrink-0 mt-0.5">
         <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center">
-          <svg className="h-4 w-4 text-primary" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-          </svg>
+          <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
         </div>
       </div>
 
-      <div className="flex flex-col max-w-[80%] items-start">
-        <div className="rounded-2xl rounded-tl-sm px-4 py-2.5 bg-surface-secondary border border-border">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-sm font-semibold text-text">NOVA</span>
+          <span className="text-[10px] text-text-tertiary">
+            {new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+          </span>
+        </div>
+
+        <div className="text-sm text-text leading-relaxed">
           {content ? (
             <MarkdownRenderer content={content} />
           ) : (
-            <div className="flex gap-1 py-1">
-              <span className="h-2 w-2 bg-text-tertiary rounded-full animate-bounce" aria-hidden="true" />
-              <span className="h-2 w-2 bg-text-tertiary rounded-full animate-bounce [animation-delay:0.1s]" aria-hidden="true" />
-              <span className="h-2 w-2 bg-text-tertiary rounded-full animate-bounce [animation-delay:0.2s]" aria-hidden="true" />
+            <div className="flex items-center gap-1.5 py-2">
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="h-1.5 w-1.5 rounded-full bg-text-tertiary"
+                  style={{
+                    animation: "pulse 1.4s ease-in-out infinite",
+                    animationDelay: `${i * 0.2}s`,
+                  }}
+                  aria-hidden="true"
+                />
+              ))}
               <span className="sr-only">Loading response</span>
             </div>
           )}

@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect, useCallback, memo } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { Copy, Check, ThumbsUp, ThumbsDown, Pencil, RotateCcw, History, X, Send, StickyNote, ChevronDown, GitBranch, Volume2, VolumeX, Paperclip, FileText, Download } from "lucide-react";
+import { Copy, Check, ThumbsUp, ThumbsDown, Pencil, RotateCcw, History, X, Send, StickyNote, ChevronDown, GitBranch, Volume2, VolumeX, Paperclip, FileText, Download, Sparkles } from "lucide-react";
 import { clsx } from "clsx";
 import { MarkdownRenderer } from "../markdown/MarkdownRenderer";
 import { ArtifactRenderer } from "./ArtifactRenderer";
 import { DynamicWidget } from "./DynamicWidget";
 import { Avatar } from "../ui/Avatar";
+import { Badge } from "../ui/Badge";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { formatDistanceToNow } from "date-fns";
@@ -181,21 +182,37 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
   const editHistory = fetchedHistory ?? (message.editHistory as EditHistoryEntry[]) ?? [];
   const totalTokens = (message.tokenCountPrompt ?? 0) + (message.tokenCountCompletion ?? 0);
 
+  const timestamp = new Date(message.createdAt);
+  const timeStr = timestamp.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
   return (
-    <div className={clsx("group flex gap-3 px-4 py-4", isUser ? "flex-row-reverse" : "")}>
+    <div className={clsx(
+      "group flex gap-3 py-3",
+      isAssistant && "bg-surface-secondary/50 -mx-2 px-5 rounded-xl",
+      isUser && "px-4",
+    )}>
       <div className="shrink-0 mt-0.5">
         {isUser ? (
           <Avatar name={userName} size="sm" />
         ) : (
           <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center">
-            <svg className="h-4 w-4 text-primary" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-            </svg>
+            <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
           </div>
         )}
       </div>
 
-      <div className={clsx("flex flex-col", isUser ? "max-w-[80%] items-end" : "flex-1 min-w-0")}>
+      <div className={clsx("flex flex-col", isUser ? "max-w-[80%] items-start" : "flex-1 min-w-0")}>
+        {/* Sender name + timestamp header */}
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-sm font-semibold text-text">
+            {isUser ? (userName || t("messages.you", { defaultValue: "You" })) : "NOVA"}
+          </span>
+          {isAssistant && message.modelId && (
+            <Badge variant="primary">{message.modelId.replace(/^(claude-|gpt-|gemini-)/, "").split("-").slice(0, 2).join("-")}</Badge>
+          )}
+          <span className="text-[10px] text-text-tertiary">{timeStr}</span>
+        </div>
+
         {isEditing ? (
           <div className="w-full min-w-[300px]">
             <textarea
@@ -237,24 +254,32 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
         ) : (
           <div
             className={clsx(
-              "rounded-2xl px-4 py-2.5",
-              isUser
-                ? "bg-primary text-primary-foreground rounded-tr-sm"
-                : "bg-surface-secondary border border-border rounded-tl-sm w-full",
-              message.status === "failed" && "border-danger/50",
+              "w-full",
+              message.status === "failed" && "border-l-2 border-danger/50 pl-3",
             )}
           >
             {message.content ? (
               isAssistant ? (
-                <MarkdownRenderer content={message.content} />
+                <div className="text-sm text-text leading-relaxed">
+                  <MarkdownRenderer content={message.content} />
+                </div>
               ) : (
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">{message.content}</p>
               )
             ) : message.status === "streaming" ? (
-              <div className="flex gap-1 py-1">
-                <span className="h-2 w-2 bg-text-tertiary rounded-full animate-bounce" />
-                <span className="h-2 w-2 bg-text-tertiary rounded-full animate-bounce [animation-delay:0.1s]" />
-                <span className="h-2 w-2 bg-text-tertiary rounded-full animate-bounce [animation-delay:0.2s]" />
+              <div className="flex items-center gap-1.5 py-2">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="h-1.5 w-1.5 rounded-full bg-text-tertiary"
+                    style={{
+                      animation: "pulse 1.4s ease-in-out infinite",
+                      animationDelay: `${i * 0.2}s`,
+                    }}
+                    aria-hidden="true"
+                  />
+                ))}
+                <span className="sr-only">{t("messages.loading", { defaultValue: "Loading response" })}</span>
               </div>
             ) : message.status === "failed" ? (
               <p className="text-sm text-danger" role="alert">{message.content ?? t("errors.messageFailed", { defaultValue: "Message failed to send." })}</p>
