@@ -28,6 +28,9 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
+import { Textarea } from "../../components/ui/Textarea";
+import { Select } from "../../components/ui/Select";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
 import { toast } from "../../components/ui/Toast";
@@ -522,20 +525,18 @@ function KnowledgeDetailPage() {
             {/* Content paste input */}
             {showContentInput && (
               <div className="space-y-2 p-4 rounded-lg border border-border bg-surface">
-                <input
+                <Input
                   type="text"
                   value={contentTitle}
                   onChange={(e) => setContentTitle(e.target.value)}
                   placeholder={t("knowledge.documentTitle", { defaultValue: "Document title" })}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm outline-none placeholder:text-text-tertiary"
                   autoFocus
                 />
-                <textarea
+                <Textarea
                   value={contentValue}
                   onChange={(e) => setContentValue(e.target.value)}
                   placeholder={t("knowledge.pasteContentPlaceholder", { defaultValue: "Paste document content here..." })}
                   rows={6}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm outline-none placeholder:text-text-tertiary resize-y"
                 />
                 <div className="flex items-center justify-end gap-2">
                   <Button variant="ghost" size="sm" onClick={() => { setShowContentInput(false); setContentTitle(""); setContentValue(""); }}>
@@ -778,26 +779,20 @@ function KnowledgeDetailPage() {
         {/* Settings Tab */}
         {activeTab === "settings" && (
           <div className="max-w-2xl space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-text mb-1.5">{t("knowledge.name", { defaultValue: "Name" })}</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm"
-              />
-            </div>
+            <Input
+              label={t("knowledge.name", { defaultValue: "Name" })}
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-text mb-1.5">{t("knowledge.description", { defaultValue: "Description" })}</label>
-              <textarea
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder={t("knowledge.descriptionPlaceholder", { defaultValue: "What kind of documents does this collection contain?" })}
-                rows={3}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary resize-y text-sm"
-              />
-            </div>
+            <Textarea
+              label={t("knowledge.description", { defaultValue: "Description" })}
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder={t("knowledge.descriptionPlaceholder", { defaultValue: "What kind of documents does this collection contain?" })}
+              rows={3}
+            />
 
             <div className="pt-2 border-t border-border">
               <h3 className="text-sm font-semibold text-text mb-4 flex items-center gap-2">
@@ -806,54 +801,37 @@ function KnowledgeDetailPage() {
               </h3>
 
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-text mb-1.5">{t("knowledge.embeddingModel", { defaultValue: "Embedding Model" })}</label>
-                  <select
-                    value={form.embeddingModel}
-                    onChange={(e) => setForm({ ...form, embeddingModel: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm"
-                  >
-                    {embeddingModels.length === 0 && (
-                      <option value={form.embeddingModel}>{form.embeddingModel}</option>
-                    )}
-                    {embeddingModels.map((m) => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-text-tertiary mt-1">
-                    {t("knowledge.embeddingModelHint", { defaultValue: "Changing the model will require a full re-index of all documents." })}
-                  </p>
-                </div>
+                <Select
+                  label={t("knowledge.embeddingModel", { defaultValue: "Embedding Model" })}
+                  value={form.embeddingModel}
+                  onChange={(value) => setForm({ ...form, embeddingModel: value })}
+                  options={
+                    embeddingModels.length === 0
+                      ? [{ value: form.embeddingModel, label: form.embeddingModel }]
+                      : embeddingModels.map((m) => ({ value: m.id, label: m.name }))
+                  }
+                  helperText={t("knowledge.embeddingModelHint", { defaultValue: "Changing the model will require a full re-index of all documents." })}
+                />
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-text mb-1.5">{t("knowledge.chunkSize", { defaultValue: "Chunk Size (tokens)" })}</label>
-                    <input
-                      type="number"
-                      value={form.chunkSize}
-                      onChange={(e) => setForm({ ...form, chunkSize: Math.max(64, parseInt(e.target.value) || 512) })}
-                      min={64}
-                      max={8192}
-                      step={64}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm"
-                    />
-                    <p className="text-xs text-text-tertiary mt-1">{t("knowledge.chunkSizeHint", { defaultValue: "64 - 8192. Smaller = more precise retrieval." })}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-text mb-1.5">{t("knowledge.chunkOverlap", { defaultValue: "Chunk Overlap (tokens)" })}</label>
-                    <input
-                      type="number"
-                      value={form.chunkOverlap}
-                      onChange={(e) => setForm({ ...form, chunkOverlap: Math.max(0, parseInt(e.target.value) || 50) })}
-                      min={0}
-                      max={form.chunkSize / 2}
-                      step={10}
-                      className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm"
-                    />
-                    <p className="text-xs text-text-tertiary mt-1">
-                      {t("knowledge.chunkOverlapHint", { defaultValue: "Overlap between consecutive chunks for context continuity." })}
-                    </p>
-                  </div>
+                  <Input
+                    label={t("knowledge.chunkSize", { defaultValue: "Chunk Size (tokens)" })}
+                    type="number"
+                    value={form.chunkSize}
+                    onChange={(e) => setForm({ ...form, chunkSize: Math.max(64, parseInt(e.target.value) || 512) })}
+                    min={64}
+                    max={8192}
+                    step={64}
+                  />
+                  <Input
+                    label={t("knowledge.chunkOverlap", { defaultValue: "Chunk Overlap (tokens)" })}
+                    type="number"
+                    value={form.chunkOverlap}
+                    onChange={(e) => setForm({ ...form, chunkOverlap: Math.max(0, parseInt(e.target.value) || 50) })}
+                    min={0}
+                    max={form.chunkSize / 2}
+                    step={10}
+                  />
                 </div>
               </div>
             </div>

@@ -17,7 +17,10 @@ import {
 } from "lucide-react";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
+import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
 import { Badge } from "../../components/ui/Badge";
+import { Tabs } from "../../components/ui/Tabs";
 import { formatDistanceToNow } from "date-fns";
 
 export const Route = createFileRoute("/_auth/search")({
@@ -146,8 +149,6 @@ function SearchPage() {
     return results[tab] ?? [];
   };
 
-  const displayResults = getResultsForTab(activeTab);
-
   const tabCounts: Record<string, number> = {
     all: results?.total ?? 0,
     conversations: results?.conversations?.length ?? 0,
@@ -213,7 +214,7 @@ function SearchPage() {
         </div>
 
         {/* Search Input */}
-        <div className="relative">
+        <div className="relative input-glow">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-text-tertiary" aria-hidden="true" />
           <input
             type="text"
@@ -269,69 +270,47 @@ function SearchPage() {
         {/* Filters Panel */}
         {showFilters && (
           <div className="flex flex-wrap items-end gap-3 p-4 rounded-xl bg-surface-secondary border border-border">
-            <div>
-              <label className="block text-xs text-text-tertiary mb-1">
-                {t("search.filter.from", "From")}
-              </label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="h-8 px-2 text-xs bg-surface border border-border rounded-lg text-text"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-text-tertiary mb-1">
-                {t("search.filter.to", "To")}
-              </label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="h-8 px-2 text-xs bg-surface border border-border rounded-lg text-text"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-text-tertiary mb-1">
-                {t("search.filter.model", "Model")}
-              </label>
-              <input
-                type="text"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder="e.g. gpt-4"
-                className="h-8 w-32 px-2 text-xs bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-text-tertiary mb-1">
-                {t("search.filter.workspace", "Workspace")}
-              </label>
-              <select
-                value={workspaceId}
-                onChange={(e) => setWorkspaceId(e.target.value)}
-                className="h-8 px-2 text-xs bg-surface border border-border rounded-lg text-text"
-              >
-                <option value="">{t("search.filter.allWorkspaces", "All workspaces")}</option>
-                {workspaces.map((ws: any) => (
-                  <option key={ws.id} value={ws.id}>
-                    {ws.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-text-tertiary mb-1">
-                {t("search.filter.participants", "Participants")}
-              </label>
-              <input
-                type="text"
-                value={participants}
-                onChange={(e) => setParticipants(e.target.value)}
-                placeholder="user-id-1,user-id-2"
-                className="h-8 w-48 px-2 text-xs bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary"
-              />
-            </div>
+            <Input
+              type="date"
+              label={t("search.filter.from", "From")}
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-8 px-2 text-xs"
+            />
+            <Input
+              type="date"
+              label={t("search.filter.to", "To")}
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-8 px-2 text-xs"
+            />
+            <Input
+              type="text"
+              label={t("search.filter.model", "Model")}
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              placeholder="e.g. gpt-4"
+              className="h-8 w-32 px-2 text-xs"
+            />
+            <Select
+              label={t("search.filter.workspace", "Workspace")}
+              value={workspaceId}
+              onChange={(value) => setWorkspaceId(value)}
+              placeholder={t("search.filter.allWorkspaces", "All workspaces")}
+              size="sm"
+              options={[
+                { value: "", label: t("search.filter.allWorkspaces", "All workspaces") },
+                ...workspaces.map((ws: any) => ({ value: ws.id, label: ws.name })),
+              ]}
+            />
+            <Input
+              type="text"
+              label={t("search.filter.participants", "Participants")}
+              value={participants}
+              onChange={(e) => setParticipants(e.target.value)}
+              placeholder="user-id-1,user-id-2"
+              className="h-8 w-48 px-2 text-xs"
+            />
             {hasFilters && (
               <button
                 onClick={clearFilters}
@@ -344,151 +323,146 @@ function SearchPage() {
           </div>
         )}
 
-        {/* Result Type Tabs */}
+        {/* Result Type Tabs + Content */}
         {results && (
-          <div className="flex gap-1 overflow-x-auto border-b border-border" role="tablist" aria-label={t("search.resultTabs", "Result types")}>
-            {TABS.map((tab) => {
-              const count = tabCounts[tab.id] ?? 0;
-              if (tab.id !== "all" && count === 0) return null;
-              const isActive = activeTab === tab.id;
+          <Tabs
+            tabs={TABS
+              .filter((tab) => tab.id === "all" || (tabCounts[tab.id] ?? 0) > 0)
+              .map((tab) => {
+                const count = tabCounts[tab.id] ?? 0;
+                return {
+                  id: tab.id,
+                  label: `${t(tab.labelKey, tab.labelDefault)}${count > 0 ? ` (${count})` : ""}`,
+                  icon: tab.icon ?? undefined,
+                };
+              })}
+            activeTab={activeTab}
+            onTabChange={(tabId) => setActiveTab(tabId as ResultType)}
+          >
+            {(currentTab) => {
+              const tabResults = getResultsForTab(currentTab as ResultType);
               return (
-                <button
-                  key={tab.id}
-                  role="tab"
-                  aria-selected={isActive}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
-                    isActive
-                      ? "border-primary text-primary"
-                      : "border-transparent text-text-secondary hover:text-text"
-                  }`}
-                >
-                  {tab.icon}
-                  {t(tab.labelKey, tab.labelDefault)}
-                  {count > 0 && (
-                    <span className="text-[10px] text-text-tertiary ml-0.5">({count})</span>
+                <div>
+                  {/* Error */}
+                  {isError && debouncedQuery.length >= 2 && (
+                    <div className="text-center py-12">
+                      <Search className="h-8 w-8 text-danger mx-auto mb-3 opacity-60" aria-hidden="true" />
+                      <p className="text-sm text-danger">{t("search.error", "Search failed")}</p>
+                      <p className="text-xs text-text-tertiary mt-1">{t("common.tryAgain", "Please try again later.")}</p>
+                    </div>
                   )}
-                </button>
-              );
-            })}
-          </div>
-        )}
 
-        {/* Error */}
-        {isError && debouncedQuery.length >= 2 && (
-          <div className="text-center py-12">
-            <Search className="h-8 w-8 text-danger mx-auto mb-3 opacity-60" aria-hidden="true" />
-            <p className="text-sm text-danger">{t("search.error", "Search failed")}</p>
-            <p className="text-xs text-text-tertiary mt-1">{t("common.tryAgain", "Please try again later.")}</p>
-          </div>
-        )}
-
-        {/* Loading */}
-        {isLoading && debouncedQuery.length >= 2 && (
-          <div className="flex items-center justify-center gap-2 py-12 text-sm text-text-tertiary">
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            {t("search.searching", "Searching...")}
-          </div>
-        )}
-
-        {/* Results List */}
-        {results && !isLoading && (
-          <div className="space-y-1">
-            {searchMode === "semantic" && (
-              <div className="flex items-center gap-1.5 px-1 pb-1">
-                <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
-                <span className="text-[10px] text-primary font-medium">
-                  {t("search.semanticMode", "Semantic search")}
-                </span>
-              </div>
-            )}
-
-            {displayResults.map((result: any) => (
-              <button
-                key={`${result.type}-${result.id}`}
-                onClick={() => handleResultClick(result)}
-                className="w-full text-left p-3 rounded-xl hover:bg-surface-secondary border border-transparent hover:border-border transition-all group"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5">{typeIcon(result.type)}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-text group-hover:text-primary transition-colors truncate">
-                        {result.title ?? result.name ?? result.filename ?? "Untitled"}
-                      </span>
-                      <Badge variant="default">{result.type}</Badge>
+                  {/* Loading */}
+                  {isLoading && debouncedQuery.length >= 2 && (
+                    <div className="flex items-center justify-center gap-2 py-12 text-sm text-text-tertiary">
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                      {t("search.searching", "Searching...")}
                     </div>
+                  )}
 
-                    {/* Snippet with highlighted matches */}
-                    {result.snippet && (
-                      <p
-                        className="text-xs text-text-secondary mt-1 line-clamp-2 [&_mark]:bg-primary/20 [&_mark]:text-primary [&_mark]:rounded-sm [&_mark]:px-0.5"
-                        dangerouslySetInnerHTML={{
-                          __html: highlightMatches(result.snippet, debouncedQuery),
-                        }}
-                      />
-                    )}
-                    {result.description && !result.snippet && (
-                      <p
-                        className="text-xs text-text-secondary mt-1 line-clamp-2 [&_mark]:bg-primary/20 [&_mark]:text-primary [&_mark]:rounded-sm [&_mark]:px-0.5"
-                        dangerouslySetInnerHTML={{
-                          __html: highlightMatches(
-                            result.description.slice(0, 200),
-                            debouncedQuery,
-                          ),
-                        }}
-                      />
-                    )}
-                    {result.content && !result.snippet && !result.description && (
-                      <p
-                        className="text-xs text-text-tertiary mt-1 line-clamp-2 [&_mark]:bg-primary/20 [&_mark]:text-primary [&_mark]:rounded-sm [&_mark]:px-0.5"
-                        dangerouslySetInnerHTML={{
-                          __html: highlightMatches(result.content.slice(0, 200), debouncedQuery),
-                        }}
-                      />
-                    )}
+                  {/* Results List */}
+                  {!isLoading && (
+                    <div className="space-y-1">
+                      {searchMode === "semantic" && (
+                        <div className="flex items-center gap-1.5 px-1 pb-1">
+                          <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
+                          <span className="text-[10px] text-primary font-medium">
+                            {t("search.semanticMode", "Semantic search")}
+                          </span>
+                        </div>
+                      )}
 
-                    {/* Metadata row */}
-                    <div className="flex items-center gap-2 mt-1">
-                      {result.score != null && searchMode === "semantic" && (
-                        <span className="text-[10px] text-primary/70">
-                          {(result.score * 100).toFixed(0)}% match
-                        </span>
+                      {tabResults.map((result: any) => (
+                        <button
+                          key={`${result.type}-${result.id}`}
+                          onClick={() => handleResultClick(result)}
+                          className="w-full text-left p-3 rounded-xl hover:bg-surface-secondary border border-transparent hover:border-border transition-all group"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="mt-0.5">{typeIcon(result.type)}</div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-text group-hover:text-primary transition-colors truncate">
+                                  {result.title ?? result.name ?? result.filename ?? "Untitled"}
+                                </span>
+                                <Badge variant="default">{result.type}</Badge>
+                              </div>
+
+                              {/* Snippet with highlighted matches */}
+                              {result.snippet && (
+                                <p
+                                  className="text-xs text-text-secondary mt-1 line-clamp-2 [&_mark]:bg-primary/20 [&_mark]:text-primary [&_mark]:rounded-sm [&_mark]:px-0.5"
+                                  dangerouslySetInnerHTML={{
+                                    __html: highlightMatches(result.snippet, debouncedQuery),
+                                  }}
+                                />
+                              )}
+                              {result.description && !result.snippet && (
+                                <p
+                                  className="text-xs text-text-secondary mt-1 line-clamp-2 [&_mark]:bg-primary/20 [&_mark]:text-primary [&_mark]:rounded-sm [&_mark]:px-0.5"
+                                  dangerouslySetInnerHTML={{
+                                    __html: highlightMatches(
+                                      result.description.slice(0, 200),
+                                      debouncedQuery,
+                                    ),
+                                  }}
+                                />
+                              )}
+                              {result.content && !result.snippet && !result.description && (
+                                <p
+                                  className="text-xs text-text-tertiary mt-1 line-clamp-2 [&_mark]:bg-primary/20 [&_mark]:text-primary [&_mark]:rounded-sm [&_mark]:px-0.5"
+                                  dangerouslySetInnerHTML={{
+                                    __html: highlightMatches(result.content.slice(0, 200), debouncedQuery),
+                                  }}
+                                />
+                              )}
+
+                              {/* Metadata row */}
+                              <div className="flex items-center gap-2 mt-1">
+                                {result.score != null && searchMode === "semantic" && (
+                                  <span className="text-[10px] text-primary/70">
+                                    {(result.score * 100).toFixed(0)}% match
+                                  </span>
+                                )}
+                                {result.workspaceId && (
+                                  <span className="text-[10px] text-text-tertiary">
+                                    {workspaces.find((w: any) => w.id === result.workspaceId)?.name ??
+                                      "Workspace"}
+                                  </span>
+                                )}
+                                {result.senderType && (
+                                  <Badge variant="default">{result.senderType}</Badge>
+                                )}
+                                <span className="text-[10px] text-text-tertiary">
+                                  {result.createdAt &&
+                                    formatDistanceToNow(new Date(result.createdAt), { addSuffix: true })}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+
+                      {/* No results */}
+                      {tabResults.length === 0 && debouncedQuery.length >= 2 && (
+                        <div className="text-center py-12">
+                          <Search className="h-8 w-8 text-text-tertiary mx-auto mb-3" />
+                          <p className="text-sm text-text-secondary">
+                            {t("search.noResults", 'No results found for "{{query}}"', {
+                              query: debouncedQuery,
+                            })}
+                          </p>
+                          <p className="text-xs text-text-tertiary mt-1">
+                            {t("search.noResultsHint", "Try different keywords or adjust filters")}
+                          </p>
+                        </div>
                       )}
-                      {result.workspaceId && (
-                        <span className="text-[10px] text-text-tertiary">
-                          {workspaces.find((w: any) => w.id === result.workspaceId)?.name ??
-                            "Workspace"}
-                        </span>
-                      )}
-                      {result.senderType && (
-                        <Badge variant="default">{result.senderType}</Badge>
-                      )}
-                      <span className="text-[10px] text-text-tertiary">
-                        {result.createdAt &&
-                          formatDistanceToNow(new Date(result.createdAt), { addSuffix: true })}
-                      </span>
                     </div>
-                  </div>
+                  )}
                 </div>
-              </button>
-            ))}
-
-            {/* No results */}
-            {displayResults.length === 0 && debouncedQuery.length >= 2 && (
-              <div className="text-center py-12">
-                <Search className="h-8 w-8 text-text-tertiary mx-auto mb-3" />
-                <p className="text-sm text-text-secondary">
-                  {t("search.noResults", 'No results found for "{{query}}"', {
-                    query: debouncedQuery,
-                  })}
-                </p>
-                <p className="text-xs text-text-tertiary mt-1">
-                  {t("search.noResultsHint", "Try different keywords or adjust filters")}
-                </p>
-              </div>
-            )}
-          </div>
+              );
+            }}
+          </Tabs>
         )}
 
         {/* Empty state */}

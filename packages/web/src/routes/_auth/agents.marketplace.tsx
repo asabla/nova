@@ -5,13 +5,14 @@ import { useTranslation } from "react-i18next";
 import {
   Bot, Search, Plus, Zap, Copy, ArrowRight, RefreshCw,
   Code2, Palette, BarChart3, BookOpen, Shield, Sparkles,
-  Star, Download, ChevronLeft, ChevronRight,
+  Star, Download,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { toast } from "../../components/ui/Toast";
+import { Pagination } from "../../components/ui/Pagination";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -101,7 +102,7 @@ function AgentMarketplacePage() {
 
         {/* Search + Category Filters */}
         <div className="flex items-center gap-3 mb-4">
-          <div className="relative flex-1 max-w-sm">
+          <div className="relative flex-1 max-w-sm input-glow">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary" />
             <input
               type="text"
@@ -109,7 +110,7 @@ function AgentMarketplacePage() {
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               placeholder={t("marketplace.searchPlaceholder", "Search agents...")}
               aria-label={t("marketplace.searchLabel", "Search marketplace agents")}
-              className="w-full h-9 pl-9 pr-3 text-sm rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary field-glow"
+              className="w-full h-9 pl-9 pr-3 text-sm rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary"
             />
           </div>
           <div className="flex gap-1">
@@ -244,37 +245,14 @@ function AgentMarketplacePage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="p-1.5 rounded-lg border border-border text-text-tertiary hover:text-text disabled:opacity-30 transition-colors"
-              aria-label={t("common.previous", "Previous page")}
-            >
-              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <button
-                key={p}
-                onClick={() => setPage(p)}
-                className={clsx(
-                  "h-8 w-8 rounded-lg text-xs font-medium transition-colors",
-                  p === page ? "bg-primary text-primary-foreground" : "text-text-secondary hover:bg-surface-tertiary",
-                )}
-                aria-current={p === page ? "page" : undefined}
-              >
-                {p}
-              </button>
-            ))}
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="p-1.5 rounded-lg border border-border text-text-tertiary hover:text-text disabled:opacity-30 transition-colors"
-              aria-label={t("common.next", "Next page")}
-            >
-              <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            showInfo
+            totalItems={filtered.length}
+            pageSize={perPage}
+          />
         )}
       </div>
     </div>

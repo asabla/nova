@@ -6,6 +6,7 @@ import { BookOpen, Loader2 } from "lucide-react";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { Input } from "../../components/ui/Input";
+import { Textarea } from "../../components/ui/Textarea";
 import { Button } from "../../components/ui/Button";
 import { toast } from "../../components/ui/Toast";
 
@@ -77,19 +78,15 @@ function NewKnowledgeCollectionPage() {
                 autoFocus
                 maxLength={200}
               />
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-text">
-                  {t("knowledge.descriptionLabel", { defaultValue: "Description" })}
-                </label>
-                <textarea
-                  className="rounded-lg border border-border hover:border-border-strong bg-surface px-3 py-2 text-sm text-text placeholder:text-text-tertiary transition-colors field-glow resize-none"
-                  rows={3}
-                  placeholder={t("knowledge.descriptionPlaceholder", { defaultValue: "Optional description of this collection" })}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  maxLength={2000}
-                />
-              </div>
+              <Textarea
+                label={t("knowledge.descriptionLabel", { defaultValue: "Description" })}
+                rows={3}
+                placeholder={t("knowledge.descriptionPlaceholder", { defaultValue: "Optional description of this collection" })}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                maxLength={2000}
+                className="resize-none"
+              />
               <div className="flex justify-end gap-2 mt-2">
                 <Button
                   type="button"

@@ -14,7 +14,7 @@ import {
   Terminal,
   Save,
   FolderOpen,
-  X,
+
   Zap,
   Clock,
   Hash,
@@ -27,6 +27,10 @@ import { queryKeys } from "../../lib/query-keys";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { toast } from "../../components/ui/Toast";
+import { Input } from "../../components/ui/Input";
+import { Textarea } from "../../components/ui/Textarea";
+import { Select } from "../../components/ui/Select";
+import { Dialog } from "../../components/ui/Dialog";
 
 export const Route = createFileRoute("/_auth/playground")({
   component: PlaygroundPage,
@@ -517,22 +521,17 @@ function PlaygroundPage() {
         <div className="w-full md:w-1/2 border-b md:border-b-0 md:border-r border-border overflow-y-auto p-6 space-y-5">
           {/* Model selector */}
           <div>
-            <label className="block text-sm font-medium text-text mb-1.5">
-              {t("playground.model", "Model")}
-            </label>
-            <select
+            <Select
+              label={t("playground.model", "Model")}
               value={model}
-              onChange={(e) => setModel(e.target.value)}
+              onChange={(value) => setModel(value)}
               disabled={running}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm"
-            >
-              <option value="">{t("playground.selectModel", "Select a model...")}</option>
-              {models.map((m: any) => (
-                <option key={m.id} value={m.modelIdExternal ?? m.id}>
-                  {m.name ?? m.modelIdExternal ?? m.id}
-                </option>
-              ))}
-            </select>
+              placeholder={t("playground.selectModel", "Select a model...")}
+              options={models.map((m: any) => ({
+                value: m.modelIdExternal ?? m.id,
+                label: m.name ?? m.modelIdExternal ?? m.id,
+              }))}
+            />
           </div>
 
           {/* Toggles row: Stream + Response format */}
@@ -555,33 +554,30 @@ function PlaygroundPage() {
 
             {/* Response format */}
             <div className="flex items-center gap-2">
-              <span className="text-sm text-text-secondary">
-                {t("playground.format", "Format:")}
-              </span>
-              <select
+              <Select
+                label={t("playground.format", "Format")}
                 value={responseFormat}
-                onChange={(e) => setResponseFormat(e.target.value as "text" | "json_object")}
+                onChange={(value) => setResponseFormat(value as "text" | "json_object")}
                 disabled={running}
-                className="px-2 py-1 rounded-lg border border-border bg-surface text-text text-sm"
-              >
-                <option value="text">text</option>
-                <option value="json_object">json_object</option>
-              </select>
+                size="sm"
+                options={[
+                  { value: "text", label: "text" },
+                  { value: "json_object", label: "json_object" },
+                ]}
+              />
             </div>
           </div>
 
           {/* System prompt */}
           <div>
-            <label className="block text-sm font-medium text-text mb-1.5">
-              {t("playground.systemPrompt", "System Prompt")}
-            </label>
-            <textarea
+            <Textarea
+              label={t("playground.systemPrompt", "System Prompt")}
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
               placeholder={t("playground.systemPromptPlaceholder", "You are a helpful assistant...")}
               rows={3}
               disabled={running}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary resize-y text-sm font-mono"
+              className="font-mono"
             />
           </div>
 
@@ -599,23 +595,25 @@ function PlaygroundPage() {
             <div className="space-y-3">
               {messages.map((msg, idx) => (
                 <div key={msg.id} className="flex gap-2">
-                  <select
+                  <Select
                     value={msg.role}
-                    onChange={(e) => updateMessage(msg.id, "role", e.target.value)}
+                    onChange={(value) => updateMessage(msg.id, "role", value)}
                     disabled={running}
-                    className="w-32 shrink-0 px-2 py-2 rounded-lg border border-border bg-surface text-text text-sm"
-                  >
-                    <option value="user">user</option>
-                    <option value="assistant">assistant</option>
-                    <option value="system">system</option>
-                  </select>
-                  <textarea
+                    className="w-32 shrink-0"
+                    size="sm"
+                    options={[
+                      { value: "user", label: "user" },
+                      { value: "assistant", label: "assistant" },
+                      { value: "system", label: "system" },
+                    ]}
+                  />
+                  <Textarea
                     value={msg.content}
                     onChange={(e) => updateMessage(msg.id, "content", e.target.value)}
                     placeholder={`${t("playground.messagePlaceholder", "Message")} ${idx + 1}...`}
                     rows={3}
                     disabled={running}
-                    className="flex-1 px-3 py-2 rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary resize-y text-sm"
+                    className="flex-1"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                         e.preventDefault();
@@ -699,17 +697,14 @@ function PlaygroundPage() {
 
                 {/* Max Tokens */}
                 <div>
-                  <label className="block text-xs text-text-secondary mb-1">
-                    {t("playground.maxTokens", "Max Tokens")}
-                  </label>
-                  <input
+                  <Input
+                    label={t("playground.maxTokens", "Max Tokens")}
                     type="number"
                     min={1}
                     max={128000}
                     value={maxTokens}
                     onChange={(e) => setMaxTokens(Number(e.target.value))}
                     disabled={running}
-                    className="w-full px-2 py-1.5 rounded-lg border border-border bg-surface text-text text-sm"
                   />
                 </div>
 
@@ -909,109 +904,84 @@ function PlaygroundPage() {
       {/* ============================================================= */}
       {/* Save Preset Dialog                                             */}
       {/* ============================================================= */}
-      {showPresetDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay" role="dialog" aria-modal="true" aria-label={t("playground.savePreset", "Save Preset")} onKeyDown={(e) => { if (e.key === "Escape") setShowPresetDialog(false); }}>
-          <div className="bg-surface border border-border rounded-xl shadow-xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-semibold text-text">
-                {t("playground.savePreset", "Save Preset")}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setShowPresetDialog(false)}
-                className="p-1.5 rounded-lg hover:bg-surface-secondary text-text-tertiary"
-                aria-label={t("common.close", "Close")}
-              >
-                <X className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </div>
-            <input
-              type="text"
-              value={presetName}
-              onChange={(e) => setPresetName(e.target.value)}
-              placeholder={t("playground.presetNamePlaceholder", "Preset name...")}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm mb-4"
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSavePreset();
-              }}
-            />
-            <div className="flex justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setShowPresetDialog(false)}>
-                {t("common.cancel", "Cancel")}
-              </Button>
-              <Button variant="primary" size="sm" onClick={handleSavePreset} disabled={!presetName.trim()}>
-                <Save className="h-3.5 w-3.5" />
-                {t("common.save", "Save")}
-              </Button>
-            </div>
-          </div>
+      <Dialog
+        open={showPresetDialog}
+        onClose={() => setShowPresetDialog(false)}
+        title={t("playground.savePreset", "Save Preset")}
+        size="sm"
+      >
+        <Input
+          value={presetName}
+          onChange={(e) => setPresetName(e.target.value)}
+          placeholder={t("playground.presetNamePlaceholder", "Preset name...")}
+          className="mb-4"
+          autoFocus
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSavePreset();
+          }}
+        />
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setShowPresetDialog(false)}>
+            {t("common.cancel", "Cancel")}
+          </Button>
+          <Button variant="primary" size="sm" onClick={handleSavePreset} disabled={!presetName.trim()}>
+            <Save className="h-3.5 w-3.5" />
+            {t("common.save", "Save")}
+          </Button>
         </div>
-      )}
+      </Dialog>
 
       {/* ============================================================= */}
       {/* Load Preset Dialog                                             */}
       {/* ============================================================= */}
-      {showLoadDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay" role="dialog" aria-modal="true" aria-label={t("playground.loadPreset", "Load Preset")} onKeyDown={(e) => { if (e.key === "Escape") setShowLoadDialog(false); }}>
-          <div className="bg-surface border border-border rounded-xl shadow-xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-semibold text-text">
-                {t("playground.loadPreset", "Load Preset")}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setShowLoadDialog(false)}
-                className="p-1.5 rounded-lg hover:bg-surface-secondary text-text-tertiary"
-                aria-label={t("common.close", "Close")}
+      <Dialog
+        open={showLoadDialog}
+        onClose={() => setShowLoadDialog(false)}
+        title={t("playground.loadPreset", "Load Preset")}
+        size="sm"
+      >
+        {presets.length === 0 ? (
+          <p className="text-sm text-text-tertiary py-8 text-center">
+            {t("playground.noPresets", "No saved presets yet.")}
+          </p>
+        ) : (
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {presets.map((preset) => (
+              <div
+                key={preset.name}
+                className="flex items-center justify-between px-3 py-2.5 rounded-lg border border-border hover:bg-surface-secondary transition-colors group"
               >
-                <X className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </div>
-            {presets.length === 0 ? (
-              <p className="text-sm text-text-tertiary py-8 text-center">
-                {t("playground.noPresets", "No saved presets yet.")}
-              </p>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {presets.map((preset) => (
-                  <div
-                    key={preset.name}
-                    className="flex items-center justify-between px-3 py-2.5 rounded-lg border border-border hover:bg-surface-secondary transition-colors group"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleLoadPreset(preset)}
-                      className="flex-1 text-left"
-                    >
-                      <div className="text-sm font-medium text-text">{preset.name}</div>
-                      <div className="text-xs text-text-tertiary mt-0.5">
-                        {preset.model || "No model"} | {preset.messages.length} msg | temp {preset.temperature}
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeletePreset(preset.name);
-                      }}
-                      className="p-1.5 rounded-lg text-text-tertiary hover:text-danger hover:bg-danger/10 opacity-0 group-hover:opacity-100 transition-all"
-                      aria-label={t("playground.deletePreset", "Delete preset")}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                    </button>
+                <button
+                  type="button"
+                  onClick={() => handleLoadPreset(preset)}
+                  className="flex-1 text-left"
+                >
+                  <div className="text-sm font-medium text-text">{preset.name}</div>
+                  <div className="text-xs text-text-tertiary mt-0.5">
+                    {preset.model || "No model"} | {preset.messages.length} msg | temp {preset.temperature}
                   </div>
-                ))}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeletePreset(preset.name);
+                  }}
+                  className="p-1.5 rounded-lg text-text-tertiary hover:text-danger hover:bg-danger/10 opacity-0 group-hover:opacity-100 transition-all"
+                  aria-label={t("playground.deletePreset", "Delete preset")}
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
               </div>
-            )}
-            <div className="flex justify-end mt-4">
-              <Button variant="ghost" size="sm" onClick={() => setShowLoadDialog(false)}>
-                {t("common.close", "Close")}
-              </Button>
-            </div>
+            ))}
           </div>
+        )}
+        <div className="flex justify-end mt-4">
+          <Button variant="ghost" size="sm" onClick={() => setShowLoadDialog(false)}>
+            {t("common.close", "Close")}
+          </Button>
         </div>
-      )}
+      </Dialog>
     </div>
   );
 }

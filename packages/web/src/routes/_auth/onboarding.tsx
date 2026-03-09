@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
+import { Switch } from "../../components/ui/Switch";
 import { toast } from "../../components/ui/Toast";
 
 export const Route = createFileRoute("/_auth/onboarding")({
@@ -108,15 +109,15 @@ function OnboardingPage() {
         <div className="space-y-4 max-w-md mx-auto">
           <h3 className="text-lg font-semibold text-text text-center">{t("onboarding.stayInformed", "Stay Informed")}</h3>
           <div className="space-y-3">
-            <NotifToggle
+            <Switch
               label={t("onboarding.inAppNotifications", "In-app Notifications")}
-              desc={t("onboarding.inAppNotificationsDesc", "Get notified about mentions, replies, and agent completions")}
+              description={t("onboarding.inAppNotificationsDesc", "Get notified about mentions, replies, and agent completions")}
               checked={preferences.enableNotifications}
               onChange={(v) => setPreferences((p) => ({ ...p, enableNotifications: v }))}
             />
-            <NotifToggle
+            <Switch
               label={t("onboarding.desktopNotifications", "Desktop Notifications")}
-              desc={t("onboarding.desktopNotificationsDesc", "Show browser notifications for important events")}
+              description={t("onboarding.desktopNotificationsDesc", "Show browser notifications for important events")}
               checked={false}
               onChange={() => {
                 if ("Notification" in window) {
@@ -239,26 +240,6 @@ function FeatureCard({ icon: Icon, title, desc }: { icon: any; title: string; de
   );
 }
 
-function NotifToggle({ label, desc, checked, onChange }: {
-  label: string; desc: string; checked: boolean; onChange: (v: boolean) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between p-3 rounded-xl bg-surface-secondary border border-border">
-      <div>
-        <p className="text-sm font-medium text-text">{label}</p>
-        <p className="text-xs text-text-tertiary">{desc}</p>
-      </div>
-      <button
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={`w-10 h-5 rounded-full transition-colors ${checked ? "bg-primary" : "bg-border"}`}
-      >
-        <div className={`h-4 w-4 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-5" : "translate-x-0.5"}`} />
-      </button>
-    </div>
-  );
-}
 
 function Tip({ icon: Icon, text }: { icon: any; text: string }) {
   return (

@@ -4,6 +4,9 @@ import { Bot, ArrowLeft, Save, Trash2, Copy, Share2, History, TestTube, Settings
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
+import { Textarea } from "../../components/ui/Textarea";
+import { Select } from "../../components/ui/Select";
 import { Dialog } from "../../components/ui/Dialog";
 import { toast } from "../../components/ui/Toast";
 import { Skeleton } from "../../components/ui/Skeleton";
@@ -167,14 +170,14 @@ function AgentDetailPage() {
             <Bot className="h-5 w-5 text-primary" aria-hidden="true" />
           </div>
           <div>
-            <input
+            <Input
               type="text"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="text-lg font-semibold text-text bg-transparent border-none outline-none"
               aria-label={t("agents.nameLabel", { defaultValue: "Agent name" })}
             />
-            <input
+            <Input
               type="text"
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -227,57 +230,49 @@ function AgentDetailPage() {
       <div className="flex-1 overflow-auto p-6">
         {activeTab === "config" && (
           <div className="max-w-2xl space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-text mb-1.5">{t("agents.systemPrompt", { defaultValue: "System Prompt" })}</label>
-              <textarea
-                value={form.systemPrompt}
-                onChange={(e) => setForm({ ...form, systemPrompt: e.target.value })}
-                placeholder={t("agents.systemPromptPlaceholder", { defaultValue: "You are a helpful assistant..." })}
-                rows={8}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary resize-y text-sm font-mono"
+            <Textarea
+              label={t("agents.systemPrompt", { defaultValue: "System Prompt" })}
+              value={form.systemPrompt}
+              onChange={(e) => setForm({ ...form, systemPrompt: e.target.value })}
+              placeholder={t("agents.systemPromptPlaceholder", { defaultValue: "You are a helpful assistant..." })}
+              rows={8}
+              className="font-mono"
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <Select
+                label={t("agents.visibility", { defaultValue: "Visibility" })}
+                value={form.visibility}
+                onChange={(value) => setForm({ ...form, visibility: value })}
+                options={[
+                  { value: "private", label: t("agents.visibilityPrivate", { defaultValue: "Private" }) },
+                  { value: "team", label: t("agents.visibilityTeam", { defaultValue: "Team" }) },
+                  { value: "org", label: t("agents.visibilityOrg", { defaultValue: "Organization" }) },
+                  { value: "public", label: t("agents.visibilityPublic", { defaultValue: "Public" }) },
+                ]}
+              />
+              <Select
+                label={t("agents.toolApproval", { defaultValue: "Tool Approval" })}
+                value={form.toolApprovalMode}
+                onChange={(value) => setForm({ ...form, toolApprovalMode: value })}
+                options={[
+                  { value: "auto", label: t("agents.toolAuto", { defaultValue: "Auto-approve" }) },
+                  { value: "always-ask", label: t("agents.toolAlwaysAsk", { defaultValue: "Always ask" }) },
+                  { value: "never", label: t("agents.toolNever", { defaultValue: "Never allow" }) },
+                ]}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-text mb-1.5">{t("agents.visibility", { defaultValue: "Visibility" })}</label>
-                <select
-                  value={form.visibility}
-                  onChange={(e) => setForm({ ...form, visibility: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm"
-                >
-                  <option value="private">{t("agents.visibilityPrivate", { defaultValue: "Private" })}</option>
-                  <option value="team">{t("agents.visibilityTeam", { defaultValue: "Team" })}</option>
-                  <option value="org">{t("agents.visibilityOrg", { defaultValue: "Organization" })}</option>
-                  <option value="public">{t("agents.visibilityPublic", { defaultValue: "Public" })}</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-text mb-1.5">{t("agents.toolApproval", { defaultValue: "Tool Approval" })}</label>
-                <select
-                  value={form.toolApprovalMode}
-                  onChange={(e) => setForm({ ...form, toolApprovalMode: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm"
-                >
-                  <option value="auto">{t("agents.toolAuto", { defaultValue: "Auto-approve" })}</option>
-                  <option value="always-ask">{t("agents.toolAlwaysAsk", { defaultValue: "Always ask" })}</option>
-                  <option value="never">{t("agents.toolNever", { defaultValue: "Never allow" })}</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-text mb-1.5">{t("agents.memoryScope", { defaultValue: "Memory Scope" })}</label>
-              <select
-                value={form.memoryScope}
-                onChange={(e) => setForm({ ...form, memoryScope: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm"
-              >
-                <option value="per-user">{t("agents.memoryPerUser", { defaultValue: "Per user" })}</option>
-                <option value="per-conversation">{t("agents.memoryPerConversation", { defaultValue: "Per conversation" })}</option>
-                <option value="global">{t("agents.memoryGlobal", { defaultValue: "Global" })}</option>
-              </select>
-            </div>
+            <Select
+              label={t("agents.memoryScope", { defaultValue: "Memory Scope" })}
+              value={form.memoryScope}
+              onChange={(value) => setForm({ ...form, memoryScope: value })}
+              options={[
+                { value: "per-user", label: t("agents.memoryPerUser", { defaultValue: "Per user" }) },
+                { value: "per-conversation", label: t("agents.memoryPerConversation", { defaultValue: "Per conversation" }) },
+                { value: "global", label: t("agents.memoryGlobal", { defaultValue: "Global" }) },
+              ]}
+            />
 
             {agent && (
               <div className="pt-4 border-t border-border text-xs text-text-tertiary space-y-1">
@@ -294,12 +289,12 @@ function AgentDetailPage() {
             <div>
               <label className="block text-sm font-medium text-text mb-1.5">{t("agents.testPrompt", { defaultValue: "Test Prompt" })}</label>
               <div className="flex gap-2">
-                <textarea
+                <Textarea
                   value={testPrompt}
                   onChange={(e) => setTestPrompt(e.target.value)}
                   placeholder={t("agents.testPlaceholder", { defaultValue: "Enter a test message..." })}
                   rows={3}
-                  className="flex-1 px-3 py-2 rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary resize-y text-sm"
+                  className="flex-1"
                 />
                 <Button variant="primary" onClick={handleTest} disabled={testing || !testPrompt.trim()}>
                   <TestTube className="h-4 w-4" aria-hidden="true" />
@@ -643,11 +638,10 @@ function AgentMemoryTab({ agentId }: { agentId: string }) {
             <div key={entry.id} className="p-3 rounded-lg bg-surface-secondary border border-border">
               {editingId === entry.id ? (
                 <div className="space-y-2">
-                  <textarea
+                  <Textarea
                     autoFocus
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
-                    className="w-full px-2 py-1 text-sm bg-surface border border-border rounded text-text resize-y"
                     rows={3}
                   />
                   <div className="flex gap-2">

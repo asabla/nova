@@ -2,11 +2,12 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Sparkles, ChevronDown, FileText, Loader2 } from "lucide-react";
+import { Sparkles, FileText, Loader2 } from "lucide-react";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { MessageInput } from "../../components/chat/MessageInput";
 import { ModelCapabilityBadges } from "../../components/ui/ModelCapabilityBadges";
+import { Select } from "../../components/ui/Select";
 import { toast } from "../../components/ui/Toast";
 import { consumePendingFiles } from "../../lib/pending-files";
 
@@ -136,38 +137,28 @@ function NewConversationPage() {
           {/* Model & Workspace selectors */}
           <div className="flex flex-col items-center gap-2 mb-6">
             <div className="flex flex-wrap items-center justify-center gap-3">
-              <div className="relative">
-                <select
-                  value={selectedModel}
-                  onChange={(e) => setSelectedModel(e.target.value)}
-                  className="h-8 pl-3 pr-7 text-xs bg-surface-secondary border border-border rounded-lg text-text appearance-none cursor-pointer"
-                  aria-label={t("conversations.selectModel", "Select model")}
-                  disabled={isCreating}
-                >
-                  <option value="">{t("conversations.autoModel", "Auto (default model)")}</option>
-                  {models.map((m: any) => (
-                    <option key={m.id} value={m.modelIdExternal}>{m.name}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-text-tertiary pointer-events-none" aria-hidden="true" />
-              </div>
+              <Select
+                options={[
+                  { value: "", label: t("conversations.autoModel", "Auto (default model)") },
+                  ...models.map((m: any) => ({ value: m.modelIdExternal, label: m.name })),
+                ]}
+                value={selectedModel}
+                onChange={(val) => setSelectedModel(val)}
+                disabled={isCreating}
+                size="sm"
+              />
 
               {workspaces.length > 0 && (
-                <div className="relative">
-                  <select
-                    value={selectedWorkspace}
-                    onChange={(e) => setSelectedWorkspace(e.target.value)}
-                    className="h-8 pl-3 pr-7 text-xs bg-surface-secondary border border-border rounded-lg text-text appearance-none cursor-pointer"
-                    aria-label={t("conversations.selectWorkspace", "Select workspace")}
-                    disabled={isCreating}
-                  >
-                    <option value="">{t("conversations.noWorkspace", "No workspace")}</option>
-                    {workspaces.map((w: any) => (
-                      <option key={w.id} value={w.id}>{w.name}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-text-tertiary pointer-events-none" aria-hidden="true" />
-                </div>
+                <Select
+                  options={[
+                    { value: "", label: t("conversations.noWorkspace", "No workspace") },
+                    ...workspaces.map((w: any) => ({ value: w.id, label: w.name })),
+                  ]}
+                  value={selectedWorkspace}
+                  onChange={(val) => setSelectedWorkspace(val)}
+                  disabled={isCreating}
+                  size="sm"
+                />
               )}
             </div>
 

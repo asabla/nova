@@ -29,9 +29,12 @@ import {
 import { useTranslation } from "react-i18next";
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
+import { Textarea } from "../../components/ui/Textarea";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
 import { Skeleton } from "../../components/ui/Skeleton";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/Table";
 import { toast } from "../../components/ui/Toast";
 import { formatDistanceToNow } from "date-fns";
 
@@ -302,20 +305,16 @@ function NewResearchForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 mt-2">
-      <div>
-        <label className="block text-xs font-medium text-text-secondary mb-1">{t("research.queryLabel", "Research Query")}</label>
-        <textarea
-          ref={textareaRef}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("research.queryPlaceholder", "What would you like to research in depth?")}
-          rows={3}
-          className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary text-sm resize-none field-glow transition-colors"
-        />
-        {query.length > 0 && query.trim().length < 3 && (
-          <p className="text-xs text-danger mt-1">{t("research.queryMinLength", "Query must be at least 3 characters")}</p>
-        )}
-      </div>
+      <Textarea
+        ref={textareaRef}
+        label={t("research.queryLabel", "Research Query")}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={t("research.queryPlaceholder", "What would you like to research in depth?")}
+        rows={3}
+        className="text-sm resize-none"
+        error={query.length > 0 && query.trim().length < 3 ? t("research.queryMinLength", "Query must be at least 3 characters") : undefined}
+      />
 
       {/* Advanced settings toggle */}
       <button
@@ -332,31 +331,25 @@ function NewResearchForm({
         <div className="space-y-3 p-3 rounded-lg bg-surface-secondary border border-border">
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-xs text-text-tertiary mb-1 flex items-center gap-1">
-                <Globe className="h-3 w-3" aria-hidden="true" />
-                {t("research.maxSources", "Max Sources")}
-              </label>
-              <input
+              <Input
                 type="number"
+                label={t("research.maxSources", "Max Sources")}
                 min={1}
                 max={50}
                 value={maxSources}
                 onChange={(e) => setMaxSources(Number(e.target.value))}
-                className="w-full px-2 py-1.5 rounded-lg border border-border bg-surface text-text text-xs field-glow"
+                className="w-full px-2 py-1.5 text-xs"
               />
             </div>
             <div className="flex-1">
-              <label className="block text-xs text-text-tertiary mb-1 flex items-center gap-1">
-                <Zap className="h-3 w-3" aria-hidden="true" />
-                {t("research.maxIterations", "Max Iterations")}
-              </label>
-              <input
+              <Input
                 type="number"
+                label={t("research.maxIterations", "Max Iterations")}
                 min={1}
                 max={10}
                 value={maxIterations}
                 onChange={(e) => setMaxIterations(Number(e.target.value))}
-                className="w-full px-2 py-1.5 rounded-lg border border-border bg-surface text-text text-xs field-glow"
+                className="w-full px-2 py-1.5 text-xs"
               />
             </div>
           </div>
@@ -1182,31 +1175,31 @@ function RenderedMarkdown({ content }: { content: string }) {
         );
       const [header, ...body] = parsedRows;
       elements.push(
-        <div key={i} className="overflow-x-auto my-3">
-          <table className="w-full text-sm border-collapse">
+        <div key={i} className="my-3">
+          <Table>
             {header && (
-              <thead>
-                <tr className="border-b border-border">
+              <TableHeader>
+                <TableRow>
                   {header.map((cell, ci) => (
-                    <th key={ci} className="px-3 py-2 text-left font-semibold text-text">
+                    <TableHead key={ci}>
                       {processInline(cell)}
-                    </th>
+                    </TableHead>
                   ))}
-                </tr>
-              </thead>
+                </TableRow>
+              </TableHeader>
             )}
-            <tbody>
+            <TableBody>
               {body.map((row, ri) => (
-                <tr key={ri} className="border-b border-border/50">
+                <TableRow key={ri}>
                   {row.map((cell, ci) => (
-                    <td key={ci} className="px-3 py-2 text-text-secondary">
+                    <TableCell key={ci} className="text-text-secondary">
                       {processInline(cell)}
-                    </td>
+                    </TableCell>
                   ))}
-                </tr>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>,
       );
     } else if (line.startsWith("---") || line.startsWith("***")) {

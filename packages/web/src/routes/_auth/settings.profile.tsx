@@ -6,6 +6,7 @@ import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
 import { Avatar } from "../../components/ui/Avatar";
 import { toast } from "../../components/ui/Toast";
 
@@ -179,43 +180,19 @@ function ProfileSettings() {
           type="url"
         />
 
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="timezone-select" className="text-sm font-medium text-text">
-            {t("settings.timezone", "Timezone")}
-          </label>
-          <select
-            id="timezone-select"
-            aria-label={t("settings.timezone", "Timezone")}
-            value={timezone}
-            onChange={(e) => setTimezone(e.target.value)}
-            className="w-full h-11 rounded-lg border border-border bg-surface px-3 text-sm text-text hover:border-border-strong field-glow transition-colors"
-          >
-            {timezones.map((tz) => (
-              <option key={tz} value={tz}>
-                {tz.replace(/_/g, " ")}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Select
+          label={t("settings.timezone", "Timezone")}
+          options={timezones.map((tz) => ({ value: tz, label: tz.replace(/_/g, " ") }))}
+          value={timezone}
+          onChange={(val) => setTimezone(val)}
+        />
 
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="language-select" className="text-sm font-medium text-text">
-            {t("settings.language", "Language")}
-          </label>
-          <select
-            id="language-select"
-            aria-label={t("settings.language", "Language")}
-            value={locale}
-            onChange={(e) => setLocale(e.target.value)}
-            className="w-full h-11 rounded-lg border border-border bg-surface px-3 text-sm text-text hover:border-border-strong field-glow transition-colors"
-          >
-            {LANGUAGES.map((lang) => (
-              <option key={lang.value} value={lang.value}>
-                {lang.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Select
+          label={t("settings.language", "Language")}
+          options={LANGUAGES.map((lang) => ({ value: lang.value, label: lang.label }))}
+          value={locale}
+          onChange={(val) => setLocale(val)}
+        />
 
         <div className="flex items-center gap-3">
           <Button type="submit" variant="primary" loading={updateProfile.isPending}>

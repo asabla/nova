@@ -6,6 +6,8 @@ import { Shield, Plus, Trash2, CheckCircle, XCircle, RefreshCw } from "lucide-re
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
+import { Checkbox } from "../../components/ui/Checkbox";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
 import { Skeleton } from "../../components/ui/Skeleton";
@@ -191,18 +193,12 @@ function AdminSsoPage() {
           }}
           className="space-y-4"
         >
-          <div>
-            <label className="block text-sm font-medium text-text mb-1">{t("admin.providerType", { defaultValue: "Provider Type" })}</label>
-            <select
-              value={form.type}
-              onChange={(e) => setForm({ ...form, type: e.target.value })}
-              className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text"
-            >
-              {SSO_TYPES.map((ssoType) => (
-                <option key={ssoType.value} value={ssoType.value}>{ssoType.label}</option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label={t("admin.providerType", { defaultValue: "Provider Type" })}
+            value={form.type}
+            onChange={(value) => setForm({ ...form, type: value })}
+            options={SSO_TYPES.map((ssoType) => ({ value: ssoType.value, label: ssoType.label }))}
+          />
           <Input
             label={t("admin.providerName", { defaultValue: "Provider Name" })}
             value={form.providerName}
@@ -229,16 +225,11 @@ function AdminSsoPage() {
             onChange={(e) => setForm({ ...form, issuerUrl: e.target.value })}
             placeholder="https://login.microsoftonline.com/{tenant}/v2.0"
           />
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="autoProvision"
-              checked={form.autoProvisionUsers}
-              onChange={(e) => setForm({ ...form, autoProvisionUsers: e.target.checked })}
-              className="rounded border-border"
-            />
-            <label htmlFor="autoProvision" className="text-sm text-text">{t("admin.autoProvisionLabel", { defaultValue: "Auto-provision users on first login" })}</label>
-          </div>
+          <Checkbox
+            checked={form.autoProvisionUsers}
+            onChange={(checked) => setForm({ ...form, autoProvisionUsers: checked })}
+            label={t("admin.autoProvisionLabel", { defaultValue: "Auto-provision users on first login" })}
+          />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => setShowCreate(false)}>{t("admin.cancel", { defaultValue: "Cancel" })}</Button>
             <Button type="submit" variant="primary" loading={createMutation.isPending}>{t("admin.addProvider", { defaultValue: "Add Provider" })}</Button>

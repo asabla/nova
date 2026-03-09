@@ -19,6 +19,8 @@ import {
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
+import { Checkbox } from "../../components/ui/Checkbox";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
 import { Skeleton } from "../../components/ui/Skeleton";
@@ -401,18 +403,11 @@ function IntegrationConfigDialog({
   return (
     <Dialog open onClose={onClose} title={t("admin.configureLabel", { defaultValue: "Configure {{label}}", label: meta.label })}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="integrationEnabled"
-            checked={isEnabled}
-            onChange={(e) => setIsEnabled(e.target.checked)}
-            className="rounded border-border"
-          />
-          <label htmlFor="integrationEnabled" className="text-sm text-text">
-            {t("admin.enableIntegrationCheckbox", { defaultValue: "Enable this integration" })}
-          </label>
-        </div>
+        <Checkbox
+          checked={isEnabled}
+          onChange={(checked) => setIsEnabled(checked)}
+          label={t("admin.enableIntegrationCheckbox", { defaultValue: "Enable this integration" })}
+        />
 
         {type === "slack" && (
           <>
@@ -492,18 +487,11 @@ function IntegrationConfigDialog({
               value={emailPassword}
               onChange={(e) => setEmailPassword(e.target.value)}
             />
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="emailSecure"
-                checked={emailSecure}
-                onChange={(e) => setEmailSecure(e.target.checked)}
-                className="rounded border-border"
-              />
-              <label htmlFor="emailSecure" className="text-sm text-text">
-                {t("admin.useTls", { defaultValue: "Use TLS/SSL" })}
-              </label>
-            </div>
+            <Checkbox
+              checked={emailSecure}
+              onChange={(checked) => setEmailSecure(checked)}
+              label={t("admin.useTls", { defaultValue: "Use TLS/SSL" })}
+            />
           </>
         )}
 
@@ -544,17 +532,15 @@ function IntegrationConfigDialog({
               onChange={(e) => setWebhookEvents(e.target.value)}
               placeholder="message.new, conversation.created, agent.complete"
             />
-            <div>
-              <label className="block text-sm font-medium text-text mb-1">{t("admin.httpMethod", { defaultValue: "HTTP Method" })}</label>
-              <select
-                value={webhookMethod}
-                onChange={(e) => setWebhookMethod(e.target.value)}
-                className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text"
-              >
-                <option value="POST">POST</option>
-                <option value="PUT">PUT</option>
-              </select>
-            </div>
+            <Select
+              label={t("admin.httpMethod", { defaultValue: "HTTP Method" })}
+              value={webhookMethod}
+              onChange={(value) => setWebhookMethod(value)}
+              options={[
+                { value: "POST", label: "POST" },
+                { value: "PUT", label: "PUT" },
+              ]}
+            />
           </>
         )}
 

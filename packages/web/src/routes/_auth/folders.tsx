@@ -28,6 +28,7 @@ import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
 import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
 import { Dropdown, DropdownItem } from "../../components/ui/Dropdown";
 import { toast } from "../../components/ui/Toast";
 import { formatDistanceToNow } from "date-fns";
@@ -496,7 +497,7 @@ function FoldersPage() {
                     <label className="block text-xs text-text-tertiary mb-1">
                       {t("folders.filter.search", "Search")}
                     </label>
-                    <div className="relative">
+                    <div className="relative input-glow">
                       <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-text-tertiary" />
                       <input
                         type="text"
@@ -507,57 +508,38 @@ function FoldersPage() {
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-xs text-text-tertiary mb-1">
-                      {t("folders.filter.from", "From")}
-                    </label>
-                    <input
-                      type="date"
-                      value={filterDateFrom}
-                      onChange={(e) => setFilterDateFrom(e.target.value)}
-                      className="h-8 px-2 text-xs bg-surface border border-border rounded-lg text-text"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-text-tertiary mb-1">
-                      {t("folders.filter.to", "To")}
-                    </label>
-                    <input
-                      type="date"
-                      value={filterDateTo}
-                      onChange={(e) => setFilterDateTo(e.target.value)}
-                      className="h-8 px-2 text-xs bg-surface border border-border rounded-lg text-text"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-text-tertiary mb-1">
-                      {t("folders.filter.model", "Model")}
-                    </label>
-                    <input
-                      type="text"
-                      value={filterModel}
-                      onChange={(e) => setFilterModel(e.target.value)}
-                      placeholder="e.g. gpt-4"
-                      className="h-8 w-28 px-2 text-xs bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-text-tertiary mb-1">
-                      {t("folders.filter.workspace", "Workspace")}
-                    </label>
-                    <select
-                      value={filterWorkspace}
-                      onChange={(e) => setFilterWorkspace(e.target.value)}
-                      className="h-8 px-2 text-xs bg-surface border border-border rounded-lg text-text"
-                    >
-                      <option value="">{t("folders.filter.all", "All")}</option>
-                      {workspaces.map((ws: any) => (
-                        <option key={ws.id} value={ws.id}>
-                          {ws.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <Input
+                    label={t("folders.filter.from", "From")}
+                    type="date"
+                    value={filterDateFrom}
+                    onChange={(e) => setFilterDateFrom(e.target.value)}
+                  />
+                  <Input
+                    label={t("folders.filter.to", "To")}
+                    type="date"
+                    value={filterDateTo}
+                    onChange={(e) => setFilterDateTo(e.target.value)}
+                  />
+                  <Input
+                    label={t("folders.filter.model", "Model")}
+                    type="text"
+                    value={filterModel}
+                    onChange={(e) => setFilterModel(e.target.value)}
+                    placeholder="e.g. gpt-4"
+                  />
+                  <Select
+                    label={t("folders.filter.workspace", "Workspace")}
+                    value={filterWorkspace}
+                    onChange={(value) => setFilterWorkspace(value)}
+                    size="sm"
+                    options={[
+                      { value: "", label: t("folders.filter.all", "All") },
+                      ...workspaces.map((ws: any) => ({
+                        value: ws.id,
+                        label: ws.name,
+                      })),
+                    ]}
+                  />
                   {hasActiveFilters && (
                     <button
                       onClick={() => {
@@ -848,20 +830,18 @@ function FoldersPage() {
                 count: selectedConversations.size,
               })}
             </p>
-            <select
+            <Select
               value={moveTargetFolderId}
-              onChange={(e) => setMoveTargetFolderId(e.target.value)}
-              className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text"
-            >
-              <option value="">
-                {t("folders.selectFolder", "Select a folder...")}
-              </option>
-              {folders.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setMoveTargetFolderId(value)}
+              placeholder={t("folders.selectFolder", "Select a folder...")}
+              options={[
+                { value: "", label: t("folders.selectFolder", "Select a folder...") },
+                ...folders.map((f) => ({
+                  value: f.id,
+                  label: f.name,
+                })),
+              ]}
+            />
             <div className="flex justify-end gap-2">
               <Button
                 variant="ghost"
@@ -1070,23 +1050,18 @@ function FolderForm({
         required
         autoFocus
       />
-      <div>
-        <label className="block text-sm font-medium text-text mb-2">
-          {t("folders.form.parent", "Parent Folder")}
-        </label>
-        <select
-          value={parentId}
-          onChange={(e) => setParentId(e.target.value)}
-          className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text"
-        >
-          <option value="">{t("folders.form.noParent", "None (root level)")}</option>
-          {parentOptions.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      <Select
+        label={t("folders.form.parent", "Parent Folder")}
+        value={parentId}
+        onChange={(value) => setParentId(value)}
+        options={[
+          { value: "", label: t("folders.form.noParent", "None (root level)") },
+          ...parentOptions.map((f) => ({
+            value: f.id,
+            label: f.name,
+          })),
+        ]}
+      />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" onClick={onCancel}>
           {t("common.cancel", "Cancel")}
@@ -1123,12 +1098,11 @@ function TagCreateForm({
       }}
       className="flex items-center gap-2"
     >
-      <input
+      <Input
         type="text"
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder={t("folders.tags.placeholder", "New tag name...")}
-        className="h-8 px-3 text-xs bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary"
       />
       <Button
         type="submit"

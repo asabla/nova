@@ -22,6 +22,7 @@ import {
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
 import { Badge } from "../../components/ui/Badge";
 import { ModelCapabilityBadges } from "../../components/ui/ModelCapabilityBadges";
 import { Dialog } from "../../components/ui/Dialog";
@@ -451,20 +452,18 @@ function AddProviderForm({ onDone }: { onDone: () => void }) {
       className="space-y-4"
     >
       <Input label={t("admin.providerName", { defaultValue: "Provider Name" })} value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
-      <div>
-        <label className="block text-sm font-medium text-text mb-1">{t("admin.type", { defaultValue: "Type" })}</label>
-        <select
-          value={type}
-          onChange={(e) => setType(e.target.value)}
-          className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text"
-        >
-          <option value="openai">OpenAI</option>
-          <option value="anthropic">Anthropic</option>
-          <option value="azure">Azure OpenAI</option>
-          <option value="ollama">Ollama</option>
-          <option value="custom">{t("admin.customCompatible", { defaultValue: "Custom (OpenAI-compatible)" })}</option>
-        </select>
-      </div>
+      <Select
+        label={t("admin.type", { defaultValue: "Type" })}
+        value={type}
+        onChange={(value) => setType(value)}
+        options={[
+          { value: "openai", label: "OpenAI" },
+          { value: "anthropic", label: "Anthropic" },
+          { value: "azure", label: "Azure OpenAI" },
+          { value: "ollama", label: "Ollama" },
+          { value: "custom", label: t("admin.customCompatible", { defaultValue: "Custom (OpenAI-compatible)" }) },
+        ]}
+      />
       <Input label={t("admin.baseUrl", { defaultValue: "Base URL (optional)" })} value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://api.example.com/v1" />
       <Input label={t("admin.apiKey", { defaultValue: "API Key (optional)" })} type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
       <div className="flex justify-end gap-2">

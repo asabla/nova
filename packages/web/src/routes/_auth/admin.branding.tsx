@@ -5,9 +5,11 @@ import { useTranslation } from "react-i18next";
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
+import { Textarea } from "../../components/ui/Textarea";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { toast } from "../../components/ui/Toast";
 import { Palette, Image, Code, Eye, Save } from "lucide-react";
+import { Switch } from "../../components/ui/Switch";
 import { clsx } from "clsx";
 
 export const Route = createFileRoute("/_auth/admin/branding")({
@@ -133,24 +135,10 @@ function BrandingPage() {
             {t("admin.customBrandingDescription", { defaultValue: "Enable to use your custom logo, colors, and styles instead of the defaults." })}
           </p>
         </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={form.brandingEnabled}
-          aria-label={t("admin.toggleBranding", { defaultValue: "Toggle custom branding" })}
-          onClick={() => updateField("brandingEnabled", !form.brandingEnabled)}
-          className={clsx(
-            "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
-            form.brandingEnabled ? "bg-primary" : "bg-surface-tertiary",
-          )}
-        >
-          <span
-            className={clsx(
-              "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform",
-              form.brandingEnabled ? "translate-x-5" : "translate-x-0",
-            )}
-          />
-        </button>
+        <Switch
+          checked={form.brandingEnabled}
+          onChange={(checked) => updateField("brandingEnabled", checked)}
+        />
       </div>
 
       <div
@@ -275,12 +263,12 @@ function BrandingPage() {
                 {t("admin.customCssWarning", { defaultValue: "Warning: Custom CSS is injected directly into the page. Improper rules may break the UI. Test changes carefully." })}
               </span>
             </div>
-            <textarea
+            <Textarea
               value={form.customCss}
               onChange={(e) => updateField("customCss", e.target.value)}
               placeholder={`:root {\n  --color-primary: #6366f1;\n  --color-primary-dark: #4f46e5;\n}`}
               rows={8}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm font-mono text-text placeholder:text-text-tertiary field-glow resize-y"
+              className="font-mono"
               aria-label={t("admin.customCssTextarea", { defaultValue: "Custom CSS rules" })}
             />
           </div>

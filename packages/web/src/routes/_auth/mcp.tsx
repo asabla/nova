@@ -30,6 +30,8 @@ import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
 import { Input } from "../../components/ui/Input";
+import { Textarea } from "../../components/ui/Textarea";
+import { Select } from "../../components/ui/Select";
 import { toast } from "../../components/ui/Toast";
 
 export const Route = createFileRoute("/_auth/mcp")({
@@ -231,14 +233,14 @@ function McpPage() {
         )}
 
         {/* Search */}
-        <div className="relative mb-6">
+        <div className="relative mb-6 input-glow">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" aria-hidden="true" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t("mcp.searchPlaceholder", "Search servers by name or URL...")}
-            className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary field-glow"
+            className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary"
           />
         </div>
 
@@ -771,34 +773,27 @@ function RegisterServerDialog({
           onChange={(e) => setUrl(e.target.value)}
           required
         />
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-text">Description</label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Optional description of this server and its capabilities..."
-            rows={2}
-            className="p-3 text-sm bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary resize-y field-glow"
-          />
-        </div>
+        <Textarea
+          label="Description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Optional description of this server and its capabilities..."
+          rows={2}
+        />
 
         {/* Auth section */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-text">
-            Authentication
-          </label>
-          <select
-            value={authType}
-            onChange={(e) =>
-              setAuthType(e.target.value as "none" | "bearer" | "api_key")
-            }
-            className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text field-glow"
-          >
-            <option value="none">None</option>
-            <option value="bearer">Bearer Token</option>
-            <option value="api_key">API Key</option>
-          </select>
-        </div>
+        <Select
+          label="Authentication"
+          options={[
+            { value: "none", label: "None" },
+            { value: "bearer", label: "Bearer Token" },
+            { value: "api_key", label: "API Key" },
+          ]}
+          value={authType}
+          onChange={(val) =>
+            setAuthType(val as "none" | "bearer" | "api_key")
+          }
+        />
 
         {authType !== "none" && (
           <div className="flex flex-col gap-1.5">
@@ -806,7 +801,7 @@ function RegisterServerDialog({
               {authType === "bearer" ? "Bearer Token" : "API Key"}
             </label>
             <div className="relative">
-              <input
+              <Input
                 type={showToken ? "text" : "password"}
                 value={authToken}
                 onChange={(e) => setAuthToken(e.target.value)}
@@ -815,7 +810,7 @@ function RegisterServerDialog({
                     ? "eyJhbGciOiJIUzI1NiIs..."
                     : "sk-..."
                 }
-                className="w-full h-9 px-3 pr-20 text-sm bg-surface border border-border rounded-lg text-text font-mono placeholder:text-text-tertiary field-glow"
+                className="pr-20 font-mono"
               />
               <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                 <button

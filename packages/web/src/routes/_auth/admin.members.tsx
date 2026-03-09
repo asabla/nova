@@ -6,6 +6,7 @@ import { UserPlus, MoreHorizontal, Mail, Shield, Trash2 } from "lucide-react";
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
 import { Avatar } from "../../components/ui/Avatar";
@@ -101,26 +102,24 @@ function MembersPage() {
                   <Badge variant={role === "org-admin" ? "primary" : "default"}>
                     {role}
                   </Badge>
-                  <select
+                  <Select
                     value={role}
-                    onChange={(e) => {
-                      const newRole = e.target.value;
+                    onChange={(newRole) => {
                       if (newRole === "org-admin" && role !== "org-admin") {
                         if (!window.confirm(t("admin.confirmRoleElevation", { defaultValue: "Are you sure you want to grant admin privileges to {{name}}?", name }))) {
-                          e.target.value = role;
                           return;
                         }
                       }
                       updateRole.mutate({ userId, role: newRole });
                     }}
-                    className="text-xs bg-surface border border-border rounded px-2 py-1 text-text"
-                    aria-label={t("admin.changeRole", { defaultValue: "Change role for {{name}}", name })}
-                  >
-                    <option value="viewer">{t("admin.roleViewer", { defaultValue: "Viewer" })}</option>
-                    <option value="member">{t("admin.roleMember", { defaultValue: "Member" })}</option>
-                    <option value="power-user">{t("admin.rolePowerUser", { defaultValue: "Power User" })}</option>
-                    <option value="org-admin">{t("admin.roleAdmin", { defaultValue: "Admin" })}</option>
-                  </select>
+                    options={[
+                      { value: "viewer", label: t("admin.roleViewer", { defaultValue: "Viewer" }) },
+                      { value: "member", label: t("admin.roleMember", { defaultValue: "Member" }) },
+                      { value: "power-user", label: t("admin.rolePowerUser", { defaultValue: "Power User" }) },
+                      { value: "org-admin", label: t("admin.roleAdmin", { defaultValue: "Admin" }) },
+                    ]}
+                    size="sm"
+                  />
                 </div>
               </div>
             );
@@ -169,19 +168,17 @@ function MembersPage() {
             autoFocus
             required
           />
-          <div>
-            <label className="block text-sm font-medium text-text mb-1">{t("admin.role", { defaultValue: "Role" })}</label>
-            <select
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value)}
-              className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text"
-            >
-              <option value="viewer">{t("admin.roleViewer", { defaultValue: "Viewer" })}</option>
-              <option value="member">{t("admin.roleMember", { defaultValue: "Member" })}</option>
-              <option value="power-user">{t("admin.rolePowerUser", { defaultValue: "Power User" })}</option>
-              <option value="org-admin">{t("admin.roleAdmin", { defaultValue: "Admin" })}</option>
-            </select>
-          </div>
+          <Select
+            label={t("admin.role", { defaultValue: "Role" })}
+            value={inviteRole}
+            onChange={(value) => setInviteRole(value)}
+            options={[
+              { value: "viewer", label: t("admin.roleViewer", { defaultValue: "Viewer" }) },
+              { value: "member", label: t("admin.roleMember", { defaultValue: "Member" }) },
+              { value: "power-user", label: t("admin.rolePowerUser", { defaultValue: "Power User" }) },
+              { value: "org-admin", label: t("admin.roleAdmin", { defaultValue: "Admin" }) },
+            ]}
+          />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => setShowInvite(false)}>{t("admin.cancel", { defaultValue: "Cancel" })}</Button>
             <Button type="submit" variant="primary" loading={invite.isPending}>{t("admin.sendInvite", { defaultValue: "Send Invite" })}</Button>

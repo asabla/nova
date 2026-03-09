@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Blocks } from "lucide-react";
+import { Textarea } from "../../components/ui/Textarea";
+import { Select } from "../../components/ui/Select";
 import { DynamicWidget, type WidgetConfig } from "../../components/chat/DynamicWidget";
 import { ArtifactRenderer, type ArtifactData } from "../../components/chat/ArtifactRenderer";
 
@@ -111,11 +113,11 @@ function CustomWidgetEditor({ onAdd }: { onAdd: (config: WidgetConfig) => void }
   return (
     <div className="rounded-xl border border-border bg-surface-secondary p-4">
       <h3 className="text-sm font-medium text-text mb-2">Custom Widget JSON</h3>
-      <textarea
+      <Textarea
         value={json}
         onChange={(e) => setJson(e.target.value)}
         rows={8}
-        className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-xs font-mono resize-y"
+        className="w-full text-xs font-mono"
       />
       {error && <p className="text-xs text-danger mt-1">{error}</p>}
       <button
@@ -149,14 +151,15 @@ function DevWidgetsPage() {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-text-secondary">Render mode:</span>
-          <select
+          <Select
+            options={[
+              { value: "standalone", label: "DynamicWidget (standalone)" },
+              { value: "artifact", label: "ArtifactRenderer (pipeline)" },
+            ]}
             value={renderMode}
-            onChange={(e) => setRenderMode(e.target.value as "standalone" | "artifact")}
-            className="px-2 py-1 rounded-lg border border-border bg-surface text-text text-xs"
-          >
-            <option value="standalone">DynamicWidget (standalone)</option>
-            <option value="artifact">ArtifactRenderer (pipeline)</option>
-          </select>
+            onChange={(val) => setRenderMode(val as "standalone" | "artifact")}
+            size="sm"
+          />
         </div>
       </div>
 

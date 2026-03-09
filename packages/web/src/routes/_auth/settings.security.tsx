@@ -301,7 +301,7 @@ function SecuritySettings() {
                 </div>
               )}
               <div className="flex gap-2">
-                <input
+                <Input
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
@@ -310,7 +310,7 @@ function SecuritySettings() {
                   placeholder="000000"
                   maxLength={6}
                   aria-label={t("settings.totpCodeLabel", "TOTP verification code")}
-                  className="w-32 h-10 px-3 text-center text-lg font-mono tracking-widest bg-surface-secondary border border-border rounded-lg text-text"
+                  className="w-32 text-center text-lg font-mono tracking-widest bg-surface-secondary"
                 />
                 <Button
                   variant="primary"

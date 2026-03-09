@@ -8,6 +8,8 @@ import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
 import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
+import { Textarea } from "../../components/ui/Textarea";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { toast } from "../../components/ui/Toast";
 
@@ -313,39 +315,47 @@ function FilterFormDialog({ open, onClose, initial, onSubmit, isPending }: {
     <Dialog open={open} onClose={onClose} title={initial ? t("admin.editFilterTitle", { defaultValue: "Edit Filter" }) : t("admin.newFilterTitle", { defaultValue: "New Content Filter" })}>
       <form onSubmit={(e) => { e.preventDefault(); onSubmit({ name, type, pattern, action, severity }); }} className="space-y-4">
         <Input label={t("admin.name", { defaultValue: "Name" })} value={name} onChange={(e) => setName(e.target.value)} required />
-        <div>
-          <label className="block text-sm font-medium text-text mb-1">{t("admin.type", { defaultValue: "Type" })}</label>
-          <select value={type} onChange={(e) => setType(e.target.value)} className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text">
-            <option value="keyword">{t("admin.keyword", { defaultValue: "Keyword" })}</option>
-            <option value="regex">{t("admin.regex", { defaultValue: "Regex" })}</option>
-            <option value="category">{t("admin.category", { defaultValue: "Category" })}</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-text mb-1">{t("admin.pattern", { defaultValue: "Pattern" })}</label>
-          <textarea value={pattern} onChange={(e) => setPattern(e.target.value)} rows={3}
-            className="w-full p-2 text-sm bg-surface border border-border rounded-lg text-text font-mono resize-y"
-            placeholder={type === "regex" ? "\\b(badword|offensive)\\b" : "comma,separated,keywords"} />
-        </div>
+        <Select
+          label={t("admin.type", { defaultValue: "Type" })}
+          value={type}
+          onChange={(value) => setType(value)}
+          options={[
+            { value: "keyword", label: t("admin.keyword", { defaultValue: "Keyword" }) },
+            { value: "regex", label: t("admin.regex", { defaultValue: "Regex" }) },
+            { value: "category", label: t("admin.category", { defaultValue: "Category" }) },
+          ]}
+        />
+        <Textarea
+          label={t("admin.pattern", { defaultValue: "Pattern" })}
+          value={pattern}
+          onChange={(e) => setPattern(e.target.value)}
+          rows={3}
+          className="font-mono"
+          placeholder={type === "regex" ? "\\b(badword|offensive)\\b" : "comma,separated,keywords"}
+        />
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-text mb-1">{t("admin.action", { defaultValue: "Action" })}</label>
-            <select value={action} onChange={(e) => setAction(e.target.value)} className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text">
-              <option value="block">{t("admin.block", { defaultValue: "Block" })}</option>
-              <option value="warn">{t("admin.warn", { defaultValue: "Warn" })}</option>
-              <option value="flag">{t("admin.flag", { defaultValue: "Flag" })}</option>
-              <option value="redact">{t("admin.redact", { defaultValue: "Redact" })}</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-text mb-1">{t("admin.severity", { defaultValue: "Severity" })}</label>
-            <select value={severity} onChange={(e) => setSeverity(e.target.value)} className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text">
-              <option value="low">{t("admin.low", { defaultValue: "Low" })}</option>
-              <option value="medium">{t("admin.medium", { defaultValue: "Medium" })}</option>
-              <option value="high">{t("admin.high", { defaultValue: "High" })}</option>
-              <option value="critical">{t("admin.critical", { defaultValue: "Critical" })}</option>
-            </select>
-          </div>
+          <Select
+            label={t("admin.action", { defaultValue: "Action" })}
+            value={action}
+            onChange={(value) => setAction(value)}
+            options={[
+              { value: "block", label: t("admin.block", { defaultValue: "Block" }) },
+              { value: "warn", label: t("admin.warn", { defaultValue: "Warn" }) },
+              { value: "flag", label: t("admin.flag", { defaultValue: "Flag" }) },
+              { value: "redact", label: t("admin.redact", { defaultValue: "Redact" }) },
+            ]}
+          />
+          <Select
+            label={t("admin.severity", { defaultValue: "Severity" })}
+            value={severity}
+            onChange={(value) => setSeverity(value)}
+            options={[
+              { value: "low", label: t("admin.low", { defaultValue: "Low" }) },
+              { value: "medium", label: t("admin.medium", { defaultValue: "Medium" }) },
+              { value: "high", label: t("admin.high", { defaultValue: "High" }) },
+              { value: "critical", label: t("admin.critical", { defaultValue: "Critical" }) },
+            ]}
+          />
         </div>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>{t("admin.cancel", { defaultValue: "Cancel" })}</Button>
@@ -373,39 +383,47 @@ function DlpFormDialog({ open, onClose, initial, onSubmit, isPending }: {
         <Input label={t("admin.name", { defaultValue: "Name" })} value={name} onChange={(e) => setName(e.target.value)} required />
         <Input label={t("admin.description", { defaultValue: "Description" })} value={description} onChange={(e) => setDescription(e.target.value)} />
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-text mb-1">{t("admin.detectorType", { defaultValue: "Detector Type" })}</label>
-            <select value={detectorType} onChange={(e) => setDetectorType(e.target.value)} className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text">
-              <option value="regex">{t("admin.regex", { defaultValue: "Regex" })}</option>
-              <option value="keyword">{t("admin.keyword", { defaultValue: "Keyword" })}</option>
-              <option value="ner">{t("admin.namedEntity", { defaultValue: "Named Entity" })}</option>
-              <option value="pii">{t("admin.piiDetection", { defaultValue: "PII Detection" })}</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-text mb-1">{t("admin.appliesTo", { defaultValue: "Applies To" })}</label>
-            <select value={appliesTo} onChange={(e) => setAppliesTo(e.target.value)} className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text">
-              <option value="input">{t("admin.inputOnly", { defaultValue: "Input Only" })}</option>
-              <option value="output">{t("admin.outputOnly", { defaultValue: "Output Only" })}</option>
-              <option value="both">{t("admin.both", { defaultValue: "Both" })}</option>
-            </select>
-          </div>
+          <Select
+            label={t("admin.detectorType", { defaultValue: "Detector Type" })}
+            value={detectorType}
+            onChange={(value) => setDetectorType(value)}
+            options={[
+              { value: "regex", label: t("admin.regex", { defaultValue: "Regex" }) },
+              { value: "keyword", label: t("admin.keyword", { defaultValue: "Keyword" }) },
+              { value: "ner", label: t("admin.namedEntity", { defaultValue: "Named Entity" }) },
+              { value: "pii", label: t("admin.piiDetection", { defaultValue: "PII Detection" }) },
+            ]}
+          />
+          <Select
+            label={t("admin.appliesTo", { defaultValue: "Applies To" })}
+            value={appliesTo}
+            onChange={(value) => setAppliesTo(value)}
+            options={[
+              { value: "input", label: t("admin.inputOnly", { defaultValue: "Input Only" }) },
+              { value: "output", label: t("admin.outputOnly", { defaultValue: "Output Only" }) },
+              { value: "both", label: t("admin.both", { defaultValue: "Both" }) },
+            ]}
+          />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-text mb-1">{t("admin.pattern", { defaultValue: "Pattern" })}</label>
-          <textarea value={pattern} onChange={(e) => setPattern(e.target.value)} rows={3}
-            className="w-full p-2 text-sm bg-surface border border-border rounded-lg text-text font-mono resize-y"
-            placeholder="\\b\\d{3}-\\d{2}-\\d{4}\\b" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-text mb-1">{t("admin.action", { defaultValue: "Action" })}</label>
-          <select value={action} onChange={(e) => setAction(e.target.value)} className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text">
-            <option value="block">{t("admin.block", { defaultValue: "Block" })}</option>
-            <option value="redact">{t("admin.redact", { defaultValue: "Redact" })}</option>
-            <option value="warn">{t("admin.warn", { defaultValue: "Warn" })}</option>
-            <option value="log">{t("admin.logOnly", { defaultValue: "Log Only" })}</option>
-          </select>
-        </div>
+        <Textarea
+          label={t("admin.pattern", { defaultValue: "Pattern" })}
+          value={pattern}
+          onChange={(e) => setPattern(e.target.value)}
+          rows={3}
+          className="font-mono"
+          placeholder="\\b\\d{3}-\\d{2}-\\d{4}\\b"
+        />
+        <Select
+          label={t("admin.action", { defaultValue: "Action" })}
+          value={action}
+          onChange={(value) => setAction(value)}
+          options={[
+            { value: "block", label: t("admin.block", { defaultValue: "Block" }) },
+            { value: "redact", label: t("admin.redact", { defaultValue: "Redact" }) },
+            { value: "warn", label: t("admin.warn", { defaultValue: "Warn" }) },
+            { value: "log", label: t("admin.logOnly", { defaultValue: "Log Only" }) },
+          ]}
+        />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>{t("admin.cancel", { defaultValue: "Cancel" })}</Button>
           <Button type="submit" variant="primary" loading={isPending}>{t("admin.save", { defaultValue: "Save" })}</Button>

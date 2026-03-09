@@ -23,6 +23,8 @@ import {
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
+import { Textarea } from "../../components/ui/Textarea";
+import { Select } from "../../components/ui/Select";
 import { Dialog } from "../../components/ui/Dialog";
 import { Badge } from "../../components/ui/Badge";
 import { Skeleton } from "../../components/ui/Skeleton";
@@ -131,29 +133,26 @@ function PromptsPage() {
 
         {/* Search and Filter Bar */}
         <div className="flex gap-3 mb-4">
-          <div className="relative flex-1">
+          <div className="relative flex-1 input-glow">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" aria-hidden="true" />
             <input
               type="text"
               placeholder={t("prompts.searchPlaceholder", "Search templates...")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-10 pl-10 pr-4 text-sm rounded-xl bg-surface-secondary border border-border text-text placeholder:text-text-tertiary field-glow"
+              className="w-full h-10 pl-10 pr-4 text-sm rounded-xl bg-surface-secondary border border-border text-text placeholder:text-text-tertiary"
             />
           </div>
           {categories.length > 0 && (
-            <select
+            <Select
               value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="h-10 px-3 text-sm rounded-xl bg-surface-secondary border border-border text-text field-glow"
-            >
-              <option value="">{t("prompts.allCategories", "All categories")}</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setCategoryFilter(value)}
+              placeholder={t("prompts.allCategories", "All categories")}
+              options={[
+                { value: "", label: t("prompts.allCategories", "All categories") },
+                ...categories.map((cat) => ({ value: cat, label: cat })),
+              ]}
+            />
           )}
         </div>
 
@@ -589,12 +588,12 @@ function PromptDetailDialog({
                   }}
                   className="inline-flex"
                 >
-                  <input
+                  <Input
                     type="text"
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     placeholder={t("prompts.addTagPlaceholder", "Add tag...")}
-                    className="h-6 w-24 px-2 text-xs rounded-md border border-border bg-surface text-text placeholder:text-text-tertiary field-glow"
+                    className="h-6 w-24 px-2 text-xs rounded-md"
                     autoFocus
                   />
                 </form>
@@ -750,29 +749,23 @@ function CreateVersionForm({
         }}
         className="space-y-3"
       >
-        <div>
-          <label className="block text-xs font-medium text-text mb-1">{t("prompts.contentLabel", "Content")}</label>
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            rows={5}
-            required
-            placeholder={t("prompts.versionContentPlaceholder", "Updated template content...")}
-            className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary field-glow resize-none font-mono"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-text mb-1">
-            {t("prompts.systemPromptOptional", "System Prompt (optional)")}
-          </label>
-          <textarea
-            value={systemPrompt}
-            onChange={(e) => setSystemPrompt(e.target.value)}
-            rows={2}
-            placeholder={t("prompts.systemPromptPlaceholder", "System prompt for this version...")}
-            className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary field-glow resize-none font-mono"
-          />
-        </div>
+        <Textarea
+          label={t("prompts.contentLabel", "Content")}
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          rows={5}
+          required
+          placeholder={t("prompts.versionContentPlaceholder", "Updated template content...")}
+          className="text-xs resize-none font-mono"
+        />
+        <Textarea
+          label={t("prompts.systemPromptOptional", "System Prompt (optional)")}
+          value={systemPrompt}
+          onChange={(e) => setSystemPrompt(e.target.value)}
+          rows={2}
+          placeholder={t("prompts.systemPromptPlaceholder", "System prompt for this version...")}
+          className="text-xs resize-none font-mono"
+        />
         <Input
           label={t("prompts.changelogLabel", "Changelog (optional)")}
           value={changelog}
@@ -888,7 +881,7 @@ function CreatePromptDialog({ open, onClose }: { open: boolean; onClose: () => v
             ))}
           </div>
           <div className="flex gap-2">
-            <input
+            <Input
               type="text"
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
@@ -899,7 +892,7 @@ function CreatePromptDialog({ open, onClose }: { open: boolean; onClose: () => v
                 }
               }}
               placeholder={t("prompts.form.tagPlaceholder", "Type and press Enter...")}
-              className="flex-1 h-8 px-3 text-sm rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary field-glow"
+              className="flex-1 h-8 px-3 text-sm"
             />
             <Button type="button" variant="secondary" size="sm" onClick={addTag}>
               {t("prompts.form.addTag", "Add")}
@@ -929,31 +922,25 @@ function CreatePromptDialog({ open, onClose }: { open: boolean; onClose: () => v
         </div>
 
         {/* Content */}
-        <div>
-          <label className="block text-sm font-medium text-text mb-1">{t("prompts.form.content", "Content")}</label>
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            rows={6}
-            required
-            placeholder={t("prompts.form.contentPlaceholder", "Use {{variable}} for template variables...")}
-            className="w-full px-3 py-2 text-sm bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary field-glow resize-none font-mono"
-          />
-        </div>
+        <Textarea
+          label={t("prompts.form.content", "Content")}
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          rows={6}
+          required
+          placeholder={t("prompts.form.contentPlaceholder", "Use {{variable}} for template variables...")}
+          className="resize-none font-mono"
+        />
 
         {/* System Prompt */}
-        <div>
-          <label className="block text-sm font-medium text-text mb-1">
-            {t("prompts.form.systemPrompt", "System Prompt (optional)")}
-          </label>
-          <textarea
-            value={systemPrompt}
-            onChange={(e) => setSystemPrompt(e.target.value)}
-            rows={3}
-            placeholder={t("prompts.form.systemPromptPlaceholder", "System-level instructions...")}
-            className="w-full px-3 py-2 text-sm bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary field-glow resize-none font-mono"
-          />
-        </div>
+        <Textarea
+          label={t("prompts.form.systemPrompt", "System Prompt (optional)")}
+          value={systemPrompt}
+          onChange={(e) => setSystemPrompt(e.target.value)}
+          rows={3}
+          placeholder={t("prompts.form.systemPromptPlaceholder", "System-level instructions...")}
+          className="resize-none font-mono"
+        />
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>

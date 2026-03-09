@@ -35,6 +35,10 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { Badge } from "../../components/ui/Badge";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/Table";
+import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
+import { Checkbox } from "../../components/ui/Checkbox";
 import { toast } from "../../components/ui/Toast";
 import { api, apiHeaders } from "../../lib/api";
 
@@ -535,22 +539,20 @@ function AdminAnalyticsPage() {
           {datePreset === "custom" && (
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-text-tertiary shrink-0" />
-              <input
+              <Input
                 type="date"
                 value={customRange.from}
                 onChange={(e) =>
                   setCustomRange((r) => ({ ...r, from: e.target.value }))
                 }
-                className="bg-surface-secondary border border-border rounded-lg px-3 py-1.5 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
               <span className="text-text-tertiary text-sm">to</span>
-              <input
+              <Input
                 type="date"
                 value={customRange.to}
                 onChange={(e) =>
                   setCustomRange((r) => ({ ...r, to: e.target.value }))
                 }
-                className="bg-surface-secondary border border-border rounded-lg px-3 py-1.5 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
             </div>
           )}
@@ -752,56 +754,46 @@ function AdminAnalyticsPage() {
                     />
                     {/* Table */}
                     <div className="overflow-x-auto -mx-5 px-5">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-border text-left">
-                            <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs">
-                              Model
-                            </th>
-                            <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs text-right">
-                              Tokens
-                            </th>
-                            <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs text-right">
-                              Requests
-                            </th>
-                            <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs text-right">
-                              Cost
-                            </th>
-                            <th className="pb-2 font-medium text-text-tertiary text-xs text-right">
-                              Latency
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Model</TableHead>
+                            <TableHead className="text-right">Tokens</TableHead>
+                            <TableHead className="text-right">Requests</TableHead>
+                            <TableHead className="text-right">Cost</TableHead>
+                            <TableHead className="text-right">Latency</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
                           {modelData.map((m) => (
-                            <tr
+                            <TableRow
                               key={m.modelId}
-                              className="border-b border-border/50 last:border-0 hover:bg-surface-tertiary/30 transition-colors"
+                              className="hover:bg-surface-tertiary/30"
                             >
-                              <td className="py-2.5 pr-3">
-                                <p className="font-medium text-text truncate max-w-[180px]">
+                              <TableCell>
+                                <p className="font-medium truncate max-w-[180px]">
                                   {m.modelName}
                                 </p>
                                 <p className="text-[10px] text-text-tertiary truncate max-w-[180px]">
                                   {m.modelExternalId}
                                 </p>
-                              </td>
-                              <td className="py-2.5 pr-3 text-right text-text tabular-nums">
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
                                 {formatNumber(m.totalTokens)}
-                              </td>
-                              <td className="py-2.5 pr-3 text-right text-text tabular-nums">
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
                                 {formatNumber(m.requestCount)}
-                              </td>
-                              <td className="py-2.5 pr-3 text-right text-text tabular-nums">
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
                                 {formatCost(m.costCents)}
-                              </td>
-                              <td className="py-2.5 text-right text-text tabular-nums">
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
                                 {formatLatency(m.avgLatencyMs)}
-                              </td>
-                            </tr>
+                              </TableCell>
+                            </TableRow>
                           ))}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     </div>
                     <div className="flex justify-end">
                       <button
@@ -911,51 +903,41 @@ function AdminAnalyticsPage() {
                       }))}
                     />
                     <div className="overflow-x-auto -mx-5 px-5">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-border text-left">
-                            <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs">
-                              Group
-                            </th>
-                            <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs text-right">
-                              Members
-                            </th>
-                            <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs text-right">
-                              Tokens
-                            </th>
-                            <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs text-right">
-                              Cost
-                            </th>
-                            <th className="pb-2 font-medium text-text-tertiary text-xs text-right">
-                              Requests
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Group</TableHead>
+                            <TableHead className="text-right">Members</TableHead>
+                            <TableHead className="text-right">Tokens</TableHead>
+                            <TableHead className="text-right">Cost</TableHead>
+                            <TableHead className="text-right">Requests</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
                           {groupData.map((g) => (
-                            <tr
+                            <TableRow
                               key={g.groupId}
-                              className="border-b border-border/50 last:border-0 hover:bg-surface-tertiary/30 transition-colors"
+                              className="hover:bg-surface-tertiary/30"
                             >
-                              <td className="py-2.5 pr-3 font-medium text-text">
+                              <TableCell className="font-medium">
                                 {g.groupName}
-                              </td>
-                              <td className="py-2.5 pr-3 text-right text-text tabular-nums">
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
                                 {g.memberCount}
-                              </td>
-                              <td className="py-2.5 pr-3 text-right text-text tabular-nums">
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
                                 {formatNumber(g.totalTokens)}
-                              </td>
-                              <td className="py-2.5 pr-3 text-right text-text tabular-nums">
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
                                 {formatCost(g.costCents)}
-                              </td>
-                              <td className="py-2.5 text-right text-text tabular-nums">
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
                                 {formatNumber(g.requestCount)}
-                              </td>
-                            </tr>
+                              </TableCell>
+                            </TableRow>
                           ))}
-                        </tbody>
-                      </table>
+                        </TableBody>
+                      </Table>
                     </div>
                   </div>
                 )}
@@ -1144,56 +1126,42 @@ function AdminAnalyticsPage() {
 
                 {/* Per-model performance table */}
                 <div className="overflow-x-auto -mx-5 px-5">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-left">
-                        <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs">
-                          Model
-                        </th>
-                        <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs text-right">
-                          Avg Latency
-                        </th>
-                        <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs text-right">
-                          P95 Latency
-                        </th>
-                        <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs text-right">
-                          P99 Latency
-                        </th>
-                        <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs text-right">
-                          Error Rate
-                        </th>
-                        <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs text-right">
-                          Cost/1K Tokens
-                        </th>
-                        <th className="pb-2 font-medium text-text-tertiary text-xs text-right">
-                          Requests
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Model</TableHead>
+                        <TableHead className="text-right">Avg Latency</TableHead>
+                        <TableHead className="text-right">P95 Latency</TableHead>
+                        <TableHead className="text-right">P99 Latency</TableHead>
+                        <TableHead className="text-right">Error Rate</TableHead>
+                        <TableHead className="text-right">Cost/1K Tokens</TableHead>
+                        <TableHead className="text-right">Requests</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {modelPerformance.map((m) => (
-                        <tr
+                        <TableRow
                           key={m.modelId}
-                          className="border-b border-border/50 last:border-0 hover:bg-surface-tertiary/30 transition-colors"
+                          className="hover:bg-surface-tertiary/30"
                         >
-                          <td className="py-2.5 pr-3">
-                            <p className="font-medium text-text truncate max-w-[180px]">
+                          <TableCell>
+                            <p className="font-medium truncate max-w-[180px]">
                               {m.modelName}
                             </p>
                             <p className="text-[10px] text-text-tertiary truncate max-w-[180px]">
                               {m.modelExternalId}
                             </p>
-                          </td>
-                          <td className="py-2.5 pr-3 text-right text-text tabular-nums">
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
                             {formatLatency(m.avgLatencyMs)}
-                          </td>
-                          <td className="py-2.5 pr-3 text-right text-text tabular-nums">
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
                             {formatLatency(m.p95LatencyMs)}
-                          </td>
-                          <td className="py-2.5 pr-3 text-right text-text tabular-nums">
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
                             {formatLatency(m.p99LatencyMs)}
-                          </td>
-                          <td className="py-2.5 pr-3 text-right tabular-nums">
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
                             <Badge
                               variant={
                                 m.errorRate > 5
@@ -1205,17 +1173,17 @@ function AdminAnalyticsPage() {
                             >
                               {m.errorRate}%
                             </Badge>
-                          </td>
-                          <td className="py-2.5 pr-3 text-right text-text tabular-nums">
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
                             {(m.costPerToken * 10).toFixed(4)}c
-                          </td>
-                          <td className="py-2.5 text-right text-text tabular-nums">
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
                             {formatNumber(m.requestCount)}
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </Table>
                 </div>
 
                 {/* Error rate bar chart per model */}
@@ -1366,53 +1334,39 @@ function AdminAnalyticsPage() {
               <EmptyState message="No budget alerts configured yet" />
             ) : (
               <div className="overflow-x-auto -mx-5 px-5">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left">
-                      <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs">
-                        Name
-                      </th>
-                      <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs">
-                        Scope
-                      </th>
-                      <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs">
-                        Period
-                      </th>
-                      <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs text-right">
-                        Threshold
-                      </th>
-                      <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs text-center">
-                        Notify
-                      </th>
-                      <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs text-center">
-                        Enabled
-                      </th>
-                      <th className="pb-2 font-medium text-text-tertiary text-xs text-right">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Scope</TableHead>
+                      <TableHead>Period</TableHead>
+                      <TableHead className="text-right">Threshold</TableHead>
+                      <TableHead className="text-center">Notify</TableHead>
+                      <TableHead className="text-center">Enabled</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {alertsData.map((alert) => (
-                      <tr
+                      <TableRow
                         key={alert.id}
-                        className="border-b border-border/50 last:border-0 hover:bg-surface-tertiary/30 transition-colors"
+                        className="hover:bg-surface-tertiary/30"
                       >
-                        <td className="py-2.5 pr-3 font-medium text-text">
+                        <TableCell className="font-medium">
                           {alert.name}
-                        </td>
-                        <td className="py-2.5 pr-3">
+                        </TableCell>
+                        <TableCell>
                           <Badge variant="default">{alert.scope}</Badge>
-                        </td>
-                        <td className="py-2.5 pr-3 text-text-secondary capitalize">
+                        </TableCell>
+                        <TableCell className="text-text-secondary capitalize">
                           {alert.period}
-                        </td>
-                        <td className="py-2.5 pr-3 text-right text-text tabular-nums">
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
                           {alert.thresholdType === "tokens"
                             ? `${formatNumber(alert.thresholdValue)} tokens`
                             : formatCost(alert.thresholdValue)}
-                        </td>
-                        <td className="py-2.5 pr-3 text-center">
+                        </TableCell>
+                        <TableCell className="text-center">
                           <div className="flex items-center justify-center gap-1.5">
                             {alert.notifyEmail && (
                               <Badge variant="primary">Email</Badge>
@@ -1421,8 +1375,8 @@ function AdminAnalyticsPage() {
                               <Badge variant="primary">Webhook</Badge>
                             )}
                           </div>
-                        </td>
-                        <td className="py-2.5 pr-3 text-center">
+                        </TableCell>
+                        <TableCell className="text-center">
                           <button
                             onClick={() =>
                               toggleAlertMutation.mutate({
@@ -1442,8 +1396,8 @@ function AdminAnalyticsPage() {
                               }`}
                             />
                           </button>
-                        </td>
-                        <td className="py-2.5 text-right">
+                        </TableCell>
+                        <TableCell className="text-right">
                           <button
                             onClick={() =>
                               deleteAlertMutation.mutate(alert.id)
@@ -1452,11 +1406,11 @@ function AdminAnalyticsPage() {
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             )}
           </div>
@@ -1494,34 +1448,20 @@ function AdminAnalyticsPage() {
             <EmptyState message="No agent traces found for this period" />
           ) : (
             <div className="overflow-x-auto -mx-5 px-5">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left">
-                    <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs w-8" />
-                    <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs">
-                      Agent
-                    </th>
-                    <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs">
-                      User
-                    </th>
-                    <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs">
-                      Model
-                    </th>
-                    <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs text-center">
-                      Status
-                    </th>
-                    <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs text-right">
-                      Duration
-                    </th>
-                    <th className="pb-2 pr-3 font-medium text-text-tertiary text-xs text-right">
-                      Tokens
-                    </th>
-                    <th className="pb-2 font-medium text-text-tertiary text-xs text-right">
-                      Cost
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8" />
+                    <TableHead>Agent</TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead>Model</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead className="text-right">Duration</TableHead>
+                    <TableHead className="text-right">Tokens</TableHead>
+                    <TableHead className="text-right">Cost</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {agentTraces.map((trace) => {
                     const isExpanded = expandedTraceId === trace.id;
                     return (
@@ -1535,8 +1475,8 @@ function AdminAnalyticsPage() {
                       />
                     );
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
         </div>
@@ -1883,47 +1823,47 @@ function TraceRow({
 
   return (
     <>
-      <tr
+      <TableRow
         onClick={onToggle}
-        className="border-b border-border/50 hover:bg-surface-tertiary/30 transition-colors cursor-pointer"
+        className="hover:bg-surface-tertiary/30 cursor-pointer"
       >
-        <td className="py-2.5 pr-2">
+        <TableCell className="pr-2">
           {isExpanded ? (
             <ChevronDown className="h-4 w-4 text-text-tertiary" />
           ) : (
             <ChevronRight className="h-4 w-4 text-text-tertiary" />
           )}
-        </td>
-        <td className="py-2.5 pr-3 font-medium text-text">
+        </TableCell>
+        <TableCell className="font-medium">
           {trace.agentName}
           <p className="text-[10px] text-text-tertiary">
             {formatDateTime(trace.startedAt)}
           </p>
-        </td>
-        <td className="py-2.5 pr-3 text-text-secondary text-xs">
+        </TableCell>
+        <TableCell className="text-text-secondary text-xs">
           {trace.userName}
-        </td>
-        <td className="py-2.5 pr-3 text-text-secondary text-xs">
+        </TableCell>
+        <TableCell className="text-text-secondary text-xs">
           {trace.modelName}
-        </td>
-        <td className="py-2.5 pr-3 text-center">
+        </TableCell>
+        <TableCell className="text-center">
           <Badge variant={statusColors[trace.status] ?? "default"}>
             {trace.status}
           </Badge>
-        </td>
-        <td className="py-2.5 pr-3 text-right text-text tabular-nums">
+        </TableCell>
+        <TableCell className="text-right tabular-nums">
           {formatLatency(trace.durationMs)}
-        </td>
-        <td className="py-2.5 pr-3 text-right text-text tabular-nums">
+        </TableCell>
+        <TableCell className="text-right tabular-nums">
           {formatNumber(trace.totalTokens)}
-        </td>
-        <td className="py-2.5 text-right text-text tabular-nums">
+        </TableCell>
+        <TableCell className="text-right tabular-nums">
           {formatCost(trace.costCents)}
-        </td>
-      </tr>
+        </TableCell>
+      </TableRow>
       {isExpanded && (
-        <tr>
-          <td colSpan={8} className="p-0">
+        <TableRow>
+          <TableCell colSpan={8} className="p-0">
             <div className="bg-surface border-y border-border/50 px-8 py-4 space-y-3">
               {trace.errorMessage && (
                 <div className="flex items-start gap-2 p-3 bg-danger/5 border border-danger/20 rounded-lg">
@@ -1991,8 +1931,8 @@ function TraceRow({
                 </span>
               </div>
             </div>
-          </td>
-        </tr>
+          </TableCell>
+        </TableRow>
       )}
     </>
   );
@@ -2042,11 +1982,6 @@ function BudgetAlertForm({
     });
   }
 
-  const inputClass =
-    "w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/40";
-  const selectClass =
-    "w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/40 appearance-none";
-
   return (
     <div className="bg-surface-secondary border border-border rounded-xl p-5">
       <div className="flex items-center justify-between mb-4">
@@ -2062,117 +1997,81 @@ function BudgetAlertForm({
       </div>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs text-text-secondary mb-1">
-              Alert Name
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Monthly cost limit"
-              className={inputClass}
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-text-secondary mb-1">
-              Scope
-            </label>
-            <select
-              value={scope}
-              onChange={(e) => setScope(e.target.value as any)}
-              className={selectClass}
-            >
-              <option value="org">Organization</option>
-              <option value="group">Group</option>
-              <option value="user">User</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs text-text-secondary mb-1">
-              Threshold Type
-            </label>
-            <select
-              value={thresholdType}
-              onChange={(e) => setThresholdType(e.target.value as any)}
-              className={selectClass}
-            >
-              <option value="cost_cents">Cost ($)</option>
-              <option value="tokens">Tokens</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs text-text-secondary mb-1">
-              Threshold Value
-              {thresholdType === "cost_cents" ? " ($)" : " (tokens)"}
-            </label>
-            <input
-              type="number"
-              value={thresholdValue}
-              onChange={(e) => setThresholdValue(e.target.value)}
-              placeholder={
-                thresholdType === "cost_cents" ? "100.00" : "1000000"
-              }
-              className={inputClass}
-              required
-              min="0"
-              step={thresholdType === "cost_cents" ? "0.01" : "1"}
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-text-secondary mb-1">
-              Period
-            </label>
-            <select
-              value={period}
-              onChange={(e) => setPeriod(e.target.value as any)}
-              className={selectClass}
-            >
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-            </select>
-          </div>
+          <Input
+            label="Alert Name"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g., Monthly cost limit"
+            required
+          />
+          <Select
+            label="Scope"
+            value={scope}
+            onChange={(value) => setScope(value as any)}
+            options={[
+              { value: "org", label: "Organization" },
+              { value: "group", label: "Group" },
+              { value: "user", label: "User" },
+            ]}
+          />
+          <Select
+            label="Threshold Type"
+            value={thresholdType}
+            onChange={(value) => setThresholdType(value as any)}
+            options={[
+              { value: "cost_cents", label: "Cost ($)" },
+              { value: "tokens", label: "Tokens" },
+            ]}
+          />
+          <Input
+            label={`Threshold Value${thresholdType === "cost_cents" ? " ($)" : " (tokens)"}`}
+            type="number"
+            value={thresholdValue}
+            onChange={(e) => setThresholdValue(e.target.value)}
+            placeholder={
+              thresholdType === "cost_cents" ? "100.00" : "1000000"
+            }
+            required
+            min="0"
+            step={thresholdType === "cost_cents" ? "0.01" : "1"}
+          />
+          <Select
+            label="Period"
+            value={period}
+            onChange={(value) => setPeriod(value as any)}
+            options={[
+              { value: "daily", label: "Daily" },
+              { value: "weekly", label: "Weekly" },
+              { value: "monthly", label: "Monthly" },
+            ]}
+          />
           <div className="space-y-2">
-            <label className="block text-xs text-text-secondary mb-1">
+            <span className="block text-xs text-text-secondary mb-1">
               Notifications
-            </label>
-            <label className="flex items-center gap-2 text-sm text-text cursor-pointer">
-              <input
-                type="checkbox"
-                checked={notifyEmail}
-                onChange={(e) => setNotifyEmail(e.target.checked)}
-                className="rounded border-border"
-              />
-              Email notification
-            </label>
-            <label className="flex items-center gap-2 text-sm text-text cursor-pointer">
-              <input
-                type="checkbox"
-                checked={notifyWebhook}
-                onChange={(e) => setNotifyWebhook(e.target.checked)}
-                className="rounded border-border"
-              />
-              Webhook notification
-            </label>
+            </span>
+            <Checkbox
+              checked={notifyEmail}
+              onChange={(checked) => setNotifyEmail(checked)}
+              label="Email notification"
+            />
+            <Checkbox
+              checked={notifyWebhook}
+              onChange={(checked) => setNotifyWebhook(checked)}
+              label="Webhook notification"
+            />
           </div>
         </div>
 
         {notifyWebhook && (
-          <div>
-            <label className="block text-xs text-text-secondary mb-1">
-              Webhook URL
-            </label>
-            <input
-              type="url"
-              value={webhookUrl}
-              onChange={(e) => setWebhookUrl(e.target.value)}
-              placeholder="https://hooks.example.com/budget-alert"
-              className={inputClass}
-              required
-            />
-          </div>
+          <Input
+            label="Webhook URL"
+            type="url"
+            value={webhookUrl}
+            onChange={(e) => setWebhookUrl(e.target.value)}
+            placeholder="https://hooks.example.com/budget-alert"
+            required
+          />
         )}
 
         <div className="flex items-center justify-end gap-2 pt-2">
@@ -2269,20 +2168,17 @@ function IntegrationCard({
       {isConfiguring && (
         <div className="mt-4 pt-4 border-t border-border space-y-4">
           {fields.map((field) => (
-            <div key={field.key}>
-              <label className="block text-xs text-text-secondary mb-1">
-                {field.label}
-              </label>
-              <input
-                type={field.isSecret ? "password" : "text"}
-                value={values[field.key] ?? ""}
-                onChange={(e) =>
-                  setValues((v) => ({ ...v, [field.key]: e.target.value }))
-                }
-                placeholder={field.placeholder}
-                className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
-              />
-            </div>
+            <Input
+              key={field.key}
+              label={field.label}
+              type={field.isSecret ? "password" : "text"}
+              value={values[field.key] ?? ""}
+              onChange={(e) =>
+                setValues((v) => ({ ...v, [field.key]: e.target.value }))
+              }
+              placeholder={field.placeholder}
+              className="font-mono"
+            />
           ))}
           <div className="flex items-center justify-between pt-2">
             <p className="text-[10px] text-text-tertiary">

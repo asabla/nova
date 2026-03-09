@@ -27,6 +27,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
+import { Textarea } from "../../components/ui/Textarea";
+import { Select } from "../../components/ui/Select";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
 import { toast } from "../../components/ui/Toast";
@@ -204,7 +206,7 @@ function ConversationsTab({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative flex-1 max-w-sm input-glow">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" aria-hidden="true" />
           <input
             type="text"
@@ -589,18 +591,18 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
               </Badge>
               {member.role !== "owner" && (
                 <div className="flex items-center gap-1">
-                  <select
+                  <Select
                     value={member.role}
-                    onChange={(e) =>
-                      updateRoleMutation.mutate({ memberId: member.id, role: e.target.value })
+                    onChange={(value) =>
+                      updateRoleMutation.mutate({ memberId: member.id, role: value })
                     }
-                    className="h-8 px-2 rounded border border-border bg-surface text-text text-xs"
-                    aria-label={t("workspaces.changeRole", { defaultValue: "Change role" })}
-                  >
-                    <option value="admin">{t("workspaces.roleAdmin", { defaultValue: "Admin" })}</option>
-                    <option value="member">{t("workspaces.roleMember", { defaultValue: "Member" })}</option>
-                    <option value="viewer">{t("workspaces.roleViewer", { defaultValue: "Viewer" })}</option>
-                  </select>
+                    size="sm"
+                    options={[
+                      { value: "admin", label: t("workspaces.roleAdmin", { defaultValue: "Admin" }) },
+                      { value: "member", label: t("workspaces.roleMember", { defaultValue: "Member" }) },
+                      { value: "viewer", label: t("workspaces.roleViewer", { defaultValue: "Viewer" }) },
+                    ]}
+                  />
                   <button
                     onClick={() => setRemoveMemberTarget(member)}
                     className="p-1.5 rounded hover:bg-surface-secondary text-text-tertiary hover:text-danger transition-colors"
@@ -634,18 +636,16 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
             placeholder="colleague@example.com"
             required
           />
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-text">{t("workspaces.role", { defaultValue: "Role" })}</label>
-            <select
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value)}
-              className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-text"
-            >
-              <option value="admin">{t("workspaces.roleAdmin", { defaultValue: "Admin" })}</option>
-              <option value="member">{t("workspaces.roleMember", { defaultValue: "Member" })}</option>
-              <option value="viewer">{t("workspaces.roleViewer", { defaultValue: "Viewer" })}</option>
-            </select>
-          </div>
+          <Select
+            label={t("workspaces.role", { defaultValue: "Role" })}
+            value={inviteRole}
+            onChange={(value) => setInviteRole(value)}
+            options={[
+              { value: "admin", label: t("workspaces.roleAdmin", { defaultValue: "Admin" }) },
+              { value: "member", label: t("workspaces.roleMember", { defaultValue: "Member" }) },
+              { value: "viewer", label: t("workspaces.roleViewer", { defaultValue: "Viewer" }) },
+            ]}
+          />
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" type="button" onClick={() => setShowInvite(false)}>
               {t("common.cancel", { defaultValue: "Cancel" })}
@@ -762,16 +762,13 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
           onChange={(e) => setForm({ ...form, name: e.target.value })}
           placeholder={t("workspaces.namePlaceholder", { defaultValue: "Workspace name" })}
         />
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-text">{t("workspaces.description", { defaultValue: "Description" })}</label>
-          <textarea
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            placeholder={t("workspaces.descriptionPlaceholder", { defaultValue: "What is this workspace for?" })}
-            rows={3}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary resize-y text-sm"
-          />
-        </div>
+        <Textarea
+          label={t("workspaces.description", { defaultValue: "Description" })}
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          placeholder={t("workspaces.descriptionPlaceholder", { defaultValue: "What is this workspace for?" })}
+          rows={3}
+        />
       </section>
 
       {/* Defaults */}
@@ -779,48 +776,39 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
         <h3 className="text-sm font-semibold text-text uppercase tracking-wider">
           {t("workspaces.defaults", { defaultValue: "Workspace Defaults" })}
         </h3>
-        <div>
-          <label className="block text-sm font-medium text-text mb-1.5">{t("workspaces.defaultAgent", { defaultValue: "Default Agent" })}</label>
-          <select
-            value={form.defaultAgentId}
-            onChange={(e) => setForm({ ...form, defaultAgentId: e.target.value })}
-            className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-text text-sm"
-          >
-            <option value="">{t("workspaces.noAgent", { defaultValue: "None (use global default)" })}</option>
-            {(agents ?? []).map((agent: any) => (
-              <option key={agent.id} value={agent.id}>
-                {agent.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-text mb-1.5">{t("workspaces.defaultModel", { defaultValue: "Default Model" })}</label>
-          <select
-            value={form.defaultModel}
-            onChange={(e) => setForm({ ...form, defaultModel: e.target.value })}
-            className="w-full h-10 px-3 rounded-lg border border-border bg-surface text-text text-sm"
-          >
-            <option value="">{t("workspaces.selectModel", { defaultValue: "Select model" })}</option>
-            {models.map((model: any) => (
-              <option key={model.id ?? model.modelId ?? model.name} value={model.id ?? model.modelId ?? model.name}>
-                {model.name ?? model.id ?? model.modelId}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-text mb-1.5">
-            {t("workspaces.defaultSystemPrompt", { defaultValue: "Default System Prompt" })}
-          </label>
-          <textarea
-            value={form.defaultSystemPrompt}
-            onChange={(e) => setForm({ ...form, defaultSystemPrompt: e.target.value })}
-            placeholder={t("workspaces.systemPromptPlaceholder", { defaultValue: "Applied to all new conversations in this workspace..." })}
-            rows={5}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary resize-y text-sm font-mono"
-          />
-        </div>
+        <Select
+          label={t("workspaces.defaultAgent", { defaultValue: "Default Agent" })}
+          value={form.defaultAgentId}
+          onChange={(value) => setForm({ ...form, defaultAgentId: value })}
+          options={[
+            { value: "", label: t("workspaces.noAgent", { defaultValue: "None (use global default)" }) },
+            ...(agents ?? []).map((agent: any) => ({
+              value: agent.id,
+              label: agent.name,
+            })),
+          ]}
+        />
+        <Select
+          label={t("workspaces.defaultModel", { defaultValue: "Default Model" })}
+          value={form.defaultModel}
+          onChange={(value) => setForm({ ...form, defaultModel: value })}
+          placeholder={t("workspaces.selectModel", { defaultValue: "Select model" })}
+          options={[
+            { value: "", label: t("workspaces.selectModel", { defaultValue: "Select model" }) },
+            ...models.map((model: any) => ({
+              value: model.id ?? model.modelId ?? model.name,
+              label: model.name ?? model.id ?? model.modelId,
+            })),
+          ]}
+        />
+        <Textarea
+          label={t("workspaces.defaultSystemPrompt", { defaultValue: "Default System Prompt" })}
+          value={form.defaultSystemPrompt}
+          onChange={(e) => setForm({ ...form, defaultSystemPrompt: e.target.value })}
+          placeholder={t("workspaces.systemPromptPlaceholder", { defaultValue: "Applied to all new conversations in this workspace..." })}
+          rows={5}
+          className="font-mono"
+        />
       </section>
 
       {/* Save */}

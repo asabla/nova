@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { toast } from "../../components/ui/Toast";
+import { Switch } from "../../components/ui/Switch";
 
 interface NotificationPrefs {
   emailOnShare: boolean;
@@ -68,25 +69,25 @@ function NotificationSettings() {
       </div>
 
       <div className="space-y-3">
-        <Toggle
+        <Switch
           label={t("settings.inAppNotifications", "In-app notifications")}
           description={t("settings.inAppNotificationsDescription", "Show real-time notifications inside the app")}
           checked={prefs?.inAppEnabled ?? true}
           onChange={(v) => togglePref("inAppEnabled", v)}
         />
-        <Toggle
+        <Switch
           label={t("settings.emailOnShare", "Email on conversation share")}
           description={t("settings.emailOnShareDescription", "Receive an email when someone shares a conversation with you")}
           checked={prefs?.emailOnShare ?? true}
           onChange={(v) => togglePref("emailOnShare", v)}
         />
-        <Toggle
+        <Switch
           label={t("settings.emailOnMention", "Email on @mention")}
           description={t("settings.emailOnMentionDescription", "Receive an email when someone mentions you in a message")}
           checked={prefs?.emailOnMention ?? true}
           onChange={(v) => togglePref("emailOnMention", v)}
         />
-        <Toggle
+        <Switch
           label={t("settings.emailOnAgentComplete", "Email on agent completion")}
           description={t("settings.emailOnAgentCompleteDescription", "Receive an email when an agent run finishes")}
           checked={prefs?.emailOnAgentComplete ?? false}
@@ -97,33 +98,3 @@ function NotificationSettings() {
   );
 }
 
-function Toggle({ label, description, checked, onChange }: {
-  label: string;
-  description: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4 p-4 rounded-xl bg-surface-secondary border border-border">
-      <div>
-        <p className="text-sm font-medium text-text">{label}</p>
-        <p className="text-xs text-text-tertiary mt-0.5">{description}</p>
-      </div>
-      <button
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        onClick={() => onChange(!checked)}
-        className={`relative w-10 h-6 rounded-full transition-colors shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
-          checked ? "bg-primary" : "bg-border-strong"
-        }`}
-      >
-        <span
-          className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-            checked ? "translate-x-4" : "translate-x-0"
-          }`}
-        />
-      </button>
-    </div>
-  );
-}

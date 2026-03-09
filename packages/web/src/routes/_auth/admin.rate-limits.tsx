@@ -8,6 +8,7 @@ import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
 import { Input } from "../../components/ui/Input";
+import { Select } from "../../components/ui/Select";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { toast } from "../../components/ui/Toast";
 
@@ -192,16 +193,18 @@ function RateLimitDialog({ open, onClose, initial, onSubmit, isPending }: {
   return (
     <Dialog open={open} onClose={onClose} title={initial ? t("admin.editRateLimitTitle", { defaultValue: "Edit Rate Limit" }) : t("admin.newRateLimitTitle", { defaultValue: "New Rate Limit Rule" })}>
       <form onSubmit={(e) => { e.preventDefault(); onSubmit({ scope, windowSeconds, maxRequests, maxTokens }); }} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-text mb-1">{t("admin.scope", { defaultValue: "Scope" })}</label>
-          <select value={scope} onChange={(e) => setScope(e.target.value)} className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text">
-            <option value="user">{t("admin.perUser", { defaultValue: "Per User" })}</option>
-            <option value="group">{t("admin.perGroup", { defaultValue: "Per Group" })}</option>
-            <option value="org">{t("admin.orgWide", { defaultValue: "Organization-wide" })}</option>
-            <option value="api-key">{t("admin.perApiKey", { defaultValue: "Per API Key" })}</option>
-            <option value="ip">{t("admin.perIp", { defaultValue: "Per IP Address" })}</option>
-          </select>
-        </div>
+        <Select
+          label={t("admin.scope", { defaultValue: "Scope" })}
+          value={scope}
+          onChange={(value) => setScope(value)}
+          options={[
+            { value: "user", label: t("admin.perUser", { defaultValue: "Per User" }) },
+            { value: "group", label: t("admin.perGroup", { defaultValue: "Per Group" }) },
+            { value: "org", label: t("admin.orgWide", { defaultValue: "Organization-wide" }) },
+            { value: "api-key", label: t("admin.perApiKey", { defaultValue: "Per API Key" }) },
+            { value: "ip", label: t("admin.perIp", { defaultValue: "Per IP Address" }) },
+          ]}
+        />
         <div className="grid grid-cols-2 gap-3">
           <Input label={t("admin.windowSeconds", { defaultValue: "Window (seconds)" })} type="number" value={windowSeconds} onChange={(e) => setWindowSeconds(Number(e.target.value))} min={1} />
           <Input label={t("admin.maxRequests", { defaultValue: "Max Requests" })} type="number" value={maxRequests} onChange={(e) => setMaxRequests(Number(e.target.value))} min={1} />

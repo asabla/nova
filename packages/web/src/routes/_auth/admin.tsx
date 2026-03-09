@@ -6,6 +6,7 @@ import {
   Code2, GitCompare, Puzzle, Wrench, FileText, Bot,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { Select } from "../../components/ui/Select";
 
 export const Route = createFileRoute("/_auth/admin")({
   component: AdminLayout,
@@ -92,20 +93,16 @@ function AdminLayout() {
           <nav className="w-full md:w-52 shrink-0 md:space-y-4 overflow-x-auto md:overflow-x-visible">
             {/* Mobile: dropdown navigation */}
             <div className="md:hidden pb-2">
-              <select
+              <Select
+                options={tabGroupDefs.flatMap((group) =>
+                  group.tabs.map(({ to, label }) => ({
+                    value: to,
+                    label: `${t(group.labelKey, group.labelDefault)} - ${t(label)}`,
+                  }))
+                )}
                 value={tabGroupDefs.flatMap((g) => g.tabs).find(({ to }) => matchRoute({ to }))?.to ?? ""}
-                onChange={(e) => navigate({ to: e.target.value })}
-                aria-label={t("admin.navigation", "Admin navigation")}
-                className="w-full h-10 px-3 text-sm bg-surface-secondary border border-border rounded-lg text-text"
-              >
-                {tabGroupDefs.map((group) => (
-                  <optgroup key={group.labelKey} label={t(group.labelKey, group.labelDefault)}>
-                    {group.tabs.map(({ to, label }) => (
-                      <option key={to} value={to}>{t(label)}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+                onChange={(val) => navigate({ to: val })}
+              />
             </div>
             {/* Desktop: vertical sidebar */}
             <div className="hidden md:block space-y-4">

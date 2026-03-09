@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Database, Save, AlertTriangle } from "lucide-react";
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
+import { Input } from "../../components/ui/Input";
 import { Badge } from "../../components/ui/Badge";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { toast } from "../../components/ui/Toast";
@@ -173,12 +174,12 @@ function RetentionField({ label, description, value, onChange, min = 0 }: {
         <p className="text-xs text-text-tertiary mt-0.5">{description}</p>
       </div>
       <div className="flex items-center gap-2 ml-4">
-        <input
+        <Input
           type="number"
           value={value}
           onChange={(e) => onChange(Math.max(min, Number(e.target.value)))}
           min={min}
-          className="w-20 h-8 px-2 text-sm text-right bg-surface border border-border rounded-lg text-text"
+          className="w-20 h-8 text-right"
           aria-label={label}
         />
         <span className="text-xs text-text-tertiary w-10">{t("admin.days", { defaultValue: "days" })}</span>

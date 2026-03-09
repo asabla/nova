@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
+import { Textarea } from "../../components/ui/Textarea";
+import { Select } from "../../components/ui/Select";
 import { toast } from "../../components/ui/Toast";
 
 export const Route = createFileRoute("/_auth/sandbox")({
@@ -138,30 +140,24 @@ function SandboxPage() {
           {/* Language selector */}
           <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-surface-secondary/50">
             <label className="text-xs text-text-secondary">{t("sandbox.language", { defaultValue: "Language:" })}</label>
-            <select
+            <Select
+              options={LANGUAGES.map((lang) => ({ value: lang.value, label: lang.label }))}
               value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="px-2 py-1 rounded-lg border border-border bg-surface text-text text-xs"
-              aria-label={t("sandbox.selectLanguage", { defaultValue: "Select language" })}
-            >
-              {LANGUAGES.map((lang) => (
-                <option key={lang.value} value={lang.value}>
-                  {lang.label}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setLanguage(val)}
+              size="sm"
+            />
             <span className="ml-auto text-[10px] text-text-tertiary">
               {navigator.platform.includes("Mac") ? "Cmd" : "Ctrl"}+Enter {t("sandbox.toRun", { defaultValue: "to run" })}
             </span>
           </div>
 
           {/* Code editor */}
-          <textarea
+          <Textarea
             value={code}
             onChange={(e) => setCode(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={getPlaceholder(language)}
-            className="flex-1 w-full px-4 py-3 bg-surface text-text placeholder:text-text-tertiary resize-none text-sm font-mono focus:outline-none"
+            className="flex-1 w-full rounded-none border-0 font-mono resize-none"
             spellCheck={false}
           />
         </div>

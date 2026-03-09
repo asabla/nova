@@ -9,6 +9,9 @@ import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { ModelCapabilityBadges } from "../../components/ui/ModelCapabilityBadges";
 import { toast } from "../../components/ui/Toast";
+import { Input } from "../../components/ui/Input";
+import { Textarea } from "../../components/ui/Textarea";
+import { Select } from "../../components/ui/Select";
 
 export const Route = createFileRoute("/_auth/model-compare")({
   component: ModelComparePage,
@@ -185,20 +188,17 @@ function ModelComparePage() {
       {/* Model selectors */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-6 py-4 border-b border-border">
         <div className="min-w-0">
-          <label className="block text-xs font-medium text-text-secondary mb-1">{t("modelCompare.modelA", "Model A")}</label>
-          <select
+          <Select
+            label={t("modelCompare.modelA", "Model A")}
             value={modelA}
-            onChange={(e) => setModelA(e.target.value)}
-            className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text"
+            onChange={(value) => setModelA(value)}
+            placeholder={t("modelCompare.selectModel", "Select model...")}
             disabled={isRunning}
-          >
-            <option value="">{t("modelCompare.selectModel", "Select model...")}</option>
-            {models.map((m: any) => (
-              <option key={m.id} value={m.modelIdExternal}>
-                {m.name}
-              </option>
-            ))}
-          </select>
+            options={models.map((m: any) => ({
+              value: m.modelIdExternal,
+              label: m.name,
+            }))}
+          />
           <ModelCapabilityBadges
             capabilities={models.find((m: any) => m.modelIdExternal === modelA)?.capabilities ?? []}
             compact
@@ -206,20 +206,17 @@ function ModelComparePage() {
           />
         </div>
         <div className="min-w-0">
-          <label className="block text-xs font-medium text-text-secondary mb-1">{t("modelCompare.modelB", "Model B")}</label>
-          <select
+          <Select
+            label={t("modelCompare.modelB", "Model B")}
             value={modelB}
-            onChange={(e) => setModelB(e.target.value)}
-            className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text"
+            onChange={(value) => setModelB(value)}
+            placeholder={t("modelCompare.selectModel", "Select model...")}
             disabled={isRunning}
-          >
-            <option value="">{t("modelCompare.selectModel", "Select model...")}</option>
-            {models.map((m: any) => (
-              <option key={m.id} value={m.modelIdExternal}>
-                {m.name}
-              </option>
-            ))}
-          </select>
+            options={models.map((m: any) => ({
+              value: m.modelIdExternal,
+              label: m.name,
+            }))}
+          />
           <ModelCapabilityBadges
             capabilities={models.find((m: any) => m.modelIdExternal === modelB)?.capabilities ?? []}
             compact
@@ -227,28 +224,26 @@ function ModelComparePage() {
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">{t("modelCompare.temperature", "Temperature")}</label>
-          <input
+          <Input
+            label={t("modelCompare.temperature", "Temperature")}
             type="number"
             min={0}
             max={2}
             step={0.1}
             value={temperature}
             onChange={(e) => setTemperature(Number(e.target.value))}
-            className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text"
             disabled={isRunning}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">{t("modelCompare.maxTokens", "Max Tokens")}</label>
-          <input
+          <Input
+            label={t("modelCompare.maxTokens", "Max Tokens")}
             type="number"
             min={1}
             max={32768}
             step={256}
             value={maxTokens}
             onChange={(e) => setMaxTokens(Number(e.target.value))}
-            className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text"
             disabled={isRunning}
           />
         </div>
@@ -304,12 +299,11 @@ function ModelComparePage() {
       <div className="border-t border-border px-6 py-4">
         <div className="flex gap-3 items-end">
           <div className="flex-1">
-            <textarea
+            <Textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder={t("modelCompare.promptPlaceholder", "Enter a prompt to send to both models...")}
               rows={3}
-              className="w-full px-3 py-2 text-sm bg-surface border border-border rounded-lg text-text resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
               disabled={isRunning}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {

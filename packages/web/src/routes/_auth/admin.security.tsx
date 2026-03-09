@@ -7,7 +7,9 @@ import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Skeleton } from "../../components/ui/Skeleton";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/Table";
 import { toast } from "../../components/ui/Toast";
+import { Switch } from "../../components/ui/Switch";
 import { formatDistanceToNow } from "date-fns";
 
 interface SecurityPolicies {
@@ -31,32 +33,6 @@ export const Route = createFileRoute("/_auth/admin/security")({
   component: SecurityPage,
 });
 
-function ToggleSwitch({ checked, onChange, label, description }: {
-  checked: boolean; onChange: (v: boolean) => void; label: string; description?: string;
-}) {
-  return (
-    <div className="flex items-center justify-between py-3">
-      <div>
-        <span className="text-sm font-medium text-text">{label}</span>
-        {description && <p className="text-xs text-text-tertiary mt-0.5">{description}</p>}
-      </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
-          checked ? "bg-primary" : "bg-surface-tertiary"
-        }`}
-      >
-        <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-          checked ? "translate-x-4" : "translate-x-0"
-        }`} />
-      </button>
-    </div>
-  );
-}
 
 function SecurityPage() {
   const { t } = useTranslation();
@@ -190,33 +166,33 @@ function SecurityPage() {
           <Skeleton className="h-48 w-full" />
         ) : (
           <div className="bg-surface-secondary border border-border rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left px-4 py-2 text-xs text-text-tertiary font-medium">{t("admin.action", { defaultValue: "Action" })}</th>
-                  <th className="text-left px-4 py-2 text-xs text-text-tertiary font-medium">{t("admin.user", { defaultValue: "User" })}</th>
-                  <th className="text-left px-4 py-2 text-xs text-text-tertiary font-medium">{t("admin.resource", { defaultValue: "Resource" })}</th>
-                  <th className="text-left px-4 py-2 text-xs text-text-tertiary font-medium">{t("admin.time", { defaultValue: "Time" })}</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("admin.action", { defaultValue: "Action" })}</TableHead>
+                  <TableHead>{t("admin.user", { defaultValue: "User" })}</TableHead>
+                  <TableHead>{t("admin.resource", { defaultValue: "Resource" })}</TableHead>
+                  <TableHead>{t("admin.time", { defaultValue: "Time" })}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {logs.map((log: any) => (
-                  <tr key={log.id} className="border-b border-border last:border-0 hover:bg-surface-tertiary/50">
-                    <td className="px-4 py-2 text-text">{log.action}</td>
-                    <td className="px-4 py-2 text-text-secondary">{log.userId?.slice(0, 8)}...</td>
-                    <td className="px-4 py-2 text-text-secondary">{log.resourceType}</td>
-                    <td className="px-4 py-2 text-text-tertiary text-xs">
+                  <TableRow key={log.id}>
+                    <TableCell>{log.action}</TableCell>
+                    <TableCell className="text-text-secondary">{log.userId?.slice(0, 8)}...</TableCell>
+                    <TableCell className="text-text-secondary">{log.resourceType}</TableCell>
+                    <TableCell className="text-text-tertiary text-xs">
                       {log.createdAt && formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
                 {logs.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-text-tertiary">{t("admin.noAuditLogs", { defaultValue: "No audit logs yet" })}</td>
-                  </tr>
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-8 text-center text-text-tertiary">{t("admin.noAuditLogs", { defaultValue: "No audit logs yet" })}</TableCell>
+                  </TableRow>
                 )}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         )}
       </div>
@@ -298,7 +274,7 @@ function SecurityPoliciesForm({ policies, isLoading, onSave, isSaving, onSaveSuc
             <Key className="h-3.5 w-3.5 text-text-tertiary" aria-hidden="true" />
             <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider">{t("admin.mfa", { defaultValue: "Multi-Factor Authentication" })}</span>
           </div>
-          <ToggleSwitch
+          <Switch
             checked={mfaRequired}
             onChange={markDirty(setMfaRequired)}
             label={t("admin.requireMfa", { defaultValue: "Require MFA for all users" })}
@@ -329,19 +305,19 @@ function SecurityPoliciesForm({ policies, isLoading, onSave, isSaving, onSaveSuc
             <p className="text-xs text-text-tertiary mt-1">{t("admin.passwordLengthHint", { defaultValue: "Characters required (6-32)" })}</p>
           </div>
 
-          <ToggleSwitch
+          <Switch
             checked={passwordRequireUppercase}
             onChange={markDirty(setPasswordRequireUppercase)}
             label={t("admin.requireUppercase", { defaultValue: "Require uppercase letter" })}
             description={t("admin.requireUppercaseDescription", { defaultValue: "At least one uppercase letter (A-Z)" })}
           />
-          <ToggleSwitch
+          <Switch
             checked={passwordRequireNumbers}
             onChange={markDirty(setPasswordRequireNumbers)}
             label={t("admin.requireNumber", { defaultValue: "Require number" })}
             description={t("admin.requireNumberDescription", { defaultValue: "At least one numeric digit (0-9)" })}
           />
-          <ToggleSwitch
+          <Switch
             checked={passwordRequireSymbols}
             onChange={markDirty(setPasswordRequireSymbols)}
             label={t("admin.requireSymbol", { defaultValue: "Require special character" })}
@@ -349,7 +325,7 @@ function SecurityPoliciesForm({ policies, isLoading, onSave, isSaving, onSaveSuc
           />
 
           <div className="py-3">
-            <ToggleSwitch
+            <Switch
               checked={passwordExpiryEnabled}
               onChange={(v) => { setPasswordExpiryEnabled(v); setDirty(true); }}
               label={t("admin.passwordExpiration", { defaultValue: "Password expiration" })}
@@ -357,14 +333,14 @@ function SecurityPoliciesForm({ policies, isLoading, onSave, isSaving, onSaveSuc
             />
             {passwordExpiryEnabled && (
               <div className="ml-0 mt-2">
-                <label className="block text-xs text-text-secondary mb-1">{t("admin.expireAfterDays", { defaultValue: "Expire after (days)" })}</label>
-                <input
+                <Input
+                  label={t("admin.expireAfterDays", { defaultValue: "Expire after (days)" })}
                   type="number"
                   min={1}
                   max={365}
                   value={passwordExpiryDays}
                   onChange={(e) => { setPasswordExpiryDays(Number(e.target.value)); setDirty(true); }}
-                  className="w-24 h-8 px-2 text-sm bg-surface border border-border rounded-lg text-text"
+                  className="w-24"
                 />
               </div>
             )}
@@ -378,17 +354,17 @@ function SecurityPoliciesForm({ policies, isLoading, onSave, isSaving, onSaveSuc
             <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider">{t("admin.sessionManagement", { defaultValue: "Session Management" })}</span>
           </div>
           <div className="py-3">
-            <label className="block text-sm font-medium text-text mb-1.5">{t("admin.maxSessionDuration", { defaultValue: "Maximum session duration" })}</label>
             <div className="flex items-center gap-2">
-              <input
+              <Input
+                label={t("admin.maxSessionDuration", { defaultValue: "Maximum session duration" })}
                 type="number"
                 min={1}
                 max={720}
                 value={sessionMaxAge}
                 onChange={(e) => { setSessionMaxAge(Number(e.target.value)); setDirty(true); }}
-                className="w-24 h-8 px-2 text-sm bg-surface border border-border rounded-lg text-text"
+                className="w-24"
               />
-              <span className="text-sm text-text-secondary">{t("admin.hours", { defaultValue: "hours" })}</span>
+              <span className="text-sm text-text-secondary mt-5">{t("admin.hours", { defaultValue: "hours" })}</span>
             </div>
             <p className="text-xs text-text-tertiary mt-1">{t("admin.sessionDurationHint", { defaultValue: "Sessions will expire after this duration (1-720 hours)" })}</p>
           </div>

@@ -14,8 +14,6 @@ import {
   FileAudio,
   FileVideo,
   File,
-  ChevronLeft,
-  ChevronRight,
   FolderKanban,
   BookOpen,
   User,
@@ -29,6 +27,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
 import { toast } from "../../components/ui/Toast";
 import { CardSkeleton } from "../../components/ui/Skeleton";
+import { Pagination } from "../../components/ui/Pagination";
 
 export const Route = createFileRoute("/_auth/files")({
   component: FilesPage,
@@ -200,14 +199,14 @@ function FilesPage() {
 
         {/* Search + Filter */}
         <div className="flex items-center gap-3 mb-4">
-          <div className="relative flex-1">
+          <div className="relative flex-1 input-glow">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-tertiary" aria-hidden="true" />
             <input
               type="text"
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder={t("files.searchPlaceholder", { defaultValue: "Search files..." })}
-              className="w-full h-10 pl-10 pr-4 rounded-lg border border-border bg-surface text-sm text-text placeholder:text-text-tertiary field-glow"
+              className="w-full h-10 pl-10 pr-4 rounded-lg border border-border bg-surface text-sm text-text placeholder:text-text-tertiary"
               aria-label={t("files.searchPlaceholder", { defaultValue: "Search files..." })}
             />
           </div>
@@ -344,34 +343,15 @@ function FilesPage() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-4 text-sm text-text-secondary">
-                <span>
-                  {t("files.showing", {
-                    defaultValue: `Showing ${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, total)} of ${total}`,
-                    from: (page - 1) * pageSize + 1,
-                    to: Math.min(page * pageSize, total),
-                    total,
-                  })}
-                </span>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="p-1.5 rounded-lg hover:bg-surface-tertiary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    aria-label="Previous page"
-                  >
-                    <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="p-1.5 rounded-lg hover:bg-surface-tertiary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    aria-label="Next page"
-                  >
-                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </div>
-              </div>
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                showInfo
+                totalItems={total}
+                pageSize={pageSize}
+                className="mt-4"
+              />
             )}
           </>
         )}
