@@ -48,6 +48,7 @@ export const knowledgeDocuments = pgTable("knowledge_documents", {
   fileId: uuid("file_id"),
   sourceUrl: text("source_url"),
   title: text("title"),
+  content: text("content"),
   status: text("status").notNull().default("pending"),
   errorMessage: text("error_message"),
   tokenCount: integer("token_count"),

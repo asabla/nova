@@ -96,6 +96,7 @@ export const knowledgeService = {
     title: string;
     sourceUrl?: string;
     fileId?: string;
+    content?: string;
   }) {
     const [doc] = await db
       .insert(knowledgeDocuments)
@@ -105,6 +106,7 @@ export const knowledgeService = {
         title: data.title,
         sourceUrl: data.sourceUrl,
         fileId: data.fileId,
+        content: data.content,
         status: "pending",
       })
       .returning();

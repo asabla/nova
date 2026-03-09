@@ -32,7 +32,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
 import { toast } from "../../components/ui/Toast";
 import { Skeleton } from "../../components/ui/Skeleton";
-import { api } from "../../lib/api";
+import { api, getActiveOrgId } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 
 export const Route = createFileRoute("/_auth/knowledge/$id")({
@@ -144,6 +144,13 @@ function KnowledgeDetailPage() {
     queryFn: () => api.get<{ data: KnowledgeDocument[] }>(`/api/knowledge/${id}/documents`),
   });
 
+  const { data: embeddingModelsData } = useQuery({
+    queryKey: [...queryKeys.knowledge.all, "embedding-models"],
+    queryFn: () => api.get<{ data: { id: string; name: string }[] }>("/api/knowledge/models/embedding"),
+  });
+
+  const embeddingModels: { id: string; name: string }[] = (embeddingModelsData as any)?.data ?? [];
+
   const { data: activityData } = useQuery({
     queryKey: [...queryKeys.knowledge.detail(id), "activity"],
     queryFn: () => api.get<{ data: IndexingJob[] }>(`/api/knowledge/${id}/jobs`),
@@ -220,9 +227,13 @@ function KnowledgeDetailPage() {
       const formData = new FormData();
       Array.from(files).forEach((file) => formData.append("files", file));
       const url = `${import.meta.env.VITE_API_URL ?? ""}/api/knowledge/${id}/documents/upload`;
+      const headers: Record<string, string> = {};
+      const orgId = getActiveOrgId();
+      if (orgId) headers["x-org-id"] = orgId;
       const res = await fetch(url, {
         method: "POST",
         credentials: "include",
+        headers,
         body: formData,
       });
       if (!res.ok) {
@@ -802,11 +813,12 @@ function KnowledgeDetailPage() {
                     onChange={(e) => setForm({ ...form, embeddingModel: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm"
                   >
-                    <option value="lmstudio/text-embedding-nomic-embed-text-v1.5">nomic-embed-text-v1.5 (768d, local)</option>
-                    <option value="text-embedding-3-small">text-embedding-3-small (1536d, OpenAI)</option>
-                    <option value="text-embedding-3-large">text-embedding-3-large (3072d, OpenAI)</option>
-                    <option value="nomic-embed-text">nomic-embed-text (768d, open-source)</option>
-                    <option value="mxbai-embed-large">mxbai-embed-large (1024d, open-source)</option>
+                    {embeddingModels.length === 0 && (
+                      <option value={form.embeddingModel}>{form.embeddingModel}</option>
+                    )}
+                    {embeddingModels.map((m) => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
                   </select>
                   <p className="text-xs text-text-tertiary mt-1">
                     {t("knowledge.embeddingModelHint", { defaultValue: "Changing the model will require a full re-index of all documents." })}

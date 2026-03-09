@@ -186,6 +186,10 @@ services:
       TEMPORAL_ADDRESS: temporal:7233
       LITELLM_URL: http://litellm:4000
       SEARXNG_URL: http://searxng:8080
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_BUCKET: nova-files
     depends_on:
       postgres:
         condition: service_healthy

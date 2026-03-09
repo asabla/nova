@@ -4,8 +4,33 @@ import type { AppContext } from "../types/context";
 import { knowledgeService } from "../services/knowledge.service";
 import { writeAuditLog } from "../services/audit.service";
 import { parsePagination } from "@nova/shared/utils";
+import * as fileService from "../services/file.service";
+import { minio } from "../lib/minio";
+import { env } from "../lib/env";
+import { getTemporalClient } from "../lib/temporal";
+import { listModels } from "../lib/litellm";
 
 const knowledgeRoutes = new Hono<AppContext>();
+
+// List available embedding models from LiteLLM (must be before /:id to avoid conflict)
+knowledgeRoutes.get("/models/embedding", async (c) => {
+  try {
+    const result = await listModels() as { data?: { id: string }[] };
+    const allModels = result?.data ?? [];
+    const embeddingModels = allModels.filter((m: any) => {
+      const id = (m.id ?? m.model_name ?? "").toLowerCase();
+      return id.includes("embed");
+    });
+    return c.json({
+      data: embeddingModels.map((m: any) => ({
+        id: m.id ?? m.model_name,
+        name: m.id ?? m.model_name,
+      })),
+    });
+  } catch {
+    return c.json({ data: [] });
+  }
+});
 
 knowledgeRoutes.get("/", async (c) => {
   const orgId = c.get("orgId");
@@ -78,27 +103,104 @@ knowledgeRoutes.get("/:id/documents", async (c) => {
   return c.json({ data: docs });
 });
 
+async function triggerDocumentIngestion(doc: { id: string; fileId?: string | null; sourceUrl?: string | null }, orgId: string, collectionId: string) {
+  try {
+    const client = await getTemporalClient();
+    await client.workflow.start("documentIngestionWorkflow", {
+      taskQueue: "nova-main",
+      workflowId: `doc-ingest-${doc.id}`,
+      args: [{
+        orgId,
+        collectionId,
+        documentId: doc.id,
+        fileId: doc.fileId ?? undefined,
+        sourceUrl: doc.sourceUrl ?? undefined,
+      }],
+    });
+  } catch (err) {
+    console.error(`[knowledge] Failed to start ingestion workflow for doc ${doc.id}:`, err);
+  }
+}
+
 const addDocumentSchema = z.object({
   title: z.string().min(1).max(500),
   sourceUrl: z.string().url().optional(),
   fileId: z.string().uuid().optional(),
+  content: z.string().max(500_000).optional(),
 });
 
 knowledgeRoutes.post("/:id/documents", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
+  const collectionId = c.req.param("id");
   const body = addDocumentSchema.parse(await c.req.json());
-  const doc = await knowledgeService.addDocument(orgId, c.req.param("id"), body);
+  const doc = await knowledgeService.addDocument(orgId, collectionId, body);
   await writeAuditLog({
     orgId,
     actorId: userId,
     actorType: "user",
     action: "knowledge.collection.document_add",
     resourceType: "knowledge_collection",
-    resourceId: c.req.param("id"),
+    resourceId: collectionId,
     details: { documentId: doc.id, title: body.title },
   });
+  await triggerDocumentIngestion(doc, orgId, collectionId);
   return c.json(doc, 201);
+});
+
+// Upload files directly to a collection (multipart/form-data)
+knowledgeRoutes.post("/:id/documents/upload", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const collectionId = c.req.param("id");
+
+  // Verify collection exists
+  await knowledgeService.getCollection(orgId, collectionId);
+
+  const body = await c.req.parseBody({ all: true });
+  const rawFiles = body["files"];
+  const fileList = Array.isArray(rawFiles) ? rawFiles : rawFiles ? [rawFiles] : [];
+  const uploadedFiles = fileList.filter((f): f is File => f instanceof File);
+
+  if (uploadedFiles.length === 0) {
+    return c.json({ title: "No files provided" }, 400);
+  }
+
+  const docs = [];
+  for (const file of uploadedFiles) {
+    const contentType = file.type || "application/octet-stream";
+    const key = `${orgId}/${crypto.randomUUID()}/${file.name}`;
+
+    // Upload directly to MinIO via the client (avoids presigned URL localhost issues in Docker)
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await minio.putObject(env.MINIO_BUCKET, key, buffer, buffer.length, {
+      "Content-Type": contentType,
+    });
+
+    // Create file record in DB
+    const fileRecord = await fileService.createFileRecord(orgId, userId, file.name, contentType, file.size, key);
+
+    // Create knowledge document linked to the file
+    const doc = await knowledgeService.addDocument(orgId, collectionId, {
+      title: file.name,
+      fileId: fileRecord.id,
+    });
+
+    await writeAuditLog({
+      orgId,
+      actorId: userId,
+      actorType: "user",
+      action: "knowledge.collection.document_add",
+      resourceType: "knowledge_collection",
+      resourceId: collectionId,
+      details: { documentId: doc.id, title: file.name },
+    });
+
+    await triggerDocumentIngestion(doc, orgId, collectionId);
+    docs.push(doc);
+  }
+
+  return c.json({ data: docs }, 201);
 });
 
 knowledgeRoutes.delete("/:collectionId/documents/:docId", async (c) => {
@@ -131,8 +233,18 @@ knowledgeRoutes.delete("/documents/:docId", async (c) => {
 knowledgeRoutes.post("/:id/reindex", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
-  const collection = await knowledgeService.reindexCollection(orgId, c.req.param("id"));
-  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "knowledge.collection.reindex", resourceType: "knowledge_collection", resourceId: c.req.param("id") });
+  const collectionId = c.req.param("id");
+  const collection = await knowledgeService.reindexCollection(orgId, collectionId);
+
+  // Trigger ingestion workflows for all pending documents
+  const docs = await knowledgeService.listDocuments(orgId, collectionId);
+  for (const doc of docs) {
+    if (doc.status === "pending" && !doc.deletedAt) {
+      await triggerDocumentIngestion(doc, orgId, collectionId);
+    }
+  }
+
+  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "knowledge.collection.reindex", resourceType: "knowledge_collection", resourceId: collectionId });
   return c.json(collection);
 });
 

@@ -21,6 +21,19 @@ export async function presignUpload(orgId: string, userId: string, filename: str
   return { uploadUrl: url, fileId: result[0].id, key };
 }
 
+export async function createFileRecord(orgId: string, userId: string, filename: string, contentType: string, sizeBytes: number, storagePath: string) {
+  const result = await db.insert(files).values({
+    orgId,
+    userId,
+    filename,
+    contentType,
+    sizeBytes,
+    storagePath,
+    storageBucket: env.MINIO_BUCKET,
+  }).returning();
+  return result[0];
+}
+
 export async function confirmUpload(orgId: string, fileId: string) {
   const result = await db
     .select()
