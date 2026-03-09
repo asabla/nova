@@ -166,7 +166,7 @@ export function ConnectionStatus() {
             </div>
             <p className="text-[10px] text-text-tertiary pt-1">
               {t("connection.lastChecked", {
-                time: lastChecked.toLocaleTimeString(),
+                time: lastChecked.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }),
                 defaultValue: "Checked at {{time}}",
               })}
             </p>

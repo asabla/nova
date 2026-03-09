@@ -853,7 +853,7 @@ function ProgressFeed({
               </div>
               {step.timestamp && (
                 <span className="text-[10px] text-text-tertiary shrink-0">
-                  {new Date(step.timestamp).toLocaleTimeString()}
+                  {new Date(step.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}
                 </span>
               )}
             </div>

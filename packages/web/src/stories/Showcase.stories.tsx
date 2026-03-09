@@ -195,7 +195,7 @@ function ApplicationShowcaseComponent() {
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-sm font-semibold text-text">Sarah Chen</span>
-                <span className="text-[10px] text-text-tertiary">2:30 PM</span>
+                <span className="text-[10px] text-text-tertiary">14:30</span>
               </div>
               <p className="text-sm text-text leading-relaxed">
                 What are the best practices for indexing JSONB columns in PostgreSQL? I have a table with
@@ -213,7 +213,7 @@ function ApplicationShowcaseComponent() {
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-sm font-semibold text-text">NOVA</span>
                 <Badge variant="primary">GPT-4o</Badge>
-                <span className="text-[10px] text-text-tertiary">2:31 PM</span>
+                <span className="text-[10px] text-text-tertiary">14:31</span>
               </div>
 
               {/* Tool chips */}
@@ -270,7 +270,7 @@ USING GIN (data jsonb_path_ops);`}
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-sm font-semibold text-text">Sarah Chen</span>
-                <span className="text-[10px] text-text-tertiary">2:34 PM</span>
+                <span className="text-[10px] text-text-tertiary">14:34</span>
               </div>
               <p className="text-sm text-text leading-relaxed">
                 That's really helpful! Can you also show me how to benchmark these indexes to see which performs better for my specific query patterns?

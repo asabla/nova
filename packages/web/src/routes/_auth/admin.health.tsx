@@ -86,7 +86,7 @@ function AdminHealthPage() {
                 {t("admin.systemStatus", { defaultValue: "System is {{status}}", status: health.status === "ready" ? t("admin.healthy", { defaultValue: "healthy" }) : health.status })}
               </p>
               <p className="text-xs text-text-tertiary">
-                {t("admin.versionInfo", { defaultValue: "Version {{version}} | Last checked: {{time}}", version: health.version, time: new Date(health.timestamp).toLocaleTimeString() })}
+                {t("admin.versionInfo", { defaultValue: "Version {{version}} | Last checked: {{time}}", version: health.version, time: new Date(health.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) })}
               </p>
             </div>
           </div>

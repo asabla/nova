@@ -49,7 +49,7 @@ function ChatMessageThread() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-sm font-semibold text-text">Sarah Chen</span>
-            <span className="text-[10px] text-text-tertiary">2:34 PM</span>
+            <span className="text-[10px] text-text-tertiary">14:34</span>
           </div>
           <div className="text-sm text-text leading-relaxed">
             Can you help me write a PostgreSQL query that finds the top 10 most active users
@@ -67,7 +67,7 @@ function ChatMessageThread() {
           <div className="flex items-center gap-2 mb-1">
             <span className="text-sm font-semibold text-text">NOVA</span>
             <Badge variant="primary">GPT-4o</Badge>
-            <span className="text-[10px] text-text-tertiary">2:34 PM</span>
+            <span className="text-[10px] text-text-tertiary">14:34</span>
           </div>
 
           {/* Tool chips */}

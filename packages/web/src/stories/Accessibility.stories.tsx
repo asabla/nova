@@ -192,7 +192,7 @@ export const AllUtilities: Story = {
       return (
         <>
           <Announce message={message} />
-          <Button size="sm" variant="secondary" onClick={() => setMessage(`Update at ${new Date().toLocaleTimeString()}`)}>
+          <Button size="sm" variant="secondary" onClick={() => setMessage(`Update at ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}`)}>
             <Volume2 className="h-3 w-3" /> Trigger announcement
           </Button>
         </>

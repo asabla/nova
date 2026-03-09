@@ -183,7 +183,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
   const totalTokens = (message.tokenCountPrompt ?? 0) + (message.tokenCountCompletion ?? 0);
 
   const timestamp = new Date(message.createdAt);
-  const timeStr = timestamp.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const timeStr = timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 
   return (
     <div className={clsx(

@@ -18,7 +18,7 @@ export function StreamingMessage({ content }: StreamingMessageProps) {
         <div className="flex items-center gap-2 mb-1">
           <span className="text-sm font-semibold text-text">NOVA</span>
           <span className="text-[10px] text-text-tertiary">
-            {new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+            {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}
           </span>
         </div>
 

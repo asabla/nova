@@ -188,7 +188,7 @@ export function SystemStatusBanner() {
                 <>
                   <CheckCircle className="h-2.5 w-2.5" />
                   {t("systemStatus.lastChecked", {
-                    time: lastChecked.toLocaleTimeString(),
+                    time: lastChecked.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }),
                   })}
                 </>
               )}
