@@ -82,7 +82,7 @@ function NewKnowledgeCollectionPage() {
                   {t("knowledge.descriptionLabel", { defaultValue: "Description" })}
                 </label>
                 <textarea
-                  className="rounded-lg border border-border hover:border-border-strong bg-surface px-3 py-2 text-sm text-text placeholder:text-text-tertiary transition-colors focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary focus-visible:border-primary resize-none"
+                  className="rounded-lg border border-border hover:border-border-strong bg-surface px-3 py-2 text-sm text-text placeholder:text-text-tertiary transition-colors field-glow resize-none"
                   rows={3}
                   placeholder={t("knowledge.descriptionPlaceholder", { defaultValue: "Optional description of this collection" })}
                   value={description}

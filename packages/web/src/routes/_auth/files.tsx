@@ -207,7 +207,7 @@ function FilesPage() {
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder={t("files.searchPlaceholder", { defaultValue: "Search files..." })}
-              className="w-full h-10 pl-10 pr-4 rounded-lg border border-border bg-surface text-sm text-text placeholder:text-text-tertiary focus-visible:outline-2 focus-visible:outline-primary focus-visible:border-primary"
+              className="w-full h-10 pl-10 pr-4 rounded-lg border border-border bg-surface text-sm text-text placeholder:text-text-tertiary field-glow"
               aria-label={t("files.searchPlaceholder", { defaultValue: "Search files..." })}
             />
           </div>

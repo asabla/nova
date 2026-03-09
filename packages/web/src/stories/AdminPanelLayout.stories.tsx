@@ -153,7 +153,7 @@ export const MemberManagement: Story = {
                 placeholder="Search members..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full h-8 pl-9 pr-3 text-xs rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary focus:outline-2 focus:outline-primary"
+                className="w-full h-8 pl-9 pr-3 text-xs rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary field-glow"
               />
             </div>
 

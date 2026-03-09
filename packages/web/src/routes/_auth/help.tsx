@@ -430,7 +430,7 @@ function HelpPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("help.searchPlaceholder", "Search help articles, FAQ, shortcuts...")}
-            className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary focus:outline-2 focus:outline-offset-0 focus:outline-primary focus:border-primary transition-colors"
+            className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary field-glow transition-colors"
           />
         </div>
 

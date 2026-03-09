@@ -109,7 +109,7 @@ function AgentMarketplacePage() {
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               placeholder={t("marketplace.searchPlaceholder", "Search agents...")}
               aria-label={t("marketplace.searchLabel", "Search marketplace agents")}
-              className="w-full h-9 pl-9 pr-3 text-sm rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary focus:outline-2 focus:outline-primary"
+              className="w-full h-9 pl-9 pr-3 text-sm rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary field-glow"
             />
           </div>
           <div className="flex gap-1">

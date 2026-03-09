@@ -172,7 +172,7 @@ function TraceStepItem({
                     }
                   }}
                   placeholder="Type your response..."
-                  className="flex-1 h-8 px-3 text-xs rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary focus:outline-2 focus:outline-primary"
+                  className="flex-1 h-8 px-3 text-xs rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary field-glow"
                 />
                 <button
                   onClick={() => {

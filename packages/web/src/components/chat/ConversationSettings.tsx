@@ -160,7 +160,7 @@ export function ConversationSettings({ conversationId, conversation, open, onClo
             onChange={(e) => setSystemPrompt(e.target.value)}
             rows={5}
             placeholder={t("settings.systemPromptPlaceholder", { defaultValue: "You are a helpful assistant..." })}
-            className="w-full px-3 py-2 text-sm bg-surface-secondary border border-border rounded-lg text-text placeholder:text-text-tertiary focus:outline-primary resize-none"
+            className="w-full px-3 py-2 text-sm bg-surface-secondary border border-border rounded-lg text-text placeholder:text-text-tertiary field-glow resize-none"
           />
         </div>
 

@@ -310,7 +310,7 @@ function NewResearchForm({
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t("research.queryPlaceholder", "What would you like to research in depth?")}
           rows={3}
-          className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary text-sm resize-none focus:outline-2 focus:outline-primary focus:border-primary transition-colors"
+          className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary text-sm resize-none field-glow transition-colors"
         />
         {query.length > 0 && query.trim().length < 3 && (
           <p className="text-xs text-danger mt-1">{t("research.queryMinLength", "Query must be at least 3 characters")}</p>
@@ -342,7 +342,7 @@ function NewResearchForm({
                 max={50}
                 value={maxSources}
                 onChange={(e) => setMaxSources(Number(e.target.value))}
-                className="w-full px-2 py-1.5 rounded-lg border border-border bg-surface text-text text-xs focus:outline-2 focus:outline-primary focus:border-primary"
+                className="w-full px-2 py-1.5 rounded-lg border border-border bg-surface text-text text-xs field-glow"
               />
             </div>
             <div className="flex-1">
@@ -356,7 +356,7 @@ function NewResearchForm({
                 max={10}
                 value={maxIterations}
                 onChange={(e) => setMaxIterations(Number(e.target.value))}
-                className="w-full px-2 py-1.5 rounded-lg border border-border bg-surface text-text text-xs focus:outline-2 focus:outline-primary focus:border-primary"
+                className="w-full px-2 py-1.5 rounded-lg border border-border bg-surface text-text text-xs field-glow"
               />
             </div>
           </div>

@@ -227,7 +227,7 @@ function MyToolsTab() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={t("tools.searchPlaceholder", "Search your tools...")}
-          className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary focus:outline-primary"
+          className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary field-glow"
         />
       </div>
 
@@ -395,7 +395,7 @@ function MarketplaceTab() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t("tools.marketplace.searchPlaceholder", "Search marketplace...")}
-            className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary focus:outline-primary"
+            className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary field-glow"
           />
         </div>
         <div className="flex items-center gap-1">
@@ -688,7 +688,7 @@ function CustomToolsTab() {
                 value={specUrl}
                 onChange={(e) => setSpecUrl(e.target.value)}
                 placeholder="https://api.example.com/openapi.json"
-                className="flex-1 h-10 px-3 rounded-lg border border-border bg-surface text-sm text-text placeholder:text-text-tertiary focus:outline-primary"
+                className="flex-1 h-10 px-3 rounded-lg border border-border bg-surface text-sm text-text placeholder:text-text-tertiary field-glow"
               />
               <Button
                 type="button"
@@ -712,7 +712,7 @@ function CustomToolsTab() {
             onBlur={() => specText.trim() && tryParseSpec(specText)}
             rows={10}
             placeholder='{\n  "openapi": "3.0.0",\n  "info": { "title": "My Tool", "version": "1.0" },\n  "paths": { ... }\n}'
-            className="w-full p-3 text-sm bg-surface border border-border rounded-lg text-text font-mono resize-y placeholder:text-text-tertiary focus:outline-primary"
+            className="w-full p-3 text-sm bg-surface border border-border rounded-lg text-text font-mono resize-y placeholder:text-text-tertiary field-glow"
           />
 
           {/* Parse status */}

@@ -142,7 +142,7 @@ export const Default: Story = {
               placeholder="Filter components..."
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="w-full h-8 pl-9 pr-3 text-xs rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary focus:outline-2 focus:outline-primary"
+              className="w-full h-8 pl-9 pr-3 text-xs rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary field-glow"
             />
           </div>
           <select

@@ -280,7 +280,7 @@ function BrandingPage() {
               onChange={(e) => updateField("customCss", e.target.value)}
               placeholder={`:root {\n  --color-primary: #6366f1;\n  --color-primary-dark: #4f46e5;\n}`}
               rows={8}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm font-mono text-text placeholder:text-text-tertiary focus:outline-2 focus:outline-offset-0 focus:outline-primary focus:border-primary resize-y"
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm font-mono text-text placeholder:text-text-tertiary field-glow resize-y"
               aria-label={t("admin.customCssTextarea", { defaultValue: "Custom CSS rules" })}
             />
           </div>

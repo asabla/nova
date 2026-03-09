@@ -238,7 +238,7 @@ function McpPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t("mcp.searchPlaceholder", "Search servers by name or URL...")}
-            className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary focus:outline-primary"
+            className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary field-glow"
           />
         </div>
 
@@ -778,7 +778,7 @@ function RegisterServerDialog({
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Optional description of this server and its capabilities..."
             rows={2}
-            className="p-3 text-sm bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary resize-y focus:outline-primary"
+            className="p-3 text-sm bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary resize-y field-glow"
           />
         </div>
 
@@ -792,7 +792,7 @@ function RegisterServerDialog({
             onChange={(e) =>
               setAuthType(e.target.value as "none" | "bearer" | "api_key")
             }
-            className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text focus:outline-primary"
+            className="w-full h-9 px-3 text-sm bg-surface border border-border rounded-lg text-text field-glow"
           >
             <option value="none">None</option>
             <option value="bearer">Bearer Token</option>
@@ -815,7 +815,7 @@ function RegisterServerDialog({
                     ? "eyJhbGciOiJIUzI1NiIs..."
                     : "sk-..."
                 }
-                className="w-full h-9 px-3 pr-20 text-sm bg-surface border border-border rounded-lg text-text font-mono placeholder:text-text-tertiary focus:outline-primary"
+                className="w-full h-9 px-3 pr-20 text-sm bg-surface border border-border rounded-lg text-text font-mono placeholder:text-text-tertiary field-glow"
               />
               <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                 <button

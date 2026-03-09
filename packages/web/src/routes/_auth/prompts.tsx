@@ -138,14 +138,14 @@ function PromptsPage() {
               placeholder={t("prompts.searchPlaceholder", "Search templates...")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-10 pl-10 pr-4 text-sm rounded-xl bg-surface-secondary border border-border text-text placeholder:text-text-tertiary focus:outline-primary"
+              className="w-full h-10 pl-10 pr-4 text-sm rounded-xl bg-surface-secondary border border-border text-text placeholder:text-text-tertiary field-glow"
             />
           </div>
           {categories.length > 0 && (
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="h-10 px-3 text-sm rounded-xl bg-surface-secondary border border-border text-text focus:outline-primary"
+              className="h-10 px-3 text-sm rounded-xl bg-surface-secondary border border-border text-text field-glow"
             >
               <option value="">{t("prompts.allCategories", "All categories")}</option>
               {categories.map((cat) => (
@@ -594,7 +594,7 @@ function PromptDetailDialog({
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     placeholder={t("prompts.addTagPlaceholder", "Add tag...")}
-                    className="h-6 w-24 px-2 text-xs rounded-md border border-border bg-surface text-text placeholder:text-text-tertiary focus:outline-primary"
+                    className="h-6 w-24 px-2 text-xs rounded-md border border-border bg-surface text-text placeholder:text-text-tertiary field-glow"
                     autoFocus
                   />
                 </form>
@@ -758,7 +758,7 @@ function CreateVersionForm({
             rows={5}
             required
             placeholder={t("prompts.versionContentPlaceholder", "Updated template content...")}
-            className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary focus:outline-primary resize-none font-mono"
+            className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary field-glow resize-none font-mono"
           />
         </div>
         <div>
@@ -770,7 +770,7 @@ function CreateVersionForm({
             onChange={(e) => setSystemPrompt(e.target.value)}
             rows={2}
             placeholder={t("prompts.systemPromptPlaceholder", "System prompt for this version...")}
-            className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary focus:outline-primary resize-none font-mono"
+            className="w-full px-3 py-2 text-xs bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary field-glow resize-none font-mono"
           />
         </div>
         <Input
@@ -899,7 +899,7 @@ function CreatePromptDialog({ open, onClose }: { open: boolean; onClose: () => v
                 }
               }}
               placeholder={t("prompts.form.tagPlaceholder", "Type and press Enter...")}
-              className="flex-1 h-8 px-3 text-sm rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary focus:outline-primary"
+              className="flex-1 h-8 px-3 text-sm rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary field-glow"
             />
             <Button type="button" variant="secondary" size="sm" onClick={addTag}>
               {t("prompts.form.addTag", "Add")}
@@ -937,7 +937,7 @@ function CreatePromptDialog({ open, onClose }: { open: boolean; onClose: () => v
             rows={6}
             required
             placeholder={t("prompts.form.contentPlaceholder", "Use {{variable}} for template variables...")}
-            className="w-full px-3 py-2 text-sm bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary focus:outline-primary resize-none font-mono"
+            className="w-full px-3 py-2 text-sm bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary field-glow resize-none font-mono"
           />
         </div>
 
@@ -951,7 +951,7 @@ function CreatePromptDialog({ open, onClose }: { open: boolean; onClose: () => v
             onChange={(e) => setSystemPrompt(e.target.value)}
             rows={3}
             placeholder={t("prompts.form.systemPromptPlaceholder", "System-level instructions...")}
-            className="w-full px-3 py-2 text-sm bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary focus:outline-primary resize-none font-mono"
+            className="w-full px-3 py-2 text-sm bg-surface border border-border rounded-lg text-text placeholder:text-text-tertiary field-glow resize-none font-mono"
           />
         </div>
 

@@ -206,7 +206,7 @@ export const Default: Story = {
           placeholder="Filter icons..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="w-full max-w-sm h-9 px-3 mb-6 text-sm rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary focus:outline-2 focus:outline-primary"
+          className="w-full max-w-sm h-9 px-3 mb-6 text-sm rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary field-glow"
         />
 
         <div className="space-y-8">

@@ -226,7 +226,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
                 }
                 if (e.key === "Escape") handleEditCancel();
               }}
-              className="w-full min-h-[80px] p-3 rounded-xl bg-surface border border-border text-sm text-text resize-y focus:outline-primary"
+              className="w-full min-h-[80px] p-3 rounded-xl bg-surface border border-border text-sm text-text resize-y field-glow"
             />
             <div className="flex items-center gap-2 mt-2">
               <button

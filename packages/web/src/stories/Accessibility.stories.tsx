@@ -107,7 +107,7 @@ export const FocusTrapDemo: Story = {
                     Press Escape to close.
                   </p>
                   <input
-                    className="w-full h-9 rounded-lg border border-border bg-surface px-3 text-sm text-text placeholder:text-text-tertiary focus-visible:outline-2 focus-visible:outline-primary"
+                    className="w-full h-9 rounded-lg border border-border bg-surface px-3 text-sm text-text placeholder:text-text-tertiary field-glow"
                     placeholder="Try tabbing..."
                   />
                   <div className="flex gap-2 justify-end">
