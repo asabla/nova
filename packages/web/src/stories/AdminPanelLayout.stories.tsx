@@ -86,7 +86,7 @@ function AdminNav({ activeTab, onTabChange }: { activeTab: string; onTabChange: 
                   key={tab.label}
                   onClick={() => onTabChange(tab.label)}
                   className={clsx(
-                    "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors",
+                    "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
                     activeTab === tab.label
                       ? "bg-primary/10 text-primary font-medium"
                       : "text-text-secondary hover:bg-surface-tertiary hover:text-text",

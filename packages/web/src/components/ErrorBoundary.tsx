@@ -16,7 +16,7 @@ interface State {
 function ErrorBoundaryFallback({ error }: { error?: Error }) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-col items-center justify-center min-h-[400px] px-4 text-center" role="alert">
+    <div className="flex flex-col items-center justify-center min-h-[400px] px-4 text-center border border-border rounded-xl bg-surface" role="alert">
       <AlertTriangle className="h-12 w-12 text-danger mb-4" aria-hidden="true" />
       <h2 className="text-lg font-semibold text-text mb-2">
         {t("errors.somethingWentWrong", "Something went wrong")}

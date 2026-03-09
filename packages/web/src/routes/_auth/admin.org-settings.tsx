@@ -98,18 +98,21 @@ function OrgSettingsPage() {
         </div>
       ) : (
         <>
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-text">{t("admin.organizationInfo", { defaultValue: "Organization Info" })}</h3>
+          <section className="rounded-xl border border-border bg-surface-secondary p-5 space-y-4">
+            <h3 className="text-sm font-semibold text-text">{t("admin.organizationInfo", { defaultValue: "Organization Info" })}</h3>
             <Input label={t("admin.organizationName", { defaultValue: "Organization Name" })} value={name} onChange={(e) => setName(e.target.value)} />
-            <Input label={t("admin.slug", { defaultValue: "Slug" })} value={slug} onChange={(e) => setSlug(e.target.value)} />
-          </div>
+            <div>
+              <Input label={t("admin.slug", { defaultValue: "Slug" })} value={slug} onChange={(e) => setSlug(e.target.value)} />
+              <p className="text-[10px] text-text-tertiary mt-1">{t("admin.slugHint", { defaultValue: "Used in URLs — changing this may break existing links" })}</p>
+            </div>
+          </section>
 
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-text">{t("admin.defaults", { defaultValue: "Defaults" })}</h3>
+          <section className="rounded-xl border border-border bg-surface-secondary p-5 space-y-4">
+            <h3 className="text-sm font-semibold text-text">{t("admin.defaults", { defaultValue: "Defaults" })}</h3>
             <Input label={t("admin.defaultModel", { defaultValue: "Default Model" })} value={defaultModel} onChange={(e) => setDefaultModel(e.target.value)} />
             <Input label={t("admin.maxTokensPerMessage", { defaultValue: "Max Tokens per Message" })} type="number" value={maxTokens} onChange={(e) => setMaxTokens(e.target.value)} />
             <Input label={t("admin.maxFileSize", { defaultValue: "Max File Size (MB)" })} type="number" value={maxFileSize} onChange={(e) => setMaxFileSize(e.target.value)} />
-          </div>
+          </section>
 
           <div className="flex items-center gap-3">
             <Button variant="primary" onClick={handleSave} loading={saving}>
