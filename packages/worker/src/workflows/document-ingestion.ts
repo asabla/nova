@@ -1,14 +1,11 @@
-import { proxyActivities, sleep } from "@temporalio/workflow";
+import { proxyActivities } from "@temporalio/workflow";
 import type * as activities from "../activities";
 
 const {
-  fetchDocumentContent,
-  chunkDocument,
-  generateEmbeddings,
-  storeChunks,
+  ingestDocument,
   updateDocumentStatus,
 } = proxyActivities<typeof activities>({
-  startToCloseTimeout: "5 minutes",
+  startToCloseTimeout: "10 minutes",
   retry: { maximumAttempts: 3 },
 });
 
@@ -24,10 +21,9 @@ export async function documentIngestionWorkflow(input: DocumentIngestionInput): 
   await updateDocumentStatus(input.documentId, "processing");
 
   try {
-    const content = await fetchDocumentContent(input);
-    const chunks = await chunkDocument(input.documentId, content);
-    const embeddings = await generateEmbeddings(chunks);
-    await storeChunks(input.documentId, input.collectionId, embeddings);
+    // Single activity handles fetch → chunk → embed → store
+    // This avoids passing large data through Temporal's 4MB gRPC limit
+    await ingestDocument(input);
     await updateDocumentStatus(input.documentId, "ready");
   } catch (err) {
     await updateDocumentStatus(input.documentId, "failed");
