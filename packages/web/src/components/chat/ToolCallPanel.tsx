@@ -40,10 +40,10 @@ interface ToolCallPanelProps {
 const statusConfig = {
   pending: { icon: Clock, color: "text-warning", bg: "bg-warning/10", label: "Pending approval" },
   approved: { icon: Check, color: "text-success", bg: "bg-success/10", label: "Approved" },
-  rejected: { icon: X, color: "text-error", bg: "bg-error/10", label: "Rejected" },
+  rejected: { icon: X, color: "text-danger", bg: "bg-danger/10", label: "Rejected" },
   running: { icon: Play, color: "text-primary", bg: "bg-primary/10", label: "Running" },
   completed: { icon: Check, color: "text-success", bg: "bg-success/10", label: "Completed" },
-  failed: { icon: AlertTriangle, color: "text-error", bg: "bg-error/10", label: "Failed" },
+  failed: { icon: AlertTriangle, color: "text-danger", bg: "bg-danger/10", label: "Failed" },
 };
 
 export function ToolCallPanel({
@@ -92,7 +92,7 @@ export function ToolCallPanel({
               <span className="text-[10px] text-success">{completedCount} completed</span>
             )}
             {failedCount > 0 && (
-              <span className="text-[10px] text-error">{failedCount} failed</span>
+              <span className="text-[10px] text-danger">{failedCount} failed</span>
             )}
             {pendingCount > 0 && (
               <span className="text-[10px] text-warning">{pendingCount} pending</span>
@@ -172,9 +172,9 @@ export function ToolCallPanel({
 
                     {/* Error */}
                     {tc.error && (
-                      <div className="flex items-start gap-2 p-2 rounded-lg bg-error/5 border border-error/20">
-                        <AlertTriangle className="h-3.5 w-3.5 text-error mt-0.5 shrink-0" />
-                        <p className="text-xs text-error">{tc.error}</p>
+                      <div className="flex items-start gap-2 p-2 rounded-lg bg-danger/5 border border-danger/20">
+                        <AlertTriangle className="h-3.5 w-3.5 text-danger mt-0.5 shrink-0" />
+                        <p className="text-xs text-danger">{tc.error}</p>
                       </div>
                     )}
 
@@ -193,7 +193,7 @@ export function ToolCallPanel({
                           {onReject && (
                             <button
                               onClick={() => onReject(tc.id)}
-                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-error/10 text-error text-xs font-medium hover:bg-error/20 transition-colors"
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-danger/10 text-danger text-xs font-medium hover:bg-danger/20 transition-colors"
                             >
                               <X className="h-3 w-3" /> Reject
                             </button>

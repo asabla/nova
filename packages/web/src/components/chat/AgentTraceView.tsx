@@ -50,7 +50,7 @@ const stepTypeConfig = {
   tool_call: { icon: Wrench, color: "text-primary", label: "Tool Call" },
   tool_result: { icon: Check, color: "text-success", label: "Tool Result" },
   sub_agent: { icon: GitBranch, color: "text-warning", label: "Sub-Agent" },
-  user_input: { icon: MessageSquare, color: "text-info", label: "User Input" },
+  user_input: { icon: MessageSquare, color: "text-primary", label: "User Input" },
   output: { icon: Zap, color: "text-success", label: "Output" },
 };
 
@@ -58,7 +58,7 @@ const statusColors = {
   pending: "border-border",
   running: "border-primary animate-pulse",
   completed: "border-success/50",
-  failed: "border-error/50",
+  failed: "border-danger/50",
   waiting_input: "border-warning animate-pulse",
 };
 
@@ -112,7 +112,7 @@ function TraceStepItem({
             </span>
           )}
           {step.status === "failed" && (
-            <span className="flex items-center gap-1 text-[10px] text-error">
+            <span className="flex items-center gap-1 text-[10px] text-danger">
               <AlertTriangle className="h-3 w-3" /> Failed
             </span>
           )}
@@ -143,14 +143,14 @@ function TraceStepItem({
             )}
 
             {step.error && (
-              <div className="flex items-start gap-2 p-2 rounded-lg bg-error/5 border border-error/20">
-                <AlertTriangle className="h-3.5 w-3.5 text-error mt-0.5 shrink-0" />
+              <div className="flex items-start gap-2 p-2 rounded-lg bg-danger/5 border border-danger/20">
+                <AlertTriangle className="h-3.5 w-3.5 text-danger mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-error">{step.error}</p>
+                  <p className="text-xs text-danger">{step.error}</p>
                   {onRetry && (
                     <button
                       onClick={() => onRetry(step.id)}
-                      className="mt-2 flex items-center gap-1 px-3 py-1 rounded-lg bg-error/10 text-error text-xs font-medium hover:bg-error/20 transition-colors"
+                      className="mt-2 flex items-center gap-1 px-3 py-1 rounded-lg bg-danger/10 text-danger text-xs font-medium hover:bg-danger/20 transition-colors"
                     >
                       <RotateCcw className="h-3 w-3" /> Retry this step
                     </button>
@@ -268,7 +268,7 @@ export function AgentTraceView({
         {isRunning && onStop && (
           <button
             onClick={onStop}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-error/10 text-error text-xs font-medium hover:bg-error/20 transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-danger/10 text-danger text-xs font-medium hover:bg-danger/20 transition-colors"
           >
             <X className="h-3 w-3" /> Stop
           </button>
