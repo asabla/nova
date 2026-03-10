@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useNavigate, useMatchRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -6,7 +6,7 @@ import { clsx } from "clsx";
 import {
   Archive, Pin, Trash2, ChevronLeft, BookOpen,
   FolderKanban, Settings, ShieldCheck,
-  Microscope, Compass, HelpCircle, Filter,
+  Microscope, Compass, HelpCircle, Filter, Search,
   CheckSquare, Square, FolderOpen, MessageSquare, Zap, HardDrive, Plus,
 } from "lucide-react";
 import { isToday, isYesterday, isThisWeek } from "date-fns";
@@ -33,6 +33,10 @@ export function Sidebar() {
   const [bulkMode, setBulkMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const matchRoute = useMatchRoute();
+  const activeMatch = matchRoute({ to: "/conversations/$id", fuzzy: false });
+  const activeConversationId = activeMatch ? (activeMatch as { id: string }).id : null;
 
   const { data: conversationsData, isLoading: loadingConversations } = useQuery({
     queryKey: queryKeys.conversations.list({ isArchived: false }),
@@ -79,6 +83,7 @@ export function Sidebar() {
 
   const filteredConversations = conversations.filter((c: any) => {
     if (filterWorkspace && c.workspaceId !== filterWorkspace) return false;
+    if (searchQuery && !(c.title ?? "").toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
 
@@ -165,6 +170,20 @@ export function Sidebar() {
 
         <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mx-4" />
 
+        {/* Search */}
+        <div className="px-3 pt-3 pb-1">
+          <div className="relative input-glow rounded-lg">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary" />
+            <input
+              type="text"
+              placeholder={t("conversations.search", { defaultValue: "Search conversations..." })}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-8 pl-8 pr-3 text-xs rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary"
+            />
+          </div>
+        </div>
+
         {/* Conversation controls */}
         <div className="px-3 pt-3 flex gap-1.5">
           <button
@@ -232,7 +251,7 @@ export function Sidebar() {
         )}
 
         {/* Conversation List — date-grouped matching ConversationList story */}
-        <nav aria-label={t("nav.conversations", { defaultValue: "Conversations" })} className="flex-1 overflow-y-auto px-2 py-2">
+        <nav aria-label={t("nav.conversations", { defaultValue: "Conversations" })} className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
           {loadingConversations ? (
             <ConversationListSkeleton />
           ) : filteredConversations.length === 0 ? (
@@ -250,35 +269,38 @@ export function Sidebar() {
             </div>
           ) : (
             groupedConversations.map((group) => (
-              <div key={group.label} className="mb-1">
-                <p className="px-3 pt-2.5 pb-1 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+              <Fragment key={group.label}>
+                <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
                   {group.label}
                 </p>
-                <div className="space-y-0.5">
-                  {group.conversations.map((conv: any) => (
-                    <button
-                      key={conv.id}
-                      onClick={() => {
-                        if (bulkMode) {
-                          toggleSelect(conv.id);
-                        } else {
-                          navigate({ to: `/conversations/${conv.id}` });
-                        }
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm text-text-secondary hover:bg-surface-tertiary hover:text-text transition-colors group"
-                    >
-                      {bulkMode && (
-                        selected.has(conv.id)
-                          ? <CheckSquare className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden="true" />
-                          : <Square className="h-3.5 w-3.5 text-text-tertiary shrink-0" aria-hidden="true" />
-                      )}
-                      {!bulkMode && conv.isPinned && <Pin className="h-3 w-3 text-primary shrink-0" aria-hidden="true" />}
-                      <span className="truncate flex-1">{conv.title ?? t("conversations.untitled", { defaultValue: "Untitled" })}</span>
-                      {conv.workspaceId && <FolderOpen className="h-3 w-3 text-text-tertiary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                {group.conversations.map((conv: any) => (
+                  <button
+                    key={conv.id}
+                    onClick={() => {
+                      if (bulkMode) {
+                        toggleSelect(conv.id);
+                      } else {
+                        navigate({ to: `/conversations/${conv.id}` });
+                      }
+                    }}
+                    className={clsx(
+                      "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm transition-colors group",
+                      !bulkMode && activeConversationId === conv.id
+                        ? "bg-primary/10 text-primary"
+                        : "text-text-secondary hover:bg-surface-tertiary hover:text-text",
+                    )}
+                  >
+                    {bulkMode && (
+                      selected.has(conv.id)
+                        ? <CheckSquare className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden="true" />
+                        : <Square className="h-3.5 w-3.5 text-text-tertiary shrink-0" aria-hidden="true" />
+                    )}
+                    {!bulkMode && conv.isPinned && <Pin className="h-3 w-3 text-primary shrink-0" aria-hidden="true" />}
+                    <span className="truncate flex-1">{conv.title ?? t("conversations.untitled", { defaultValue: "Untitled" })}</span>
+                    {conv.workspaceId && <FolderOpen className="h-3 w-3 text-text-tertiary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" />}
+                  </button>
+                ))}
+              </Fragment>
             ))
           )}
         </nav>
