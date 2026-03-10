@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "../lib/db";
-import { LITELLM_URL, litellmHeaders } from "../lib/litellm";
+import { openai } from "../lib/litellm";
 import { getDefaultChatModel } from "../lib/models";
 import { researchReports } from "@nova/shared/schemas";
 
@@ -89,10 +89,8 @@ export async function fetchPageContent(url: string): Promise<string> {
 export async function analyzeSource(query: string, content: string): Promise<{ summary: string; relevance: number }> {
   const model = process.env.RESEARCH_MODEL ?? await getDefaultChatModel();
 
-  const resp = await fetch(`${LITELLM_URL}/v1/chat/completions`, {
-    method: "POST",
-    headers: litellmHeaders(),
-    body: JSON.stringify({
+  try {
+    const result = await openai.chat.completions.create({
       model,
       messages: [
         { role: "system", content: "Analyze this source for relevance to the research query. Return a JSON with 'summary' (200 words max) and 'relevance' (0-100 score)." },
@@ -100,13 +98,10 @@ export async function analyzeSource(query: string, content: string): Promise<{ s
       ],
       max_tokens: 500,
       temperature: 0.3,
-    }),
-  });
+    });
 
-  try {
-    const data = await resp.json();
-    const result = JSON.parse(data.choices?.[0]?.message?.content ?? "{}");
-    return { summary: result.summary ?? "", relevance: result.relevance ?? 50 };
+    const parsed = JSON.parse(result.choices?.[0]?.message?.content ?? "{}");
+    return { summary: parsed.summary ?? "", relevance: parsed.relevance ?? 50 };
   } catch {
     return { summary: content.slice(0, 500), relevance: 50 };
   }
@@ -121,22 +116,17 @@ export async function generateResearchReport(
 
   const sourceSummaries = sources.map((s, i) => `[${i + 1}] ${s.title}\n${s.content}`).join("\n\n");
 
-  const resp = await fetch(`${LITELLM_URL}/v1/chat/completions`, {
-    method: "POST",
-    headers: litellmHeaders(),
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: "Generate a comprehensive research report in standard markdown format. Use ## headings for sections (Executive Summary, Key Findings, Detailed Analysis, Conclusion, References). Use paragraphs, bullet points, and numbered lists for content — do NOT use markdown tables. Use [n] format for inline citations that reference the numbered sources." },
-        { role: "user", content: `Research query: ${query}\n\nSources:\n${sourceSummaries}` },
-      ],
-      max_tokens: 4096,
-      temperature: 0.5,
-    }),
+  const result = await openai.chat.completions.create({
+    model,
+    messages: [
+      { role: "system", content: "Generate a comprehensive research report in standard markdown format. Use ## headings for sections (Executive Summary, Key Findings, Detailed Analysis, Conclusion, References). Use paragraphs, bullet points, and numbered lists for content — do NOT use markdown tables. Use [n] format for inline citations that reference the numbered sources." },
+      { role: "user", content: `Research query: ${query}\n\nSources:\n${sourceSummaries}` },
+    ],
+    max_tokens: 4096,
+    temperature: 0.5,
   });
 
-  const data = await resp.json();
-  const report = data.choices?.[0]?.message?.content ?? "Report generation failed.";
+  const report = result.choices?.[0]?.message?.content ?? "Report generation failed.";
 
   await db.update(researchReports).set({
     reportContent: report,

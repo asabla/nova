@@ -15,8 +15,8 @@ const knowledgeRoutes = new Hono<AppContext>();
 // List available embedding models from LiteLLM (must be before /:id to avoid conflict)
 knowledgeRoutes.get("/models/embedding", async (c) => {
   try {
-    const result = await listModels() as { data?: { id: string }[] };
-    const allModels = result?.data ?? [];
+    const modelsPage = await listModels();
+    const allModels = modelsPage?.data ?? [];
     const embeddingModels = allModels.filter((m: any) => {
       const id = (m.id ?? m.model_name ?? "").toLowerCase();
       return id.includes("embed");

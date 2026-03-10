@@ -3,7 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { streamSSE } from "hono/streaming";
 import type { AppContext } from "../types/context";
-import { chatCompletion } from "../lib/litellm";
+import { streamChatCompletion } from "../lib/litellm";
 import { DEFAULTS } from "@nova/shared/constants";
 
 const modelCompareRoutes = new Hono<AppContext>();
@@ -33,54 +33,26 @@ modelCompareRoutes.post("/", zValidator("json", compareSchema), async (c) => {
         let completionTokens = 0;
 
         try {
-          const response = await chatCompletion({
+          const llmStream = await streamChatCompletion({
             model: modelId,
             messages: [{ role: "user", content: body.prompt }],
-            stream: true,
             temperature: body.temperature,
             max_tokens: body.maxTokens,
           });
 
-          if (!response.ok) {
-            await stream.writeSSE({
-              event: "error",
-              data: JSON.stringify({
-                modelId,
-                message: `Model API error: ${response.status}`,
-              }),
-            });
-            return;
-          }
-
-          const reader = response.body!.getReader();
-          const decoder = new TextDecoder();
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value, { stream: true });
-            for (const line of chunk.split("\n")) {
-              if (line.startsWith("data: ") && line !== "data: [DONE]") {
-                try {
-                  const data = JSON.parse(line.slice(6));
-                  const token = data.choices?.[0]?.delta?.content;
-                  if (token) {
-                    fullContent += token;
-                    await stream.writeSSE({
-                      event: "token",
-                      data: JSON.stringify({ modelId, content: token }),
-                    });
-                  }
-                  // Capture usage if present (some providers send it in the last chunk)
-                  if (data.usage) {
-                    promptTokens = data.usage.prompt_tokens ?? 0;
-                    completionTokens = data.usage.completion_tokens ?? 0;
-                  }
-                } catch {
-                  // Skip malformed JSON lines
-                }
-              }
+          for await (const chunk of llmStream) {
+            const token = chunk.choices?.[0]?.delta?.content;
+            if (token) {
+              fullContent += token;
+              await stream.writeSSE({
+                event: "token",
+                data: JSON.stringify({ modelId, content: token }),
+              });
+            }
+            // Capture usage if present (arrives in the final chunk)
+            if (chunk.usage) {
+              promptTokens = chunk.usage.prompt_tokens ?? 0;
+              completionTokens = chunk.usage.completion_tokens ?? 0;
             }
           }
 

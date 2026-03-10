@@ -306,7 +306,6 @@ urlPreviewRoutes.post(
           { role: "system", content: "You are a concise content summarizer. Provide structured summaries with key takeaways." },
           { role: "user", content: prompt },
         ],
-        stream: false,
         max_tokens: 1000,
       });
 

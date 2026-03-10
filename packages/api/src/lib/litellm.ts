@@ -1,10 +1,19 @@
+import OpenAI from "openai";
+import type { ChatCompletionCreateParamsNonStreaming, ChatCompletionCreateParamsStreaming } from "openai/resources/chat/completions";
 import { env } from "./env";
 import { traceGeneration, getHeliconeHeaders } from "./observability";
+
+export const openai = new OpenAI({
+  baseURL: env.LITELLM_API_URL,
+  apiKey: env.LITELLM_MASTER_KEY,
+  defaultHeaders: getHeliconeHeaders(),
+  timeout: 120_000,
+  maxRetries: 0, // We handle fallbacks ourselves
+});
 
 interface ChatCompletionRequest {
   model: string;
   messages: Array<{ role: string; content: string | null | undefined }>;
-  stream?: boolean;
   temperature?: number;
   top_p?: number;
   max_tokens?: number;
@@ -16,10 +25,10 @@ interface ChatCompletionRequest {
 }
 
 /**
- * Call LiteLLM chat/completions endpoint.
+ * Call LiteLLM chat/completions endpoint (non-streaming).
  * Supports automatic fallback to alternative models (Story #88, #200).
  */
-export async function chatCompletion(request: ChatCompletionRequest): Promise<any> {
+export async function chatCompletion(request: ChatCompletionRequest): Promise<OpenAI.Chat.ChatCompletion> {
   const { fallbackModels, ...req } = request;
   const modelsToTry = [req.model, ...(fallbackModels ?? [])];
 
@@ -29,154 +38,114 @@ export async function chatCompletion(request: ChatCompletionRequest): Promise<an
   for (const model of modelsToTry) {
     const startTime = new Date().toISOString();
     try {
-      const response = await fetch(`${env.LITELLM_API_URL}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${env.LITELLM_MASTER_KEY}`,
-          ...getHeliconeHeaders(),
-        },
-        body: JSON.stringify({ ...req, model }),
-        signal: AbortSignal.timeout(120_000),
-      });
+      const result = await openai.chat.completions.create({
+        ...req,
+        model,
+        stream: false,
+      } as ChatCompletionCreateParamsNonStreaming);
 
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => "Unknown error");
-        // If this is a model-specific error and we have fallbacks, try the next model
-        if (response.status >= 500 && modelsToTry.indexOf(model) < modelsToTry.length - 1) {
-          lastError = new Error(`Model ${model} failed (${response.status}): ${errorText}`);
-          continue;
-        }
-        // For streaming, still return the response even on error so caller handles it
-        if (req.stream) return response;
-        throw new Error(`LLM API error (${response.status}): ${errorText}`);
-      }
-
-      // For streaming requests, return the raw Response
-      if (req.stream) return response;
-
-      const data = await response.json();
       // Tag the response with the model that actually served it
       if (model !== req.model) {
-        data._fallbackModel = model;
-        data._originalModel = req.model;
+        (result as any)._fallbackModel = model;
+        (result as any)._originalModel = req.model;
       }
+
       // Record trace for observability (Story #160)
       traceGeneration({
         traceId,
         model,
         input: req.messages,
-        output: data.choices?.[0]?.message,
+        output: result.choices?.[0]?.message,
         usage: {
-          promptTokens: data.usage?.prompt_tokens,
-          completionTokens: data.usage?.completion_tokens,
-          totalTokens: data.usage?.total_tokens,
+          promptTokens: result.usage?.prompt_tokens,
+          completionTokens: result.usage?.completion_tokens,
+          totalTokens: result.usage?.total_tokens,
         },
         startTime,
         endTime: new Date().toISOString(),
       });
-      return data;
+
+      return result;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      // If we have more models to try, continue
-      if (modelsToTry.indexOf(model) < modelsToTry.length - 1) continue;
-      throw lastError;
+      // If this is a server error and we have fallbacks, try the next model
+      if (
+        err instanceof OpenAI.APIError &&
+        err.status !== undefined &&
+        err.status >= 500 &&
+        modelsToTry.indexOf(model) < modelsToTry.length - 1
+      ) {
+        continue;
+      }
+      // For non-server errors or last model, throw immediately
+      if (modelsToTry.indexOf(model) >= modelsToTry.length - 1) {
+        throw lastError;
+      }
+      continue;
     }
   }
 
   throw lastError ?? new Error("No models available");
 }
 
-export async function streamChatCompletion(c: any, request: ChatCompletionRequest) {
+/**
+ * Call LiteLLM chat/completions with streaming.
+ * Returns an async iterable Stream<ChatCompletionChunk>.
+ * Always requests usage in the final chunk via stream_options.
+ * Supports automatic fallback to alternative models.
+ */
+export async function streamChatCompletion(
+  request: ChatCompletionRequest,
+): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk> & { toReadableStream(): ReadableStream }> {
   const { fallbackModels, ...req } = request;
+  const modelsToTry = [req.model, ...(fallbackModels ?? [])];
 
-  const response = await fetch(`${env.LITELLM_API_URL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${env.LITELLM_MASTER_KEY}`,
-    },
-    body: JSON.stringify({ ...req, stream: true }),
-    signal: AbortSignal.timeout(120_000),
-  });
+  let lastError: Error | null = null;
 
-  if (!response.ok || !response.body) {
-    // Try fallback models for streaming
-    if (fallbackModels && fallbackModels.length > 0) {
-      for (const fallbackModel of fallbackModels) {
-        try {
-          const fbResp = await fetch(`${env.LITELLM_API_URL}/chat/completions`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${env.LITELLM_MASTER_KEY}`,
-            },
-            body: JSON.stringify({ ...req, model: fallbackModel, stream: true }),
-            signal: AbortSignal.timeout(120_000),
-          });
+  for (const model of modelsToTry) {
+    try {
+      const stream = await openai.chat.completions.create({
+        ...req,
+        model,
+        stream: true,
+        stream_options: { include_usage: true },
+      } as ChatCompletionCreateParamsStreaming);
 
-          if (fbResp.ok && fbResp.body) {
-            c.header("Content-Type", "text/event-stream");
-            c.header("Cache-Control", "no-cache");
-            c.header("Connection", "keep-alive");
-            c.header("X-Fallback-Model", fallbackModel);
-            return new Response(fbResp.body, {
-              headers: {
-                "Content-Type": "text/event-stream",
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "X-Fallback-Model": fallbackModel,
-              },
-            });
-          }
-        } catch {
-          continue;
-        }
+      return stream as any;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (
+        err instanceof OpenAI.APIError &&
+        err.status !== undefined &&
+        err.status >= 500 &&
+        modelsToTry.indexOf(model) < modelsToTry.length - 1
+      ) {
+        continue;
       }
+      if (modelsToTry.indexOf(model) >= modelsToTry.length - 1) {
+        throw lastError;
+      }
+      continue;
     }
-
-    return c.json({ error: "LLM request failed" }, 502);
   }
 
-  c.header("Content-Type", "text/event-stream");
-  c.header("Cache-Control", "no-cache");
-  c.header("Connection", "keep-alive");
-
-  return new Response(response.body, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
-    },
-  });
+  throw lastError ?? new Error("No models available");
 }
 
-export async function listModels(): Promise<unknown> {
-  const response = await fetch(`${env.LITELLM_API_URL}/models`, {
-    headers: {
-      Authorization: `Bearer ${env.LITELLM_MASTER_KEY}`,
-    },
-    signal: AbortSignal.timeout(10_000),
-  });
-  return response.json();
+export async function listModels(): Promise<OpenAI.Models.ModelsPage> {
+  return openai.models.list();
 }
 
-export async function generateEmbedding(text: string, model = env.EMBEDDING_MODEL ?? "lmstudio/text-embedding-nomic-embed-text-v1.5"): Promise<number[] | null> {
+export async function generateEmbedding(
+  text: string,
+  model = env.EMBEDDING_MODEL ?? "lmstudio/text-embedding-nomic-embed-text-v1.5",
+): Promise<number[] | null> {
   try {
-    const response = await fetch(`${env.LITELLM_API_URL}/embeddings`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${env.LITELLM_MASTER_KEY}`,
-      },
-      body: JSON.stringify({ model, input: [text] }),
-      signal: AbortSignal.timeout(30_000),
+    const result = await openai.embeddings.create({
+      model,
+      input: [text],
     });
-
-    if (!response.ok) return null;
-
-    const data = await response.json() as { data: { embedding: number[] }[] };
-    return data.data?.[0]?.embedding ?? null;
+    return result.data?.[0]?.embedding ?? null;
   } catch {
     return null;
   }

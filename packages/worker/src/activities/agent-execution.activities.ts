@@ -1,6 +1,6 @@
 import { eq, and, isNull } from "drizzle-orm";
 import { db } from "../lib/db";
-import { LITELLM_URL, litellmHeaders } from "../lib/litellm";
+import { openai } from "../lib/litellm";
 import { getDefaultChatModel } from "../lib/models";
 import { agents, agentMemoryEntries, conversations, messages } from "@nova/shared/schemas";
 
@@ -80,7 +80,7 @@ export async function executeAgentStep(
     ...messageHistory,
   ];
 
-  const body: Record<string, unknown> = {
+  const params: Record<string, unknown> = {
     model,
     messages: msgs,
     temperature: (agentConfig.modelParams as any)?.temperature ?? 0.7,
@@ -88,30 +88,20 @@ export async function executeAgentStep(
   };
 
   if (tools.length > 0) {
-    body.tools = tools.map((t) => ({
+    params.tools = tools.map((t) => ({
       type: "function",
       function: { name: t.name, description: t.description, parameters: t.parameters },
     }));
   }
 
-  const resp = await fetch(`${LITELLM_URL}/v1/chat/completions`, {
-    method: "POST",
-    headers: litellmHeaders(),
-    body: JSON.stringify(body),
-  });
-
-  if (!resp.ok) {
-    throw new Error(`LLM API error: ${resp.status} ${await resp.text()}`);
-  }
-
-  const data = await resp.json();
+  const data = await openai.chat.completions.create(params as any);
   const choice = data.choices?.[0];
 
   return {
     content: choice?.message?.content ?? "",
-    toolCalls: choice?.message?.tool_calls ?? [],
+    toolCalls: (choice?.message?.tool_calls ?? []) as any[],
     finishReason: choice?.finish_reason ?? "stop",
-    usage: data.usage ?? {},
+    usage: data.usage as { prompt_tokens?: number; completion_tokens?: number } ?? {},
   };
 }
 

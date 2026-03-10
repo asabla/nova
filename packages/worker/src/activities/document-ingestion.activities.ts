@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "../lib/db";
-import { LITELLM_URL, litellmHeaders } from "../lib/litellm";
+import { openai } from "../lib/litellm";
 import { getDefaultEmbeddingModel } from "../lib/models";
 import { knowledgeDocuments, knowledgeChunks } from "@nova/shared/schemas";
 import { files } from "@nova/shared/schema";
@@ -84,20 +84,12 @@ async function embedChunks(
     const texts = batch.map((c) => c.text);
 
     try {
-      const resp = await fetch(`${LITELLM_URL}/v1/embeddings`, {
-        method: "POST",
-        headers: litellmHeaders(),
-        body: JSON.stringify({ model: embeddingModel, input: texts }),
+      const response = await openai.embeddings.create({
+        model: embeddingModel,
+        input: texts,
       });
 
-      if (!resp.ok) {
-        console.warn(`[EMBED] LiteLLM returned ${resp.status}, skipping batch`);
-        results.push(...batch.map((c) => ({ ...c, embedding: null })));
-        continue;
-      }
-
-      const data = await resp.json() as { data: { embedding: number[]; index: number }[] };
-      for (const item of data.data) {
+      for (const item of response.data) {
         results.push({ ...batch[item.index], embedding: item.embedding });
       }
     } catch (err) {
@@ -139,7 +131,7 @@ async function persistChunks(
 
 /**
  * Single activity that does the entire ingestion pipeline:
- * fetch content → chunk → embed → store.
+ * fetch content -> chunk -> embed -> store.
  * This avoids passing large data through Temporal's 4MB gRPC message limit.
  * Returns only a small summary.
  */

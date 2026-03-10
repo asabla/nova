@@ -50,12 +50,9 @@ webhookRoutes.post("/agents/:webhookId", async (c) => {
     const result = await chatCompletion({
       model: agent.modelId ?? "default",
       messages,
-      stream: false,
       temperature: modelParams.temperature as number | undefined,
       max_tokens: modelParams.maxTokens as number | undefined,
     });
-
-    const data = result as any;
 
     await writeAuditLog({
       orgId: agent.orgId,
@@ -69,9 +66,9 @@ webhookRoutes.post("/agents/:webhookId", async (c) => {
     return c.json({
       agent_id: agent.id,
       agent_name: agent.name,
-      content: data.choices?.[0]?.message?.content ?? "",
-      model: data.model,
-      usage: data.usage,
+      content: result.choices?.[0]?.message?.content ?? "",
+      model: result.model,
+      usage: result.usage,
     });
   } catch (err: any) {
     return c.json({ error: err.message ?? "Agent execution failed" }, 500);
@@ -113,10 +110,7 @@ webhookRoutes.post("/email/inbound", async (c) => {
     const result = await chatCompletion({
       model: agent.modelId ?? "default",
       messages,
-      stream: false,
     });
-
-    const data = result as any;
 
     await writeAuditLog({
       orgId: agent.orgId,
@@ -131,7 +125,7 @@ webhookRoutes.post("/email/inbound", async (c) => {
     return c.json({
       status: "processed",
       agent_id: agent.id,
-      response: data.choices?.[0]?.message?.content ?? "",
+      response: result.choices?.[0]?.message?.content ?? "",
     });
   } catch (err: any) {
     return c.json({ error: err.message ?? "Email processing failed" }, 500);

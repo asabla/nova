@@ -5,7 +5,7 @@ import { streamSSE } from "hono/streaming";
 import type { AppContext } from "../types/context";
 import * as messageService from "../services/message.service";
 import * as conversationService from "../services/conversation.service";
-import { chatCompletion } from "../lib/litellm";
+import { streamChatCompletion, chatCompletion } from "../lib/litellm";
 import { AppError } from "@nova/shared/utils";
 import { DEFAULTS } from "@nova/shared/constants";
 import { notificationService } from "../services/notification.service";
@@ -330,7 +330,6 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
       const completionParams: Record<string, unknown> = {
         model: resolvedModel,
         messages: enrichedMessages,
-        stream: true,
         temperature: body.temperature,
         top_p: body.topP,
         max_tokens: body.maxTokens,
@@ -340,69 +339,45 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         completionParams.tools = DEFAULT_TOOLS;
       }
 
-      const response = await chatCompletion(completionParams as any);
+      const llmStream = await streamChatCompletion(completionParams as any);
 
-      if (!response.ok) {
-        const errBody = await response.text().catch(() => "Unknown error");
-        await stream.writeSSE({
-          event: "error",
-          data: JSON.stringify({ message: "Model API error", code: `${response.status}`, detail: errBody }),
-        });
-        return;
-      }
-
-      const reader = response.body!.getReader();
-      const decoder = new TextDecoder();
       let fullContent = "";
       let usageData: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null = null;
       let toolCalls: { id: string; function: { name: string; arguments: string } }[] = [];
       let finishReason = "stop";
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      for await (const chunk of llmStream) {
+        const delta = chunk.choices?.[0]?.delta;
+        const choiceFinish = chunk.choices?.[0]?.finish_reason;
 
-        const chunk = decoder.decode(value, { stream: true });
-        for (const line of chunk.split("\n")) {
-          if (line.startsWith("data: ") && line !== "data: [DONE]") {
-            try {
-              const data = JSON.parse(line.slice(6));
-              const delta = data.choices?.[0]?.delta;
-              const choiceFinish = data.choices?.[0]?.finish_reason;
+        const token = delta?.content;
+        if (token) {
+          fullContent += token;
+          await stream.writeSSE({
+            event: "token",
+            data: JSON.stringify({ content: token }),
+          });
+        }
 
-              const token = delta?.content;
-              if (token) {
-                fullContent += token;
-                await stream.writeSSE({
-                  event: "token",
-                  data: JSON.stringify({ content: token }),
-                });
-              }
-
-              // Accumulate tool calls from streaming deltas
-              if (delta?.tool_calls) {
-                for (const tc of delta.tool_calls) {
-                  const idx = tc.index ?? 0;
-                  if (!toolCalls[idx]) {
-                    toolCalls[idx] = { id: tc.id ?? "", function: { name: "", arguments: "" } };
-                  }
-                  if (tc.id) toolCalls[idx].id = tc.id;
-                  if (tc.function?.name) toolCalls[idx].function.name += tc.function.name;
-                  if (tc.function?.arguments) toolCalls[idx].function.arguments += tc.function.arguments;
-                }
-              }
-
-              if (choiceFinish) {
-                finishReason = choiceFinish;
-              }
-
-              if (data.usage) {
-                usageData = data.usage;
-              }
-            } catch {
-              // Skip malformed JSON lines
+        // Accumulate tool calls from streaming deltas
+        if (delta?.tool_calls) {
+          for (const tc of delta.tool_calls) {
+            const idx = tc.index ?? 0;
+            if (!toolCalls[idx]) {
+              toolCalls[idx] = { id: tc.id ?? "", function: { name: "", arguments: "" } };
             }
+            if (tc.id) toolCalls[idx].id = tc.id;
+            if (tc.function?.name) toolCalls[idx].function.name += tc.function.name;
+            if (tc.function?.arguments) toolCalls[idx].function.arguments += tc.function.arguments;
           }
+        }
+
+        if (choiceFinish) {
+          finishReason = choiceFinish;
+        }
+
+        if (chunk.usage) {
+          usageData = chunk.usage;
         }
       }
 

@@ -1,6 +1,6 @@
 import { eq, asc } from "drizzle-orm";
 import { db } from "../lib/db";
-import { LITELLM_URL, litellmHeaders } from "../lib/litellm";
+import { openai } from "../lib/litellm";
 import { getDefaultChatModel } from "../lib/models";
 import { messages, conversations } from "@nova/shared/schemas";
 
@@ -21,22 +21,17 @@ export async function getConversationMessages(conversationId: string): Promise<{
 export async function generateSummary(msgs: { role: string; content: string }[]): Promise<string> {
   const model = process.env.SUMMARY_MODEL ?? await getDefaultChatModel();
 
-  const resp = await fetch(`${LITELLM_URL}/v1/chat/completions`, {
-    method: "POST",
-    headers: litellmHeaders(),
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: "Generate a short (5-8 word) title for this conversation. Respond with only the title." },
-        ...msgs.slice(0, 4),
-      ],
-      max_tokens: 30,
-      temperature: 0.3,
-    }),
+  const result = await openai.chat.completions.create({
+    model,
+    messages: [
+      { role: "system", content: "Generate a short (5-8 word) title for this conversation. Respond with only the title." },
+      ...msgs.slice(0, 4),
+    ] as any,
+    max_tokens: 30,
+    temperature: 0.3,
   });
 
-  const data = await resp.json();
-  return data.choices?.[0]?.message?.content?.trim() ?? "Untitled Conversation";
+  return result.choices?.[0]?.message?.content?.trim() ?? "Untitled Conversation";
 }
 
 export async function updateConversationTitle(conversationId: string, title: string): Promise<void> {

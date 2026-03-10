@@ -29,26 +29,20 @@ batchRoutes.post("/", zValidator("json", batchRequestSchema), async (c) => {
 
   const results = await Promise.allSettled(
     requests.map(async (req) => {
-      const response = await chatCompletion({
+      const result = await chatCompletion({
         model: req.model,
         messages: req.messages,
-        stream: false,
         temperature: req.temperature,
         max_tokens: req.maxTokens,
       });
 
-      if (!response.ok) {
-        throw new Error(`Model API error: ${response.status}`);
-      }
-
-      const data = await response.json() as any;
       return {
         id: req.id,
         status: "success" as const,
         result: {
-          content: data.choices?.[0]?.message?.content ?? "",
-          model: data.model,
-          usage: data.usage,
+          content: result.choices?.[0]?.message?.content ?? "",
+          model: result.model,
+          usage: result.usage,
         },
       };
     }),

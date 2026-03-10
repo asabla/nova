@@ -1,11 +1,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { streamSSE } from "hono/streaming";
 import type { AppContext } from "../types/context";
-import { chatCompletion, streamChatCompletion } from "../lib/litellm";
+import { chatCompletion, streamChatCompletion, openai } from "../lib/litellm";
 import { writeAuditLog } from "../services/audit.service";
-import { env } from "../lib/env";
-import { DEFAULTS } from "@nova/shared/constants";
 
 const v1ChatRoutes = new Hono<AppContext>();
 
@@ -66,7 +63,7 @@ v1ChatRoutes.post("/completions", async (c) => {
   });
 
   if (body.stream) {
-    return streamChatCompletion(c, {
+    const stream = await streamChatCompletion({
       model: body.model,
       messages: body.messages as Array<{ role: string; content: string }>,
       temperature: body.temperature,
@@ -76,6 +73,14 @@ v1ChatRoutes.post("/completions", async (c) => {
       tool_choice: body.tool_choice,
       response_format: body.response_format,
       stop: body.stop,
+    });
+
+    return new Response(stream.toReadableStream(), {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
     });
   }
 
@@ -105,25 +110,20 @@ v1ChatRoutes.post("/../embeddings", async (c) => {
   const body = embeddingSchema.parse(await c.req.json());
   const inputs = Array.isArray(body.input) ? body.input : [body.input];
 
-  const resp = await fetch(`${env.LITELLM_API_URL}/v1/embeddings`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: body.model,
-      input: inputs,
-      encoding_format: body.encoding_format,
-    }),
+  const result = await openai.embeddings.create({
+    model: body.model,
+    input: inputs,
+    encoding_format: body.encoding_format,
   });
 
-  const result = await resp.json();
   return c.json(result);
 });
 
 // List available models (OpenAI-compatible)
 v1ChatRoutes.get("/../models", async (c) => {
   const { listModels } = await import("../lib/litellm");
-  const result = await listModels() as any;
-  const modelList = Array.isArray(result?.data) ? result.data : Array.isArray(result) ? result : [];
+  const modelsPage = await listModels();
+  const modelList = modelsPage?.data ?? [];
   return c.json({
     object: "list",
     data: modelList.map((m: any) => ({
@@ -182,19 +182,26 @@ v1ChatRoutes.post("/../agents/run", async (c) => {
   const modelParams = (agent.modelParams as Record<string, unknown>) ?? {};
 
   if (body.stream) {
-    return streamChatCompletion(c, {
+    const stream = await streamChatCompletion({
       model: agent.modelId ?? "default",
       messages,
       temperature: modelParams.temperature as number | undefined,
       max_tokens: modelParams.maxTokens as number | undefined,
       top_p: modelParams.topP as number | undefined,
     });
+
+    return new Response(stream.toReadableStream(), {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+      },
+    });
   }
 
   const result = await chatCompletion({
     model: agent.modelId ?? "default",
     messages,
-    stream: false,
     temperature: modelParams.temperature as number | undefined,
     max_tokens: modelParams.maxTokens as number | undefined,
     top_p: modelParams.topP as number | undefined,

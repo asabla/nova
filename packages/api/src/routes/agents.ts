@@ -193,17 +193,15 @@ agentRoutes.post("/:id/test", async (c) => {
   messages.push({ role: "user" as const, content: prompt });
 
   try {
-    const response = await chatCompletion({
+    const result = await chatCompletion({
       model: agent.modelId ?? "default",
       messages,
-      stream: false,
       ...(agent.modelParams as Record<string, unknown> ?? {}),
     });
-    const data = await response.json() as any;
     return c.json({
-      content: data.choices?.[0]?.message?.content ?? "",
-      model: data.model,
-      usage: data.usage,
+      content: result.choices?.[0]?.message?.content ?? "",
+      model: result.model,
+      usage: result.usage,
     });
   } catch (err: any) {
     return c.json({ error: err.message ?? "Test failed" }, 500);
