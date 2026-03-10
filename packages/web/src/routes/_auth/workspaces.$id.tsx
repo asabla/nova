@@ -277,6 +277,17 @@ function ConversationsTab({ workspaceId }: { workspaceId: string }) {
 
 function FilesTab({ knowledgeCollectionId }: { knowledgeCollectionId: string | null }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+
+  const reindexMutation = useMutation({
+    mutationFn: () => api.post(`/api/knowledge/${knowledgeCollectionId}/reindex`),
+    onSuccess: () => {
+      toast.success(t("knowledge.reindexStarted", { defaultValue: "Re-indexing started" }));
+      queryClient.invalidateQueries({ queryKey: ["knowledge", knowledgeCollectionId, "documents"] });
+    },
+    onError: (err: any) => toast.error(err.message ?? t("knowledge.reindexFailed", { defaultValue: "Re-index failed" })),
+  });
+
   if (!knowledgeCollectionId) {
     return (
       <div className="text-center py-12">
@@ -287,7 +298,22 @@ function FilesTab({ knowledgeCollectionId }: { knowledgeCollectionId: string | n
       </div>
     );
   }
-  return <DocumentsPanel collectionId={knowledgeCollectionId} />;
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => reindexMutation.mutate()}
+          disabled={reindexMutation.isPending}
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${reindexMutation.isPending ? "animate-spin" : ""}`} aria-hidden="true" />
+          {reindexMutation.isPending ? t("knowledge.reindexing", { defaultValue: "Re-indexing..." }) : t("knowledge.reindex", { defaultValue: "Re-index" })}
+        </Button>
+      </div>
+      <DocumentsPanel collectionId={knowledgeCollectionId} />
+    </div>
+  );
 }
 
 /* -------------------------------------------------------------------------- */
