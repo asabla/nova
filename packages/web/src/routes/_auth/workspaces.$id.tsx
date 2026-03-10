@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
@@ -9,7 +9,6 @@ import {
   Settings2,
   Activity,
   Plus,
-  Upload,
   UserPlus,
   Archive,
   Trash2,
@@ -30,6 +29,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
 import { toast } from "../../components/ui/Toast";
 import { Skeleton } from "../../components/ui/Skeleton";
+import { DocumentsPanel } from "../../components/knowledge/DocumentsPanel";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 
@@ -145,7 +145,7 @@ function WorkspaceDetailPage() {
       {/* Tab Content */}
       <div className="flex-1 overflow-auto p-6">
         {activeTab === "conversations" && <ConversationsTab workspaceId={id} />}
-        {activeTab === "files" && <FilesTab workspaceId={id} />}
+        {activeTab === "files" && <FilesTab knowledgeCollectionId={workspace?.knowledgeCollectionId} />}
         {activeTab === "members" && <MembersTab workspaceId={id} />}
         {activeTab === "settings" && <SettingsTab workspaceId={id} workspace={workspace} />}
         {activeTab === "activity" && <ActivityTab workspaceId={id} />}
@@ -275,179 +275,19 @@ function ConversationsTab({ workspaceId }: { workspaceId: string }) {
 /*  Files Tab                                                                  */
 /* -------------------------------------------------------------------------- */
 
-function FilesTab({ workspaceId }: { workspaceId: string }) {
+function FilesTab({ knowledgeCollectionId }: { knowledgeCollectionId: string | null }) {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [deleteFileTarget, setDeleteFileTarget] = useState<any>(null);
-
-  const { data: filesData, isLoading, isError, refetch } = useQuery({
-    queryKey: queryKeys.workspaces.files(workspaceId),
-    queryFn: () => api.get<any>(`/api/workspaces/${workspaceId}/files`),
-  });
-
-  const files = (filesData as any)?.data ?? filesData;
-
-  const uploadMutation = useMutation({
-    mutationFn: async (fileList: FileList) => {
-      const results = [];
-      for (const file of Array.from(fileList)) {
-        const { uploadUrl, fileId } = await api.post<any>(`/api/workspaces/${workspaceId}/files`, {
-          filename: file.name,
-          contentType: file.type || "application/octet-stream",
-          sizeBytes: file.size,
-        });
-        await fetch(uploadUrl, {
-          method: "PUT",
-          body: file,
-          headers: { "Content-Type": file.type || "application/octet-stream" },
-        });
-        results.push({ fileId });
-      }
-      return results;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.files(workspaceId) });
-      toast.success(t("workspaces.filesUploaded", { defaultValue: "Files uploaded" }));
-    },
-    onError: (err: any) => toast.error(err.message ?? t("workspaces.uploadFailed", { defaultValue: "Upload failed" })),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (fileId: string) =>
-      api.delete(`/api/workspaces/${workspaceId}/files/${fileId}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.files(workspaceId) });
-      toast.success(t("workspaces.fileDeleted", { defaultValue: "File deleted" }));
-      setDeleteFileTarget(null);
-    },
-    onError: (err: any) => toast.error(err.message ?? t("workspaces.fileDeleteFailed", { defaultValue: "Delete failed" })),
-  });
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      uploadMutation.mutate(e.target.files);
-      e.target.value = "";
-    }
-  };
-
-  function formatFileSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-
-  if (isError) {
+  if (!knowledgeCollectionId) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <p className="text-sm text-danger mb-4">{t("workspaces.filesLoadError", { defaultValue: "Failed to load files." })}</p>
-        <Button variant="secondary" onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4" aria-hidden="true" />
-          {t("common.retry", { defaultValue: "Retry" })}
-        </Button>
+      <div className="text-center py-12">
+        <FileText className="h-12 w-12 text-text-tertiary mx-auto mb-3" />
+        <p className="text-sm text-text-secondary">
+          {t("workspaces.noCollection", { defaultValue: "Knowledge collection not available." })}
+        </p>
       </div>
     );
   }
-
-  return (
-    <div className="max-w-3xl space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-text-secondary">
-          {(files ?? []).length} {(files ?? []).length === 1 ? t("workspaces.file", { defaultValue: "file" }) : t("workspaces.files", { defaultValue: "files" })}
-        </h3>
-        <div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            className="hidden"
-            onChange={handleFileChange}
-          />
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-            loading={uploadMutation.isPending}
-          >
-            <Upload className="h-3.5 w-3.5" aria-hidden="true" /> {t("workspaces.uploadFiles", { defaultValue: "Upload Files" })}
-          </Button>
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-14 rounded-lg bg-surface-secondary animate-pulse" />
-          ))}
-        </div>
-      ) : (files ?? []).length === 0 ? (
-        <div className="text-center py-12">
-          <FileText className="h-12 w-12 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
-          <h3 className="text-lg font-medium text-text mb-1">{t("workspaces.noFiles", { defaultValue: "No files uploaded" })}</h3>
-          <p className="text-sm text-text-secondary mb-4">
-            {t("workspaces.noFilesDesc", { defaultValue: "Upload files to share with workspace members and conversations." })}
-          </p>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload className="h-3.5 w-3.5" aria-hidden="true" /> {t("workspaces.uploadFiles", { defaultValue: "Upload Files" })}
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {(files ?? []).map((file: any) => (
-            <div
-              key={file.id}
-              className="flex items-center gap-3 p-3 rounded-lg border border-border bg-surface"
-            >
-              <FileText className="h-5 w-5 text-text-tertiary shrink-0" aria-hidden="true" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-text truncate">{file.filename}</p>
-                <p className="text-xs text-text-tertiary">
-                  {file.sizeBytes != null && formatFileSize(file.sizeBytes)}
-                  {file.createdAt && (
-                    <> &middot; {new Date(file.createdAt).toLocaleDateString()}</>
-                  )}
-                  {(file.uploaderName || file.uploaderEmail) && <> &middot; {file.uploaderName ?? file.uploaderEmail}</>}
-                </p>
-              </div>
-              <button
-                onClick={() => setDeleteFileTarget(file)}
-                className="p-1.5 rounded hover:bg-surface-secondary text-text-tertiary hover:text-danger transition-colors"
-                aria-label={t("workspaces.deleteFile", { defaultValue: "Delete file" })}
-              >
-                <Trash2 className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Delete File Dialog */}
-      <Dialog open={!!deleteFileTarget} onClose={() => setDeleteFileTarget(null)} title={t("workspaces.deleteFileTitle", { defaultValue: "Delete File" })}>
-        <p className="text-sm text-text-secondary mb-4">
-          {t("workspaces.deleteFileConfirm", { defaultValue: "Are you sure you want to delete this file? This action cannot be undone." })}
-        </p>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => setDeleteFileTarget(null)}>
-            {t("common.cancel", { defaultValue: "Cancel" })}
-          </Button>
-          <Button
-            variant="danger"
-            onClick={() => {
-              if (deleteFileTarget) deleteMutation.mutate(deleteFileTarget.id);
-            }}
-            disabled={deleteMutation.isPending}
-          >
-            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-            {deleteMutation.isPending ? t("common.deleting", { defaultValue: "Deleting..." }) : t("common.delete", { defaultValue: "Delete" })}
-          </Button>
-        </div>
-      </Dialog>
-    </div>
-  );
+  return <DocumentsPanel collectionId={knowledgeCollectionId} />;
 }
 
 /* -------------------------------------------------------------------------- */

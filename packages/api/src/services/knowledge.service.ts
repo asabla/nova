@@ -1,12 +1,16 @@
-import { eq, and, desc, isNull, ilike, sql } from "drizzle-orm";
+import { eq, and, desc, isNull, ilike, ne, sql } from "drizzle-orm";
 import { db } from "../lib/db";
 import { knowledgeCollections, knowledgeDocuments, knowledgeChunks } from "@nova/shared/schemas";
 import { auditLogs } from "@nova/shared/schema";
 import { AppError } from "@nova/shared/utils";
+import { getTemporalClient } from "../lib/temporal";
 
 export const knowledgeService = {
   async listCollections(orgId: string, opts?: { search?: string; limit?: number; offset?: number }) {
-    const conditions = [eq(knowledgeCollections.orgId, orgId)];
+    const conditions = [
+      eq(knowledgeCollections.orgId, orgId),
+      ne(knowledgeCollections.source, "workspace"),
+    ];
     if (opts?.search) {
       conditions.push(ilike(knowledgeCollections.name, `%${opts.search}%`));
     }
@@ -41,6 +45,7 @@ export const knowledgeService = {
     name: string;
     description?: string;
     embeddingModelId?: string;
+    source?: string;
   }) {
     const [collection] = await db
       .insert(knowledgeCollections)
@@ -50,6 +55,7 @@ export const knowledgeService = {
         name: data.name,
         description: data.description,
         embeddingModelId: data.embeddingModelId,
+        source: data.source ?? "manual",
         status: "active",
       })
       .returning();
@@ -349,3 +355,26 @@ export const knowledgeService = {
     return { data: entries, total: count };
   },
 };
+
+export async function triggerDocumentIngestion(
+  doc: { id: string; fileId?: string | null; sourceUrl?: string | null },
+  orgId: string,
+  collectionId: string,
+) {
+  try {
+    const client = await getTemporalClient();
+    await client.workflow.start("documentIngestionWorkflow", {
+      taskQueue: "nova-main",
+      workflowId: `doc-ingest-${doc.id}`,
+      args: [{
+        orgId,
+        collectionId,
+        documentId: doc.id,
+        fileId: doc.fileId ?? undefined,
+        sourceUrl: doc.sourceUrl ?? undefined,
+      }],
+    });
+  } catch (err) {
+    console.error(`[knowledge] Failed to start ingestion workflow for doc ${doc.id}:`, err);
+  }
+}

@@ -1,7 +1,8 @@
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { db } from "../lib/db";
-import { workspaces, workspaceMemberships } from "@nova/shared/schemas";
+import { workspaces, workspaceMemberships, files } from "@nova/shared/schemas";
 import { AppError } from "@nova/shared/utils";
+import { knowledgeService } from "./knowledge.service";
 
 export const workspaceService = {
   async list(orgId: string, userId: string, opts?: { search?: string; limit?: number; offset?: number }) {
@@ -82,7 +83,20 @@ export const workspaceService = {
       role: "admin",
     });
 
-    return workspace;
+    // Eager-create a knowledge collection for workspace files
+    const collection = await knowledgeService.createCollection(orgId, userId, {
+      name: `Workspace: ${data.name}`,
+      description: "Auto-indexed workspace files",
+      source: "workspace",
+    });
+
+    const [updated] = await db
+      .update(workspaces)
+      .set({ knowledgeCollectionId: collection.id, updatedAt: new Date() })
+      .where(eq(workspaces.id, workspace.id))
+      .returning();
+
+    return updated;
   },
 
   async update(orgId: string, workspaceId: string, data: Partial<{
@@ -100,6 +114,25 @@ export const workspaceService = {
   },
 
   async delete(orgId: string, workspaceId: string) {
+    // Fetch workspace to get knowledgeCollectionId before deleting
+    const existing = await this.get(orgId, workspaceId);
+
+    // Cascade: delete linked knowledge collection (hard-deletes documents + chunks)
+    if (existing.knowledgeCollectionId) {
+      try {
+        await knowledgeService.deleteCollection(orgId, existing.knowledgeCollectionId);
+      } catch {
+        // Collection may already be deleted; continue
+      }
+    }
+
+    // Soft-delete workspace file records
+    await db
+      .update(files)
+      .set({ deletedAt: new Date() })
+      .where(and(eq(files.workspaceId, workspaceId), eq(files.orgId, orgId), isNull(files.deletedAt)));
+
+    // Soft-delete the workspace
     const [workspace] = await db
       .update(workspaces)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
@@ -153,4 +186,5 @@ export const workspaceService = {
       .from(workspaceMemberships)
       .where(eq(workspaceMemberships.workspaceId, workspaceId));
   },
+
 };

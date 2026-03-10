@@ -1,13 +1,12 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppContext } from "../types/context";
-import { knowledgeService } from "../services/knowledge.service";
+import { knowledgeService, triggerDocumentIngestion } from "../services/knowledge.service";
 import { writeAuditLog } from "../services/audit.service";
 import { parsePagination } from "@nova/shared/utils";
 import * as fileService from "../services/file.service";
 import { minio } from "../lib/minio";
 import { env } from "../lib/env";
-import { getTemporalClient } from "../lib/temporal";
 import { listModels } from "../lib/litellm";
 
 const knowledgeRoutes = new Hono<AppContext>();
@@ -102,25 +101,6 @@ knowledgeRoutes.get("/:id/documents", async (c) => {
   const docs = await knowledgeService.listDocuments(orgId, c.req.param("id"));
   return c.json({ data: docs });
 });
-
-async function triggerDocumentIngestion(doc: { id: string; fileId?: string | null; sourceUrl?: string | null }, orgId: string, collectionId: string) {
-  try {
-    const client = await getTemporalClient();
-    await client.workflow.start("documentIngestionWorkflow", {
-      taskQueue: "nova-main",
-      workflowId: `doc-ingest-${doc.id}`,
-      args: [{
-        orgId,
-        collectionId,
-        documentId: doc.id,
-        fileId: doc.fileId ?? undefined,
-        sourceUrl: doc.sourceUrl ?? undefined,
-      }],
-    });
-  } catch (err) {
-    console.error(`[knowledge] Failed to start ingestion workflow for doc ${doc.id}:`, err);
-  }
-}
 
 const addDocumentSchema = z.object({
   title: z.string().min(1).max(500),

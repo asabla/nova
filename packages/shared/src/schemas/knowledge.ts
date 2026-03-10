@@ -30,6 +30,7 @@ export const knowledgeCollections = pgTable("knowledge_collections", {
   embeddingModel: text("embedding_model"),
   chunkSize: integer("chunk_size").notNull().default(512),
   chunkOverlap: integer("chunk_overlap").notNull().default(64),
+  source: text("source").notNull().default("manual"),
   version: integer("version").notNull().default(1),
   lastIndexedAt: timestamp("last_indexed_at", { withTimezone: true }),
   status: text("status").notNull().default("pending"),
