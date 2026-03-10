@@ -172,13 +172,13 @@ export const knowledgeService = {
     const threshold = opts?.threshold ?? 0.0;
 
     // Verify collection exists and belongs to org
-    await this.getCollection(orgId, collectionId);
+    const collection = await this.getCollection(orgId, collectionId);
 
-    // Generate embedding for the query text via LiteLLM
+    // Generate embedding for the query text using the collection's configured model
     let queryEmbedding: number[] | null = null;
     try {
       const { generateEmbedding } = await import("../lib/litellm");
-      queryEmbedding = await generateEmbedding(query);
+      queryEmbedding = await generateEmbedding(query, collection.embeddingModel ?? undefined);
     } catch {
       // Fallback to text similarity if embedding API is unavailable
     }
@@ -256,7 +256,7 @@ export const knowledgeService = {
     const updates: Record<string, unknown> = { updatedAt: new Date() };
 
     if (config.embeddingModel !== undefined) {
-      updates.embeddingModelId = config.embeddingModel;
+      updates.embeddingModel = config.embeddingModel;
     }
     if (config.chunkSize !== undefined) {
       if (config.chunkSize < 64 || config.chunkSize > 8192) {

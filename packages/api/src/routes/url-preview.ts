@@ -4,6 +4,7 @@ import { zValidator } from "@hono/zod-validator";
 import type { AppContext } from "../types/context";
 import { AppError } from "@nova/shared/utils";
 import { domainService } from "../services/domain.service";
+import { extractFromHtml } from "@nova/shared/content";
 
 const urlPreviewRoutes = new Hono<AppContext>();
 
@@ -274,22 +275,9 @@ urlPreviewRoutes.post(
 
       if (contentType.includes("text/html") || contentType.includes("xhtml")) {
         const html = await response.text();
-        // Extract title
-        const title = extractMetaContent(html, "og:title") ?? extractTitle(html) ?? "";
-        // Extract article text - strip tags, keep text
-        const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-        const bodyHtml = bodyMatch?.[1] ?? html;
-        // Remove script/style tags first
-        const cleaned = bodyHtml
-          .replace(/<script[\s\S]*?<\/script>/gi, "")
-          .replace(/<style[\s\S]*?<\/style>/gi, "")
-          .replace(/<nav[\s\S]*?<\/nav>/gi, "")
-          .replace(/<footer[\s\S]*?<\/footer>/gi, "")
-          .replace(/<header[\s\S]*?<\/header>/gi, "")
-          .replace(/<[^>]+>/g, " ")
-          .replace(/\s+/g, " ")
-          .trim();
-        textContent = `Title: ${title}\n\n${cleaned.slice(0, 8000)}`;
+        const extracted = extractFromHtml(html, url);
+        const title = extracted.title ?? "";
+        textContent = `Title: ${title}\n\n${extracted.markdown.slice(0, 8000)}`;
       } else {
         textContent = (await response.text()).slice(0, 8000);
       }

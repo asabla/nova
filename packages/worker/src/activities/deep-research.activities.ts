@@ -3,6 +3,7 @@ import { db } from "../lib/db";
 import { openai } from "../lib/litellm";
 import { getDefaultChatModel } from "../lib/models";
 import { researchReports } from "@nova/shared/schemas";
+import { extractFromHtml } from "@nova/shared/content";
 
 export async function searchWeb(query: string, iteration: number): Promise<{ url: string; title: string }[]> {
   const searxngUrl = process.env.SEARXNG_URL;
@@ -78,9 +79,18 @@ export async function fetchPageContent(url: string): Promise<string> {
       headers: { "User-Agent": "NovaBot/1.0" },
       signal: AbortSignal.timeout(15_000),
     });
+    const contentType = response.headers.get("content-type") ?? "";
     const text = await response.text();
-    // Strip HTML tags for basic extraction
-    return text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 50_000);
+
+    // Use structured extraction for HTML content
+    if (contentType.includes("text/html") || contentType.includes("xhtml") ||
+        text.trimStart().slice(0, 200).toLowerCase().startsWith("<!doctype html") ||
+        text.trimStart().slice(0, 200).toLowerCase().startsWith("<html")) {
+      const extracted = extractFromHtml(text, url);
+      return extracted.markdown.slice(0, 50_000);
+    }
+
+    return text.slice(0, 50_000);
   } catch {
     return "";
   }
