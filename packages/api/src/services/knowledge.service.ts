@@ -223,7 +223,33 @@ export const knowledgeService = {
           LIMIT ${topK}
         `);
 
-    const rows = (results as any[]).filter((r: any) => r.score >= threshold);
+    let rows = (results as any[]).filter((r: any) => {
+      const score = parseFloat(r.score);
+      return !isNaN(score) && score >= threshold;
+    });
+
+    // If vector search returned all NaN scores (e.g. zero vectors), fall back to text similarity
+    if (queryEmbedding && rows.length === 0 && (results as any[]).length > 0) {
+      const fallbackResults = await db.execute(sql`
+        SELECT
+          kc.id,
+          kc.knowledge_document_id AS "documentId",
+          kd.title AS "documentName",
+          kc.content,
+          kc.chunk_index AS "chunkIndex",
+          kc.metadata,
+          similarity(kc.content, ${query}) AS score
+        FROM knowledge_chunks kc
+        JOIN knowledge_documents kd ON kd.id = kc.knowledge_document_id
+        WHERE kc.knowledge_collection_id = ${collectionId}
+          AND kc.org_id = ${orgId}
+          AND kc.deleted_at IS NULL
+          AND kd.deleted_at IS NULL
+        ORDER BY score DESC
+        LIMIT ${topK}
+      `);
+      rows = (fallbackResults as any[]).filter((r: any) => parseFloat(r.score) >= threshold);
+    }
 
     return rows.map((r: any) => ({
       id: r.id,

@@ -95,6 +95,7 @@ interface KnowledgeCollection {
   description?: string;
   status: string;
   embeddingModelId?: string;
+  embeddingModel?: string;
   chunkSize: number;
   chunkOverlap: number;
   version: number;
@@ -185,7 +186,7 @@ function KnowledgeDetailPage() {
       setForm({
         name: col.name ?? "",
         description: col.description ?? "",
-        embeddingModel: col.embeddingModelId ?? "text-embedding-3-small",
+        embeddingModel: col.embeddingModel ?? "text-embedding-3-small",
         chunkSize: col.chunkSize ?? 512,
         chunkOverlap: col.chunkOverlap ?? 50,
       });

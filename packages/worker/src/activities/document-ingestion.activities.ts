@@ -98,8 +98,9 @@ interface EmbeddedChunk extends ContentChunk {
 
 async function embedChunks(
   chunks: ContentChunk[],
+  embeddingModelOverride?: string,
 ): Promise<EmbeddedChunk[]> {
-  const embeddingModel = process.env.EMBEDDING_MODEL ?? await getDefaultEmbeddingModel();
+  const embeddingModel = embeddingModelOverride ?? process.env.EMBEDDING_MODEL ?? await getDefaultEmbeddingModel();
   const batchSize = 20;
   const results: EmbeddedChunk[] = [];
 
@@ -118,7 +119,9 @@ async function embedChunks(
       });
 
       for (const item of response.data) {
-        results.push({ ...batch[item.index], embedding: item.embedding });
+        // Discard zero vectors (model returned empty/invalid embedding)
+        const isZero = item.embedding.every((v) => v === 0);
+        results.push({ ...batch[item.index], embedding: isZero ? null : item.embedding });
       }
     } catch (err) {
       console.warn(`[EMBED] Embedding API error, skipping batch:`, err);
@@ -138,6 +141,9 @@ async function persistChunks(
 ): Promise<void> {
   const [doc] = await db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.id, documentId));
   const orgId = doc?.orgId ?? "";
+
+  // Delete any existing chunks for this document (handles re-indexing)
+  await db.delete(knowledgeChunks).where(eq(knowledgeChunks.knowledgeDocumentId, documentId));
 
   for (const chunk of chunks) {
     await db.insert(knowledgeChunks).values({
@@ -178,9 +184,13 @@ async function persistChunks(
 export async function ingestDocument(input: DocumentIngestionInput): Promise<{ chunkCount: number }> {
   const resolved = await resolveDocumentContent(input);
 
-  // Fetch collection settings for chunk size/overlap
+  // Fetch collection settings for chunk size/overlap and embedding model
   const [collection] = await db
-    .select({ chunkSize: knowledgeCollections.chunkSize, chunkOverlap: knowledgeCollections.chunkOverlap })
+    .select({
+      chunkSize: knowledgeCollections.chunkSize,
+      chunkOverlap: knowledgeCollections.chunkOverlap,
+      embeddingModel: knowledgeCollections.embeddingModel,
+    })
     .from(knowledgeCollections)
     .where(eq(knowledgeCollections.id, input.collectionId));
 
@@ -189,7 +199,7 @@ export async function ingestDocument(input: DocumentIngestionInput): Promise<{ c
     overlap: collection?.chunkOverlap ?? 150,
   });
 
-  const withEmbeddings = await embedChunks(chunks);
+  const withEmbeddings = await embedChunks(chunks, collection?.embeddingModel ?? undefined);
   await persistChunks(input.documentId, input.collectionId, withEmbeddings, resolved.title, resolved.sourceUrl);
   return { chunkCount: withEmbeddings.length };
 }

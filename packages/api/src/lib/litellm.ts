@@ -144,6 +144,8 @@ export async function generateEmbedding(
     const result = await openai.embeddings.create({
       model,
       input: [text],
+    }, {
+      timeout: 10_000, // Short timeout for embeddings — fall back to text search if slow
     });
     return result.data?.[0]?.embedding ?? null;
   } catch {
