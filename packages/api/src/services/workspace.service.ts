@@ -5,13 +5,24 @@ import { AppError } from "@nova/shared/utils";
 
 export const workspaceService = {
   async list(orgId: string, userId: string, opts?: { search?: string; limit?: number; offset?: number }) {
+    const memberCountSq = db
+      .select({ wId: workspaceMemberships.workspaceId, cnt: sql<number>`count(*)::int`.as("cnt") })
+      .from(workspaceMemberships)
+      .where(isNull(workspaceMemberships.deletedAt))
+      .groupBy(workspaceMemberships.workspaceId)
+      .as("mc");
+
     const result = await db
-      .select({ workspace: workspaces })
+      .select({
+        workspace: workspaces,
+        memberCount: sql<number>`coalesce(${memberCountSq.cnt}, 0)`.mapWith(Number),
+      })
       .from(workspaces)
       .leftJoin(workspaceMemberships, and(
         eq(workspaceMemberships.workspaceId, workspaces.id),
         eq(workspaceMemberships.userId, userId),
       ))
+      .leftJoin(memberCountSq, eq(memberCountSq.wId, workspaces.id))
       .where(and(
         eq(workspaces.orgId, orgId),
         eq(workspaces.isArchived, false),
@@ -26,17 +37,28 @@ export const workspaceService = {
       .from(workspaces)
       .where(and(eq(workspaces.orgId, orgId), eq(workspaces.isArchived, false), isNull(workspaces.deletedAt)));
 
-    return { data: result.map((r) => r.workspace), total: count };
+    return { data: result.map((r) => ({ ...r.workspace, memberCount: r.memberCount })), total: count };
   },
 
   async get(orgId: string, workspaceId: string) {
-    const [workspace] = await db
-      .select()
+    const memberCountSq = db
+      .select({ cnt: sql<number>`count(*)::int`.as("cnt") })
+      .from(workspaceMemberships)
+      .where(and(
+        eq(workspaceMemberships.workspaceId, workspaces.id),
+        isNull(workspaceMemberships.deletedAt),
+      ));
+
+    const [row] = await db
+      .select({
+        workspace: workspaces,
+        memberCount: sql<number>`coalesce((${memberCountSq}), 0)`.mapWith(Number),
+      })
       .from(workspaces)
       .where(and(eq(workspaces.id, workspaceId), eq(workspaces.orgId, orgId), isNull(workspaces.deletedAt)));
 
-    if (!workspace) throw AppError.notFound("Workspace not found");
-    return workspace;
+    if (!row) throw AppError.notFound("Workspace not found");
+    return { ...row.workspace, memberCount: row.memberCount };
   },
 
   async create(orgId: string, userId: string, data: {
@@ -92,6 +114,17 @@ export const workspaceService = {
     const [workspace] = await db
       .update(workspaces)
       .set({ isArchived: true, updatedAt: new Date() })
+      .where(and(eq(workspaces.id, workspaceId), eq(workspaces.orgId, orgId)))
+      .returning();
+
+    if (!workspace) throw AppError.notFound("Workspace not found");
+    return workspace;
+  },
+
+  async unarchive(orgId: string, workspaceId: string) {
+    const [workspace] = await db
+      .update(workspaces)
+      .set({ isArchived: false, updatedAt: new Date() })
       .where(and(eq(workspaces.id, workspaceId), eq(workspaces.orgId, orgId)))
       .returning();
 

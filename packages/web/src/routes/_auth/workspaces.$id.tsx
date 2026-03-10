@@ -14,11 +14,8 @@ import {
   Archive,
   Trash2,
   Save,
-  MoreVertical,
   Search,
   Clock,
-  Bot,
-  Shield,
   Mail,
   X,
   RefreshCw,
@@ -33,7 +30,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
 import { toast } from "../../components/ui/Toast";
 import { Skeleton } from "../../components/ui/Skeleton";
-import { api, apiHeaders } from "../../lib/api";
+import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 
 export const Route = createFileRoute("/_auth/workspaces/$id")({
@@ -50,7 +47,7 @@ function WorkspaceDetailPage() {
   const [activeTab, setActiveTab] = useState<TabId>("conversations");
 
   const { data: workspace, isLoading, isError, refetch } = useQuery({
-    queryKey: ["workspaces", id],
+    queryKey: queryKeys.workspaces.detail(id),
     queryFn: () => api.get<any>(`/api/workspaces/${id}`),
   });
 
@@ -122,7 +119,7 @@ function WorkspaceDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {workspace.archived && <Badge variant="warning">{t("workspaces.archived", { defaultValue: "Archived" })}</Badge>}
+          {workspace.isArchived && <Badge variant="warning">{t("workspaces.archived", { defaultValue: "Archived" })}</Badge>}
           <Badge variant="default">{workspace.memberCount ?? 0} {t("workspaces.members", { defaultValue: "members" })}</Badge>
         </div>
       </div>
@@ -168,7 +165,7 @@ function ConversationsTab({ workspaceId }: { workspaceId: string }) {
   const [search, setSearch] = useState("");
 
   const { data: conversationsData, isLoading, isError, refetch } = useQuery({
-    queryKey: ["workspaces", workspaceId, "conversations"],
+    queryKey: queryKeys.workspaces.conversations(workspaceId),
     queryFn: () => api.get<any>(`/api/workspaces/${workspaceId}/conversations`),
   });
 
@@ -180,7 +177,7 @@ function ConversationsTab({ workspaceId }: { workspaceId: string }) {
         title: t("workspaces.newConversationTitle", { defaultValue: "New Conversation" }),
       }),
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["workspaces", workspaceId, "conversations"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.conversations(workspaceId) });
       toast.success(t("workspaces.conversationCreated", { defaultValue: "Conversation created" }));
       navigate({ to: "/conversations/$id", params: { id: data.id } });
     },
@@ -285,7 +282,7 @@ function FilesTab({ workspaceId }: { workspaceId: string }) {
   const [deleteFileTarget, setDeleteFileTarget] = useState<any>(null);
 
   const { data: filesData, isLoading, isError, refetch } = useQuery({
-    queryKey: ["workspaces", workspaceId, "files"],
+    queryKey: queryKeys.workspaces.files(workspaceId),
     queryFn: () => api.get<any>(`/api/workspaces/${workspaceId}/files`),
   });
 
@@ -293,26 +290,24 @@ function FilesTab({ workspaceId }: { workspaceId: string }) {
 
   const uploadMutation = useMutation({
     mutationFn: async (fileList: FileList) => {
-      const formData = new FormData();
-      Array.from(fileList).forEach((file) => formData.append("files", file));
-
-      const BASE_URL = import.meta.env.VITE_API_URL ?? "";
-      const orgHeaders = apiHeaders();
-      delete orgHeaders["Content-Type"];
-      const response = await fetch(`${BASE_URL}/api/workspaces/${workspaceId}/files`, {
-        method: "POST",
-        credentials: "include",
-        headers: orgHeaders,
-        body: formData,
-      });
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ title: "Upload failed" }));
-        throw new Error(err.title ?? "Upload failed");
+      const results = [];
+      for (const file of Array.from(fileList)) {
+        const { uploadUrl, fileId } = await api.post<any>(`/api/workspaces/${workspaceId}/files`, {
+          filename: file.name,
+          contentType: file.type || "application/octet-stream",
+          sizeBytes: file.size,
+        });
+        await fetch(uploadUrl, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+        });
+        results.push({ fileId });
       }
-      return response.json();
+      return results;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["workspaces", workspaceId, "files"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.files(workspaceId) });
       toast.success(t("workspaces.filesUploaded", { defaultValue: "Files uploaded" }));
     },
     onError: (err: any) => toast.error(err.message ?? t("workspaces.uploadFailed", { defaultValue: "Upload failed" })),
@@ -322,7 +317,7 @@ function FilesTab({ workspaceId }: { workspaceId: string }) {
     mutationFn: (fileId: string) =>
       api.delete(`/api/workspaces/${workspaceId}/files/${fileId}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["workspaces", workspaceId, "files"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.files(workspaceId) });
       toast.success(t("workspaces.fileDeleted", { defaultValue: "File deleted" }));
       setDeleteFileTarget(null);
     },
@@ -358,7 +353,7 @@ function FilesTab({ workspaceId }: { workspaceId: string }) {
     <div className="max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-medium text-text-secondary">
-          {(files ?? []).length} {t("workspaces.fileCount", { defaultValue: "file", count: (files ?? []).length })}{(files ?? []).length !== 1 ? "s" : ""}
+          {(files ?? []).length} {(files ?? []).length === 1 ? t("workspaces.file", { defaultValue: "file" }) : t("workspaces.files", { defaultValue: "files" })}
         </h3>
         <div>
           <input
@@ -409,13 +404,13 @@ function FilesTab({ workspaceId }: { workspaceId: string }) {
             >
               <FileText className="h-5 w-5 text-text-tertiary shrink-0" aria-hidden="true" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-text truncate">{file.name}</p>
+                <p className="text-sm font-medium text-text truncate">{file.filename}</p>
                 <p className="text-xs text-text-tertiary">
-                  {file.size != null && formatFileSize(file.size)}
-                  {file.uploadedAt && (
-                    <> &middot; {new Date(file.uploadedAt).toLocaleDateString()}</>
+                  {file.sizeBytes != null && formatFileSize(file.sizeBytes)}
+                  {file.createdAt && (
+                    <> &middot; {new Date(file.createdAt).toLocaleDateString()}</>
                   )}
-                  {file.uploadedBy && <> &middot; {file.uploadedBy}</>}
+                  {(file.uploaderName || file.uploaderEmail) && <> &middot; {file.uploaderName ?? file.uploaderEmail}</>}
                 </p>
               </div>
               <button
@@ -468,7 +463,7 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
   const [removeMemberTarget, setRemoveMemberTarget] = useState<any>(null);
 
   const { data: membersData, isLoading, isError, refetch } = useQuery({
-    queryKey: ["workspaces", workspaceId, "members"],
+    queryKey: queryKeys.workspaces.members(workspaceId),
     queryFn: () => api.get<any>(`/api/workspaces/${workspaceId}/members`),
   });
 
@@ -478,7 +473,7 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
     mutationFn: (data: { email: string; role: string }) =>
       api.post(`/api/workspaces/${workspaceId}/members/invite`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["workspaces", workspaceId, "members"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.members(workspaceId) });
       toast.success(t("workspaces.inviteSent", { defaultValue: "Invitation sent" }));
       setShowInvite(false);
       setInviteEmail("");
@@ -491,7 +486,7 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
     mutationFn: ({ memberId, role }: { memberId: string; role: string }) =>
       api.patch(`/api/workspaces/${workspaceId}/members/${memberId}`, { role }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["workspaces", workspaceId, "members"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.members(workspaceId) });
       toast.success(t("workspaces.roleUpdated", { defaultValue: "Role updated" }));
     },
     onError: (err: any) => toast.error(err.message ?? t("workspaces.roleUpdateFailed", { defaultValue: "Failed to update role" })),
@@ -501,7 +496,7 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
     mutationFn: (memberId: string) =>
       api.delete(`/api/workspaces/${workspaceId}/members/${memberId}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["workspaces", workspaceId, "members"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.members(workspaceId) });
       toast.success(t("workspaces.memberRemoved", { defaultValue: "Member removed" }));
       setRemoveMemberTarget(null);
     },
@@ -575,15 +570,15 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
             >
               <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                 <span className="text-sm font-medium text-primary">
-                  {(member.name ?? member.email ?? "?").charAt(0).toUpperCase()}
+                  {(member.userName ?? member.userEmail ?? "?").charAt(0).toUpperCase()}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-text truncate">
-                  {member.name ?? member.email}
+                  {member.userName ?? member.userEmail}
                 </p>
-                {member.name && member.email && (
-                  <p className="text-xs text-text-tertiary truncate">{member.email}</p>
+                {member.userName && member.userEmail && (
+                  <p className="text-xs text-text-tertiary truncate">{member.userEmail}</p>
                 )}
               </div>
               <Badge variant={roleBadgeVariant(member.role)}>
@@ -660,7 +655,7 @@ function MembersTab({ workspaceId }: { workspaceId: string }) {
       {/* Remove Member Dialog */}
       <Dialog open={!!removeMemberTarget} onClose={() => setRemoveMemberTarget(null)} title={t("workspaces.removeMemberTitle", { defaultValue: "Remove Member" })}>
         <p className="text-sm text-text-secondary mb-4">
-          {t("workspaces.removeMemberConfirm", { defaultValue: "Are you sure you want to remove {{name}} from this workspace?", name: removeMemberTarget?.name ?? removeMemberTarget?.email ?? "" })}
+          {t("workspaces.removeMemberConfirm", { defaultValue: "Are you sure you want to remove {{name}} from this workspace?", name: removeMemberTarget?.userName ?? removeMemberTarget?.userEmail ?? "" })}
         </p>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setRemoveMemberTarget(null)}>
@@ -695,7 +690,7 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
     name: workspace.name ?? "",
     description: workspace.description ?? "",
     defaultAgentId: workspace.defaultAgentId ?? "",
-    defaultModel: workspace.defaultModel ?? "",
+    defaultModelId: workspace.defaultModelId ?? "",
     defaultSystemPrompt: workspace.defaultSystemPrompt ?? "",
   });
 
@@ -704,7 +699,7 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
       name: workspace.name ?? "",
       description: workspace.description ?? "",
       defaultAgentId: workspace.defaultAgentId ?? "",
-      defaultModel: workspace.defaultModel ?? "",
+      defaultModelId: workspace.defaultModelId ?? "",
       defaultSystemPrompt: workspace.defaultSystemPrompt ?? "",
     });
   }, [workspace]);
@@ -724,7 +719,11 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
   const models = (modelsData as any)?.data ?? [];
 
   const updateMutation = useMutation({
-    mutationFn: (data: typeof form) => api.patch(`/api/workspaces/${workspaceId}`, data),
+    mutationFn: (data: typeof form) => api.patch(`/api/workspaces/${workspaceId}`, {
+      ...data,
+      defaultAgentId: data.defaultAgentId || null,
+      defaultModelId: data.defaultModelId || null,
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.all });
       toast.success(t("workspaces.updated", { defaultValue: "Workspace updated" }));
@@ -734,10 +733,10 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
 
   const archiveMutation = useMutation({
     mutationFn: () =>
-      api.patch(`/api/workspaces/${workspaceId}`, { archived: !workspace.archived }),
+      api.post(`/api/workspaces/${workspaceId}/${workspace.isArchived ? "unarchive" : "archive"}`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.all });
-      toast.success(workspace.archived ? t("workspaces.restored", { defaultValue: "Workspace restored" }) : t("workspaces.archivedSuccess", { defaultValue: "Workspace archived" }));
+      toast.success(workspace.isArchived ? t("workspaces.restored", { defaultValue: "Workspace restored" }) : t("workspaces.archivedSuccess", { defaultValue: "Workspace archived" }));
     },
     onError: (err: any) => toast.error(err.message ?? t("workspaces.actionFailed", { defaultValue: "Action failed" })),
   });
@@ -755,7 +754,9 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
     <div className="max-w-2xl space-y-6">
       {/* General Settings */}
       <section className="space-y-4">
-        <h3 className="text-sm font-semibold text-text uppercase tracking-wider">{t("workspaces.general", { defaultValue: "General" })}</h3>
+        <div className="pb-2 border-b border-border">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">{t("workspaces.general", { defaultValue: "General" })}</h3>
+        </div>
         <Input
           label={t("workspaces.name", { defaultValue: "Name" })}
           value={form.name}
@@ -773,9 +774,11 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
 
       {/* Defaults */}
       <section className="space-y-4 pt-4 border-t border-border">
-        <h3 className="text-sm font-semibold text-text uppercase tracking-wider">
-          {t("workspaces.defaults", { defaultValue: "Workspace Defaults" })}
-        </h3>
+        <div className="pb-2 border-b border-border">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+            {t("workspaces.defaults", { defaultValue: "Workspace Defaults" })}
+          </h3>
+        </div>
         <Select
           label={t("workspaces.defaultAgent", { defaultValue: "Default Agent" })}
           value={form.defaultAgentId}
@@ -790,8 +793,8 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
         />
         <Select
           label={t("workspaces.defaultModel", { defaultValue: "Default Model" })}
-          value={form.defaultModel}
-          onChange={(value) => setForm({ ...form, defaultModel: value })}
+          value={form.defaultModelId}
+          onChange={(value) => setForm({ ...form, defaultModelId: value })}
           placeholder={t("workspaces.selectModel", { defaultValue: "Select model" })}
           options={[
             { value: "", label: t("workspaces.selectModel", { defaultValue: "Select model" }) },
@@ -825,16 +828,18 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
 
       {/* Danger Zone */}
       <section className="space-y-4 pt-4 border-t border-danger/30">
-        <h3 className="text-sm font-semibold text-danger uppercase tracking-wider">
-          {t("workspaces.dangerZone", { defaultValue: "Danger Zone" })}
-        </h3>
-        <div className="flex items-center justify-between p-4 rounded-lg border border-border bg-surface">
+        <div className="pb-2 border-b border-danger/30">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-danger">
+            {t("workspaces.dangerZone", { defaultValue: "Danger Zone" })}
+          </h3>
+        </div>
+        <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-border bg-surface">
           <div>
             <p className="text-sm font-medium text-text">
-              {workspace.archived ? t("workspaces.restoreWorkspace", { defaultValue: "Restore workspace" }) : t("workspaces.archiveWorkspace", { defaultValue: "Archive workspace" })}
+              {workspace.isArchived ? t("workspaces.restoreWorkspace", { defaultValue: "Restore workspace" }) : t("workspaces.archiveWorkspace", { defaultValue: "Archive workspace" })}
             </p>
             <p className="text-xs text-text-secondary">
-              {workspace.archived
+              {workspace.isArchived
                 ? t("workspaces.restoreDesc", { defaultValue: "Restore this workspace to make it active again." })
                 : t("workspaces.archiveDesc", { defaultValue: "Archived workspaces are read-only and hidden from default views." })}
             </p>
@@ -846,10 +851,10 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
             loading={archiveMutation.isPending}
           >
             <Archive className="h-3.5 w-3.5" aria-hidden="true" />
-            {workspace.archived ? t("workspaces.restore", { defaultValue: "Restore" }) : t("workspaces.archive", { defaultValue: "Archive" })}
+            {workspace.isArchived ? t("workspaces.restore", { defaultValue: "Restore" }) : t("workspaces.archive", { defaultValue: "Archive" })}
           </Button>
         </div>
-        <div className="flex items-center justify-between p-4 rounded-lg border border-danger/30 bg-danger/5">
+        <div className="flex items-start justify-between gap-4 p-4 rounded-xl border border-danger/20 bg-danger/5">
           <div>
             <p className="text-sm font-medium text-text">{t("workspaces.deleteWorkspace", { defaultValue: "Delete workspace" })}</p>
             <p className="text-xs text-text-secondary">
@@ -907,28 +912,25 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
 function ActivityTab({ workspaceId }: { workspaceId: string }) {
   const { t } = useTranslation();
   const { data: activitiesData, isLoading, isError, refetch } = useQuery({
-    queryKey: ["workspaces", workspaceId, "activity"],
+    queryKey: queryKeys.workspaces.activity(workspaceId),
     queryFn: () => api.get<any>(`/api/workspaces/${workspaceId}/activity`),
   });
 
   const activities = (activitiesData as any)?.data ?? [];
 
-  const activityIcon = (type: string) => {
-    switch (type) {
-      case "conversation_created":
-      case "conversation_updated":
+  const activityIcon = (action: string) => {
+    switch (action) {
+      case "conversation.create":
+      case "conversation.update":
         return MessageSquare;
-      case "file_uploaded":
-      case "file_deleted":
-        return FileText;
-      case "member_joined":
-      case "member_invited":
-      case "member_removed":
+      case "workspace.member.add":
+      case "workspace.member.invite":
+      case "workspace.member.remove":
         return Users;
-      case "settings_updated":
+      case "workspace.update":
         return Settings2;
-      case "workspace_archived":
-      case "workspace_restored":
+      case "workspace.archive":
+      case "workspace.unarchive":
         return Archive;
       default:
         return Activity;
@@ -936,28 +938,29 @@ function ActivityTab({ workspaceId }: { workspaceId: string }) {
   };
 
   const activityLabel = (entry: any) => {
-    const actor = entry.actorName ?? t("workspaces.someone", { defaultValue: "Someone" });
-    switch (entry.type) {
-      case "conversation_created":
+    const actor = entry.actorName ?? entry.actorEmail ?? t("workspaces.someone", { defaultValue: "Someone" });
+    const targetEmail = entry.details?.email;
+    switch (entry.action) {
+      case "conversation.create":
         return t("workspaces.activityConversationCreated", { defaultValue: "{{actor}} created a conversation", actor });
-      case "conversation_updated":
+      case "conversation.update":
         return t("workspaces.activityConversationUpdated", { defaultValue: "{{actor}} updated a conversation", actor });
-      case "file_uploaded":
-        return t("workspaces.activityFileUploaded", { defaultValue: "{{actor}} uploaded {{target}}", actor, target: entry.targetName ?? t("workspaces.aFile", { defaultValue: "a file" }) });
-      case "file_deleted":
-        return t("workspaces.activityFileDeleted", { defaultValue: "{{actor}} deleted {{target}}", actor, target: entry.targetName ?? t("workspaces.aFile", { defaultValue: "a file" }) });
-      case "member_joined":
-        return t("workspaces.activityMemberJoined", { defaultValue: "{{name}} joined the workspace", name: entry.targetName ?? actor });
-      case "member_invited":
-        return t("workspaces.activityMemberInvited", { defaultValue: "{{actor}} invited {{target}}", actor, target: entry.targetName ?? t("workspaces.aMember", { defaultValue: "a member" }) });
-      case "member_removed":
-        return t("workspaces.activityMemberRemoved", { defaultValue: "{{actor}} removed {{target}}", actor, target: entry.targetName ?? t("workspaces.aMember", { defaultValue: "a member" }) });
-      case "settings_updated":
+      case "workspace.member.add":
+        return t("workspaces.activityMemberJoined", { defaultValue: "{{actor}} added {{target}}", actor, target: targetEmail ?? t("workspaces.aMember", { defaultValue: "a member" }) });
+      case "workspace.member.invite":
+        return t("workspaces.activityMemberInvited", { defaultValue: "{{actor}} invited {{target}}", actor, target: targetEmail ?? t("workspaces.aMember", { defaultValue: "a member" }) });
+      case "workspace.member.remove":
+        return t("workspaces.activityMemberRemoved", { defaultValue: "{{actor}} removed {{target}}", actor, target: targetEmail ?? t("workspaces.aMember", { defaultValue: "a member" }) });
+      case "workspace.update":
         return t("workspaces.activitySettingsUpdated", { defaultValue: "{{actor}} updated workspace settings", actor });
-      case "workspace_archived":
+      case "workspace.archive":
         return t("workspaces.activityArchived", { defaultValue: "{{actor}} archived the workspace", actor });
-      case "workspace_restored":
+      case "workspace.unarchive":
         return t("workspaces.activityRestored", { defaultValue: "{{actor}} restored the workspace", actor });
+      case "workspace.create":
+        return t("workspaces.activityCreated", { defaultValue: "{{actor}} created the workspace", actor });
+      case "workspace.delete":
+        return t("workspaces.activityDeleted", { defaultValue: "{{actor}} deleted the workspace", actor });
       default:
         return t("workspaces.activityDefault", { defaultValue: "{{actor}} performed an action", actor });
     }
@@ -998,7 +1001,7 @@ function ActivityTab({ workspaceId }: { workspaceId: string }) {
 
           <div className="space-y-4">
             {(activities ?? []).map((entry: any, index: number) => {
-              const Icon = activityIcon(entry.type);
+              const Icon = activityIcon(entry.action);
               return (
                 <div key={entry.id ?? index} className="flex items-start gap-3 relative">
                   <div className="h-10 w-10 rounded-full bg-surface border-2 border-border flex items-center justify-center shrink-0 z-10">

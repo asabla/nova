@@ -14,6 +14,7 @@ import {
   files,
   auditLogs,
   users,
+  userProfiles,
   invitations,
 } from "@nova/shared/schemas";
 import { notificationService } from "../services/notification.service";
@@ -104,6 +105,26 @@ workspaceRoutes.post("/:id/archive", async (c) => {
     actorId: userId,
     actorType: "user",
     action: "workspace.archive",
+    resourceType: "workspace",
+    resourceId: workspaceId,
+  });
+
+  return c.json({ ok: true });
+});
+
+// --- Unarchive ---
+
+workspaceRoutes.post("/:id/unarchive", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const workspaceId = c.req.param("id");
+  await workspaceService.unarchive(orgId, workspaceId);
+
+  await writeAuditLog({
+    orgId,
+    actorId: userId,
+    actorType: "user",
+    action: "workspace.unarchive",
     resourceType: "workspace",
     resourceId: workspaceId,
   });
@@ -222,7 +243,32 @@ workspaceRoutes.get("/:id/files", async (c) => {
   );
 
   const [data, countResult] = await Promise.all([
-    db.select().from(files).where(where).orderBy(desc(files.createdAt)).offset(offset).limit(limit),
+    db.select({
+      id: files.id,
+      orgId: files.orgId,
+      userId: files.userId,
+      workspaceId: files.workspaceId,
+      filename: files.filename,
+      contentType: files.contentType,
+      sizeBytes: files.sizeBytes,
+      storagePath: files.storagePath,
+      storageBucket: files.storageBucket,
+      createdAt: files.createdAt,
+      updatedAt: files.updatedAt,
+      deletedAt: files.deletedAt,
+      uploaderName: userProfiles.displayName,
+      uploaderEmail: users.email,
+    })
+      .from(files)
+      .leftJoin(users, eq(users.id, files.userId))
+      .leftJoin(userProfiles, and(
+        eq(userProfiles.userId, files.userId),
+        eq(userProfiles.orgId, files.orgId),
+      ))
+      .where(where)
+      .orderBy(desc(files.createdAt))
+      .offset(offset)
+      .limit(limit),
     db.select({ count: sql<number>`count(*)::int` }).from(files).where(where),
   ]);
 
@@ -322,12 +368,16 @@ workspaceRoutes.get("/:id/members", async (c) => {
       userId: workspaceMemberships.userId,
       groupId: workspaceMemberships.groupId,
       role: workspaceMemberships.role,
-      userName: users.email,
+      userName: userProfiles.displayName,
       userEmail: users.email,
       joinedAt: workspaceMemberships.createdAt,
     })
     .from(workspaceMemberships)
     .leftJoin(users, eq(users.id, workspaceMemberships.userId))
+    .leftJoin(userProfiles, and(
+      eq(userProfiles.userId, workspaceMemberships.userId),
+      eq(userProfiles.orgId, workspaceMemberships.orgId),
+    ))
     .where(and(
       eq(workspaceMemberships.workspaceId, workspaceId),
       eq(workspaceMemberships.orgId, orgId),
@@ -501,17 +551,26 @@ workspaceRoutes.get("/:id/activity", async (c) => {
     eq(auditLogs.resourceId, workspaceId),
   );
 
+  const activitySelect = {
+    id: auditLogs.id,
+    action: auditLogs.action,
+    actorId: auditLogs.actorId,
+    actorType: auditLogs.actorType,
+    actorName: userProfiles.displayName,
+    actorEmail: users.email,
+    details: auditLogs.details,
+    createdAt: auditLogs.createdAt,
+  };
+
   const [data, countResult] = await Promise.all([
     db
-      .select({
-        id: auditLogs.id,
-        action: auditLogs.action,
-        actorId: auditLogs.actorId,
-        actorType: auditLogs.actorType,
-        details: auditLogs.details,
-        createdAt: auditLogs.createdAt,
-      })
+      .select(activitySelect)
       .from(auditLogs)
+      .leftJoin(users, eq(users.id, auditLogs.actorId))
+      .leftJoin(userProfiles, and(
+        eq(userProfiles.userId, auditLogs.actorId),
+        eq(userProfiles.orgId, auditLogs.orgId),
+      ))
       .where(where)
       .orderBy(desc(auditLogs.createdAt))
       .offset(offset)
@@ -521,15 +580,13 @@ workspaceRoutes.get("/:id/activity", async (c) => {
 
   // Also include conversation-level activity within this workspace
   const conversationActivity = await db
-    .select({
-      id: auditLogs.id,
-      action: auditLogs.action,
-      actorId: auditLogs.actorId,
-      actorType: auditLogs.actorType,
-      details: auditLogs.details,
-      createdAt: auditLogs.createdAt,
-    })
+    .select(activitySelect)
     .from(auditLogs)
+    .leftJoin(users, eq(users.id, auditLogs.actorId))
+    .leftJoin(userProfiles, and(
+      eq(userProfiles.userId, auditLogs.actorId),
+      eq(userProfiles.orgId, auditLogs.orgId),
+    ))
     .innerJoin(conversations, and(
       eq(auditLogs.resourceId, conversations.id),
       eq(auditLogs.resourceType, "conversation"),
