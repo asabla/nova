@@ -532,6 +532,7 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
     defaultAgentId: workspace.defaultAgentId ?? "",
     defaultModelId: workspace.defaultModelId ?? "",
     defaultSystemPrompt: workspace.defaultSystemPrompt ?? "",
+    embeddingModel: workspace.embeddingModel ?? "",
   });
 
   useEffect(() => {
@@ -541,6 +542,7 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
       defaultAgentId: workspace.defaultAgentId ?? "",
       defaultModelId: workspace.defaultModelId ?? "",
       defaultSystemPrompt: workspace.defaultSystemPrompt ?? "",
+      embeddingModel: workspace.embeddingModel ?? "",
     });
   }, [workspace]);
 
@@ -558,11 +560,19 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
 
   const models = (modelsData as any)?.data ?? [];
 
+  const { data: embeddingModelsData } = useQuery({
+    queryKey: ["knowledge", "embedding-models"],
+    queryFn: () => api.get<any>("/api/knowledge/models/embedding"),
+  });
+
+  const embeddingModels: { id: string; name: string }[] = (embeddingModelsData as any)?.data ?? [];
+
   const updateMutation = useMutation({
     mutationFn: (data: typeof form) => api.patch(`/api/workspaces/${workspaceId}`, {
       ...data,
       defaultAgentId: data.defaultAgentId || null,
       defaultModelId: data.defaultModelId || null,
+      embeddingModel: data.embeddingModel || null,
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.all });
@@ -651,6 +661,20 @@ function SettingsTab({ workspaceId, workspace }: { workspaceId: string; workspac
           placeholder={t("workspaces.systemPromptPlaceholder", { defaultValue: "Applied to all new conversations in this workspace..." })}
           rows={5}
           className="font-mono"
+        />
+        <Select
+          label={t("workspaces.embeddingModel", { defaultValue: "Embedding Model" })}
+          value={form.embeddingModel}
+          onChange={(value) => setForm({ ...form, embeddingModel: value })}
+          options={[
+            { value: "", label: t("workspaces.defaultEmbeddingModel", { defaultValue: "Default" }) },
+            ...(embeddingModels.length > 0
+              ? embeddingModels.map((m) => ({ value: m.id, label: m.name }))
+              : form.embeddingModel
+                ? [{ value: form.embeddingModel, label: form.embeddingModel }]
+                : []),
+          ]}
+          helperText={t("workspaces.embeddingModelHint", { defaultValue: "Model used to embed workspace knowledge documents. Changing this requires re-indexing." })}
         />
       </section>
 

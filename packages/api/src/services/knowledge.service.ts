@@ -1,6 +1,6 @@
 import { eq, and, desc, isNull, ilike, ne, sql } from "drizzle-orm";
 import { db } from "../lib/db";
-import { knowledgeCollections, knowledgeDocuments, knowledgeChunks } from "@nova/shared/schemas";
+import { knowledgeCollections, knowledgeDocuments, knowledgeChunks, workspaces } from "@nova/shared/schemas";
 import { auditLogs } from "@nova/shared/schema";
 import { AppError } from "@nova/shared/utils";
 import { getTemporalClient } from "../lib/temporal";
@@ -355,6 +355,64 @@ export const knowledgeService = {
     return { data: entries, total: count };
   },
 };
+
+export async function retrieveWorkspaceContext(
+  orgId: string,
+  workspaceId: string,
+  query: string,
+): Promise<{ documentName: string; content: string; score: number }[]> {
+  try {
+    const [workspace] = await db
+      .select({ knowledgeCollectionId: workspaces.knowledgeCollectionId })
+      .from(workspaces)
+      .where(and(eq(workspaces.id, workspaceId), eq(workspaces.orgId, orgId)));
+
+    if (!workspace?.knowledgeCollectionId) return [];
+
+    const results = await knowledgeService.queryCollection(orgId, workspace.knowledgeCollectionId, query, {
+      topK: 5,
+      threshold: 0.3,
+    });
+
+    return results.map((r) => ({
+      documentName: r.documentName,
+      content: r.content,
+      score: r.score,
+    }));
+  } catch (err) {
+    console.error("[rag] Failed to retrieve workspace context:", err);
+    return [];
+  }
+}
+
+const RAG_CHAR_BUDGET = 16_000;
+
+export function formatRAGContext(
+  chunks: { documentName: string; content: string; score: number }[],
+): string | null {
+  if (chunks.length === 0) return null;
+
+  // Chunks are already sorted by score (highest first) from queryCollection
+  const lines: string[] = [
+    "## Workspace Knowledge Context",
+    "The following excerpts are from workspace documents. Use them to inform your response when relevant. If the context doesn't help answer the user's question, you may ignore it.",
+    "",
+  ];
+
+  let charCount = lines.join("\n").length;
+
+  for (const chunk of chunks) {
+    const section = `[Source: ${chunk.documentName}]\n${chunk.content}\n`;
+    if (charCount + section.length > RAG_CHAR_BUDGET) break;
+    lines.push(section);
+    charCount += section.length;
+  }
+
+  // If no chunks fit the budget, return null
+  if (lines.length <= 3) return null;
+
+  return lines.join("\n");
+}
 
 export async function triggerDocumentIngestion(
   doc: { id: string; fileId?: string | null; sourceUrl?: string | null },

@@ -16,6 +16,7 @@ import {
   users,
   userProfiles,
   invitations,
+  knowledgeCollections,
 } from "@nova/shared/schemas";
 import { notificationService } from "../services/notification.service";
 
@@ -61,6 +62,7 @@ const updateWorkspaceSchema = z.object({
   defaultAgentId: z.string().uuid().nullable().optional(),
   defaultModelId: z.string().uuid().nullable().optional(),
   defaultSystemPrompt: z.string().max(10_000).nullable().optional(),
+  embeddingModel: z.string().max(200).nullable().optional(),
 });
 
 workspaceRoutes.patch("/:id", zValidator("json", updateWorkspaceSchema), async (c) => {
@@ -69,13 +71,24 @@ workspaceRoutes.patch("/:id", zValidator("json", updateWorkspaceSchema), async (
   const data = c.req.valid("json");
   const workspaceId = c.req.param("id");
 
+  // Extract embeddingModel — it goes to the knowledge collection, not the workspace
+  const { embeddingModel, ...workspaceData } = data;
+
   const [workspace] = await db
     .update(workspaces)
-    .set({ ...data, updatedAt: new Date() })
+    .set({ ...workspaceData, updatedAt: new Date() })
     .where(and(eq(workspaces.id, workspaceId), eq(workspaces.orgId, orgId), isNull(workspaces.deletedAt)))
     .returning();
 
   if (!workspace) throw AppError.notFound("Workspace");
+
+  // Update embedding model on the workspace's knowledge collection
+  if (embeddingModel !== undefined && workspace.knowledgeCollectionId) {
+    await db
+      .update(knowledgeCollections)
+      .set({ embeddingModel: embeddingModel || null, updatedAt: new Date() })
+      .where(and(eq(knowledgeCollections.id, workspace.knowledgeCollectionId), eq(knowledgeCollections.orgId, orgId)));
+  }
 
   await writeAuditLog({
     orgId,
@@ -87,7 +100,7 @@ workspaceRoutes.patch("/:id", zValidator("json", updateWorkspaceSchema), async (
     details: { updatedFields: Object.keys(data) },
   });
 
-  return c.json(workspace);
+  return c.json({ ...workspace, embeddingModel: embeddingModel !== undefined ? (embeddingModel || null) : undefined });
 });
 
 // --- Archive ---

@@ -14,6 +14,7 @@ import { db } from "../lib/db";
 import { userProfiles, users, agents, orgSettings, files } from "@nova/shared/schemas";
 import { eq, and, isNull, inArray } from "drizzle-orm";
 import { extractFileContent } from "../lib/file-extract";
+import { retrieveWorkspaceContext, formatRAGContext } from "../services/knowledge.service";
 
 // --- Mention helpers (stories #45, #46) ---
 
@@ -224,6 +225,12 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
     resolvedModel = setting?.value ?? body.model;
   }
 
+  // Start RAG retrieval in parallel with file enrichment (zero net latency)
+  const lastUserContent = [...body.messages].reverse().find((m) => m.role === "user")?.content;
+  const ragPromise = conversation.workspaceId && lastUserContent
+    ? retrieveWorkspaceContext(orgId, conversation.workspaceId, lastUserContent)
+    : Promise.resolve([]);
+
   // Enrich messages with file content so the LLM can read uploaded files
   const dbMessages = await messageService.listMessages(orgId, conversationId, { page: 1, pageSize: 1000 });
   const dbMsgList: any[] = (dbMessages as any).data ?? dbMessages;
@@ -320,12 +327,33 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
     enrichedMessages.unshift(formattingInstruction);
   }
 
+  // Await RAG results and inject into system message
+  const ragChunks = await ragPromise;
+  const ragContext = formatRAGContext(ragChunks);
+  if (ragContext) {
+    enrichedMessages[0] = {
+      ...enrichedMessages[0],
+      content: `${enrichedMessages[0].content}\n\n${ragContext}`,
+    };
+  }
+
   return streamSSE(c, async (stream) => {
     const heartbeat = setInterval(() => {
       stream.writeSSE({ event: "heartbeat", data: "" });
     }, DEFAULTS.SSE_HEARTBEAT_INTERVAL_MS);
 
     try {
+      // Emit RAG context event for frontend
+      const ragSources = ragChunks.length > 0
+        ? ragChunks.map((c) => ({ document: c.documentName, score: c.score }))
+        : undefined;
+      if (ragSources) {
+        await stream.writeSSE({
+          event: "rag_context",
+          data: JSON.stringify({ sources: ragSources }),
+        });
+      }
+
       const startTime = Date.now();
       const completionParams: Record<string, unknown> = {
         model: resolvedModel,
@@ -417,7 +445,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
               orgId,
               conversationId,
               streamChannelId,
-              messageHistory: body.messages,
+              messageHistory: enrichedMessages,
               pendingToolCalls: toolCalls,
               model: resolvedModel,
               modelParams: { temperature: body.temperature, maxTokens: body.maxTokens },
@@ -440,7 +468,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
             modelId: conversation.modelId ?? undefined,
             tokenCountPrompt: totalPromptTokens,
             tokenCountCompletion: totalCompletionTokens,
-            metadata: { latencyMs: Date.now() - startTime, model: body.model, smartRouted: true },
+            metadata: { latencyMs: Date.now() - startTime, model: body.model, smartRouted: true, ragSources },
           });
 
           await stream.writeSSE({
@@ -465,7 +493,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
               modelId: conversation.modelId ?? undefined,
               tokenCountPrompt: promptTokens,
               tokenCountCompletion: completionTokens,
-              metadata: { latencyMs, model: body.model, partial: true },
+              metadata: { latencyMs, model: body.model, partial: true, ragSources },
             });
 
             await stream.writeSSE({
@@ -500,7 +528,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         modelId: conversation.modelId ?? undefined,
         tokenCountPrompt: promptTokens,
         tokenCountCompletion: completionTokens,
-        metadata: { latencyMs, model: body.model },
+        metadata: { latencyMs, model: body.model, ragSources },
       });
 
       await stream.writeSSE({
@@ -604,6 +632,9 @@ messagesRouter.post("/:conversationId/messages/:messageId/replay", zValidator("j
   const messageId = c.req.param("messageId");
   const { model, temperature, topP, maxTokens } = c.req.valid("json");
 
+  const replayConversation = await conversationService.getConversation(orgId, conversationId);
+  if (!replayConversation) throw AppError.notFound("Conversation");
+
   // Get the original message and all prior messages in the conversation
   const allMessages = await messageService.listMessages(orgId, conversationId, { page: 1, pageSize: 1000 });
   const msgList = (allMessages as any).data ?? allMessages;
@@ -639,6 +670,18 @@ messagesRouter.post("/:conversationId/messages/:messageId/replay", zValidator("j
     history.unshift({ role: "system", content: replayFormatting });
   }
 
+  // Retrieve and inject RAG context for workspace conversations
+  const lastUserMsg = [...history].reverse().find((m) => m.role === "user")?.content;
+  let replayRagSources: { document: string; score: number }[] | undefined;
+  if (replayConversation.workspaceId && lastUserMsg) {
+    const replayRagChunks = await retrieveWorkspaceContext(orgId, replayConversation.workspaceId, lastUserMsg);
+    const replayRagContext = formatRAGContext(replayRagChunks);
+    if (replayRagContext) {
+      history[0] = { ...history[0], content: `${history[0].content}\n\n${replayRagContext}` };
+      replayRagSources = replayRagChunks.map((c) => ({ document: c.documentName, score: c.score }));
+    }
+  }
+
   // Call the new model
   const result = await chatCompletion({
     model,
@@ -659,7 +702,7 @@ messagesRouter.post("/:conversationId/messages/:messageId/replay", zValidator("j
     modelId: model,
     tokenCountPrompt: data.usage?.prompt_tokens,
     tokenCountCompletion: data.usage?.completion_tokens,
-    metadata: { replayOf: messageId, model },
+    metadata: { replayOf: messageId, model, ragSources: replayRagSources },
   });
 
   return c.json(replayMessage, 201);

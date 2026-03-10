@@ -1,6 +1,6 @@
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { db } from "../lib/db";
-import { workspaces, workspaceMemberships, files } from "@nova/shared/schemas";
+import { workspaces, workspaceMemberships, files, knowledgeCollections } from "@nova/shared/schemas";
 import { AppError } from "@nova/shared/utils";
 import { knowledgeService } from "./knowledge.service";
 
@@ -54,12 +54,14 @@ export const workspaceService = {
       .select({
         workspace: workspaces,
         memberCount: sql<number>`coalesce((${memberCountSq}), 0)`.mapWith(Number),
+        embeddingModel: knowledgeCollections.embeddingModel,
       })
       .from(workspaces)
+      .leftJoin(knowledgeCollections, eq(knowledgeCollections.id, workspaces.knowledgeCollectionId))
       .where(and(eq(workspaces.id, workspaceId), eq(workspaces.orgId, orgId), isNull(workspaces.deletedAt)));
 
     if (!row) throw AppError.notFound("Workspace not found");
-    return { ...row.workspace, memberCount: row.memberCount };
+    return { ...row.workspace, memberCount: row.memberCount, embeddingModel: row.embeddingModel };
   },
 
   async create(orgId: string, userId: string, data: {
