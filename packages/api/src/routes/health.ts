@@ -71,7 +71,10 @@ health.get("/ready", async (c) => {
   }
 
   const allOk = Object.values(checks).every((v) => v.status === "ok");
-  const anyError = Object.values(checks).some((v) => v.status === "error");
+  const criticalServices = ["database", "redis"] as const;
+  const criticalDown = criticalServices.some(
+    (name) => checks[name]?.status === "error",
+  );
 
   // Build services array for SystemStatusBanner compatibility
   const services = Object.entries(checks).map(([name, check]) => ({
@@ -81,13 +84,13 @@ health.get("/ready", async (c) => {
   }));
 
   return c.json({
-    status: allOk ? "healthy" : anyError ? "down" : "degraded",
+    status: allOk ? "healthy" : criticalDown ? "down" : "degraded",
     version: env.APP_VERSION ?? "dev",
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     checks,
     services,
-  }, allOk ? 200 : 503);
+  }, criticalDown ? 503 : 200);
 });
 
 // Detailed system info for admin dashboard

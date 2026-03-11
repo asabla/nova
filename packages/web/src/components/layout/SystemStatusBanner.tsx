@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
   AlertTriangle,
@@ -56,20 +56,28 @@ export function SystemStatusBanner() {
     try {
       setLoading(true);
       const response = await fetch("/health/ready", {
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(10_000),
       });
 
       if (!response.ok) {
-        setHealth({
-          status: "down",
-          services: [
-            {
-              name: "api",
-              status: "down",
-              message: `HTTP ${response.status}`,
-            },
-          ],
-        });
+        // Try to parse the JSON body for per-service breakdown
+        try {
+          const data: HealthResponse = await response.json();
+          setHealth(data);
+          if (data.status !== "healthy") setDismissed(false);
+        } catch {
+          setHealth({
+            status: "down",
+            services: [
+              {
+                name: "api",
+                status: "down",
+                message: `HTTP ${response.status}`,
+              },
+            ],
+          });
+          setDismissed(false);
+        }
         return;
       }
 
@@ -98,19 +106,29 @@ export function SystemStatusBanner() {
     }
   }, [t]);
 
-  // Initial fetch + polling
+  // Track current status for polling interval without triggering re-renders
+  const statusRef = useRef(health?.status);
+  statusRef.current = health?.status;
+
+  // Initial fetch + polling with recursive setTimeout to avoid dependency loops
   useEffect(() => {
     fetchHealth();
 
-    const interval = setInterval(
-      fetchHealth,
-      health?.status === "degraded" || health?.status === "down"
-        ? DEGRADED_POLL_INTERVAL
-        : POLL_INTERVAL,
-    );
+    let timeoutId: ReturnType<typeof setTimeout>;
+    function scheduleNext() {
+      const interval =
+        statusRef.current === "degraded" || statusRef.current === "down"
+          ? DEGRADED_POLL_INTERVAL
+          : POLL_INTERVAL;
+      timeoutId = setTimeout(async () => {
+        await fetchHealth();
+        scheduleNext();
+      }, interval);
+    }
+    scheduleNext();
 
-    return () => clearInterval(interval);
-  }, [fetchHealth, health?.status]);
+    return () => clearTimeout(timeoutId);
+  }, [fetchHealth]);
 
   // Nothing to show if healthy or dismissed
   if (!health || health.status === "healthy" || dismissed) return null;
