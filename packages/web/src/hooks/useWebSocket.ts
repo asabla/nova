@@ -13,11 +13,14 @@ export function useWebSocket() {
   const setTyping = useWSStore((s) => s.setTyping);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      disconnectWebSocket();
+      setStatus("disconnected");
+      return;
+    }
 
-    setStatus("connecting");
+    // connectWebSocket is idempotent — won't create a new connection if one exists
     connectWebSocket();
-    setStatus("connected");
 
     const unsubscribe = onWsMessage((event: ServerWSEvent) => {
       switch (event.type) {
@@ -48,10 +51,11 @@ export function useWebSocket() {
       }
     });
 
+    // Only unsubscribe the listener on cleanup — don't tear down the global WS.
+    // The connection persists across StrictMode remounts and route navigations.
+    // It's only closed when user becomes null (logout).
     return () => {
       unsubscribe();
-      disconnectWebSocket();
-      setStatus("disconnected");
     };
   }, [user, setStatus, setTyping, queryClient]);
 

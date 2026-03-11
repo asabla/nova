@@ -1,5 +1,6 @@
 import ReconnectingWebSocket from "reconnecting-websocket";
 import type { ServerWSEvent } from "@nova/shared/types";
+import { useWSStore } from "../stores/ws.store";
 
 let ws: ReconnectingWebSocket | null = null;
 type Listener = (event: ServerWSEvent) => void;
@@ -8,12 +9,38 @@ const listeners = new Set<Listener>();
 export function connectWebSocket() {
   if (ws) return;
 
+  useWSStore.getState().setStatus("connecting");
+
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  ws = new ReconnectingWebSocket(`${protocol}//${window.location.host}/ws`);
+  ws = new ReconnectingWebSocket(`${protocol}//${window.location.host}/ws`, [], {
+    debug: !!import.meta.env.DEV,
+  });
+
+  ws.onopen = () => {
+    useWSStore.getState().setStatus("connected");
+  };
+
+  ws.onclose = () => {
+    // reconnecting-websocket will auto-reconnect; only set "disconnected" on intentional close
+    if (ws) {
+      useWSStore.getState().setStatus("reconnecting");
+    }
+  };
+
+  ws.onerror = () => {
+    useWSStore.getState().setStatus("reconnecting");
+  };
 
   ws.onmessage = (event) => {
+    // Any message received means the connection is alive
+    if (useWSStore.getState().status !== "connected") {
+      useWSStore.getState().setStatus("connected");
+    }
     try {
-      const msg = JSON.parse(event.data) as ServerWSEvent;
+      const raw = JSON.parse(event.data) as { type: string };
+      // Skip internal control messages
+      if (raw.type === "connected") return;
+      const msg = raw as ServerWSEvent;
       for (const listener of listeners) {
         listener(msg);
       }

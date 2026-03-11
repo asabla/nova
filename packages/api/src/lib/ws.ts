@@ -14,6 +14,8 @@ export function handleWsUpgrade(ws: ServerWebSocket<WSData>) {
     connections.set(userId, new Set());
   }
   connections.get(userId)!.add(ws);
+  // Force a frame to be sent — confirms connection through proxy
+  ws.send(JSON.stringify({ type: "connected" }));
 }
 
 export function handleWsClose(ws: ServerWebSocket<WSData>) {
