@@ -8,23 +8,34 @@ litellm_settings:
     port: 6379
 
 model_list:
-  # LM Studio (OpenAI-compatible local server)
+  # These models will be selected by default in the
+  # Nova UI for things like: conversations, rag embedding
+  # model, and any other place where a model selection is
+  # needed but the user has not specified one.
+  # ------------- Default models --------------
+  - model_name: default-model
+    litellm_params:
+      model: openai/gpt-oss-20b
+      api_base: http://host.docker.internal:1234/v1
+      api_key: "not-needed"
+
+  - model_name: default-embedding-model
+    litellm_params:
+      model: openai/text-embedding-nomic-embed-text-v1.5
+      api_base: http://host.docker.internal:1234/v1
+      api_key: "not-needed"
+  # ------------- Default models --------------
+
+  # ------------- Lm Studio examples -------------
   - model_name: lmstudio/gpt-oss:20b
     litellm_params:
       model: openai/gpt-oss-20b
       api_base: http://host.docker.internal:1234/v1
       api_key: "not-needed"
 
-  # LM Studio embeddings
   - model_name: lmstudio/text-embedding-nomic-embed-text-v1.5
     litellm_params:
       model: openai/text-embedding-nomic-embed-text-v1.5
       api_base: http://host.docker.internal:1234/v1
       api_key: "not-needed"
-
-  # Ollama example
-  # - model_name: ollama/gpt-oss:20b
-  #   litellm_params:
-  #     model: gpt-oss:20b
-  #     api_base: http://host.docker.internal:11434/v1
-  #     api_key: "not-needed"
+  # ------------- Lm Studio examples -------------
