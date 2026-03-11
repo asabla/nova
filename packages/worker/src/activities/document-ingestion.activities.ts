@@ -20,6 +20,63 @@ async function getMinioClient() {
   });
 }
 
+/** Minimum characters of extracted text to consider a PDF extraction successful */
+const PDF_MIN_TEXT_LENGTH = 50;
+
+/**
+ * Extract text from a PDF buffer. Tries unpdf (pdfjs) first for speed,
+ * then falls back to mupdf page rendering + tesseract.js OCR for PDFs
+ * that render text as vector paths (e.g. Firefox "Print to PDF" on macOS).
+ */
+async function extractPdfText(fileBuffer: Buffer): Promise<string> {
+  // 1. Try unpdf (fast, works for most PDFs)
+  try {
+    const { extractText } = await import("unpdf");
+    const result = await extractText(new Uint8Array(fileBuffer));
+    const pages = result.text;
+    const text = Array.isArray(pages) ? pages.join("\n") : String(pages);
+    if (text.trim().length >= PDF_MIN_TEXT_LENGTH) {
+      return text;
+    }
+    console.warn("[PDF] unpdf returned insufficient text, trying OCR fallback");
+  } catch (err) {
+    console.warn("[PDF] unpdf extraction failed, trying OCR fallback:", err);
+  }
+
+  // 2. Fallback: render pages with mupdf → OCR with tesseract.js
+  const mupdf = await import("mupdf");
+  const { createWorker } = await import("tesseract.js");
+
+  const doc = mupdf.Document.openDocument(fileBuffer, "application/pdf");
+  const pageCount = doc.countPages();
+  const ocrWorker = await createWorker("eng");
+  const pageTexts: string[] = [];
+
+  try {
+    for (let i = 0; i < pageCount; i++) {
+      const page = doc.loadPage(i);
+      // Render at 2x scale for better OCR accuracy
+      const pixmap = page.toPixmap(
+        [2, 0, 0, 2, 0, 0],
+        mupdf.ColorSpace.DeviceRGB,
+        false,
+        true,
+      );
+      const png = pixmap.asPNG();
+      const { data: { text } } = await ocrWorker.recognize(Buffer.from(png));
+      pageTexts.push(text);
+    }
+  } finally {
+    await ocrWorker.terminate();
+  }
+
+  const fullText = pageTexts.join("\n\n");
+  if (fullText.trim().length === 0) {
+    console.warn("[PDF] OCR also returned no text (image-only PDF with no recognizable text)");
+  }
+  return fullText;
+}
+
 interface ResolvedContent {
   text: string;
   title?: string;
@@ -75,10 +132,8 @@ async function resolveDocumentContent(input: DocumentIngestionInput): Promise<Re
 
     const ct = (fileRecord.contentType ?? "").toLowerCase();
     if (ct === "application/pdf" || fileRecord.filename?.toLowerCase().endsWith(".pdf")) {
-      const { extractText } = await import("unpdf");
-      const result = await extractText(new Uint8Array(fileBuffer));
-      const pages = result.text;
-      return { text: Array.isArray(pages) ? pages.join("\n") : String(pages) };
+      const text = await extractPdfText(fileBuffer);
+      return { text };
     }
 
     const text = fileBuffer.toString("utf-8");
@@ -184,6 +239,10 @@ async function persistChunks(
 export async function ingestDocument(input: DocumentIngestionInput): Promise<{ chunkCount: number }> {
   const resolved = await resolveDocumentContent(input);
 
+  if (!resolved.text.trim()) {
+    throw new Error("No text could be extracted from the document");
+  }
+
   // Fetch collection settings for chunk size/overlap and embedding model
   const [collection] = await db
     .select({
@@ -198,6 +257,10 @@ export async function ingestDocument(input: DocumentIngestionInput): Promise<{ c
     maxChunkSize: collection?.chunkSize ?? 1500,
     overlap: collection?.chunkOverlap ?? 150,
   });
+
+  if (chunks.length === 0) {
+    throw new Error("Document produced no chunks after processing");
+  }
 
   const withEmbeddings = await embedChunks(chunks, collection?.embeddingModel ?? undefined);
   await persistChunks(input.documentId, input.collectionId, withEmbeddings, resolved.title, resolved.sourceUrl);
