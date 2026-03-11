@@ -100,7 +100,7 @@ v1ChatRoutes.post("/completions", async (c) => {
 
 // OpenAI-compatible embeddings endpoint
 const embeddingSchema = z.object({
-  model: z.string().default("lmstudio/text-embedding-nomic-embed-text-v1.5"),
+  model: z.string().default("default-embedding-model"),
   input: z.union([z.string(), z.array(z.string())]),
   encoding_format: z.enum(["float", "base64"]).optional(),
 });

@@ -138,7 +138,7 @@ export async function listModels(): Promise<OpenAI.Models.ModelsPage> {
 
 export async function generateEmbedding(
   text: string,
-  model = env.EMBEDDING_MODEL ?? "lmstudio/text-embedding-nomic-embed-text-v1.5",
+  model = env.EMBEDDING_MODEL ?? "default-embedding-model",
 ): Promise<number[] | null> {
   try {
     const result = await openai.embeddings.create({

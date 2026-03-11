@@ -33,7 +33,7 @@ async function seed() {
 
   // Org settings
   const settings: Record<string, string> = {
-    defaultModel: "lmstudio/gpt-oss:20b",
+    defaultModel: "default-model",
     maxTokensPerMessage: "4096",
     maxMessagesPerConversation: "1000",
     maxFileSizeMb: "50",
@@ -120,8 +120,8 @@ async function seed() {
   const providerId = provider?.id ?? (await db.select().from(modelProviders).where(eq(modelProviders.orgId, orgId)).then((r) => r[0]!.id));
 
   const modelDefs = [
-    { name: "LM Studio (gpt-oss:20b)", modelIdExternal: "lmstudio/gpt-oss:20b", capabilities: ["chat"], contextWindow: 32000, isDefault: true },
-    { name: "LM Studio Embeddings", modelIdExternal: "lmstudio/text-embedding-nomic-embed-text-v1.5", capabilities: ["embeddings"], contextWindow: 8192 },
+    { name: "Default Model", modelIdExternal: "default-model", capabilities: ["chat"], contextWindow: 32000, isDefault: true },
+    { name: "Default Embedding Model", modelIdExternal: "default-embedding-model", capabilities: ["embeddings"], contextWindow: 8192 },
   ];
 
   for (const m of modelDefs) {

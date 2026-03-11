@@ -43,7 +43,7 @@ async function refreshCache(): Promise<void> {
  */
 export async function getDefaultChatModel(): Promise<string> {
   await refreshCache();
-  return cachedDefaultModel ?? process.env.SUMMARY_MODEL ?? "lmstudio/gpt-oss:20b";
+  return cachedDefaultModel ?? process.env.SUMMARY_MODEL ?? "default-model";
 }
 
 /**
@@ -52,5 +52,5 @@ export async function getDefaultChatModel(): Promise<string> {
  */
 export async function getDefaultEmbeddingModel(): Promise<string> {
   await refreshCache();
-  return cachedEmbeddingModel ?? process.env.EMBEDDING_MODEL ?? "lmstudio/text-embedding-nomic-embed-text-v1.5";
+  return cachedEmbeddingModel ?? process.env.EMBEDDING_MODEL ?? "default-embedding-model";
 }
