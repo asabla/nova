@@ -69,6 +69,133 @@ export const IframeEmbed: Story = {
   },
 };
 
+/** Bar chart widget */
+export const BarChart: Story = {
+  args: {
+    config: {
+      type: "chart",
+      title: "Quarterly Sales",
+      params: {
+        chartType: "bar",
+        data: "10,25,40,30",
+        labels: "Q1,Q2,Q3,Q4",
+      },
+    } satisfies WidgetConfig,
+  },
+};
+
+/** Line chart widget */
+export const LineChart: Story = {
+  args: {
+    config: {
+      type: "chart",
+      title: "Monthly Trend",
+      params: {
+        chartType: "line",
+        data: "5,12,8,22,18,30",
+        labels: "Jan,Feb,Mar,Apr,May,Jun",
+      },
+    } satisfies WidgetConfig,
+  },
+};
+
+/** Pie chart widget */
+export const PieChart: Story = {
+  args: {
+    config: {
+      type: "chart",
+      title: "Market Share",
+      params: {
+        chartType: "pie",
+        data: "45,30,15,10",
+        labels: "Chrome,Safari,Firefox,Edge",
+      },
+    } satisfies WidgetConfig,
+  },
+};
+
+/** Progress step tracker */
+export const Progress: Story = {
+  args: {
+    config: {
+      type: "progress",
+      title: "Setup Progress",
+      params: {
+        steps: "Account,Profile,Settings,Done",
+        current: "2",
+        status: "in-progress",
+      },
+    } satisfies WidgetConfig,
+  },
+};
+
+/** Progress — completed state */
+export const ProgressCompleted: Story = {
+  args: {
+    config: {
+      type: "progress",
+      title: "All Done",
+      params: {
+        steps: "Upload,Process,Review,Publish",
+        current: "3",
+        status: "completed",
+      },
+    } satisfies WidgetConfig,
+  },
+};
+
+/** Timer / stopwatch widget */
+export const Timer: Story = {
+  args: {
+    config: {
+      type: "timer",
+      title: "Focus Timer",
+      params: { autoStart: "false", label: "Focus Session" },
+    } satisfies WidgetConfig,
+  },
+};
+
+/** Map widget (OpenStreetMap) */
+export const Map: Story = {
+  args: {
+    config: {
+      type: "map",
+      title: "Paris",
+      params: {
+        lat: "48.8566",
+        lon: "2.3522",
+        zoom: "13",
+        query: "Paris, France",
+      },
+    } satisfies WidgetConfig,
+  },
+};
+
+/** Math / LaTeX equation widget */
+export const Math: Story = {
+  args: {
+    config: {
+      type: "math",
+      title: "Einstein's Equation",
+      params: { expression: "E = mc^2", displayMode: "true" },
+    } satisfies WidgetConfig,
+  },
+};
+
+/** Math — complex equation */
+export const MathComplex: Story = {
+  args: {
+    config: {
+      type: "math",
+      title: "Quadratic Formula",
+      params: {
+        expression: "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}",
+        displayMode: "true",
+      },
+    } satisfies WidgetConfig,
+  },
+};
+
 /** All widget types gallery */
 export const AllWidgets: Story = {
   render: () => (
@@ -103,6 +230,83 @@ export const AllWidgets: Story = {
           type: "weather",
           title: "Stockholm Weather",
           params: { location: "Stockholm" },
+        }}
+      />
+
+      <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary mt-6">
+        Bar Chart
+      </p>
+      <DynamicWidget
+        config={{
+          type: "chart",
+          title: "Quarterly Revenue",
+          params: { chartType: "bar", data: "10,25,40,30", labels: "Q1,Q2,Q3,Q4" },
+        }}
+      />
+
+      <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary mt-6">
+        Line Chart
+      </p>
+      <DynamicWidget
+        config={{
+          type: "chart",
+          title: "Growth Trend",
+          params: { chartType: "line", data: "5,12,8,22,18,30", labels: "Jan,Feb,Mar,Apr,May,Jun" },
+        }}
+      />
+
+      <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary mt-6">
+        Pie Chart
+      </p>
+      <DynamicWidget
+        config={{
+          type: "chart",
+          title: "Browser Share",
+          params: { chartType: "pie", data: "45,30,15,10", labels: "Chrome,Safari,Firefox,Edge" },
+        }}
+      />
+
+      <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary mt-6">
+        Progress
+      </p>
+      <DynamicWidget
+        config={{
+          type: "progress",
+          title: "Onboarding",
+          params: { steps: "Sign Up,Verify,Profile,Complete", current: "2", status: "in-progress" },
+        }}
+      />
+
+      <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary mt-6">
+        Timer
+      </p>
+      <DynamicWidget
+        config={{
+          type: "timer",
+          title: "Stopwatch",
+          params: { autoStart: "false", label: "Elapsed" },
+        }}
+      />
+
+      <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary mt-6">
+        Map
+      </p>
+      <DynamicWidget
+        config={{
+          type: "map",
+          title: "Tokyo",
+          params: { lat: "35.6762", lon: "139.6503", zoom: "12", query: "Tokyo, Japan" },
+        }}
+      />
+
+      <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary mt-6">
+        Math
+      </p>
+      <DynamicWidget
+        config={{
+          type: "math",
+          title: "Euler's Identity",
+          params: { expression: "e^{i\\pi} + 1 = 0", displayMode: "true" },
         }}
       />
     </div>

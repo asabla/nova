@@ -68,6 +68,62 @@ const SAMPLE_WIDGETS: { label: string; config: WidgetConfig }[] = [
       height: 200,
     },
   },
+  {
+    label: "Bar Chart",
+    config: {
+      type: "chart",
+      title: "Quarterly Revenue",
+      params: { chartType: "bar", data: "10,25,40,30", labels: "Q1,Q2,Q3,Q4" },
+    },
+  },
+  {
+    label: "Line Chart",
+    config: {
+      type: "chart",
+      title: "Monthly Trend",
+      params: { chartType: "line", data: "5,12,8,22,18,30", labels: "Jan,Feb,Mar,Apr,May,Jun" },
+    },
+  },
+  {
+    label: "Pie Chart",
+    config: {
+      type: "chart",
+      title: "Market Share",
+      params: { chartType: "pie", data: "45,30,15,10", labels: "Chrome,Safari,Firefox,Edge" },
+    },
+  },
+  {
+    label: "Progress (step 2 of 4)",
+    config: {
+      type: "progress",
+      title: "Setup Progress",
+      params: { steps: "Account,Profile,Settings,Done", current: "2", status: "in-progress" },
+    },
+  },
+  {
+    label: "Timer",
+    config: {
+      type: "timer",
+      title: "Focus Timer",
+      params: { autoStart: "false", label: "Focus Session" },
+    },
+  },
+  {
+    label: "Map (Paris)",
+    config: {
+      type: "map",
+      title: "Paris",
+      params: { lat: "48.8566", lon: "2.3522", zoom: "13", query: "Paris, France" },
+    },
+  },
+  {
+    label: "Math (Euler's Identity)",
+    config: {
+      type: "math",
+      title: "Euler's Identity",
+      params: { expression: "e^{i\\pi} + 1 = 0", displayMode: "true" },
+    },
+  },
 ];
 
 // Wrap a widget config as an ArtifactData to test the ArtifactRenderer pipeline
@@ -212,7 +268,8 @@ function DevWidgetsPage() {
           <h2 className="text-sm font-medium text-text mb-2">WidgetConfig Reference</h2>
           <pre className="p-4 rounded-xl border border-border bg-surface-secondary text-xs text-text-secondary font-mono overflow-x-auto">
 {`interface WidgetConfig {
-  type: "weather" | "iframe" | "api" | "countdown" | "poll";
+  type: "weather" | "iframe" | "api" | "countdown" | "poll"
+       | "chart" | "progress" | "timer" | "map" | "math";
   title?: string;
   src?: string;              // iframe widgets
   endpoint?: string;         // api widgets
@@ -221,9 +278,15 @@ function DevWidgetsPage() {
   params?: Record<string, string>;
 }
 
-// Store as artifact metadata:
-// INSERT INTO artifacts (type, title, content, metadata)
-// VALUES ('widget', 'Weather', '', '{"type":"weather","params":{"location":"Stockholm"}}')`}
+// Widget param reference:
+// weather:   { location }
+// countdown: { date, label }
+// poll:      { question, options (comma-sep) }
+// chart:     { chartType (bar|line|pie), data (comma-sep numbers), labels (comma-sep) }
+// progress:  { steps (comma-sep), current (0-based index), status (in-progress|completed|failed) }
+// timer:     { autoStart (true|false), label }
+// map:       { lat, lon, zoom, query }
+// math:      { expression (LaTeX), displayMode (true|false) }`}
           </pre>
         </section>
       </div>

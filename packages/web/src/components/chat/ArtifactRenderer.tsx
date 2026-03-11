@@ -244,10 +244,7 @@ function SimpleBarChart({ csv }: { csv: string }) {
 
 // --- Interactive Chart (structured data: bar, line, pie) ---
 
-const CHART_COLORS = [
-  "#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6",
-  "#ec4899", "#14b8a6", "#f97316", "#6366f1", "#06b6d4",
-];
+import { CHART_COLORS } from "@/constants/chart-colors";
 
 function InteractiveChart({ data }: { data: ChartData }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
