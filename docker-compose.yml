@@ -162,7 +162,7 @@ services:
       TEMPORAL_ADDRESS: temporal:7233
       BETTER_AUTH_SECRET: change-me-in-production-use-openssl-rand-base64-32
       BETTER_AUTH_URL: http://localhost:5173
-      CORS_ORIGINS: http://localhost:5173,http://web:80
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000
       APP_URL: http://localhost:5173
     depends_on:
       postgres:

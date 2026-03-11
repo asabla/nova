@@ -13,18 +13,55 @@ model_list:
   # model, and any other place where a model selection is
   # needed but the user has not specified one.
   # ------------- Default models --------------
-  - model_name: default-model
-    litellm_params:
-      model: openai/gpt-oss-20b
-      api_base: http://host.docker.internal:1234/v1
-      api_key: "not-needed"
+  # - model_name: default-model
+  #   litellm_params:
+  #     model: openai/gpt-oss-20b
+  #     api_base: http://host.docker.internal:1234/v1
+  #     api_key: "not-needed"
+  #
+  # - model_name: default-embedding-model
+  #   litellm_params:
+  #     model: openai/text-embedding-nomic-embed-text-v1.5
+  #     api_base: http://host.docker.internal:1234/v1
+  #     api_key: "not-needed"
+  # ------------- Default models --------------
 
   - model_name: default-embedding-model
     litellm_params:
-      model: openai/text-embedding-nomic-embed-text-v1.5
-      api_base: http://host.docker.internal:1234/v1
-      api_key: "not-needed"
-  # ------------- Default models --------------
+      model: openai/text-embedding-3-small
+      api_base: "https://eu.api.openai.com/v1"
+      api_key: os.environ/OPENAI_EU_API_KEY
+
+  - model_name: default-model
+    litellm_params:
+      model: openai/gpt-5.2
+      api_base: "https://eu.api.openai.com/v1"
+      api_key: os.environ/OPENAI_EU_API_KEY
+      reasoning:
+        effort: "medium"
+        summary: "detailed"
+      max_output_tokens: 16000
+      merge_reasoning_content_in_choices: true
+      drop_params: true
+      tools: # ← native Responses API web search
+        - type: "web_search_preview"
+      additional_drop_params:
+        - temperature
+        - top_p
+        - presence_penalty
+        - frequency_penalty
+        - logprobs
+        - top_logprobs
+        - parallel_tool_calls
+        - max_completion_tokens
+        - max_tokens
+        - stream_options
+      allowed_openai_params:
+        - stream
+    model_info:
+      mode: responses
+      supports_reasoning: true
+      base_model: openai/gpt-5.2
 
   # ------------- Lm Studio examples -------------
   - model_name: lmstudio/gpt-oss:20b
@@ -39,3 +76,40 @@ model_list:
       api_base: http://host.docker.internal:1234/v1
       api_key: "not-needed"
   # ------------- Lm Studio examples -------------
+
+  - model_name: openai-embedding
+    litellm_params:
+      model: openai/text-embedding-3-small
+      api_base: "https://eu.api.openai.com/v1"
+      api_key: os.environ/OPENAI_EU_API_KEY
+
+  - model_name: openai-gpt-5.2-responses
+    litellm_params:
+      model: openai/gpt-5.2
+      api_base: "https://eu.api.openai.com/v1"
+      api_key: os.environ/OPENAI_EU_API_KEY
+      reasoning:
+        effort: "medium"
+        summary: "detailed"
+      max_output_tokens: 16000
+      merge_reasoning_content_in_choices: true
+      drop_params: true
+      tools: # ← native Responses API web search
+        - type: "web_search_preview"
+      additional_drop_params:
+        - temperature
+        - top_p
+        - presence_penalty
+        - frequency_penalty
+        - logprobs
+        - top_logprobs
+        - parallel_tool_calls
+        - max_completion_tokens
+        - max_tokens
+        - stream_options
+      allowed_openai_params:
+        - stream
+    model_info:
+      mode: responses
+      supports_reasoning: true
+      base_model: openai/gpt-5.2
