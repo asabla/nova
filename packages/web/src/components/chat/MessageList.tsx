@@ -61,21 +61,47 @@ export function MessageList({ messages, artifactsByMessageId, streamingContent, 
   }, [checkIfNearBottom]);
 
   // Auto-scroll on new messages / streaming content, or show "new messages" button
+  const rafRef = useRef<number | null>(null);
+
   useEffect(() => {
     const newMessagesArrived = messages.length > prevMessageCountRef.current;
     prevMessageCountRef.current = messages.length;
 
     if (isNearBottomRef.current) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      if (isStreaming) {
+        // During streaming: use instant scroll coalesced via rAF to avoid overlapping animations
+        if (rafRef.current === null) {
+          rafRef.current = requestAnimationFrame(() => {
+            const container = scrollContainerRef.current;
+            if (container) {
+              container.scrollTop = container.scrollHeight;
+            }
+            rafRef.current = null;
+          });
+        }
+      } else {
+        // New messages (not streaming): smooth scroll
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      }
     } else if (newMessagesArrived) {
       setShowNewMessages(true);
     }
-  }, [messages.length, streamingContent]);
+  }, [messages.length, streamingContent, isStreaming]);
+
+  // Cleanup rAF on unmount
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div
       ref={scrollContainerRef}
       className="flex-1 overflow-y-auto relative"
+      style={{ overflowAnchor: "auto" }}
       role="log"
       aria-live="polite"
     >

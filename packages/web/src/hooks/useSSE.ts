@@ -15,6 +15,23 @@ export function useSSEStream() {
   const abortRef = useRef<AbortController | null>(null);
   const pausedRef = useRef(false);
   const bufferWhilePausedRef = useRef("");
+  const pendingTokensRef = useRef("");
+  const rafIdRef = useRef<number | null>(null);
+
+  const flushPendingTokens = useCallback(() => {
+    if (pendingTokensRef.current) {
+      const pending = pendingTokensRef.current;
+      pendingTokensRef.current = "";
+      setTokens((prev) => prev + pending);
+    }
+    rafIdRef.current = null;
+  }, []);
+
+  const scheduleTokenFlush = useCallback(() => {
+    if (rafIdRef.current === null) {
+      rafIdRef.current = requestAnimationFrame(flushPendingTokens);
+    }
+  }, [flushPendingTokens]);
 
   const startStream = useCallback(async (url: string, body: unknown) => {
     setTokens("");
@@ -95,7 +112,8 @@ export function useSSEStream() {
                 if (pausedRef.current) {
                   bufferWhilePausedRef.current += data.content;
                 } else {
-                  setTokens((prev) => prev + data.content);
+                  pendingTokensRef.current += data.content;
+                  scheduleTokenFlush();
                 }
               }
             } catch {
@@ -121,10 +139,16 @@ export function useSSEStream() {
 
   const stopStream = useCallback(() => {
     abortRef.current?.abort();
-    // Flush paused content before stopping
-    if (bufferWhilePausedRef.current) {
-      setTokens((prev) => prev + bufferWhilePausedRef.current);
-      bufferWhilePausedRef.current = "";
+    // Cancel pending rAF and flush all buffered content
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    const allPending = pendingTokensRef.current + bufferWhilePausedRef.current;
+    pendingTokensRef.current = "";
+    bufferWhilePausedRef.current = "";
+    if (allPending) {
+      setTokens((prev) => prev + allPending);
     }
     setStatus("done");
   }, []);
@@ -145,10 +169,15 @@ export function useSSEStream() {
   }, []);
 
   const resetStream = useCallback(() => {
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    pendingTokensRef.current = "";
+    bufferWhilePausedRef.current = "";
     setTokens("");
     setStatus("idle");
     setActiveTools([]);
-    bufferWhilePausedRef.current = "";
   }, []);
 
   return { tokens, status, activeTools, startStream, stopStream, pauseStream, resumeStream, resetStream };

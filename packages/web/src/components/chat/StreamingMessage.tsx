@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Sparkles } from "lucide-react";
 import { MarkdownRenderer } from "../markdown/MarkdownRenderer";
 
@@ -6,8 +7,13 @@ interface StreamingMessageProps {
 }
 
 export function StreamingMessage({ content }: StreamingMessageProps) {
+  const timestamp = useMemo(
+    () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }),
+    [],
+  );
+
   return (
-    <div className="flex gap-3 py-3 bg-surface-secondary/50 -mx-2 px-5 rounded-xl">
+    <div className="flex gap-3 py-3 bg-surface-secondary/50 -mx-2 px-5 rounded-xl" style={{ contain: "content" }}>
       <div className="shrink-0 mt-0.5">
         <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center">
           <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
@@ -18,7 +24,7 @@ export function StreamingMessage({ content }: StreamingMessageProps) {
         <div className="flex items-center gap-2 mb-1">
           <span className="text-sm font-semibold text-text">NOVA</span>
           <span className="text-[10px] text-text-tertiary">
-            {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}
+            {timestamp}
           </span>
         </div>
 
