@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { Menu, Sun, Moon, Monitor, Plus } from "lucide-react";
+import { PanelLeft, Sun, Moon, Monitor, Plus } from "lucide-react";
 import { authClient } from "../../hooks/useAuth";
 import { useUIStore } from "../../stores/ui.store";
 import { Avatar } from "../ui/Avatar";
@@ -38,7 +38,7 @@ export function Header() {
             aria-expanded={sidebarOpen}
             className="text-text-secondary hover:text-text p-1.5 rounded-lg hover:bg-surface-secondary focus-visible:outline-2 focus-visible:outline-primary"
           >
-            <Menu className="h-5 w-5" aria-hidden="true" />
+            <PanelLeft className="h-5 w-5" aria-hidden="true" />
           </button>
         )}
       </div>
