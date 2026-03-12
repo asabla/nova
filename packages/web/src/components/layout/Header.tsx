@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { PanelLeft, Sun, Moon, Monitor, Plus } from "lucide-react";
+import { Sun, Moon, Monitor } from "lucide-react";
 import { authClient } from "../../hooks/useAuth";
 import { useUIStore } from "../../stores/ui.store";
 import { Avatar } from "../ui/Avatar";
@@ -12,8 +12,6 @@ export function Header() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data: session } = authClient.useSession();
-  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
-  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const theme = useUIStore((s) => s.theme);
   const setTheme = useUIStore((s) => s.setTheme);
 
@@ -29,29 +27,9 @@ export function Header() {
       >
         {t("nav.skipToContent", { defaultValue: "Skip to content" })}
       </a>
-      {/* Left: Menu toggle */}
-      <div className="flex items-center shrink-0">
-        {!sidebarOpen && (
-          <button
-            onClick={toggleSidebar}
-            aria-label={t("nav.openSidebar", { defaultValue: "Open sidebar" })}
-            aria-expanded={sidebarOpen}
-            className="text-text-secondary hover:text-text p-1.5 rounded-lg hover:bg-surface-secondary focus-visible:outline-2 focus-visible:outline-primary"
-          >
-            <PanelLeft className="h-5 w-5" aria-hidden="true" />
-          </button>
-        )}
-      </div>
 
-      {/* Center: New conversation + OmniBar search */}
-      <div className="flex-1 flex items-center justify-center gap-2 min-w-0">
-        <button
-          onClick={() => navigate({ to: "/" })}
-          aria-label={t("conversations.new", { defaultValue: "New conversation" })}
-          className="shrink-0 h-10 w-10 flex items-center justify-center rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-colors focus-visible:outline-2 focus-visible:outline-primary"
-        >
-          <Plus className="h-5 w-5" aria-hidden="true" />
-        </button>
+      {/* Center: OmniBar search */}
+      <div className="flex-1 flex items-center justify-center min-w-0">
         <OmniBarTrigger />
       </div>
 

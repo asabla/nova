@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { clsx } from "clsx";
 import {
-  Archive, Pin, Trash2, PanelLeftClose, BookOpen,
+  Archive, Pin, Trash2, PanelLeft, PanelLeftClose, BookOpen,
   FolderKanban, Settings, ShieldCheck,
   Microscope, Compass, HelpCircle, Filter, Search,
   CheckSquare, Square, FolderOpen, MessageSquare, Zap, HardDrive, Plus,
@@ -140,23 +140,34 @@ export function Sidebar() {
           "flex items-center border-b border-border",
           sidebarOpen ? "justify-between px-4 py-3.5" : "justify-center py-3.5",
         )}>
-          <button
-            onClick={() => navigate({ to: "/" })}
-            className="flex items-center gap-2.5 group"
-            title={!sidebarOpen ? "NOVA" : undefined}
-          >
-            <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
-              <Zap className="h-4 w-4 text-primary" aria-hidden="true" />
-            </div>
-            {sidebarOpen && <span className="font-bold text-sm tracking-tight text-text nova-glow">NOVA</span>}
-          </button>
-          {sidebarOpen && (
+          {sidebarOpen ? (
+            <>
+              <button
+                onClick={() => navigate({ to: "/" })}
+                className="flex items-center gap-2.5 group"
+              >
+                <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
+                  <Zap className="h-4 w-4 text-primary" aria-hidden="true" />
+                </div>
+                <span className="font-bold text-sm tracking-tight text-text nova-glow">NOVA</span>
+              </button>
+              <button
+                onClick={toggleSidebar}
+                aria-label={t("nav.collapseSidebar", { defaultValue: "Collapse sidebar" })}
+                className="text-text-tertiary hover:text-text p-1.5 rounded-lg hover:bg-surface-tertiary focus-visible:outline-2 focus-visible:outline-primary transition-colors"
+              >
+                <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </>
+          ) : (
             <button
               onClick={toggleSidebar}
-              aria-label={t("nav.collapseSidebar", { defaultValue: "Collapse sidebar" })}
-              className="text-text-tertiary hover:text-text p-1.5 rounded-lg hover:bg-surface-tertiary focus-visible:outline-2 focus-visible:outline-primary transition-colors"
+              aria-label={t("nav.openSidebar", { defaultValue: "Open sidebar" })}
+              className="group/logo relative h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center hover:bg-primary/15 transition-colors"
+              title={t("nav.openSidebar", { defaultValue: "Open sidebar" })}
             >
-              <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
+              <Zap className="h-4 w-4 text-primary transition-opacity group-hover/logo:opacity-0" aria-hidden="true" />
+              <PanelLeft className="h-4 w-4 text-primary absolute opacity-0 transition-opacity group-hover/logo:opacity-100" aria-hidden="true" />
             </button>
           )}
         </div>
