@@ -38,13 +38,11 @@ model_list:
       api_base: "https://eu.api.openai.com/v1"
       api_key: os.environ/OPENAI_EU_API_KEY
       reasoning:
-        effort: "medium"
+        effort: "low"
         summary: "detailed"
       max_output_tokens: 16000
       merge_reasoning_content_in_choices: true
       drop_params: true
-      tools: # ← native Responses API web search
-        - type: "web_search_preview"
       additional_drop_params:
         - temperature
         - top_p
@@ -53,11 +51,6 @@ model_list:
         - logprobs
         - top_logprobs
         - parallel_tool_calls
-        - max_completion_tokens
-        - max_tokens
-        - stream_options
-      allowed_openai_params:
-        - stream
     model_info:
       mode: responses
       supports_reasoning: true
@@ -89,13 +82,11 @@ model_list:
       api_base: "https://eu.api.openai.com/v1"
       api_key: os.environ/OPENAI_EU_API_KEY
       reasoning:
-        effort: "medium"
+        effort: "low"
         summary: "detailed"
       max_output_tokens: 16000
       merge_reasoning_content_in_choices: true
       drop_params: true
-      tools: # ← native Responses API web search
-        - type: "web_search_preview"
       additional_drop_params:
         - temperature
         - top_p
@@ -104,11 +95,6 @@ model_list:
         - logprobs
         - top_logprobs
         - parallel_tool_calls
-        - max_completion_tokens
-        - max_tokens
-        - stream_options
-      allowed_openai_params:
-        - stream
     model_info:
       mode: responses
       supports_reasoning: true
