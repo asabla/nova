@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, memo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Copy, Check, ThumbsUp, ThumbsDown, Pencil, RotateCcw, History, X, Send, StickyNote, ChevronDown, GitBranch, Volume2, VolumeX, Paperclip, FileText, Download, Sparkles } from "lucide-react";
@@ -6,6 +6,7 @@ import { clsx } from "clsx";
 import { MarkdownRenderer } from "../markdown/MarkdownRenderer";
 import { ArtifactRenderer } from "./ArtifactRenderer";
 import { DynamicWidget } from "./DynamicWidget";
+import { ToolSummaryCompact } from "./InlineToolStatus";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/Badge";
 import { Input } from "../ui/Input";
@@ -13,6 +14,10 @@ import { Textarea } from "../ui/Textarea";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { formatDistanceToNow } from "date-fns";
+
+function stripThinkingBlocks(content: string): string {
+  return content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+}
 
 interface EditHistoryEntry {
   content: string;
@@ -34,6 +39,7 @@ interface MessageBubbleProps {
     tokenCountCompletion?: number | null;
     costCents?: number | null;
     modelId?: string | null;
+    metadata?: Record<string, any> | null;
     rating?: "up" | "down" | null;
     attachments?: {
       id: string;
@@ -67,6 +73,11 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
   const isUser = message.senderType === "user";
   const isAssistant = message.senderType === "assistant";
 
+  const displayContent = useMemo(() => {
+    if (!message.content || !isAssistant) return message.content;
+    return stripThinkingBlocks(message.content);
+  }, [message.content, isAssistant]);
+
   const { data: modelsData } = useQuery({
     queryKey: queryKeys.models.all,
     queryFn: () => api.get<any>("/api/models"),
@@ -92,7 +103,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
   const ttsSupported = typeof window !== "undefined" && "speechSynthesis" in window;
 
   const handleSpeak = useCallback(() => {
-    if (!ttsSupported || !message.content) return;
+    if (!ttsSupported || !displayContent) return;
 
     if (isSpeaking) {
       window.speechSynthesis.cancel();
@@ -101,7 +112,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
     }
 
     // Strip markdown syntax for cleaner TTS output
-    const plainText = message.content
+    const plainText = displayContent
       .replace(/```[\s\S]*?```/g, " code block ")
       .replace(/`([^`]+)`/g, "$1")
       .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
@@ -120,7 +131,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
     utteranceRef.current = utterance;
     setIsSpeaking(true);
     window.speechSynthesis.speak(utterance);
-  }, [ttsSupported, message.content, isSpeaking]);
+  }, [ttsSupported, displayContent, isSpeaking]);
 
   // Cancel TTS on unmount
   useEffect(() => {
@@ -254,39 +265,52 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
             </div>
           </div>
         ) : (
-          <div
-            className={clsx(
-              "w-full",
-              message.status === "failed" && "border-l-2 border-danger/50 pl-3",
+          <>
+            {/* Tool summary - ABOVE content like streaming view */}
+            {isAssistant && message.metadata?.toolSummary && (
+              <ToolSummaryCompact
+                tools={(message.metadata.toolSummary as { name: string; durationMs?: number; error?: string }[]).map((t) => ({
+                  name: t.name,
+                  status: t.error ? "error" as const : "completed" as const,
+                  resultSummary: t.error ? `Error: ${t.error.slice(0, 40)}` : undefined,
+                }))}
+              />
             )}
-          >
-            {message.content ? (
-              isAssistant ? (
-                <div className="text-sm text-text leading-relaxed">
-                  <MarkdownRenderer content={message.content} />
+
+            <div
+              className={clsx(
+                "w-full",
+                message.status === "failed" && "border-l-2 border-danger/50 pl-3",
+              )}
+            >
+              {displayContent ? (
+                isAssistant ? (
+                  <div className="text-sm text-text leading-relaxed">
+                    <MarkdownRenderer content={displayContent} />
+                  </div>
+                ) : (
+                  <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">{displayContent}</p>
+                )
+              ) : message.status === "streaming" ? (
+                <div className="flex items-center gap-1.5 py-2">
+                  {[0, 1, 2].map((i) => (
+                    <span
+                      key={i}
+                      className="h-1.5 w-1.5 rounded-full bg-text-tertiary"
+                      style={{
+                        animation: "pulse 1.4s ease-in-out infinite",
+                        animationDelay: `${i * 0.2}s`,
+                      }}
+                      aria-hidden="true"
+                    />
+                  ))}
+                  <span className="sr-only">{t("messages.loading", { defaultValue: "Loading response" })}</span>
                 </div>
-              ) : (
-                <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">{message.content}</p>
-              )
-            ) : message.status === "streaming" ? (
-              <div className="flex items-center gap-1.5 py-2">
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    className="h-1.5 w-1.5 rounded-full bg-text-tertiary"
-                    style={{
-                      animation: "pulse 1.4s ease-in-out infinite",
-                      animationDelay: `${i * 0.2}s`,
-                    }}
-                    aria-hidden="true"
-                  />
-                ))}
-                <span className="sr-only">{t("messages.loading", { defaultValue: "Loading response" })}</span>
-              </div>
-            ) : message.status === "failed" ? (
-              <p className="text-sm text-danger" role="alert">{message.content ?? t("errors.messageFailed", { defaultValue: "Message failed to send." })}</p>
-            ) : null}
-          </div>
+              ) : message.status === "failed" ? (
+                <p className="text-sm text-danger" role="alert">{message.content ?? t("errors.messageFailed", { defaultValue: "Message failed to send." })}</p>
+              ) : null}
+            </div>
+          </>
         )}
 
         {/* Artifacts (including dynamic widgets) */}

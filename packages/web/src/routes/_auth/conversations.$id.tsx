@@ -11,7 +11,6 @@ import { ConversationHeader } from "../../components/chat/ConversationHeader";
 import { MessageSkeleton } from "../../components/ui/Skeleton";
 import { Button } from "../../components/ui/Button";
 import { useSSEStream } from "../../hooks/useSSE";
-import { ToolStatusBar } from "../../components/chat/ToolStatusChip";
 import { useAuthStore } from "../../stores/auth.store";
 import { useDragDrop } from "../../hooks/useDragDrop";
 import { useClipboardPaste } from "../../hooks/useClipboardPaste";
@@ -334,6 +333,7 @@ function ConversationPage() {
             artifactsByMessageId={artifactsByMessageId}
             streamingContent={(status === "streaming" || status === "paused") ? tokens : undefined}
             isStreaming={status === "streaming" || status === "paused"}
+            activeTools={activeTools}
             userName={user?.name}
             conversationId={id}
             onRate={handleRate}
@@ -343,11 +343,6 @@ function ConversationPage() {
             onNote={handleNote}
             onFork={handleFork}
           />
-
-          {/* Tool execution status chips */}
-          {activeTools.length > 0 && (status === "streaming" || status === "paused") && (
-            <ToolStatusBar tools={activeTools} />
-          )}
 
           {/* SSE error state */}
           {status === "error" && (

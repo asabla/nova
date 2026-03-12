@@ -1,12 +1,15 @@
 import { useMemo } from "react";
 import { Sparkles } from "lucide-react";
 import { MarkdownRenderer } from "../markdown/MarkdownRenderer";
+import { InlineToolStatusList } from "./InlineToolStatus";
+import type { ActiveTool } from "../../hooks/useSSE";
 
 interface StreamingMessageProps {
   content: string;
+  activeTools?: ActiveTool[];
 }
 
-export function StreamingMessage({ content }: StreamingMessageProps) {
+export function StreamingMessage({ content, activeTools }: StreamingMessageProps) {
   const timestamp = useMemo(
     () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }),
     [],
@@ -28,24 +31,30 @@ export function StreamingMessage({ content }: StreamingMessageProps) {
           </span>
         </div>
 
+        {activeTools && activeTools.length > 0 && (
+          <InlineToolStatusList tools={activeTools} />
+        )}
+
         <div className="text-sm text-text leading-relaxed">
           {content ? (
             <MarkdownRenderer content={content} />
           ) : (
-            <div className="flex items-center gap-1.5 py-2">
-              {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  className="h-1.5 w-1.5 rounded-full bg-text-tertiary"
-                  style={{
-                    animation: "pulse 1.4s ease-in-out infinite",
-                    animationDelay: `${i * 0.2}s`,
-                  }}
-                  aria-hidden="true"
-                />
-              ))}
-              <span className="sr-only">Loading response</span>
-            </div>
+            !activeTools?.length && (
+              <div className="flex items-center gap-1.5 py-2">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="h-1.5 w-1.5 rounded-full bg-text-tertiary"
+                    style={{
+                      animation: "pulse 1.4s ease-in-out infinite",
+                      animationDelay: `${i * 0.2}s`,
+                    }}
+                    aria-hidden="true"
+                  />
+                ))}
+                <span className="sr-only">Loading response</span>
+              </div>
+            )
           )}
           <span className="inline-block w-1.5 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom" aria-hidden="true" />
         </div>
