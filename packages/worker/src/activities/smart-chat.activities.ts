@@ -7,8 +7,9 @@ export async function publishToolStatus(
   channelId: string,
   tool: string,
   status: "running" | "completed" | "error",
+  extra?: { args?: Record<string, unknown>; resultSummary?: string },
 ) {
-  await pubToolStatus(channelId, tool, status);
+  await pubToolStatus(channelId, tool, status, extra);
 }
 
 export async function publishDone(
@@ -34,21 +35,26 @@ function truncateMessages(
     return m;
   });
 
-  // If total is still too large, drop older non-system/non-tool messages
+  // If total is still too large, drop oldest droppable messages (preserve tool-call pairs)
   let total = truncated.reduce((sum, m) => sum + (typeof m.content === "string" ? m.content.length : 0), 0);
   if (total > maxTotalChars) {
-    // Keep system (first), last 2 user messages, and all tool messages; trim the rest
-    const result: typeof truncated = [];
-    for (let i = truncated.length - 1; i >= 0; i--) {
-      result.unshift(truncated[i]);
-      total = result.reduce((sum, m) => sum + (typeof m.content === "string" ? m.content.length : 0), 0);
-      if (total >= maxTotalChars && i > 0) {
-        // Drop this message
-        result.shift();
-        break;
-      }
+    // Identify safe-to-drop indices: not system, not tool, not assistant-with-tool_calls
+    const droppable: number[] = [];
+    for (let i = 1; i < truncated.length; i++) {
+      const m = truncated[i];
+      if (m.role === "tool") continue;
+      if (m.role === "assistant" && (m as any).tool_calls) continue;
+      droppable.push(i);
     }
-    return result;
+    // Drop oldest droppable messages until under budget
+    const dropSet = new Set<number>();
+    for (const idx of droppable) {
+      if (total <= maxTotalChars) break;
+      const len = typeof truncated[idx].content === "string" ? (truncated[idx].content as string).length : 0;
+      total -= len;
+      dropSet.add(idx);
+    }
+    return truncated.filter((_, i) => !dropSet.has(i));
   }
 
   return truncated;

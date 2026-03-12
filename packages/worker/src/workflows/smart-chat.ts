@@ -30,11 +30,43 @@ export interface SmartChatInput {
   maxSteps?: number;
 }
 
+export interface ToolCallRecord {
+  toolName: string;
+  input: Record<string, unknown>;
+  output: unknown;
+  error?: string;
+  durationMs: number;
+}
+
 export interface SmartChatResult {
   content: string;
   totalTokens: number;
   steps: number;
   status: "completed" | "cancelled";
+  toolCallRecords: ToolCallRecord[];
+}
+
+function buildResultSummary(toolName: string, result: { result: unknown; error?: string }): string {
+  if (result.error) return `Error: ${result.error.slice(0, 60)}`;
+  try {
+    const r = result.result;
+    if (toolName === "web_search") {
+      if (Array.isArray(r)) return `Found ${r.length} result${r.length === 1 ? "" : "s"}`;
+      if (typeof r === "object" && r !== null && "results" in r) {
+        const arr = (r as any).results;
+        if (Array.isArray(arr)) return `Found ${arr.length} result${arr.length === 1 ? "" : "s"}`;
+      }
+      const str = typeof r === "string" ? r : JSON.stringify(r);
+      return `Fetched ${str.length.toLocaleString()} chars`;
+    }
+    if (toolName === "fetch_url") {
+      const str = typeof r === "string" ? r : JSON.stringify(r);
+      return `Read ${str.length.toLocaleString()} chars`;
+    }
+    return "Done";
+  } catch {
+    return "Done";
+  }
 }
 
 export async function smartChatWorkflow(input: SmartChatInput): Promise<SmartChatResult> {
@@ -47,6 +79,7 @@ export async function smartChatWorkflow(input: SmartChatInput): Promise<SmartCha
   let lastContent = "";
   let pendingToolCalls = input.pendingToolCalls;
   const messageHistory = [...input.messageHistory];
+  const toolCallRecords: ToolCallRecord[] = [];
 
   const loop = async () => {
     while (steps < maxSteps && !cancelled) {
@@ -67,8 +100,12 @@ export async function smartChatWorkflow(input: SmartChatInput): Promise<SmartCha
       for (const tc of pendingToolCalls) {
         if (cancelled) break;
 
-        await publishToolStatus(input.streamChannelId, tc.function.name, "running");
+        let parsedArgs: Record<string, unknown> = {};
+        try { parsedArgs = JSON.parse(tc.function.arguments); } catch { /* ignore */ }
 
+        await publishToolStatus(input.streamChannelId, tc.function.name, "running", { args: parsedArgs });
+
+        const startMs = Date.now();
         const result = await executeToolCall(
           input.orgId,
           "", // no agentId for smart chat
@@ -76,8 +113,23 @@ export async function smartChatWorkflow(input: SmartChatInput): Promise<SmartCha
           tc.function.name,
           tc.function.arguments,
         );
+        const durationMs = Date.now() - startMs;
 
-        await publishToolStatus(input.streamChannelId, tc.function.name, result.error ? "error" : "completed");
+        const summary = buildResultSummary(tc.function.name, result);
+        await publishToolStatus(
+          input.streamChannelId,
+          tc.function.name,
+          result.error ? "error" : "completed",
+          { resultSummary: summary },
+        );
+
+        toolCallRecords.push({
+          toolName: tc.function.name,
+          input: parsedArgs,
+          output: result.result ?? null,
+          error: result.error,
+          durationMs,
+        });
 
         messageHistory.push({
           role: "tool",
@@ -88,7 +140,7 @@ export async function smartChatWorkflow(input: SmartChatInput): Promise<SmartCha
 
       if (cancelled) break;
 
-      // 2. Call LLM with streaming (tokens published via Redis)
+      // 3. Call LLM with streaming (tokens published via Redis)
       const llmResult = await streamingLLMStep({
         streamChannelId: input.streamChannelId,
         model: input.model,
@@ -105,7 +157,7 @@ export async function smartChatWorkflow(input: SmartChatInput): Promise<SmartCha
         messageHistory.push({ role: "assistant", content: llmResult.content });
       }
 
-      // 3. Check if more tool calls are needed
+      // 4. Check if more tool calls are needed
       if (llmResult.finishReason === "tool_calls" && llmResult.toolCalls.length > 0) {
         pendingToolCalls = llmResult.toolCalls;
         continue;
@@ -137,5 +189,6 @@ export async function smartChatWorkflow(input: SmartChatInput): Promise<SmartCha
     totalTokens,
     steps,
     status: cancelled ? "cancelled" : "completed",
+    toolCallRecords,
   };
 }

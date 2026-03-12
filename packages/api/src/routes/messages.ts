@@ -11,7 +11,7 @@ import { DEFAULTS } from "@nova/shared/constants";
 import { notificationService } from "../services/notification.service";
 import { getTemporalClient } from "../lib/temporal";
 import { db } from "../lib/db";
-import { userProfiles, users, agents, orgSettings, files } from "@nova/shared/schemas";
+import { userProfiles, users, agents, orgSettings, files, toolCalls as toolCallsTable } from "@nova/shared/schemas";
 import { eq, and, isNull, inArray } from "drizzle-orm";
 import { extractFileContent } from "../lib/file-extract";
 import { retrieveWorkspaceContext, formatRAGContext } from "../services/knowledge.service";
@@ -430,11 +430,13 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
       console.log(`[stream] finishReason=${finishReason} toolCalls=${toolCalls.length} contentLen=${fullContent.length}`);
       if (finishReason === "tool_calls" && toolCalls.length > 0) {
         console.log(`[stream] tool calls:`, toolCalls.map(tc => `${tc.function.name}(${tc.function.arguments.slice(0, 50)})`));
-        // Send tool status events to the client
+        // Send tool status events to the client (with parsed args)
         for (const tc of toolCalls) {
+          let parsedArgs: Record<string, unknown> = {};
+          try { parsedArgs = JSON.parse(tc.function.arguments); } catch { /* ignore */ }
           await stream.writeSSE({
             event: "tool_status",
-            data: JSON.stringify({ tool: tc.function.name, status: "running" }),
+            data: JSON.stringify({ tool: tc.function.name, status: "running", args: parsedArgs }),
           });
         }
 
@@ -471,6 +473,21 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
           const totalPromptTokens = promptTokens + (relayResult?.usage?.prompt_tokens ?? 0);
           const totalCompletionTokens = completionTokens + (relayResult?.usage?.completion_tokens ?? 0);
 
+          // Try to get tool call records from Temporal workflow result
+          let toolCallRecords: { toolName: string; input: Record<string, unknown>; output: unknown; error?: string; durationMs: number }[] = [];
+          try {
+            const handle = client.workflow.getHandle(workflowId);
+            const wfResult = await handle.result();
+            toolCallRecords = (wfResult as any)?.toolCallRecords ?? [];
+          } catch {
+            // Workflow may still be running or failed — skip tool call persistence
+          }
+
+          // Build tool call summary for metadata
+          const toolSummary = toolCallRecords.length > 0
+            ? toolCallRecords.map((r) => ({ name: r.toolName, durationMs: r.durationMs, error: r.error }))
+            : undefined;
+
           const assistantMessage = await messageService.createMessage(orgId, {
             conversationId,
             senderType: "assistant",
@@ -478,8 +495,29 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
             modelId: conversation.modelId ?? undefined,
             tokenCountPrompt: totalPromptTokens,
             tokenCountCompletion: totalCompletionTokens,
-            metadata: { latencyMs: Date.now() - startTime, model: body.model, smartRouted: true, ragSources },
+            metadata: { latencyMs: Date.now() - startTime, model: body.model, smartRouted: true, ragSources, toolSummary },
           });
+
+          // Persist tool calls to DB
+          if (toolCallRecords.length > 0) {
+            try {
+              await db.insert(toolCallsTable).values(
+                toolCallRecords.map((r) => ({
+                  messageId: assistantMessage.id,
+                  conversationId,
+                  orgId,
+                  toolName: r.toolName,
+                  input: r.input,
+                  output: r.output ?? null,
+                  status: r.error ? "error" : "completed",
+                  errorMessage: r.error ?? null,
+                  durationMs: r.durationMs,
+                })),
+              );
+            } catch (dbErr) {
+              console.error("[smart-chat] Failed to persist tool calls:", dbErr);
+            }
+          }
 
           await stream.writeSSE({
             event: "done",

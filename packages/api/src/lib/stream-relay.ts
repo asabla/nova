@@ -45,7 +45,12 @@ export async function relayRedisToSSE(
           case "tool_status":
             stream.writeSSE({
               event: "tool_status",
-              data: JSON.stringify({ tool: data.tool, status: data.status }),
+              data: JSON.stringify({
+                tool: data.tool,
+                status: data.status,
+                ...(data.args ? { args: data.args } : {}),
+                ...(data.resultSummary ? { resultSummary: data.resultSummary } : {}),
+              }),
             });
             break;
 

@@ -8,8 +8,9 @@ export async function publishToolStatus(
   channelId: string,
   tool: string,
   status: "running" | "completed" | "error",
+  extra?: { args?: Record<string, unknown>; resultSummary?: string },
 ) {
-  await redis.publish(channelId, JSON.stringify({ type: "tool_status", tool, status }));
+  await redis.publish(channelId, JSON.stringify({ type: "tool_status", tool, status, ...extra }));
 }
 
 export async function publishDone(
