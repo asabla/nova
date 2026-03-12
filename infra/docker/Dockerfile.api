@@ -16,7 +16,8 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 COPY packages/shared/ packages/shared/
 COPY packages/api/ packages/api/
 
-# Production deps only
+# ── Production deps ──────────────────────────────
+FROM builder AS production
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile --production
 
@@ -25,10 +26,10 @@ FROM oven/bun:1-alpine
 
 WORKDIR /app
 
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/packages/shared ./packages/shared
-COPY --from=builder /app/packages/api ./packages/api
-COPY --from=builder /app/package.json ./
+COPY --from=production /app/node_modules ./node_modules
+COPY --from=production /app/packages/shared ./packages/shared
+COPY --from=production /app/packages/api ./packages/api
+COPY --from=production /app/package.json ./
 
 EXPOSE 3000
 
