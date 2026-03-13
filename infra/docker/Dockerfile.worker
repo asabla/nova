@@ -25,6 +25,23 @@ RUN rm -rf packages/shared/dist packages/worker/dist packages/shared/*.tsbuildin
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile --production
 
+# Strip TypeScript source from @openai/agents-core to prevent tsx from
+# loading .ts files instead of compiled .js (causes zod v3 compat issues)
+RUN rm -rf node_modules/@openai/agents-core/src \
+           node_modules/@openai/agents-openai/src
+
+# Patch: agents-core uses .superRefine() on ComputerUseCallItem which produces
+# ZodEffects — but zod v3 compat discriminatedUnion requires ZodObject with .shape.
+# Remove the .superRefine() call so the discriminated union can read the discriminator.
+RUN for f in node_modules/@openai/agents-core/dist/types/protocol.mjs \
+             node_modules/@openai/agents-core/dist/types/protocol.js; do \
+      bun -e " \
+        const code = await Bun.file('$f').text(); \
+        const patched = code.replace(/\}\)\.superRefine\(\(value,\s*ctx\)\s*=>\s*\{[\s\S]*?\n\}\);/g, '});'); \
+        await Bun.write('$f', patched); \
+      "; \
+    done
+
 # ── Runtime (Node.js — required by Temporal) ─────
 FROM node:22-slim
 

@@ -1,17 +1,23 @@
 import { proxyActivities, defineSignal, defineQuery, setHandler, sleep, condition, CancellationScope } from "@temporalio/workflow";
 import type * as agentActivities from "../activities/agent-execution.activities";
+import type * as agentStepActivities from "../activities/agent-step.activities";
 
 const {
   getAgentConfig,
   loadAgentMemory,
   saveAgentMemory,
-  executeAgentStep,
   saveAgentMessage,
   createAgentConversation,
   executeToolCall,
   notifyAgentCompletion,
 } = proxyActivities<typeof agentActivities>({
   startToCloseTimeout: "2 minutes",
+  retry: { maximumAttempts: 3 },
+});
+
+const { executeAgentStepWithSDK } = proxyActivities<typeof agentStepActivities>({
+  startToCloseTimeout: "2 minutes",
+  heartbeatTimeout: "30 seconds",
   retry: { maximumAttempts: 3 },
 });
 
@@ -110,16 +116,14 @@ export async function agentExecutionWorkflow(input: AgentExecutionInput): Promis
     while (currentStep < maxSteps && !cancelled) {
       currentStep++;
 
-      const result = await executeAgentStep(
-        {
-          systemPrompt: agent.systemPrompt,
-          modelId: agent.modelId,
-          modelParams: agent.modelParams,
-        },
+      const result = await executeAgentStepWithSDK({
+        systemPrompt: agent.systemPrompt,
+        modelId: agent.modelId ?? "default-model",
+        modelParams: agent.modelParams,
         messageHistory,
-        [],
-        currentStep,
-      );
+        agentId: input.agentId,
+        singleTurn: true, // Workflow handles tool approval between turns
+      });
 
       totalTokens += (result.usage.prompt_tokens ?? 0) + (result.usage.completion_tokens ?? 0);
 
@@ -139,15 +143,15 @@ export async function agentExecutionWorkflow(input: AgentExecutionInput): Promis
       }
 
       // Check if agent is requesting user input (Story #53)
-      if (result.finishReason === "function_call" && result.toolCalls.some(
-        (tc: any) => tc.function?.name === "__request_user_input"
+      if (result.toolCalls.some(
+        (tc) => tc.name === "__request_user_input"
       )) {
         currentStatus = "awaiting_input";
         const inputRequest = result.toolCalls.find(
-          (tc: any) => tc.function?.name === "__request_user_input"
+          (tc) => tc.name === "__request_user_input"
         );
-        const prompt = inputRequest?.function?.arguments
-          ? JSON.parse(inputRequest.function.arguments).prompt ?? "Please provide input:"
+        const prompt = inputRequest?.arguments
+          ? JSON.parse(inputRequest.arguments).prompt ?? "Please provide input:"
           : "Please provide input:";
 
         // Save the input request as a message
@@ -208,8 +212,8 @@ export async function agentExecutionWorkflow(input: AgentExecutionInput): Promis
               input.orgId,
               input.agentId,
               toolCall.id,
-              toolCall.function?.name ?? "unknown",
-              toolCall.function?.arguments ?? "{}",
+              toolCall.name,
+              toolCall.arguments,
             );
             messageHistory.push({
               role: "tool",

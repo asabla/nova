@@ -4,3 +4,5 @@ export { cleanupExpiredSessions, cleanupExpiredInvitations, cleanupOrphanedFiles
 export { searchWeb, fetchPageContent, analyzeSource, generateResearchReport, updateResearchStatus } from "./deep-research.activities";
 export { getAgentConfig, loadAgentMemory, saveAgentMemory, executeAgentStep, saveAgentMessage, createAgentConversation, executeToolCall, notifyAgentCompletion } from "./agent-execution.activities";
 export { streamingLLMStep, publishToolStatus, publishDone } from "./smart-chat.activities";
+export { runAgentLoop } from "./agent-run.activities";
+export { executeAgentStepWithSDK } from "./agent-step.activities";

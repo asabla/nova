@@ -16,7 +16,17 @@ import { queryKeys } from "../../lib/query-keys";
 import { formatDistanceToNow } from "date-fns";
 
 function stripThinkingBlocks(content: string): string {
-  return content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  // Strip properly closed <think>...</think> blocks
+  let result = content.replace(/<think>[\s\S]*?<\/think>/g, "");
+  // Handle models that use <think> as both opener and closer (no </think>).
+  // Pattern: <think>thinking content<think>more thinking<think>...actual content
+  // Strip each <think>...<think> pair, leaving content after the last <think> block.
+  while (/<think>[\s\S]*?<think>/.test(result)) {
+    result = result.replace(/<think>[\s\S]*?<think>/, "<think>");
+  }
+  // Remove any remaining lone <think> at the start (the collapsed marker)
+  result = result.replace(/^<think>/, "");
+  return result.trim();
 }
 
 interface EditHistoryEntry {
