@@ -287,6 +287,27 @@ researchRoutes.post("/", async (c) => {
   return c.json(report, 201);
 });
 
+// Rename research report title
+const patchResearchSchema = z.object({
+  title: z.string().min(1).max(200),
+});
+
+researchRoutes.patch("/:id", async (c) => {
+  const orgId = c.get("orgId");
+  const body = patchResearchSchema.parse(await c.req.json());
+  const [report] = await db.select().from(researchReports)
+    .where(and(eq(researchReports.id, c.req.param("id")), eq(researchReports.orgId, orgId)));
+
+  if (!report) throw AppError.notFound("Research report not found");
+
+  const [updated] = await db.update(researchReports).set({
+    title: body.title,
+    updatedAt: new Date(),
+  }).where(eq(researchReports.id, report.id)).returning();
+
+  return c.json(updated);
+});
+
 // Export research report
 researchRoutes.get("/:id/export", async (c) => {
   const orgId = c.get("orgId");

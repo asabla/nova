@@ -135,6 +135,7 @@ export const researchReports = pgTable("research_reports", {
   workflowId: uuid("workflow_id").notNull(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
   query: text("query").notNull(),
+  title: text("title"),
   config: jsonb("config"),
   reportContent: text("report_content"),
   sources: jsonb("sources"),

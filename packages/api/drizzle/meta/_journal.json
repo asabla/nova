@@ -15,6 +15,13 @@
       "when": 1773175215364,
       "tag": "0001_illegal_calypso",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773421132626,
+      "tag": "0002_magical_thunderbird",
+      "breakpoints": true
     }
   ]
 }

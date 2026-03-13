@@ -129,17 +129,27 @@ export async function generateResearchReport(
   const result = await openai.chat.completions.create({
     model,
     messages: [
-      { role: "system", content: "Generate a comprehensive research report in standard markdown format. Use ## headings for sections (Executive Summary, Key Findings, Detailed Analysis, Conclusion, References). Use paragraphs, bullet points, and numbered lists for content — do NOT use markdown tables. Use [n] format for inline citations that reference the numbered sources." },
+      { role: "system", content: "Generate a comprehensive research report in standard markdown format. Use ## headings for sections (Executive Summary, Key Findings, Detailed Analysis, Conclusion, References). Use paragraphs, bullet points, and numbered lists for content — do NOT use markdown tables. Use [n] format for inline citations that reference the numbered sources.\n\nIMPORTANT: The very first line of your response MUST be a concise title (max 80 characters) for this report, prefixed with \"TITLE: \". Then leave a blank line before the report content." },
       { role: "user", content: `Research query: ${query}\n\nSources:\n${sourceSummaries}` },
     ],
     max_tokens: 4096,
     temperature: 0.5,
   });
 
-  const report = result.choices?.[0]?.message?.content ?? "Report generation failed.";
+  const rawOutput = result.choices?.[0]?.message?.content ?? "Report generation failed.";
+
+  // Extract title from the first line if present
+  let title: string | null = null;
+  let report = rawOutput;
+  const titleMatch = rawOutput.match(/^TITLE:\s*(.+)/);
+  if (titleMatch) {
+    title = titleMatch[1].trim().slice(0, 80);
+    report = rawOutput.slice(titleMatch[0].length).replace(/^\n+/, "");
+  }
 
   await db.update(researchReports).set({
     reportContent: report,
+    title,
     sources: sources.map((s) => ({ url: s.url, title: s.title })),
     updatedAt: new Date(),
   }).where(eq(researchReports.id, reportId));
