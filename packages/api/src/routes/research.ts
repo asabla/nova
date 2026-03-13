@@ -240,6 +240,11 @@ const startResearchSchema = z.object({
   conversationId: z.string().uuid().optional(),
   maxSources: z.number().int().min(1).max(50).optional().default(10),
   maxIterations: z.number().int().min(1).max(10).optional().default(3),
+  sources: z.object({
+    webSearch: z.boolean().optional().default(true),
+    knowledgeCollectionIds: z.array(z.string().uuid()).optional().default([]),
+    fileIds: z.array(z.string().uuid()).optional().default([]),
+  }).optional().default({ webSearch: true, knowledgeCollectionIds: [], fileIds: [] }),
 });
 
 researchRoutes.post("/", async (c) => {
@@ -255,7 +260,7 @@ researchRoutes.post("/", async (c) => {
     workflowId,
     query: body.query,
     status: "pending",
-    config: { maxSources: body.maxSources, maxIterations: body.maxIterations },
+    config: { maxSources: body.maxSources, maxIterations: body.maxIterations, sources: body.sources },
   }).returning();
 
   // Start Temporal workflow
@@ -271,6 +276,7 @@ researchRoutes.post("/", async (c) => {
         query: body.query,
         maxSources: body.maxSources,
         maxIterations: body.maxIterations,
+        sources: body.sources,
       }],
     });
   } catch {
@@ -383,9 +389,19 @@ researchRoutes.post("/:id/rerun", async (c) => {
   const body = z.object({
     maxSources: z.number().int().min(1).max(50).optional(),
     maxIterations: z.number().int().min(1).max(10).optional(),
+    sources: z.object({
+      webSearch: z.boolean().optional(),
+      knowledgeCollectionIds: z.array(z.string().uuid()).optional(),
+      fileIds: z.array(z.string().uuid()).optional(),
+    }).optional(),
   }).parse(await c.req.json());
 
-  const config = (originalReport.config as Record<string, number>) ?? {};
+  const config = (originalReport.config as Record<string, any>) ?? {};
+  const resolvedSources = {
+    webSearch: body.sources?.webSearch ?? config.sources?.webSearch ?? true,
+    knowledgeCollectionIds: body.sources?.knowledgeCollectionIds ?? config.sources?.knowledgeCollectionIds ?? [],
+    fileIds: body.sources?.fileIds ?? config.sources?.fileIds ?? [],
+  };
   const workflowId = crypto.randomUUID();
   const [newReport] = await db.insert(researchReports).values({
     orgId,
@@ -397,6 +413,7 @@ researchRoutes.post("/:id/rerun", async (c) => {
     config: {
       maxSources: body.maxSources ?? config.maxSources ?? 10,
       maxIterations: body.maxIterations ?? config.maxIterations ?? 3,
+      sources: resolvedSources,
     },
   }).returning();
 
@@ -412,6 +429,7 @@ researchRoutes.post("/:id/rerun", async (c) => {
         query: originalReport.query,
         maxSources: body.maxSources ?? config.maxSources ?? 10,
         maxIterations: body.maxIterations ?? config.maxIterations ?? 3,
+        sources: resolvedSources,
       }],
     });
   } catch {

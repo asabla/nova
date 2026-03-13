@@ -1,8 +1,8 @@
-import { eq } from "drizzle-orm";
+import { eq, and, inArray, isNull, sql, desc } from "drizzle-orm";
 import { db } from "../lib/db";
 import { openai } from "../lib/litellm";
 import { getDefaultChatModel } from "../lib/models";
-import { researchReports } from "@nova/shared/schemas";
+import { researchReports, knowledgeChunks, knowledgeDocuments, files, fileChunks } from "@nova/shared/schemas";
 import { extractFromHtml } from "@nova/shared/content";
 
 export async function searchWeb(query: string, iteration: number): Promise<{ url: string; title: string }[]> {
@@ -155,4 +155,95 @@ export async function updateResearchStatus(
     config: metadata ?? {},
     updatedAt: new Date(),
   }).where(eq(researchReports.id, reportId));
+}
+
+export async function queryKnowledgeCollections(
+  orgId: string,
+  collectionIds: string[],
+  query: string,
+  topK: number,
+): Promise<{ collectionId: string; documentId: string; documentName: string; content: string; score: number }[]> {
+  if (collectionIds.length === 0) return [];
+
+  // Use text similarity search (pg_trgm) since the worker may not have the embedding model.
+  // This avoids needing to generate embeddings in the worker process.
+  const results = await db
+    .select({
+      id: knowledgeChunks.id,
+      collectionId: knowledgeChunks.knowledgeCollectionId,
+      documentId: knowledgeChunks.knowledgeDocumentId,
+      content: knowledgeChunks.content,
+      score: sql<number>`similarity(${knowledgeChunks.content}, ${query})`.as("score"),
+    })
+    .from(knowledgeChunks)
+    .where(
+      and(
+        eq(knowledgeChunks.orgId, orgId),
+        inArray(knowledgeChunks.knowledgeCollectionId, collectionIds),
+        isNull(knowledgeChunks.deletedAt),
+      ),
+    )
+    .orderBy(desc(sql`similarity(${knowledgeChunks.content}, ${query})`))
+    .limit(topK);
+
+  // Fetch document names for the matched chunks
+  const docIds = [...new Set(results.map((r) => r.documentId))];
+  const docs = docIds.length > 0
+    ? await db
+        .select({ id: knowledgeDocuments.id, title: knowledgeDocuments.title })
+        .from(knowledgeDocuments)
+        .where(inArray(knowledgeDocuments.id, docIds))
+    : [];
+  const docNameMap = new Map(docs.map((d) => [d.id, d.title ?? "Untitled"]));
+
+  return results.map((r) => ({
+    collectionId: r.collectionId,
+    documentId: r.documentId,
+    documentName: docNameMap.get(r.documentId) ?? "Untitled",
+    content: r.content,
+    score: r.score ?? 0,
+  }));
+}
+
+export async function fetchFileContents(
+  orgId: string,
+  fileIds: string[],
+): Promise<{ fileId: string; filename: string; content: string }[]> {
+  if (fileIds.length === 0) return [];
+
+  // Get file metadata
+  const fileRecords = await db
+    .select({ id: files.id, filename: files.filename })
+    .from(files)
+    .where(
+      and(
+        eq(files.orgId, orgId),
+        inArray(files.id, fileIds),
+        isNull(files.deletedAt),
+      ),
+    );
+
+  const results: { fileId: string; filename: string; content: string }[] = [];
+
+  for (const file of fileRecords) {
+    // Retrieve pre-chunked content from file_chunks table
+    const chunks = await db
+      .select({ content: fileChunks.content, chunkIndex: fileChunks.chunkIndex })
+      .from(fileChunks)
+      .where(
+        and(
+          eq(fileChunks.fileId, file.id),
+          eq(fileChunks.orgId, orgId),
+          isNull(fileChunks.deletedAt),
+        ),
+      )
+      .orderBy(fileChunks.chunkIndex);
+
+    const content = chunks.map((c) => c.content).join("\n\n");
+    if (content.length > 0) {
+      results.push({ fileId: file.id, filename: file.filename, content: content.slice(0, 50_000) });
+    }
+  }
+
+  return results;
 }

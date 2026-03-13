@@ -19,24 +19,23 @@ import {
   Globe,
   Zap,
   Hash,
-  Settings2,
   ArrowRight,
   Copy,
   Check,
   Trash2,
-  LayoutList,
+  Database,
+  FileIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
-import { Input } from "../../components/ui/Input";
-import { Textarea } from "../../components/ui/Textarea";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/Table";
 import { toast } from "../../components/ui/Toast";
 import { formatDistanceToNow } from "date-fns";
+import { NewResearchForm, type NewResearchFormSubmitData } from "../../components/research/NewResearchForm";
 
 // ---------------------------------------------------------------------------
 // Route
@@ -68,6 +67,11 @@ interface ResearchConfig {
   maxSources: number;
   maxIterations: number;
   outputFormat?: "markdown" | "structured";
+  sources?: {
+    webSearch: boolean;
+    knowledgeCollectionIds: string[];
+    fileIds: string[];
+  };
 }
 
 interface ResearchReport {
@@ -89,8 +93,6 @@ interface ResearchReport {
   completedAt?: string;
   error?: string;
 }
-
-type OutputFormat = "markdown" | "structured";
 
 // ---------------------------------------------------------------------------
 // Main page
@@ -128,12 +130,8 @@ function ResearchPage() {
   // ---- Mutations ----
 
   const startResearch = useMutation({
-    mutationFn: (data: {
-      query: string;
-      maxSources: number;
-      maxIterations: number;
-      outputFormat?: OutputFormat;
-    }) => api.post<ResearchReport>("/api/research", data),
+    mutationFn: (data: NewResearchFormSubmitData) =>
+      api.post<ResearchReport>("/api/research", data),
     onSuccess: (data: any) => {
       toast(t("research.started", "Research task started"), "success");
       queryClient.invalidateQueries({ queryKey: ["research-reports"] });
@@ -163,7 +161,7 @@ function ResearchPage() {
   );
 
   const handleRerunSubmit = useCallback(
-    (params: { query: string; maxSources: number; maxIterations: number; outputFormat: OutputFormat }) => {
+    (params: NewResearchFormSubmitData) => {
       startResearch.mutate(params);
       setRerunDialogReport(null);
     },
@@ -195,6 +193,7 @@ function ResearchPage() {
             <NewResearchForm
               onSubmit={(data) => startResearch.mutate(data)}
               isPending={startResearch.isPending}
+              compact
             />
           )}
         </div>
@@ -255,7 +254,10 @@ function ResearchPage() {
             onDelete={(id) => deleteReport.mutate(id)}
           />
         ) : (
-          <EmptyDetailState onNew={() => setShowNewForm(true)} />
+          <EmptyDetailState
+            onSubmit={(data) => startResearch.mutate(data)}
+            isPending={startResearch.isPending}
+          />
         )}
       </div>
 
@@ -269,135 +271,6 @@ function ResearchPage() {
         />
       )}
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// New Research Form  (#77 & #81)
-// ---------------------------------------------------------------------------
-
-function NewResearchForm({
-  onSubmit,
-  isPending,
-  defaultValues,
-}: {
-  onSubmit: (data: { query: string; maxSources: number; maxIterations: number; outputFormat: OutputFormat }) => void;
-  isPending: boolean;
-  defaultValues?: { query?: string; maxSources?: number; maxIterations?: number; outputFormat?: OutputFormat };
-}) {
-  const { t } = useTranslation();
-  const [query, setQuery] = useState(defaultValues?.query ?? "");
-  const [maxSources, setMaxSources] = useState(defaultValues?.maxSources ?? 10);
-  const [maxIterations, setMaxIterations] = useState(defaultValues?.maxIterations ?? 5);
-  const [outputFormat, setOutputFormat] = useState<OutputFormat>(defaultValues?.outputFormat ?? "markdown");
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    textareaRef.current?.focus();
-  }, []);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (query.trim().length < 3) return;
-    onSubmit({ query: query.trim(), maxSources, maxIterations, outputFormat });
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-3 mt-2">
-      <Textarea
-        ref={textareaRef}
-        label={t("research.queryLabel", "Research Query")}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder={t("research.queryPlaceholder", "What would you like to research in depth?")}
-        rows={3}
-        className="text-sm resize-none"
-        error={query.length > 0 && query.trim().length < 3 ? t("research.queryMinLength", "Query must be at least 3 characters") : undefined}
-      />
-
-      {/* Advanced settings toggle */}
-      <button
-        type="button"
-        onClick={() => setShowAdvanced((v) => !v)}
-        className="flex items-center gap-1 text-xs text-text-secondary hover:text-text transition-colors"
-      >
-        <Settings2 className="h-3 w-3" aria-hidden="true" />
-        {t("research.advancedSettings", "Advanced settings")}
-        {showAdvanced ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-      </button>
-
-      {showAdvanced && (
-        <div className="space-y-3 p-3 rounded-lg bg-surface-secondary border border-border">
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <Input
-                type="number"
-                label={t("research.maxSources", "Max Sources")}
-                min={1}
-                max={50}
-                value={maxSources}
-                onChange={(e) => setMaxSources(Number(e.target.value))}
-                className="w-full px-2 py-1.5 text-xs"
-              />
-            </div>
-            <div className="flex-1">
-              <Input
-                type="number"
-                label={t("research.maxIterations", "Max Iterations")}
-                min={1}
-                max={10}
-                value={maxIterations}
-                onChange={(e) => setMaxIterations(Number(e.target.value))}
-                className="w-full px-2 py-1.5 text-xs"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs text-text-tertiary mb-1 flex items-center gap-1">
-              <LayoutList className="h-3 w-3" aria-hidden="true" />
-              {t("research.outputFormat", "Output Format")}
-            </label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setOutputFormat("markdown")}
-                className={`flex-1 px-2 py-1.5 rounded-lg border text-xs transition-colors ${
-                  outputFormat === "markdown"
-                    ? "border-primary bg-primary/10 text-primary font-medium"
-                    : "border-border bg-surface text-text-secondary hover:border-border-strong"
-                }`}
-              >
-                {t("research.formatMarkdown", "Markdown")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setOutputFormat("structured")}
-                className={`flex-1 px-2 py-1.5 rounded-lg border text-xs transition-colors ${
-                  outputFormat === "structured"
-                    ? "border-primary bg-primary/10 text-primary font-medium"
-                    : "border-border bg-surface text-text-secondary hover:border-border-strong"
-                }`}
-              >
-                {t("research.formatStructured", "Structured")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <Button
-        type="submit"
-        variant="primary"
-        className="w-full"
-        disabled={query.trim().length < 3 || isPending}
-        loading={isPending}
-      >
-        <Search className="h-3.5 w-3.5" aria-hidden="true" />
-        {isPending ? t("research.starting", "Starting...") : t("research.startResearch", "Start Research")}
-      </Button>
-    </form>
   );
 }
 
@@ -602,9 +475,28 @@ function ReportDetail({
             {report.status}
           </Badge>
           {report.config && (
-            <span className="text-xs text-text-tertiary ml-2">
+            <span className="text-xs text-text-tertiary ml-2 flex items-center gap-1.5">
               {report.config.maxSources} sources / {report.config.maxIterations} iterations
               {report.config.outputFormat ? ` / ${report.config.outputFormat}` : ""}
+              {report.config.sources && (
+                <span className="inline-flex items-center gap-1 ml-1">
+                  {report.config.sources.webSearch && (
+                    <span title="Web search" className="inline-flex items-center gap-0.5 text-[10px] text-primary bg-primary/10 rounded px-1 py-0">
+                      <Globe className="h-2.5 w-2.5" />Web
+                    </span>
+                  )}
+                  {report.config.sources.knowledgeCollectionIds?.length > 0 && (
+                    <span title="Knowledge collections" className="inline-flex items-center gap-0.5 text-[10px] text-success bg-success/10 rounded px-1 py-0">
+                      <Database className="h-2.5 w-2.5" />{report.config.sources.knowledgeCollectionIds.length}
+                    </span>
+                  )}
+                  {report.config.sources.fileIds?.length > 0 && (
+                    <span title="Files" className="inline-flex items-center gap-0.5 text-[10px] text-warning bg-warning/10 rounded px-1 py-0">
+                      <FileIcon className="h-2.5 w-2.5" />{report.config.sources.fileIds.length}
+                    </span>
+                  )}
+                </span>
+              )}
             </span>
           )}
         </div>
@@ -954,12 +846,12 @@ function RerunDialog({
 }: {
   report: ResearchReport;
   onClose: () => void;
-  onSubmit: (params: { query: string; maxSources: number; maxIterations: number; outputFormat: OutputFormat }) => void;
+  onSubmit: (params: NewResearchFormSubmitData) => void;
   isPending: boolean;
 }) {
   const { t } = useTranslation();
   return (
-    <Dialog open onClose={onClose} title={t("research.rerunTitle", "Re-run Research")} className="max-w-md">
+    <Dialog open onClose={onClose} title={t("research.rerunTitle", "Re-run Research")} className="max-w-lg">
       <p className="text-xs text-text-secondary mb-4">
         {t("research.rerunDescription", "Adjust the parameters below and re-run this research task.")}
       </p>
@@ -971,6 +863,11 @@ function RerunDialog({
           maxSources: report.config?.maxSources ?? 10,
           maxIterations: report.config?.maxIterations ?? 5,
           outputFormat: report.config?.outputFormat ?? "markdown",
+          sources: report.config?.sources ?? {
+            webSearch: true,
+            knowledgeCollectionIds: [],
+            fileIds: [],
+          },
         }}
       />
     </Dialog>
@@ -981,20 +878,17 @@ function RerunDialog({
 // Empty detail state
 // ---------------------------------------------------------------------------
 
-function EmptyDetailState({ onNew }: { onNew: () => void }) {
-  const { t } = useTranslation();
+function EmptyDetailState({
+  onSubmit,
+  isPending,
+}: {
+  onSubmit: (data: NewResearchFormSubmitData) => void;
+  isPending: boolean;
+}) {
   return (
-    <div className="flex items-center justify-center h-full text-text-tertiary">
-      <div className="text-center">
-        <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-40" aria-hidden="true" />
-        <p className="text-sm font-medium text-text-secondary">{t("research.selectOrStart", "Select a report or start new research")}</p>
-        <p className="text-xs text-text-tertiary mt-1 max-w-xs mx-auto">
-          {t("research.description", "Deep research performs multi-step web research, visiting multiple sources and synthesizing a comprehensive report.")}
-        </p>
-        <Button variant="primary" size="sm" className="mt-4" onClick={onNew}>
-          <Search className="h-3.5 w-3.5" aria-hidden="true" />
-          {t("research.startResearch", "Start Research")}
-        </Button>
+    <div className="flex items-center justify-center h-full">
+      <div className="w-full max-w-lg p-5">
+        <NewResearchForm onSubmit={onSubmit} isPending={isPending} />
       </div>
     </div>
   );
