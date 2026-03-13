@@ -8,7 +8,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "storybook": "storybook dev -p 6006",
-    "storybook:build": "storybook build -o storybook-static"
+    "storybook:build": "storybook build -o storybook-static",
+    "storybook:gap": "bun run scripts/storybook-gap-analysis.ts"
   },
   "dependencies": {
     "@nova/shared": "workspace:*",
