@@ -7,6 +7,8 @@ import { MarkdownRenderer } from "../markdown/MarkdownRenderer";
 import { ArtifactRenderer } from "./ArtifactRenderer";
 import { DynamicWidget } from "./DynamicWidget";
 import { ToolSummaryCompact } from "./InlineToolStatus";
+import { ThinkingIndicator } from "./ThinkingIndicator";
+import { parseThinkBlocksComplete } from "../../lib/think-parser";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/Badge";
 import { Input } from "../ui/Input";
@@ -14,20 +16,6 @@ import { Textarea } from "../ui/Textarea";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { formatDistanceToNow } from "date-fns";
-
-function stripThinkingBlocks(content: string): string {
-  // Strip properly closed <think>...</think> blocks
-  let result = content.replace(/<think>[\s\S]*?<\/think>/g, "");
-  // Handle models that use <think> as both opener and closer (no </think>).
-  // Pattern: <think>thinking content<think>more thinking<think>...actual content
-  // Strip each <think>...<think> pair, leaving content after the last <think> block.
-  while (/<think>[\s\S]*?<think>/.test(result)) {
-    result = result.replace(/<think>[\s\S]*?<think>/, "<think>");
-  }
-  // Remove any remaining lone <think> at the start (the collapsed marker)
-  result = result.replace(/^<think>/, "");
-  return result.trim();
-}
 
 interface EditHistoryEntry {
   content: string;
@@ -83,9 +71,16 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
   const isUser = message.senderType === "user";
   const isAssistant = message.senderType === "assistant";
 
-  const displayContent = useMemo(() => {
-    if (!message.content || !isAssistant) return message.content;
-    return stripThinkingBlocks(message.content);
+  const { displayContent, thinkingContent, hasThinkingContent } = useMemo(() => {
+    if (!message.content || !isAssistant) {
+      return { displayContent: message.content, thinkingContent: "", hasThinkingContent: false };
+    }
+    const parsed = parseThinkBlocksComplete(message.content);
+    return {
+      displayContent: parsed.visibleContent.trim() || null,
+      thinkingContent: parsed.thinkingContent,
+      hasThinkingContent: parsed.hasThinkingContent,
+    };
   }, [message.content, isAssistant]);
 
   const { data: modelsData } = useQuery({
@@ -276,6 +271,11 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
           </div>
         ) : (
           <>
+            {/* Thinking indicator */}
+            {isAssistant && hasThinkingContent && (
+              <ThinkingIndicator content={thinkingContent} />
+            )}
+
             {/* Tool summary - ABOVE content like streaming view */}
             {isAssistant && message.metadata?.toolSummary && (
               <ToolSummaryCompact

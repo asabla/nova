@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { Sparkles } from "lucide-react";
 import { MarkdownRenderer } from "../markdown/MarkdownRenderer";
 import { InlineToolStatusList } from "./InlineToolStatus";
+import { ThinkingIndicator } from "./ThinkingIndicator";
+import { useThinkingParser } from "../../hooks/useThinkingParser";
 import type { ActiveTool } from "../../hooks/useSSE";
 
 interface StreamingMessageProps {
@@ -14,6 +16,8 @@ export function StreamingMessage({ content, activeTools }: StreamingMessageProps
     () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }),
     [],
   );
+
+  const { visibleContent, thinkingContent, isThinking, hasThinkingContent } = useThinkingParser(content);
 
   return (
     <div className="flex gap-3 py-3 bg-surface-secondary/50 -mx-2 px-5 rounded-xl" style={{ contain: "content" }}>
@@ -35,11 +39,15 @@ export function StreamingMessage({ content, activeTools }: StreamingMessageProps
           <InlineToolStatusList tools={activeTools} />
         )}
 
+        {hasThinkingContent && (
+          <ThinkingIndicator content={thinkingContent} isStreaming={isThinking} />
+        )}
+
         <div className="text-sm text-text leading-relaxed">
-          {content ? (
-            <MarkdownRenderer content={content} />
+          {visibleContent ? (
+            <MarkdownRenderer content={visibleContent} />
           ) : (
-            !activeTools?.length && (
+            !activeTools?.length && !isThinking && (
               <div className="flex items-center gap-1.5 py-2">
                 {[0, 1, 2].map((i) => (
                   <span
