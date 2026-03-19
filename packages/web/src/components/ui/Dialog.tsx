@@ -50,7 +50,7 @@ export function Dialog({ open, onClose, title, children, className, size = "md" 
       onClose={onClose}
       aria-labelledby={title ? titleId : undefined}
       className={clsx(
-        "rounded-xl bg-surface border border-border p-0 shadow-2xl backdrop:bg-overlay",
+        "m-auto rounded-xl bg-surface border border-border p-0 shadow-2xl backdrop:bg-overlay",
         sizeClasses[size],
         "w-full",
         className,
