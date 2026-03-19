@@ -14,6 +14,7 @@ import { useAuthStore } from "../../stores/auth.store";
 import { setPendingFiles as storePendingFiles } from "../../lib/pending-files";
 import { ALLOWED_MIME_TYPES } from "@nova/shared/constants";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
+import { MentionPopup, useMentionTrigger, type MentionCandidate } from "../../components/chat/MentionPopup";
 
 export const Route = createFileRoute("/_auth/")({
   component: () => (
@@ -41,6 +42,17 @@ function HomePage() {
 
   const greeting = getGreeting(t);
   const firstName = user?.name?.split(" ")[0] || "";
+
+  // --- @mention support ---
+  const mention = useMentionTrigger(message, textareaRef);
+  const handleMentionSelect = useCallback(
+    (candidate: MentionCandidate) => {
+      const newValue = mention.handleSelect(candidate);
+      setMessage(newValue);
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    },
+    [mention.handleSelect],
+  );
 
   const quickStarters = [
     {
@@ -145,7 +157,11 @@ function HomePage() {
 
         {/* Chat Input — hero element with signature glow */}
         <div className="relative mb-10">
-          <div className="rounded-2xl border border-border bg-surface shadow-sm input-glow transition-all duration-200">
+          <div className="relative rounded-2xl border border-border bg-surface shadow-sm input-glow transition-all duration-200">
+            <MentionPopup
+              {...mention.popupProps}
+              onSelect={handleMentionSelect}
+            />
             {pendingFiles.length > 0 && (
               <div className="flex flex-wrap gap-1.5 px-4 pt-3">
                 {pendingFiles.map((f, i) => (

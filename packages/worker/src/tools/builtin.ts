@@ -1,5 +1,9 @@
 import { tool } from "@openai/agents";
 import { extractFromHtml } from "@nova/shared/content";
+import { eq, and, isNull } from "drizzle-orm";
+import { db } from "../lib/db";
+import { openai } from "../lib/litellm";
+import { getDefaultChatModel } from "../lib/models";
 
 /**
  * Built-in tools extracted from agent-execution.activities.ts,
@@ -153,5 +157,69 @@ export const fetchUrlTool = tool({
   },
 });
 
+export const invokeAgentTool = tool({
+  name: "invoke_agent",
+  description:
+    "Delegate a task to a specialized agent. Use when users @mention an agent or when the task matches an agent's expertise.",
+  parameters: {
+    type: "object" as const,
+    properties: {
+      agent_id: { type: "string", description: "The agent's ID" },
+      task: {
+        type: "string",
+        description: "Clear description of what the agent should do",
+      },
+    },
+    required: ["agent_id", "task"],
+    additionalProperties: false,
+  },
+  execute: async (args: unknown) => {
+    const { agent_id, task } = args as { agent_id: string; task: string };
+
+    // Look up the agent config
+    const { agents } = await import("@nova/shared/schemas");
+    const [agent] = await db
+      .select()
+      .from(agents)
+      .where(
+        and(
+          eq(agents.id, agent_id),
+          eq(agents.isEnabled, true),
+          isNull(agents.deletedAt),
+        ),
+      );
+
+    if (!agent) {
+      return { error: `Agent ${agent_id} not found or is disabled` };
+    }
+
+    const model = agent.modelId ?? (await getDefaultChatModel());
+    const temperature =
+      (agent.modelParams as any)?.temperature ?? 0.7;
+    const maxTokens =
+      (agent.modelParams as any)?.maxTokens ?? 16384;
+
+    const messages = [
+      ...(agent.systemPrompt
+        ? [{ role: "system" as const, content: agent.systemPrompt }]
+        : []),
+      { role: "user" as const, content: task },
+    ];
+
+    const result = await openai.chat.completions.create({
+      model,
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+    });
+
+    const content = result.choices?.[0]?.message?.content ?? "";
+    return {
+      agent_name: agent.name,
+      response: content,
+    };
+  },
+});
+
 /** All built-in tools as an array, ready to attach to an Agent */
-export const builtinTools = [webSearchTool, fetchUrlTool];
+export const builtinTools = [webSearchTool, fetchUrlTool, invokeAgentTool];

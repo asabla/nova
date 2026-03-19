@@ -151,6 +151,7 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
           <MentionPopup
             {...mention.popupProps}
             onSelect={handleMentionSelect}
+            conversationId={conversationId}
           />
 
           {onFileUpload && (

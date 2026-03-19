@@ -151,6 +151,12 @@ function summarizeToolResult(toolName: string, data: unknown, truncated: boolean
         const str = typeof data === "string" ? data : JSON.stringify(data);
         return `Fetched ${str.length.toLocaleString()} chars${truncated ? " (truncated)" : ""}`;
       }
+      case "invoke_agent": {
+        if (typeof data === "object" && data !== null && "agent_name" in data) {
+          return `Delegated to ${(data as any).agent_name}`;
+        }
+        return "Agent invocation completed";
+      }
       case "code_execute":
         return "Code execution result";
       default: {
@@ -265,6 +271,44 @@ export async function executeToolCall(
         } else {
           rawResult = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
         }
+        break;
+      }
+      case "invoke_agent": {
+        const targetAgentId = args.agent_id ?? "";
+        const task = args.task ?? "";
+        const [targetAgent] = await db.select().from(agents)
+          .where(and(eq(agents.id, targetAgentId), eq(agents.isEnabled, true), isNull(agents.deletedAt)));
+
+        if (!targetAgent) {
+          return {
+            tool_call_id: toolCallId,
+            success: false,
+            data: null,
+            summary: `Agent ${targetAgentId} not found or is disabled`,
+            truncated: false,
+            error: `Agent ${targetAgentId} not found or is disabled`,
+          };
+        }
+
+        const targetModel = targetAgent.modelId ?? await getDefaultChatModel();
+        const msgs = [
+          ...(targetAgent.systemPrompt
+            ? [{ role: "system" as const, content: targetAgent.systemPrompt }]
+            : []),
+          { role: "user" as const, content: task },
+        ];
+
+        const agentResult = await openai.chat.completions.create({
+          model: targetModel,
+          messages: msgs,
+          temperature: (targetAgent.modelParams as any)?.temperature ?? 0.7,
+          max_tokens: (targetAgent.modelParams as any)?.maxTokens ?? 16384,
+        });
+
+        rawResult = {
+          agent_name: targetAgent.name,
+          response: agentResult.choices?.[0]?.message?.content ?? "",
+        };
         break;
       }
       case "code_execute": {

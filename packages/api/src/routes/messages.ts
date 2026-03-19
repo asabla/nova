@@ -207,7 +207,30 @@ const DEFAULT_TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "invoke_agent",
+      description: "Delegate a task to a specialized agent. Use when users @mention an agent or when the task matches an agent's expertise.",
+      parameters: {
+        type: "object",
+        properties: {
+          agent_id: { type: "string", description: "The agent's ID" },
+          task: { type: "string", description: "Clear description of what the agent should do" },
+        },
+        required: ["agent_id", "task"],
+      },
+    },
+  },
 ];
+
+/** Fetch enabled agents for the org and return them for system prompt injection */
+async function getAvailableAgents(orgId: string) {
+  return db
+    .select({ id: agents.id, name: agents.name, description: agents.description })
+    .from(agents)
+    .where(and(eq(agents.orgId, orgId), eq(agents.isEnabled, true), isNull(agents.deletedAt)));
+}
 
 messagesRouter.post("/:conversationId/messages/stream", zValidator("json", streamSchema), async (c) => {
   const orgId = c.get("orgId");
@@ -345,6 +368,29 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
       ...enrichedMessages[0],
       content: `${enrichedMessages[0].content}\n\n${ragContext}`,
     };
+  }
+
+  // Fetch available agents and inject into system prompt so the LLM knows about them
+  if (body.enableTools) {
+    const availableAgents = await getAvailableAgents(orgId);
+    if (availableAgents.length > 0) {
+      const agentList = availableAgents
+        .map((a) => {
+          const slug = a.name.toLowerCase().replace(/\s+/g, "-");
+          return `- @${slug} (id: ${a.id}): ${a.description ?? a.name}`;
+        })
+        .join("\n");
+      const agentSection = [
+        "## Available Agents",
+        "You can delegate tasks to specialized agents using the invoke_agent tool.",
+        agentList,
+        "When a user mentions an agent with @name, use the invoke_agent tool to delegate to them.",
+      ].join("\n");
+      enrichedMessages[0] = {
+        ...enrichedMessages[0],
+        content: `${enrichedMessages[0].content}\n\n${agentSection}`,
+      };
+    }
   }
 
   return streamSSE(c, async (stream) => {
