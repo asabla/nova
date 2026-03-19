@@ -3,6 +3,9 @@ import { definePreview, type Renderer } from "@storybook/react-vite";
 import { withThemeByDataAttribute } from "@storybook/addon-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+import "@fontsource-variable/dm-sans";
+import "@fontsource-variable/dm-sans/wght-italic.css";
+import "@fontsource-variable/jetbrains-mono";
 import "../src/styles/app.css";
 import "../src/i18n";
 

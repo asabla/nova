@@ -12,6 +12,8 @@
     "storybook:gap": "bun run scripts/storybook-gap-analysis.ts"
   },
   "dependencies": {
+    "@fontsource-variable/dm-sans": "^5.2.8",
+    "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@nova/shared": "workspace:*",
     "@tanstack/react-query": "^5.72.2",
     "@tanstack/react-router": "^1.114.26",
