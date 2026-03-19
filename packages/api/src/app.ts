@@ -7,6 +7,7 @@ import { errorHandler } from "./middleware/error-handler";
 import { rateLimiter } from "./middleware/rate-limit";
 import { authMiddleware } from "./middleware/auth";
 import { orgScope } from "./middleware/org-scope";
+import { roleResolver } from "./middleware/role-resolver";
 import type { AppContext } from "./types/context";
 import { env } from "./lib/env";
 
@@ -91,13 +92,16 @@ app.use("/api/*", authMiddleware());
 // 9. Org scoping
 app.use("/api/*", orgScope());
 
-// 10. MFA enforcement (Story #6)
+// 10. Role resolution (sets userRole from user_profiles)
+app.use("/api/*", roleResolver());
+
+// 11. MFA enforcement (Story #6)
 app.use("/api/*", mfaGuard());
 
-// 11. Content filtering
+// 12. Content filtering
 app.use("/api/*", contentFilter());
 
-// 11. Budget enforcement (on LLM-calling routes)
+// 13. Budget enforcement (on LLM-calling routes)
 app.use("/api/conversations/*/messages", budgetGuard());
 app.use("/v1/chat/*", budgetGuard());
 app.use("/api/sandbox/*", budgetGuard());
