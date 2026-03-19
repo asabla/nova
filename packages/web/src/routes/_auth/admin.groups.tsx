@@ -8,8 +8,31 @@ import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { toast } from "../../components/ui/Toast";
+
+interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  monthlyTokenLimit?: number;
+  monthlyCostLimitCents?: number;
+  memberCount?: number;
+}
+
+interface GroupMember {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+}
+
+interface OrgMember {
+  id: string;
+  name: string;
+  email: string;
+}
 
 export const Route = createFileRoute("/_auth/admin/groups")({
   component: AdminGroupsPage,
@@ -22,21 +45,22 @@ function AdminGroupsPage() {
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [showAddMember, setShowAddMember] = useState(false);
   const [newGroup, setNewGroup] = useState({ name: "", description: "", monthlyTokenLimit: 0, monthlyCostLimitCents: 0 });
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const { data: groupsData, isLoading: groupsLoading } = useQuery({
     queryKey: ["groups"],
-    queryFn: () => api.get<any>("/api/groups"),
+    queryFn: () => api.get<{ data: Group[] }>("/api/groups"),
   });
 
   const { data: groupDetail } = useQuery({
     queryKey: ["groups", selectedGroup],
-    queryFn: () => api.get<any>(`/api/groups/${selectedGroup}`),
+    queryFn: () => api.get<Group>(`/api/groups/${selectedGroup}`),
     enabled: !!selectedGroup,
   });
 
   const { data: membersData, isLoading: membersLoading } = useQuery({
     queryKey: ["groups", selectedGroup, "members"],
-    queryFn: () => api.get<any>(`/api/groups/${selectedGroup}/members`),
+    queryFn: () => api.get<{ data: GroupMember[] }>(`/api/groups/${selectedGroup}/members`),
     enabled: !!selectedGroup,
   });
 
@@ -71,9 +95,9 @@ function AdminGroupsPage() {
     onError: (err: any) => toast(err.message ?? t("admin.memberRemoveFailed", { defaultValue: "Failed to remove member" }), "error"),
   });
 
-  const groups = (groupsData as any)?.data ?? [];
-  const members = (membersData as any)?.data ?? [];
-  const detail = groupDetail as any;
+  const groups = groupsData?.data ?? [];
+  const members = membersData?.data ?? [];
+  const detail = groupDetail;
 
   return (
     <div className="flex gap-6 h-full">
@@ -140,9 +164,7 @@ function AdminGroupsPage() {
                   variant="ghost"
                   size="sm"
                   className="text-danger hover:text-danger"
-                  onClick={() => {
-                    if (confirm(t("admin.deleteGroupConfirm", { defaultValue: "Delete this group?" }))) deleteMutation.mutate(selectedGroup);
-                  }}
+                  onClick={() => setDeleteTarget(selectedGroup)}
                   aria-label={t("admin.deleteGroup", { defaultValue: "Delete group" })}
                 >
                   <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> {t("admin.delete", { defaultValue: "Delete" })}
@@ -274,6 +296,20 @@ function AdminGroupsPage() {
           }}
         />
       </Dialog>
+
+      {/* Delete Group Confirmation */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate(deleteTarget);
+          setDeleteTarget(null);
+        }}
+        title={t("admin.confirmDelete", { defaultValue: "Confirm Delete" })}
+        description={t("admin.deleteGroupConfirm", { defaultValue: "Are you sure you want to delete this group? This action cannot be undone." })}
+        confirmLabel={t("admin.delete", { defaultValue: "Delete" })}
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 }
@@ -283,7 +319,7 @@ function AddMemberForm({ groupId, onDone }: { groupId: string; onDone: () => voi
   const [search, setSearch] = useState("");
   const { data: searchResults } = useQuery({
     queryKey: ["org-members-search", search],
-    queryFn: () => api.get<any>(`/api/org/members?search=${search}`),
+    queryFn: () => api.get<{ data: OrgMember[] }>(`/api/org/members?search=${search}`),
     enabled: search.length >= 2,
   });
 
@@ -296,7 +332,7 @@ function AddMemberForm({ groupId, onDone }: { groupId: string; onDone: () => voi
     onError: (err: any) => toast(err.message ?? t("admin.memberAddFailed", { defaultValue: "Failed to add member" }), "error"),
   });
 
-  const results = (searchResults as any)?.data ?? [];
+  const results = searchResults?.data ?? [];
 
   return (
     <div className="space-y-4">

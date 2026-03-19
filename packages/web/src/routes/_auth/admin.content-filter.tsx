@@ -7,11 +7,33 @@ import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
 import { Textarea } from "../../components/ui/Textarea";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { toast } from "../../components/ui/Toast";
+
+interface ContentFilter {
+  id: string;
+  name: string;
+  type: string;
+  pattern?: string;
+  action: string;
+  severity: string;
+  isEnabled: boolean;
+}
+
+interface DlpRule {
+  id: string;
+  name: string;
+  description?: string;
+  detectorType: string;
+  pattern?: string;
+  action: string;
+  appliesTo: string;
+  isEnabled: boolean;
+}
 
 export const Route = createFileRoute("/_auth/admin/content-filter")({
   component: ContentFilterPage,
@@ -22,24 +44,24 @@ function ContentFilterPage() {
   const queryClient = useQueryClient();
   const [showFilterDialog, setShowFilterDialog] = useState(false);
   const [showDlpDialog, setShowDlpDialog] = useState(false);
-  const [editingFilter, setEditingFilter] = useState<any>(null);
-  const [editingDlp, setEditingDlp] = useState<any>(null);
+  const [editingFilter, setEditingFilter] = useState<ContentFilter | null>(null);
+  const [editingDlp, setEditingDlp] = useState<DlpRule | null>(null);
   const [tab, setTab] = useState<"filters" | "dlp">("filters");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmType, setDeleteConfirmType] = useState<"filter" | "dlp">("filter");
 
   const { data: filters, isLoading: filtersLoading } = useQuery({
     queryKey: ["content-filters"],
-    queryFn: () => api.get<any[]>("/api/content/filters"),
+    queryFn: () => api.get<ContentFilter[]>("/api/content/filters"),
   });
 
   const { data: dlpRules, isLoading: dlpLoading } = useQuery({
     queryKey: ["dlp-rules"],
-    queryFn: () => api.get<any[]>("/api/content/dlp"),
+    queryFn: () => api.get<DlpRule[]>("/api/content/dlp"),
   });
 
   const createFilter = useMutation({
-    mutationFn: (data: any) => editingFilter?.id
+    mutationFn: (data: Omit<ContentFilter, "id" | "isEnabled">) => editingFilter?.id
       ? api.patch(`/api/content/filters/${editingFilter.id}`, data)
       : api.post("/api/content/filters", data),
     onSuccess: () => {
@@ -62,7 +84,7 @@ function ContentFilterPage() {
   });
 
   const createDlp = useMutation({
-    mutationFn: (data: any) => editingDlp?.id
+    mutationFn: (data: Omit<DlpRule, "id" | "isEnabled">) => editingDlp?.id
       ? api.patch(`/api/content/dlp/${editingDlp.id}`, data)
       : api.post("/api/content/dlp", data),
     onSuccess: () => {
@@ -121,7 +143,7 @@ function ContentFilterPage() {
             tab === "filters" ? "bg-surface text-text shadow-sm" : "text-text-tertiary hover:text-text"
           }`}
         >
-          {t("admin.contentFilters", { defaultValue: "Content Filters" })} ({(filters as any[])?.length ?? 0})
+          {t("admin.contentFilters", { defaultValue: "Content Filters" })} ({filters?.length ?? 0})
         </button>
         <button
           onClick={() => setTab("dlp")}
@@ -129,7 +151,7 @@ function ContentFilterPage() {
             tab === "dlp" ? "bg-surface text-text shadow-sm" : "text-text-tertiary hover:text-text"
           }`}
         >
-          {t("admin.dlpRules", { defaultValue: "DLP Rules" })} ({(dlpRules as any[])?.length ?? 0})
+          {t("admin.dlpRules", { defaultValue: "DLP Rules" })} ({dlpRules?.length ?? 0})
         </button>
       </div>
 
@@ -148,14 +170,14 @@ function ContentFilterPage() {
                 <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
-          ) : (filters as any[])?.length === 0 ? (
+          ) : filters?.length === 0 ? (
             <div className="text-center py-12">
               <Shield className="h-8 w-8 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
               <p className="text-sm text-text-secondary">{t("admin.noContentFilters", { defaultValue: "No content filters configured" })}</p>
               <p className="text-xs text-text-tertiary mt-1">{t("admin.noContentFiltersHint", { defaultValue: "Add filters to block or flag inappropriate content" })}</p>
             </div>
           ) : (
-            (filters as any[])?.map((f: any) => (
+            filters?.map((f) => (
               <div key={f.id} className="flex items-center justify-between p-4 rounded-xl bg-surface-secondary border border-border">
                 <div className="flex items-center gap-3">
                   {actionIcon(f.action)}
@@ -208,14 +230,14 @@ function ContentFilterPage() {
                 <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
-          ) : (dlpRules as any[])?.length === 0 ? (
+          ) : dlpRules?.length === 0 ? (
             <div className="text-center py-12">
               <AlertTriangle className="h-8 w-8 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
               <p className="text-sm text-text-secondary">{t("admin.noDlpRules", { defaultValue: "No DLP rules configured" })}</p>
               <p className="text-xs text-text-tertiary mt-1">{t("admin.noDlpRulesHint", { defaultValue: "Add rules to detect and protect sensitive data" })}</p>
             </div>
           ) : (
-            (dlpRules as any[])?.map((r: any) => (
+            dlpRules?.map((r) => (
               <div key={r.id} className="flex items-center justify-between p-4 rounded-xl bg-surface-secondary border border-border">
                 <div className="flex items-center gap-3">
                   {actionIcon(r.action)}
@@ -271,38 +293,21 @@ function ContentFilterPage() {
         isPending={createDlp.isPending}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog
+      <ConfirmDialog
         open={!!deleteConfirmId}
         onClose={() => setDeleteConfirmId(null)}
+        onConfirm={handleDeleteConfirm}
         title={t("admin.confirmDelete", { defaultValue: "Confirm Delete" })}
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-text-secondary">
-            {t("admin.confirmDeleteMessage", { defaultValue: "Are you sure you want to delete this item? This action cannot be undone." })}
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setDeleteConfirmId(null)}>
-              {t("admin.cancel", { defaultValue: "Cancel" })}
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              className="bg-danger hover:bg-danger/90"
-              onClick={handleDeleteConfirm}
-              loading={deleteFilter.isPending || deleteDlp.isPending}
-            >
-              {t("admin.delete", { defaultValue: "Delete" })}
-            </Button>
-          </div>
-        </div>
-      </Dialog>
+        description={t("admin.confirmDeleteMessage", { defaultValue: "Are you sure you want to delete this item? This action cannot be undone." })}
+        confirmLabel={t("admin.delete", { defaultValue: "Delete" })}
+        isLoading={deleteFilter.isPending || deleteDlp.isPending}
+      />
     </div>
   );
 }
 
 function FilterFormDialog({ open, onClose, initial, onSubmit, isPending }: {
-  open: boolean; onClose: () => void; initial: any; onSubmit: (data: any) => void; isPending: boolean;
+  open: boolean; onClose: () => void; initial: ContentFilter | null; onSubmit: (data: Omit<ContentFilter, "id" | "isEnabled">) => void; isPending: boolean;
 }) {
   const { t } = useTranslation();
   const [name, setName] = useState(initial?.name ?? "");
@@ -367,7 +372,7 @@ function FilterFormDialog({ open, onClose, initial, onSubmit, isPending }: {
 }
 
 function DlpFormDialog({ open, onClose, initial, onSubmit, isPending }: {
-  open: boolean; onClose: () => void; initial: any; onSubmit: (data: any) => void; isPending: boolean;
+  open: boolean; onClose: () => void; initial: DlpRule | null; onSubmit: (data: Omit<DlpRule, "id" | "isEnabled">) => void; isPending: boolean;
 }) {
   const { t } = useTranslation();
   const [name, setName] = useState(initial?.name ?? "");

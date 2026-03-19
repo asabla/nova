@@ -7,10 +7,20 @@ import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { toast } from "../../components/ui/Toast";
+
+interface RateLimitRule {
+  id: string;
+  scope: string;
+  windowSeconds: number;
+  maxRequests: number;
+  maxTokens?: number;
+  isEnabled: boolean;
+}
 
 export const Route = createFileRoute("/_auth/admin/rate-limits")({
   component: RateLimitsPage,
@@ -20,16 +30,16 @@ function RateLimitsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [showDialog, setShowDialog] = useState(false);
-  const [editing, setEditing] = useState<any>(null);
+  const [editing, setEditing] = useState<RateLimitRule | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const { data: rules, isLoading } = useQuery({
     queryKey: ["rate-limit-rules"],
-    queryFn: () => api.get<any[]>("/api/org/rate-limits"),
+    queryFn: () => api.get<RateLimitRule[]>("/api/org/rate-limits"),
   });
 
   const save = useMutation({
-    mutationFn: (data: any) => editing?.id
+    mutationFn: (data: Omit<RateLimitRule, "id" | "isEnabled">) => editing?.id
       ? api.patch(`/api/org/rate-limits/${editing.id}`, data)
       : api.post("/api/org/rate-limits", data),
     onSuccess: () => {
@@ -98,7 +108,7 @@ function RateLimitsPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {((rules as any[]) ?? []).map((rule: any) => (
+          {(rules ?? []).map((rule) => (
             <div key={rule.id} className="flex items-center justify-between p-4 rounded-xl bg-surface-secondary border border-border">
               <div className="flex items-center gap-3">
                 <Gauge className="h-4 w-4 text-text-tertiary" aria-hidden="true" />
@@ -132,7 +142,7 @@ function RateLimitsPage() {
             </div>
           ))}
 
-          {((rules as any[]) ?? []).length === 0 && (
+          {(rules ?? []).length === 0 && (
             <div className="text-center py-12">
               <Gauge className="h-8 w-8 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
               <p className="text-sm text-text-secondary">{t("admin.noRateLimits", { defaultValue: "No custom rate limit rules" })}</p>
@@ -151,38 +161,21 @@ function RateLimitsPage() {
         isPending={save.isPending}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog
+      <ConfirmDialog
         open={!!deleteConfirmId}
         onClose={() => setDeleteConfirmId(null)}
+        onConfirm={() => deleteConfirmId && remove.mutate(deleteConfirmId)}
         title={t("admin.confirmDelete", { defaultValue: "Confirm Delete" })}
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-text-secondary">
-            {t("admin.confirmDeleteRateLimit", { defaultValue: "Are you sure you want to delete this rate limit rule? This action cannot be undone." })}
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setDeleteConfirmId(null)}>
-              {t("admin.cancel", { defaultValue: "Cancel" })}
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              className="bg-danger hover:bg-danger/90"
-              onClick={() => deleteConfirmId && remove.mutate(deleteConfirmId)}
-              loading={remove.isPending}
-            >
-              {t("admin.delete", { defaultValue: "Delete" })}
-            </Button>
-          </div>
-        </div>
-      </Dialog>
+        description={t("admin.confirmDeleteRateLimit", { defaultValue: "Are you sure you want to delete this rate limit rule? This action cannot be undone." })}
+        confirmLabel={t("admin.delete", { defaultValue: "Delete" })}
+        isLoading={remove.isPending}
+      />
     </div>
   );
 }
 
 function RateLimitDialog({ open, onClose, initial, onSubmit, isPending }: {
-  open: boolean; onClose: () => void; initial: any; onSubmit: (data: any) => void; isPending: boolean;
+  open: boolean; onClose: () => void; initial: RateLimitRule | null; onSubmit: (data: Omit<RateLimitRule, "id" | "isEnabled">) => void; isPending: boolean;
 }) {
   const { t } = useTranslation();
   const [scope, setScope] = useState(initial?.scope ?? "user");

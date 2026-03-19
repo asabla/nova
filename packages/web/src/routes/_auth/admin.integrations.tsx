@@ -23,6 +23,7 @@ import { Select } from "../../components/ui/Select";
 import { Checkbox } from "../../components/ui/Checkbox";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { toast } from "../../components/ui/Toast";
 
@@ -269,32 +270,15 @@ function AdminIntegrationsPage() {
         />
       )}
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog
+      <ConfirmDialog
         open={!!deleteConfirmType}
         onClose={() => setDeleteConfirmType(null)}
+        onConfirm={() => deleteConfirmType && deleteMutation.mutate(deleteConfirmType)}
         title={t("admin.confirmDelete", { defaultValue: "Confirm Delete" })}
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-text-secondary">
-            {t("admin.confirmDeleteIntegration", { defaultValue: "Are you sure you want to remove this integration? This will disconnect the service and delete its configuration." })}
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setDeleteConfirmType(null)}>
-              {t("admin.cancel", { defaultValue: "Cancel" })}
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              className="bg-danger hover:bg-danger/90"
-              onClick={() => deleteConfirmType && deleteMutation.mutate(deleteConfirmType)}
-              loading={deleteMutation.isPending}
-            >
-              {t("admin.remove", { defaultValue: "Remove" })}
-            </Button>
-          </div>
-        </div>
-      </Dialog>
+        description={t("admin.confirmDeleteIntegration", { defaultValue: "Are you sure you want to remove this integration? This will disconnect the service and delete its configuration." })}
+        confirmLabel={t("admin.remove", { defaultValue: "Remove" })}
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 }

@@ -9,10 +9,28 @@ import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Avatar } from "../../components/ui/Avatar";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { toast } from "../../components/ui/Toast";
 import { formatDistanceToNow } from "date-fns";
+
+interface OrgMember {
+  id: string;
+  user?: { id: string; name?: string; displayName?: string; email: string };
+  profile?: { userId: string; displayName?: string; role: string };
+  role?: string;
+  name?: string;
+  displayName?: string;
+  email?: string;
+}
+
+interface Invitation {
+  id: string;
+  email: string;
+  role: string;
+  createdAt: string;
+}
 
 export const Route = createFileRoute("/_auth/admin/members")({
   component: MembersPage,
@@ -24,16 +42,19 @@ function MembersPage() {
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("member");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [elevateTarget, setElevateTarget] = useState<{ userId: string; name: string } | null>(null);
 
   const { data: membersData, isLoading: membersLoading } = useQuery({
     queryKey: ["org-members"],
-    queryFn: () => api.get<any>("/api/org/members"),
+    queryFn: () => api.get<{ data: OrgMember[] }>("/api/org/members"),
     staleTime: 30_000,
   });
 
   const { data: invitationsData, isLoading: invitationsLoading } = useQuery({
     queryKey: ["org-invitations"],
-    queryFn: () => api.get<any>("/api/org/invitations"),
+    queryFn: () => api.get<{ data: Invitation[] }>("/api/org/invitations"),
     staleTime: 30_000,
   });
 
@@ -58,8 +79,19 @@ function MembersPage() {
     onError: (err: any) => toast(err.message ?? t("admin.roleUpdateFailed", { defaultValue: "Failed to update role" }), "error"),
   });
 
-  const members = (membersData as any)?.data ?? [];
-  const invitations = (invitationsData as any)?.data ?? [];
+  const members = membersData?.data ?? [];
+  const invitations = invitationsData?.data ?? [];
+
+  const filteredMembers = members.filter((member: any) => {
+    const user = member.user ?? member;
+    const profile = member.profile ?? member;
+    const name = (user.name ?? user.displayName ?? profile.displayName ?? "").toLowerCase();
+    const email = (user.email ?? "").toLowerCase();
+    const role = profile.role ?? member.role ?? "member";
+    if (searchQuery && !name.includes(searchQuery.toLowerCase()) && !email.includes(searchQuery.toLowerCase())) return false;
+    if (roleFilter && role !== roleFilter) return false;
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -74,6 +106,28 @@ function MembersPage() {
         </Button>
       </div>
 
+      {/* Search and filter */}
+      <div className="flex items-center gap-3">
+        <Input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={t("admin.searchMembers", { defaultValue: "Search by name or email..." })}
+          className="flex-1"
+        />
+        <Select
+          value={roleFilter}
+          onChange={(value) => setRoleFilter(value)}
+          options={[
+            { value: "", label: t("admin.allRoles", { defaultValue: "All Roles" }) },
+            { value: "org-admin", label: t("admin.roleAdmin", { defaultValue: "Admin" }) },
+            { value: "power-user", label: t("admin.rolePowerUser", { defaultValue: "Power User" }) },
+            { value: "member", label: t("admin.roleMember", { defaultValue: "Member" }) },
+            { value: "viewer", label: t("admin.roleViewer", { defaultValue: "Viewer" }) },
+          ]}
+          size="sm"
+        />
+      </div>
+
       {membersLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 3 }).map((_, i) => (
@@ -82,7 +136,7 @@ function MembersPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {members.map((member: any) => {
+          {filteredMembers.map((member: any) => {
             const user = member.user ?? member;
             const profile = member.profile ?? member;
             const name = user.name ?? user.displayName ?? profile.displayName ?? "Unknown";
@@ -106,9 +160,8 @@ function MembersPage() {
                     value={role}
                     onChange={(newRole) => {
                       if (newRole === "org-admin" && role !== "org-admin") {
-                        if (!window.confirm(t("admin.confirmRoleElevation", { defaultValue: "Are you sure you want to grant admin privileges to {{name}}?", name }))) {
-                          return;
-                        }
+                        setElevateTarget({ userId, name });
+                        return;
                       }
                       updateRole.mutate({ userId, role: newRole });
                     }}
@@ -133,7 +186,7 @@ function MembersPage() {
         <div>
           <h3 className="text-sm font-medium text-text mb-3">{t("admin.pendingInvitations", { defaultValue: "Pending Invitations" })}</h3>
           <div className="space-y-2">
-            {invitations.map((inv: any) => (
+            {invitations.map((inv) => (
               <div key={inv.id} className="flex items-center justify-between p-3 rounded-xl bg-surface-secondary border border-border">
                 <div className="flex items-center gap-3">
                   <Mail className="h-4 w-4 text-text-tertiary" aria-hidden="true" />
@@ -185,6 +238,20 @@ function MembersPage() {
           </div>
         </form>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!elevateTarget}
+        onClose={() => setElevateTarget(null)}
+        onConfirm={() => {
+          if (elevateTarget) updateRole.mutate({ userId: elevateTarget.userId, role: "org-admin" });
+          setElevateTarget(null);
+        }}
+        title={t("admin.confirmRoleElevationTitle", { defaultValue: "Grant Admin Privileges" })}
+        description={t("admin.confirmRoleElevation", { defaultValue: "Are you sure you want to grant admin privileges to {{name}}?", name: elevateTarget?.name ?? "" })}
+        confirmLabel={t("admin.grantAdmin", { defaultValue: "Grant Admin" })}
+        confirmVariant="danger"
+        isLoading={updateRole.isPending}
+      />
     </div>
   );
 }

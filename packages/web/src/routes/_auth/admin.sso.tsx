@@ -10,8 +10,20 @@ import { Select } from "../../components/ui/Select";
 import { Checkbox } from "../../components/ui/Checkbox";
 import { Badge } from "../../components/ui/Badge";
 import { Dialog } from "../../components/ui/Dialog";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { toast } from "../../components/ui/Toast";
+
+interface SsoProvider {
+  id: string;
+  type: string;
+  providerName: string;
+  clientId: string;
+  issuerUrl?: string;
+  isEnabled: boolean;
+  autoProvisionUsers: boolean;
+  defaultRole: string;
+}
 
 export const Route = createFileRoute("/_auth/admin/sso")({
   component: AdminSsoPage,
@@ -44,7 +56,7 @@ function AdminSsoPage() {
 
   const { data: providersData, isLoading } = useQuery({
     queryKey: ["sso-providers"],
-    queryFn: () => api.get<any>("/api/sso"),
+    queryFn: () => api.get<{ data: SsoProvider[] }>("/api/sso"),
   });
 
   const createMutation = useMutation({
@@ -76,14 +88,14 @@ function AdminSsoPage() {
 
   const handleTest = async (id: string) => {
     try {
-      const result = await api.post<any>(`/api/sso/${id}/test`, {});
+      const result = await api.post<{ success: boolean; issuer?: string; error?: string }>(`/api/sso/${id}/test`, {});
       setTestResults((prev) => ({ ...prev, [id]: result }));
     } catch (err: any) {
       setTestResults((prev) => ({ ...prev, [id]: { success: false, error: err.message } }));
     }
   };
 
-  const providers = (providersData as any)?.data ?? [];
+  const providers = providersData?.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -105,7 +117,7 @@ function AdminSsoPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {providers.map((provider: any) => (
+          {providers.map((provider) => (
             <div key={provider.id} className="p-4 rounded-xl bg-surface-secondary border border-border">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
@@ -237,32 +249,15 @@ function AdminSsoPage() {
         </form>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog
+      <ConfirmDialog
         open={!!deleteConfirmId}
         onClose={() => setDeleteConfirmId(null)}
+        onConfirm={() => deleteConfirmId && deleteMutation.mutate(deleteConfirmId)}
         title={t("admin.confirmDelete", { defaultValue: "Confirm Delete" })}
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-text-secondary">
-            {t("admin.confirmDeleteSsoProvider", { defaultValue: "Are you sure you want to remove this SSO provider? Users who sign in via this provider will no longer be able to authenticate." })}
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setDeleteConfirmId(null)}>
-              {t("admin.cancel", { defaultValue: "Cancel" })}
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              className="bg-danger hover:bg-danger/90"
-              onClick={() => deleteConfirmId && deleteMutation.mutate(deleteConfirmId)}
-              loading={deleteMutation.isPending}
-            >
-              {t("admin.remove", { defaultValue: "Remove" })}
-            </Button>
-          </div>
-        </div>
-      </Dialog>
+        description={t("admin.confirmDeleteSsoProvider", { defaultValue: "Are you sure you want to remove this SSO provider? Users who sign in via this provider will no longer be able to authenticate." })}
+        confirmLabel={t("admin.remove", { defaultValue: "Remove" })}
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 }
