@@ -1,9 +1,9 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { Context } from "@temporalio/activity";
 import { db } from "../lib/db";
 import { openai } from "../lib/litellm";
 import { getDefaultEmbeddingModel } from "../lib/models";
-import { knowledgeDocuments, knowledgeChunks, knowledgeCollections } from "@nova/shared/schemas";
+import { knowledgeDocuments, knowledgeChunks, knowledgeCollections, knowledgeTags, knowledgeDocumentTagAssignments } from "@nova/shared/schemas";
 import { files } from "@nova/shared/schema";
 import { extractFromHtml, chunkContent } from "@nova/shared/content";
 import type { ContentChunk } from "@nova/shared/content";
@@ -79,10 +79,20 @@ async function extractPdfText(fileBuffer: Buffer): Promise<string> {
   return fullText;
 }
 
+interface ExtractedMetadata {
+  byline?: string | null;
+  publishedDate?: string | null;
+  description?: string | null;
+  language?: string | null;
+  siteName?: string | null;
+  wordCount?: number;
+}
+
 interface ResolvedContent {
   text: string;
   title?: string;
   sourceUrl?: string;
+  extractedMetadata?: ExtractedMetadata;
 }
 
 function isHtmlContent(text: string, contentType?: string): boolean {
@@ -99,7 +109,12 @@ async function resolveDocumentContent(input: DocumentIngestionInput): Promise<Re
     // Stored content might be HTML
     if (isHtmlContent(doc.content)) {
       const extracted = extractFromHtml(doc.content, doc.sourceUrl ?? undefined);
-      return { text: extracted.markdown, title: extracted.title ?? undefined, sourceUrl: doc.sourceUrl ?? undefined };
+      return {
+        text: extracted.markdown,
+        title: extracted.title ?? undefined,
+        sourceUrl: doc.sourceUrl ?? undefined,
+        extractedMetadata: { byline: extracted.byline, publishedDate: extracted.publishedDate, description: extracted.description, language: extracted.language, siteName: extracted.siteName, wordCount: extracted.wordCount },
+      };
     }
     return { text: doc.content };
   }
@@ -113,7 +128,12 @@ async function resolveDocumentContent(input: DocumentIngestionInput): Promise<Re
 
     if (isHtmlContent(body, contentType)) {
       const extracted = extractFromHtml(body, url);
-      return { text: extracted.markdown, title: extracted.title ?? undefined, sourceUrl: url };
+      return {
+        text: extracted.markdown,
+        title: extracted.title ?? undefined,
+        sourceUrl: url,
+        extractedMetadata: { byline: extracted.byline, publishedDate: extracted.publishedDate, description: extracted.description, language: extracted.language, siteName: extracted.siteName, wordCount: extracted.wordCount },
+      };
     }
     return { text: body, sourceUrl: url };
   }
@@ -141,7 +161,11 @@ async function resolveDocumentContent(input: DocumentIngestionInput): Promise<Re
     const text = fileBuffer.toString("utf-8");
     if (isHtmlContent(text, ct)) {
       const extracted = extractFromHtml(text);
-      return { text: extracted.markdown, title: extracted.title ?? undefined };
+      return {
+        text: extracted.markdown,
+        title: extracted.title ?? undefined,
+        extractedMetadata: { byline: extracted.byline, publishedDate: extracted.publishedDate, description: extracted.description, language: extracted.language, siteName: extracted.siteName, wordCount: extracted.wordCount },
+      };
     }
     return { text };
   }
@@ -196,6 +220,7 @@ async function persistChunks(
   chunks: EmbeddedChunk[],
   documentTitle?: string,
   sourceUrl?: string,
+  fullText?: string,
 ): Promise<void> {
   const [doc] = await db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.id, documentId));
   const orgId = doc?.orgId ?? "";
@@ -220,17 +245,114 @@ async function persistChunks(
     });
   }
 
-  // Update document with title if we extracted one and it's not already set
+  // Update document with title, content, tokenCount
+  const totalTokens = chunks.reduce((sum, c) => sum + Math.ceil(c.text.length / 4), 0);
   const updateData: Record<string, unknown> = {
     chunkCount: chunks.length,
+    tokenCount: totalTokens,
     status: "ready",
     updatedAt: new Date(),
   };
   if (documentTitle && !doc?.title) {
     updateData.title = documentTitle;
   }
+  if (fullText && !doc?.content) {
+    updateData.content = fullText;
+  }
 
   await db.update(knowledgeDocuments).set(updateData).where(eq(knowledgeDocuments.id, documentId));
+}
+
+interface EnrichmentResult {
+  summary: string;
+  tags: string[];
+  category: string;
+}
+
+async function enrichDocument(text: string, title?: string): Promise<EnrichmentResult | null> {
+  try {
+    const model = process.env.ENRICHMENT_MODEL ?? "default-model";
+    const snippet = text.slice(0, 4000);
+    const prompt = `Analyze this document and return a JSON object with:
+- "summary": a 2-3 sentence summary of the document
+- "tags": an array of 3-7 descriptive tags (lowercase, no #)
+- "category": a single category label (e.g. "tutorial", "research", "news", "documentation", "blog", "reference")
+
+${title ? `Title: ${title}\n` : ""}Content:
+${snippet}`;
+
+    const response = await openai.chat.completions.create({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+      max_tokens: 500,
+    });
+
+    const raw = response.choices[0]?.message?.content;
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as EnrichmentResult;
+    return {
+      summary: parsed.summary ?? "",
+      tags: Array.isArray(parsed.tags) ? parsed.tags.map(String).slice(0, 10) : [],
+      category: parsed.category ?? "",
+    };
+  } catch (err) {
+    console.warn("[ENRICH] LLM enrichment failed, continuing without:", err);
+    return null;
+  }
+}
+
+async function persistEnrichment(
+  documentId: string,
+  orgId: string,
+  extractedMetadata: ExtractedMetadata | undefined,
+  enrichment: EnrichmentResult | null,
+): Promise<void> {
+  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  if (extractedMetadata) updates.metadata = extractedMetadata;
+  if (enrichment?.summary) updates.summary = enrichment.summary;
+
+  await db.update(knowledgeDocuments).set(updates).where(eq(knowledgeDocuments.id, documentId));
+
+  if (enrichment && enrichment.tags.length > 0) {
+    // Collect all tags including category
+    const tagNames = [...enrichment.tags];
+    if (enrichment.category) tagNames.push(enrichment.category);
+    const uniqueTags = [...new Set(tagNames.map((t) => t.toLowerCase().trim()).filter(Boolean))];
+
+    // Clear existing auto-generated assignments for this document
+    await db.delete(knowledgeDocumentTagAssignments).where(
+      and(
+        eq(knowledgeDocumentTagAssignments.knowledgeDocumentId, documentId),
+        eq(knowledgeDocumentTagAssignments.source, "auto"),
+      ),
+    );
+
+    for (const tagName of uniqueTags) {
+      // Upsert tag
+      await db.insert(knowledgeTags).values({
+        orgId,
+        name: tagName,
+        source: "auto",
+      }).onConflictDoNothing({ target: [knowledgeTags.orgId, knowledgeTags.name] });
+
+      // Fetch the tag ID
+      const [tag] = await db.select({ id: knowledgeTags.id }).from(knowledgeTags).where(
+        and(eq(knowledgeTags.orgId, orgId), eq(knowledgeTags.name, tagName)),
+      );
+      if (!tag) continue;
+
+      // Create assignment
+      await db.insert(knowledgeDocumentTagAssignments).values({
+        knowledgeDocumentId: documentId,
+        knowledgeTagId: tag.id,
+        orgId,
+        source: "auto",
+      }).onConflictDoNothing();
+    }
+  }
 }
 
 /**
@@ -266,7 +388,13 @@ export async function ingestDocument(input: DocumentIngestionInput): Promise<{ c
   }
 
   const withEmbeddings = await embedChunks(chunks, collection?.embeddingModel ?? undefined);
-  await persistChunks(input.documentId, input.collectionId, withEmbeddings, resolved.title, resolved.sourceUrl);
+  await persistChunks(input.documentId, input.collectionId, withEmbeddings, resolved.title, resolved.sourceUrl, resolved.text);
+
+  // LLM enrichment (non-blocking — failure just skips enrichment)
+  Context.current().heartbeat("Enriching document with LLM");
+  const enrichment = await enrichDocument(resolved.text, resolved.title);
+  await persistEnrichment(input.documentId, input.orgId, resolved.extractedMetadata, enrichment);
+
   return { chunkCount: withEmbeddings.length };
 }
 

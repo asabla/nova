@@ -6,6 +6,9 @@ import {
   messages,
   agents,
   knowledgeCollections,
+  knowledgeDocuments,
+  knowledgeTags,
+  knowledgeDocumentTagAssignments,
   files,
   workspaces,
   researchReports,
@@ -65,7 +68,7 @@ export const searchService = {
       }
     }
 
-    const [convResults, msgResults, agentResults, kbResults, fileResults, wsResults, researchResults] = await Promise.all([
+    const [convResults, msgResults, agentResults, kbResults, docResults, fileResults, wsResults, researchResults] = await Promise.all([
       // --- Conversations ---
       shouldSearch("conversations")
         ? db
@@ -222,6 +225,69 @@ export const searchService = {
             .offset(offset)
         : Promise.resolve([]),
 
+      // --- Knowledge documents (by title, summary, tags) ---
+      shouldSearch("knowledge")
+        ? (async () => {
+            const byTitleSummary = await db
+              .select({
+                id: knowledgeDocuments.id,
+                title: knowledgeDocuments.title,
+                summary: knowledgeDocuments.summary,
+                collectionId: knowledgeDocuments.knowledgeCollectionId,
+                createdAt: knowledgeDocuments.createdAt,
+                type: sql<string>`'knowledge_document'`,
+              })
+              .from(knowledgeDocuments)
+              .where(
+                and(
+                  eq(knowledgeDocuments.orgId, orgId),
+                  isNull(knowledgeDocuments.deletedAt),
+                  or(
+                    ilike(knowledgeDocuments.title, pattern),
+                    ilike(knowledgeDocuments.summary, pattern),
+                  ),
+                  ...dateConditions(knowledgeDocuments),
+                ),
+              )
+              .orderBy(desc(knowledgeDocuments.createdAt))
+              .limit(limit);
+
+            const byTag = await db
+              .selectDistinct({
+                id: knowledgeDocuments.id,
+                title: knowledgeDocuments.title,
+                summary: knowledgeDocuments.summary,
+                collectionId: knowledgeDocuments.knowledgeCollectionId,
+                createdAt: knowledgeDocuments.createdAt,
+                type: sql<string>`'knowledge_document'`,
+              })
+              .from(knowledgeDocuments)
+              .innerJoin(knowledgeDocumentTagAssignments, eq(knowledgeDocumentTagAssignments.knowledgeDocumentId, knowledgeDocuments.id))
+              .innerJoin(knowledgeTags, eq(knowledgeDocumentTagAssignments.knowledgeTagId, knowledgeTags.id))
+              .where(
+                and(
+                  eq(knowledgeDocuments.orgId, orgId),
+                  isNull(knowledgeDocuments.deletedAt),
+                  ilike(knowledgeTags.name, pattern),
+                  ...dateConditions(knowledgeDocuments),
+                ),
+              )
+              .orderBy(desc(knowledgeDocuments.createdAt))
+              .limit(limit);
+
+            // Deduplicate
+            const seen = new Set<string>();
+            const merged = [];
+            for (const doc of [...byTitleSummary, ...byTag]) {
+              if (!seen.has(doc.id)) {
+                seen.add(doc.id);
+                merged.push(doc);
+              }
+            }
+            return merged.slice(0, limit);
+          })()
+        : Promise.resolve([]),
+
       // --- Files ---
       shouldSearch("files")
         ? db
@@ -318,6 +384,12 @@ export const searchService = {
       snippet: k.description ? extractSnippet(k.description, query, 200) : null,
     }));
 
+    const docsWithSnippets = docResults.map((d: any) => ({
+      ...d,
+      name: d.title,
+      snippet: d.summary ? extractSnippet(d.summary, query, 200) : null,
+    }));
+
     const workspacesWithSnippets = wsResults.map((w: any) => ({
       ...w,
       snippet: w.description ? extractSnippet(w.description, query, 200) : null,
@@ -334,6 +406,7 @@ export const searchService = {
       messages: messagesWithSnippets,
       agents: agentsWithSnippets,
       knowledge: knowledgeWithSnippets,
+      knowledgeDocuments: docsWithSnippets,
       files: fileResults,
       workspaces: workspacesWithSnippets,
       research: researchWithSnippets,
@@ -342,6 +415,7 @@ export const searchService = {
         msgResults.length +
         agentResults.length +
         kbResults.length +
+        docResults.length +
         fileResults.length +
         wsResults.length +
         researchResults.length,

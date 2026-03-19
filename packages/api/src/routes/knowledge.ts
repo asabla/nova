@@ -31,6 +31,33 @@ knowledgeRoutes.get("/models/embedding", async (c) => {
   }
 });
 
+// ── Tag routes (before /:id to avoid param conflicts) ──
+
+knowledgeRoutes.get("/tags", async (c) => {
+  const orgId = c.get("orgId");
+  const search = c.req.query("search");
+  const tags = await knowledgeService.listTags(orgId, { search });
+  return c.json({ data: tags });
+});
+
+const createTagSchema = z.object({
+  name: z.string().min(1).max(100),
+  color: z.string().max(20).optional(),
+});
+
+knowledgeRoutes.post("/tags", async (c) => {
+  const orgId = c.get("orgId");
+  const body = createTagSchema.parse(await c.req.json());
+  const tag = await knowledgeService.createTag(orgId, body);
+  return c.json(tag, 201);
+});
+
+knowledgeRoutes.delete("/tags/:tagId", async (c) => {
+  const orgId = c.get("orgId");
+  await knowledgeService.deleteTag(orgId, c.req.param("tagId"));
+  return c.body(null, 204);
+});
+
 knowledgeRoutes.get("/", async (c) => {
   const orgId = c.get("orgId");
   const { limit, offset } = parsePagination(c.req.query());
@@ -98,7 +125,8 @@ knowledgeRoutes.delete("/:id", async (c) => {
 // Documents within a collection
 knowledgeRoutes.get("/:id/documents", async (c) => {
   const orgId = c.get("orgId");
-  const docs = await knowledgeService.listDocuments(orgId, c.req.param("id"));
+  const tagId = c.req.query("tag");
+  const docs = await knowledgeService.listDocuments(orgId, c.req.param("id"), { tagId: tagId || undefined });
   return c.json({ data: docs });
 });
 
@@ -181,6 +209,31 @@ knowledgeRoutes.post("/:id/documents/upload", async (c) => {
   }
 
   return c.json({ data: docs }, 201);
+});
+
+// ── Document tag routes ──
+
+knowledgeRoutes.get("/:collectionId/documents/:docId/tags", async (c) => {
+  const orgId = c.get("orgId");
+  const tags = await knowledgeService.getDocumentTags(orgId, c.req.param("docId"));
+  return c.json({ data: tags });
+});
+
+const addDocTagSchema = z.object({
+  name: z.string().min(1).max(100),
+});
+
+knowledgeRoutes.post("/:collectionId/documents/:docId/tags", async (c) => {
+  const orgId = c.get("orgId");
+  const body = addDocTagSchema.parse(await c.req.json());
+  const tag = await knowledgeService.addTagToDocument(orgId, c.req.param("docId"), body.name);
+  return c.json(tag, 201);
+});
+
+knowledgeRoutes.delete("/:collectionId/documents/:docId/tags/:tagId", async (c) => {
+  const orgId = c.get("orgId");
+  await knowledgeService.removeTagFromDocument(orgId, c.req.param("docId"), c.req.param("tagId"));
+  return c.body(null, 204);
 });
 
 knowledgeRoutes.delete("/:collectionId/documents/:docId", async (c) => {

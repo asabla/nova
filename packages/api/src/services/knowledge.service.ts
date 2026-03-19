@@ -1,6 +1,6 @@
 import { eq, and, desc, isNull, ilike, ne, sql } from "drizzle-orm";
 import { db } from "../lib/db";
-import { knowledgeCollections, knowledgeDocuments, knowledgeChunks, workspaces } from "@nova/shared/schemas";
+import { knowledgeCollections, knowledgeDocuments, knowledgeChunks, knowledgeTags, knowledgeDocumentTagAssignments, workspaces } from "@nova/shared/schemas";
 import { auditLogs } from "@nova/shared/schema";
 import { AppError } from "@nova/shared/utils";
 import { getTemporalClient } from "../lib/temporal";
@@ -90,12 +90,64 @@ export const knowledgeService = {
     return collection;
   },
 
-  async listDocuments(orgId: string, collectionId: string) {
-    return db
+  async listDocuments(orgId: string, collectionId: string, opts?: { tagId?: string }) {
+    const conditions = [
+      eq(knowledgeDocuments.knowledgeCollectionId, collectionId),
+      eq(knowledgeDocuments.orgId, orgId),
+    ];
+
+    if (opts?.tagId) {
+      // Filter by tag — join through assignments
+      const docIds = db
+        .select({ id: knowledgeDocumentTagAssignments.knowledgeDocumentId })
+        .from(knowledgeDocumentTagAssignments)
+        .where(eq(knowledgeDocumentTagAssignments.knowledgeTagId, opts.tagId));
+
+      const docs = await db
+        .select()
+        .from(knowledgeDocuments)
+        .where(and(...conditions, sql`${knowledgeDocuments.id} IN (${docIds})`))
+        .orderBy(desc(knowledgeDocuments.createdAt));
+
+      return this._attachTags(orgId, docs);
+    }
+
+    const docs = await db
       .select()
       .from(knowledgeDocuments)
-      .where(and(eq(knowledgeDocuments.knowledgeCollectionId, collectionId), eq(knowledgeDocuments.orgId, orgId)))
+      .where(and(...conditions))
       .orderBy(desc(knowledgeDocuments.createdAt));
+
+    return this._attachTags(orgId, docs);
+  },
+
+  async _attachTags(orgId: string, docs: (typeof knowledgeDocuments.$inferSelect)[]) {
+    if (docs.length === 0) return docs;
+
+    const docIds = docs.map((d) => d.id);
+    const allAssignments = await db
+      .select({
+        documentId: knowledgeDocumentTagAssignments.knowledgeDocumentId,
+        tagId: knowledgeTags.id,
+        tagName: knowledgeTags.name,
+        tagColor: knowledgeTags.color,
+        source: knowledgeDocumentTagAssignments.source,
+      })
+      .from(knowledgeDocumentTagAssignments)
+      .innerJoin(knowledgeTags, eq(knowledgeDocumentTagAssignments.knowledgeTagId, knowledgeTags.id))
+      .where(and(
+        eq(knowledgeDocumentTagAssignments.orgId, orgId),
+        sql`${knowledgeDocumentTagAssignments.knowledgeDocumentId} IN (${sql.join(docIds.map((id) => sql`${id}`), sql`, `)})`,
+      ));
+
+    const tagsByDoc = new Map<string, { id: string; name: string; color: string | null; source: string }[]>();
+    for (const a of allAssignments) {
+      const list = tagsByDoc.get(a.documentId) ?? [];
+      list.push({ id: a.tagId, name: a.tagName, color: a.tagColor, source: a.source });
+      tagsByDoc.set(a.documentId, list);
+    }
+
+    return docs.map((d) => ({ ...d, tags: tagsByDoc.get(d.id) ?? [] }));
   },
 
   async addDocument(orgId: string, collectionId: string, data: {
@@ -196,6 +248,7 @@ export const knowledgeService = {
             kc.id,
             kc.knowledge_document_id AS "documentId",
             kd.title AS "documentName",
+            kd.summary AS "documentSummary",
             kc.content,
             kc.chunk_index AS "chunkIndex",
             kc.metadata,
@@ -215,6 +268,7 @@ export const knowledgeService = {
             kc.id,
             kc.knowledge_document_id AS "documentId",
             kd.title AS "documentName",
+            kd.summary AS "documentSummary",
             kc.content,
             kc.chunk_index AS "chunkIndex",
             kc.metadata,
@@ -261,6 +315,7 @@ export const knowledgeService = {
       id: r.id,
       documentId: r.documentId,
       documentName: r.documentName,
+      documentSummary: r.documentSummary ?? null,
       content: r.content,
       chunkIndex: r.chunkIndex,
       score: parseFloat(r.score) || 0,
@@ -313,6 +368,86 @@ export const knowledgeService = {
     return collection;
   },
 
+  async listTags(orgId: string, opts?: { search?: string }) {
+    const conditions = [eq(knowledgeTags.orgId, orgId)];
+    if (opts?.search) {
+      conditions.push(ilike(knowledgeTags.name, `%${opts.search}%`));
+    }
+    return db.select().from(knowledgeTags).where(and(...conditions)).orderBy(knowledgeTags.name);
+  },
+
+  async createTag(orgId: string, data: { name: string; color?: string }) {
+    const [tag] = await db.insert(knowledgeTags).values({
+      orgId,
+      name: data.name.toLowerCase().trim(),
+      color: data.color,
+      source: "manual",
+    }).returning();
+    return tag;
+  },
+
+  async deleteTag(orgId: string, tagId: string) {
+    // Cascade deletes assignments via FK
+    const [tag] = await db.delete(knowledgeTags)
+      .where(and(eq(knowledgeTags.id, tagId), eq(knowledgeTags.orgId, orgId)))
+      .returning();
+    if (!tag) throw AppError.notFound("Tag not found");
+    return tag;
+  },
+
+  async getDocumentTags(orgId: string, docId: string) {
+    return db.select({
+      id: knowledgeTags.id,
+      name: knowledgeTags.name,
+      color: knowledgeTags.color,
+      source: knowledgeDocumentTagAssignments.source,
+    })
+      .from(knowledgeDocumentTagAssignments)
+      .innerJoin(knowledgeTags, eq(knowledgeDocumentTagAssignments.knowledgeTagId, knowledgeTags.id))
+      .where(and(
+        eq(knowledgeDocumentTagAssignments.knowledgeDocumentId, docId),
+        eq(knowledgeDocumentTagAssignments.orgId, orgId),
+      ));
+  },
+
+  async addTagToDocument(orgId: string, docId: string, tagName: string) {
+    const normalizedName = tagName.toLowerCase().trim();
+
+    // Upsert tag
+    await db.insert(knowledgeTags).values({
+      orgId,
+      name: normalizedName,
+      source: "manual",
+    }).onConflictDoNothing({ target: [knowledgeTags.orgId, knowledgeTags.name] });
+
+    const [tag] = await db.select().from(knowledgeTags).where(
+      and(eq(knowledgeTags.orgId, orgId), eq(knowledgeTags.name, normalizedName)),
+    );
+    if (!tag) throw AppError.badRequest("Failed to create tag");
+
+    // Create assignment
+    await db.insert(knowledgeDocumentTagAssignments).values({
+      knowledgeDocumentId: docId,
+      knowledgeTagId: tag.id,
+      orgId,
+      source: "manual",
+    }).onConflictDoNothing();
+
+    return tag;
+  },
+
+  async removeTagFromDocument(orgId: string, docId: string, tagId: string) {
+    const [assignment] = await db.delete(knowledgeDocumentTagAssignments)
+      .where(and(
+        eq(knowledgeDocumentTagAssignments.knowledgeDocumentId, docId),
+        eq(knowledgeDocumentTagAssignments.knowledgeTagId, tagId),
+        eq(knowledgeDocumentTagAssignments.orgId, orgId),
+      ))
+      .returning();
+    if (!assignment) throw AppError.notFound("Tag assignment not found");
+    return assignment;
+  },
+
   async getCollectionHistory(orgId: string, collectionId: string, opts?: { limit?: number; offset?: number }) {
     // Verify collection exists and belongs to org
     await this.getCollection(orgId, collectionId);
@@ -360,7 +495,7 @@ export async function retrieveWorkspaceContext(
   orgId: string,
   workspaceId: string,
   query: string,
-): Promise<{ documentName: string; content: string; score: number }[]> {
+): Promise<{ documentId: string; documentName: string; documentSummary?: string | null; content: string; score: number }[]> {
   try {
     const [workspace] = await db
       .select({ knowledgeCollectionId: workspaces.knowledgeCollectionId })
@@ -375,7 +510,9 @@ export async function retrieveWorkspaceContext(
     });
 
     return results.map((r) => ({
+      documentId: r.documentId,
       documentName: r.documentName,
+      documentSummary: r.documentSummary,
       content: r.content,
       score: r.score,
     }));
@@ -388,7 +525,7 @@ export async function retrieveWorkspaceContext(
 const RAG_CHAR_BUDGET = 16_000;
 
 export function formatRAGContext(
-  chunks: { documentName: string; content: string; score: number }[],
+  chunks: { documentId?: string; documentName: string; documentSummary?: string | null; content: string; score: number }[],
 ): string | null {
   if (chunks.length === 0) return null;
 
@@ -400,9 +537,19 @@ export function formatRAGContext(
   ];
 
   let charCount = lines.join("\n").length;
+  const seenDocuments = new Set<string>();
 
   for (const chunk of chunks) {
-    const section = `[Source: ${chunk.documentName}]\n${chunk.content}\n`;
+    let section = `[Source: ${chunk.documentName}]\n`;
+
+    // Prepend summary only for the first chunk of each document
+    const docKey = chunk.documentId ?? chunk.documentName;
+    if (!seenDocuments.has(docKey) && chunk.documentSummary) {
+      section += `Summary: ${chunk.documentSummary}\n`;
+    }
+    seenDocuments.add(docKey);
+
+    section += `${chunk.content}\n`;
     if (charCount + section.length > RAG_CHAR_BUDGET) break;
     lines.push(section);
     charCount += section.length;
