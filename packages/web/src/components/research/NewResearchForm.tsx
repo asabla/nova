@@ -91,7 +91,7 @@ export function NewResearchForm({
   const [maxSources, setMaxSources] = useState(defaultValues?.maxSources ?? 10);
   const [maxIterations, setMaxIterations] = useState(defaultValues?.maxIterations ?? 5);
   const [outputFormat, setOutputFormat] = useState<OutputFormat>(
-    defaultValues?.outputFormat ?? "markdown",
+    defaultValues?.outputFormat ?? "structured",
   );
   const [sources, setSources] = useState<SourceSelection>(
     defaultValues?.sources ?? {
@@ -104,8 +104,6 @@ export function NewResearchForm({
   // UI state
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
-  const [knowledgeTabOpened, setKnowledgeTabOpened] = useState(false);
-  const [filesTabOpened, setFilesTabOpened] = useState(false);
   const [knowledgeSearch, setKnowledgeSearch] = useState("");
   const [filesSearch, setFilesSearch] = useState("");
 
@@ -113,13 +111,12 @@ export function NewResearchForm({
     textareaRef.current?.focus();
   }, []);
 
-  // ---- Data fetching (lazy) ----
+  // ---- Data fetching ----
 
   const { data: knowledgeData, isLoading: isLoadingKnowledge } = useQuery({
     queryKey: ["knowledge-collections"],
     queryFn: () =>
       api.get<{ data: KnowledgeCollection[]; total: number }>("/api/knowledge?limit=100"),
-    enabled: knowledgeTabOpened,
     staleTime: 30_000,
   });
 
@@ -127,7 +124,6 @@ export function NewResearchForm({
     queryKey: ["user-files"],
     queryFn: () =>
       api.get<{ data: UserFile[]; total: number }>("/api/files?pageSize=100"),
-    enabled: filesTabOpened,
     staleTime: 30_000,
   });
 
@@ -219,9 +215,8 @@ export function NewResearchForm({
     });
   };
 
-  const handleTabChange = (tabId: string) => {
-    if (tabId === "knowledge" && !knowledgeTabOpened) setKnowledgeTabOpened(true);
-    if (tabId === "files" && !filesTabOpened) setFilesTabOpened(true);
+  const handleTabChange = (_tabId: string) => {
+    // no-op — data is pre-fetched on mount
   };
 
   // ---- Source picker tabs (shared between compact dropdown and full panel) ----
@@ -302,7 +297,6 @@ export function NewResearchForm({
                 >
                   <Checkbox
                     checked={sources.knowledgeCollectionIds.includes(col.id)}
-                    onChange={() => toggleCollection(col.id)}
                   />
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-text truncate">
@@ -363,7 +357,6 @@ export function NewResearchForm({
                 >
                   <Checkbox
                     checked={sources.fileIds.includes(file.id)}
-                    onChange={() => toggleFile(file.id)}
                   />
                   <FileTypeIcon contentType={file.contentType} />
                   <div className="min-w-0 flex-1">
@@ -508,14 +501,14 @@ export function NewResearchForm({
               </label>
               <div className="flex gap-2">
                 <FormatButton
-                  active={outputFormat === "markdown"}
-                  onClick={() => setOutputFormat("markdown")}
-                  label={t("research.formatMarkdown", "Markdown")}
-                />
-                <FormatButton
                   active={outputFormat === "structured"}
                   onClick={() => setOutputFormat("structured")}
                   label={t("research.formatStructured", "Structured")}
+                />
+                <FormatButton
+                  active={outputFormat === "markdown"}
+                  onClick={() => setOutputFormat("markdown")}
+                  label={t("research.formatMarkdown", "Markdown")}
                 />
               </div>
             </div>
@@ -641,13 +634,6 @@ export function NewResearchForm({
         </label>
         <div className="grid grid-cols-2 gap-3">
           <FormatCard
-            active={outputFormat === "markdown"}
-            onClick={() => setOutputFormat("markdown")}
-            icon={<BookOpen className="h-4 w-4" />}
-            title={t("research.formatMarkdown", "Markdown")}
-            description={t("research.markdownDesc", "Flowing prose with headings and citations")}
-          />
-          <FormatCard
             active={outputFormat === "structured"}
             onClick={() => setOutputFormat("structured")}
             icon={<LayoutList className="h-4 w-4" />}
@@ -656,6 +642,13 @@ export function NewResearchForm({
               "research.structuredDesc",
               "Sections with summaries and key findings",
             )}
+          />
+          <FormatCard
+            active={outputFormat === "markdown"}
+            onClick={() => setOutputFormat("markdown")}
+            icon={<BookOpen className="h-4 w-4" />}
+            title={t("research.formatMarkdown", "Markdown")}
+            description={t("research.markdownDesc", "Flowing prose with headings and citations")}
           />
         </div>
       </div>
