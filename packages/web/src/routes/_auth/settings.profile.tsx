@@ -9,9 +9,14 @@ import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
 import { Avatar } from "../../components/ui/Avatar";
 import { toast } from "../../components/ui/Toast";
+import { ErrorBoundary } from "../../components/ErrorBoundary";
 
 export const Route = createFileRoute("/_auth/settings/profile")({
-  component: ProfileSettings,
+  component: () => (
+    <ErrorBoundary>
+      <ProfileSettings />
+    </ErrorBoundary>
+  ),
 });
 
 const LANGUAGES = [

@@ -13,9 +13,14 @@ import { queryKeys } from "../../lib/query-keys";
 import { useAuthStore } from "../../stores/auth.store";
 import { setPendingFiles as storePendingFiles } from "../../lib/pending-files";
 import { ALLOWED_MIME_TYPES } from "@nova/shared/constants";
+import { ErrorBoundary } from "../../components/ErrorBoundary";
 
 export const Route = createFileRoute("/_auth/")({
-  component: HomePage,
+  component: () => (
+    <ErrorBoundary>
+      <HomePage />
+    </ErrorBoundary>
+  ),
 });
 
 function getGreeting(t: (key: string, fallback: string) => string): string {

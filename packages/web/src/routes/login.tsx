@@ -185,7 +185,7 @@ function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div role="alert" className="bg-danger/10 border border-danger/20 text-danger text-sm rounded-lg px-3 py-2 flex items-start gap-2">
+            <div id="login-error" role="alert" className="bg-danger/10 border border-danger/20 text-danger text-sm rounded-lg px-3 py-2 flex items-start gap-2">
               <span className="flex-1">{error}</span>
               <button
                 type="button"
@@ -206,6 +206,8 @@ function LoginPage() {
             placeholder="you@example.com"
             required
             autoFocus
+            aria-invalid={!!error || undefined}
+            aria-describedby={error ? "login-error" : undefined}
           />
 
           {mode === "password" && (
@@ -217,6 +219,8 @@ function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                aria-invalid={!!error || undefined}
+                aria-describedby={error ? "login-error" : undefined}
               />
               <button
                 type="button"

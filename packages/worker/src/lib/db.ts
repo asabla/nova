@@ -1,6 +1,15 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { env } from "./env";
 
-const connectionString = process.env.DATABASE_URL ?? "postgres://nova:nova@localhost:5432/nova";
-const client = postgres(connectionString);
+const client = postgres(env.DATABASE_URL, {
+  max: 10,
+  idle_timeout: 20,
+  connect_timeout: 10,
+  max_lifetime: 60 * 30,
+});
 export const db = drizzle(client);
+
+export async function closeDb() {
+  await client.end({ timeout: 5 });
+}

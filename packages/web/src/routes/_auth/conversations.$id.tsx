@@ -156,23 +156,33 @@ function ConversationPage() {
     } catch { /* sessionStorage unavailable */ }
   }, [handleSend, conversation]);
 
-  const handleRate = useCallback(async (messageId: string, rating: 1 | -1) => {
-    try {
-      await api.post(`/api/conversations/${id}/messages/${messageId}/rate`, { rating });
+  const rateMutation = useMutation({
+    mutationFn: ({ messageId, rating }: { messageId: string; rating: 1 | -1 }) =>
+      api.post(`/api/conversations/${id}/messages/${messageId}/rate`, { rating }),
+    onSuccess: (_data, { rating }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
       toast(rating === 1 ? t("conversations.upvoted", "Upvoted") : t("conversations.downvoted", "Downvoted"), "success");
-    } catch {
-      toast(t("conversations.rateFailed", "Failed to rate message"), "error");
-    }
-  }, [id, t]);
+    },
+    onError: () => toast(t("conversations.rateFailed", "Failed to rate message"), "error"),
+  });
 
-  const handleNote = useCallback(async (messageId: string, content: string) => {
-    try {
-      await api.post(`/api/conversations/${id}/messages/${messageId}/notes`, { content });
+  const noteMutation = useMutation({
+    mutationFn: ({ messageId, content }: { messageId: string; content: string }) =>
+      api.post(`/api/conversations/${id}/messages/${messageId}/notes`, { content }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
       toast(t("conversations.noteAdded", "Note added"), "success");
-    } catch {
-      toast(t("conversations.noteFailed", "Failed to add note"), "error");
-    }
-  }, [id, t]);
+    },
+    onError: () => toast(t("conversations.noteFailed", "Failed to add note"), "error"),
+  });
+
+  const handleRate = useCallback((messageId: string, rating: 1 | -1) => {
+    rateMutation.mutate({ messageId, rating });
+  }, [rateMutation]);
+
+  const handleNote = useCallback((messageId: string, content: string) => {
+    noteMutation.mutate({ messageId, content });
+  }, [noteMutation]);
 
   const handleEdit = useCallback((messageId: string, content: string) => {
     editMessage.mutate({ messageId, content });
@@ -242,6 +252,7 @@ function ConversationPage() {
     mutationFn: (messageId: string) =>
       api.post<{ id: string }>(`/api/conversations/${id}/fork`, { messageId }),
     onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
       toast(t("conversations.forked", "Conversation forked from message"), "success");
       navigate({ to: `/conversations/${data.id}` });
     },

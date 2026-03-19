@@ -46,7 +46,10 @@ export async function relayRedisToSSE(
         switch (data.type) {
           case "token":
             accumulatedContent += data.content;
-            stream.writeSSE({ event: "token", data: JSON.stringify({ content: data.content }) });
+            stream.writeSSE({ event: "token", data: JSON.stringify({ content: data.content }) }).catch(() => {
+              // Client disconnected
+              if (!settled) { settled = true; cleanup(); resolve({ content: accumulatedContent, usage: {} }); }
+            });
             break;
 
           case "tool_status":
@@ -58,6 +61,8 @@ export async function relayRedisToSSE(
                 ...(data.args ? { args: data.args } : {}),
                 ...(data.resultSummary ? { resultSummary: data.resultSummary } : {}),
               }),
+            }).catch(() => {
+              if (!settled) { settled = true; cleanup(); resolve({ content: accumulatedContent, usage: {} }); }
             });
             break;
 
@@ -69,10 +74,13 @@ export async function relayRedisToSSE(
                 maxAttempts: data.maxAttempts,
                 error: data.error,
               }),
+            }).catch(() => {
+              if (!settled) { settled = true; cleanup(); resolve({ content: accumulatedContent, usage: {} }); }
             });
             break;
 
           case "done":
+            if (settled) return;
             settled = true;
             cleanup();
             resolve({
@@ -83,12 +91,13 @@ export async function relayRedisToSSE(
 
           case "error":
             console.log(`[relay] ERROR received: ${data.message}, accumulated ${accumulatedContent.length} chars`);
+            if (settled) return;
             settled = true;
             cleanup();
             stream.writeSSE({
               event: "error",
               data: JSON.stringify({ message: data.message, code: "tool_error" }),
-            }).then(() => resolve({
+            }).catch(() => {}).then(() => resolve({
               content: accumulatedContent,
               usage: {},
             }));
@@ -105,12 +114,14 @@ export async function relayRedisToSSE(
       redisSub.unsubscribe(channelId).catch(() => {});
     };
 
+    // Attach handler before subscribing to avoid missing messages
+    redisSub.on("message", handler);
     redisSub.subscribe(channelId).then(() => {
       console.log(`[relay] subscribed to ${channelId.slice(-12)}, timeout=${timeoutMs}ms`);
-      redisSub.on("message", handler);
     }).catch((err) => {
       settled = true;
       clearTimeout(timeout);
+      redisSub.off("message", handler);
       reject(err);
     });
   });
@@ -140,6 +151,12 @@ export async function relayResearchToSSE(
       }).then(() => resolve());
     }, timeoutMs);
 
+    const safeWrite = (event: string, data: string) => {
+      stream.writeSSE({ event, data }).catch(() => {
+        if (!settled) { settled = true; cleanup(); resolve(); }
+      });
+    };
+
     const handler = (channel: string, message: string) => {
       if (channel !== channelId || settled) return;
 
@@ -148,42 +165,35 @@ export async function relayResearchToSSE(
 
         switch (data.type) {
           case "research.status":
-            stream.writeSSE({
-              event: "research.status",
-              data: JSON.stringify({ status: data.status, phase: data.phase }),
-            });
+            safeWrite("research.status", JSON.stringify({ status: data.status, phase: data.phase }));
             break;
 
           case "research.source":
-            stream.writeSSE({
-              event: "research.source",
-              data: JSON.stringify({ title: data.title, url: data.url, relevance: data.relevance }),
-            });
+            safeWrite("research.source", JSON.stringify({ title: data.title, url: data.url, relevance: data.relevance }));
             break;
 
           case "research.progress":
-            stream.writeSSE({
-              event: "research.progress",
-              data: JSON.stringify({ type: data.progressType, message: data.message, sourceUrl: data.sourceUrl }),
-            });
+            safeWrite("research.progress", JSON.stringify({ type: data.progressType, message: data.message, sourceUrl: data.sourceUrl }));
             break;
 
           case "research.done":
+            if (settled) return;
             settled = true;
             cleanup();
             stream.writeSSE({
               event: "research.done",
               data: JSON.stringify({ reportId: data.reportId, sourcesCount: data.sourcesCount }),
-            }).then(() => resolve());
+            }).catch(() => {}).then(() => resolve());
             break;
 
           case "research.error":
+            if (settled) return;
             settled = true;
             cleanup();
             stream.writeSSE({
               event: "research.error",
               data: JSON.stringify({ message: data.message }),
-            }).then(() => resolve());
+            }).catch(() => {}).then(() => resolve());
             break;
         }
       } catch {
@@ -197,12 +207,14 @@ export async function relayResearchToSSE(
       redisSub.unsubscribe(channelId).catch(() => {});
     };
 
+    // Attach handler before subscribing to avoid missing messages
+    redisSub.on("message", handler);
     redisSub.subscribe(channelId).then(() => {
       console.log(`[relay-research] subscribed to ${channelId.slice(-12)}, timeout=${timeoutMs}ms`);
-      redisSub.on("message", handler);
     }).catch((err) => {
       settled = true;
       clearTimeout(timeout);
+      redisSub.off("message", handler);
       reject(err);
     });
   });

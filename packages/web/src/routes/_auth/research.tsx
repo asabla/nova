@@ -42,13 +42,18 @@ import { toast } from "../../components/ui/Toast";
 import { formatDistanceToNow } from "date-fns";
 import { NewResearchForm, type NewResearchFormSubmitData } from "../../components/research/NewResearchForm";
 import { useResearchSSE } from "../../hooks/useResearchSSE";
+import { ErrorBoundary } from "../../components/ErrorBoundary";
 
 // ---------------------------------------------------------------------------
 // Route
 // ---------------------------------------------------------------------------
 
 export const Route = createFileRoute("/_auth/research")({
-  component: ResearchPage,
+  component: () => (
+    <ErrorBoundary>
+      <ResearchPage />
+    </ErrorBoundary>
+  ),
 });
 
 // ---------------------------------------------------------------------------
@@ -431,6 +436,13 @@ function ReportDetail({
 
   // Real-time SSE for active research reports
   const sse = useResearchSSE(report.id, report.status);
+
+  // Surface SSE errors to user
+  useEffect(() => {
+    if (sse.error) {
+      toast(sse.error, "error");
+    }
+  }, [sse.error]);
 
   // Merge SSE progress events with any existing report.progress
   const isActive = report.status === "pending" || report.status === "searching" ||

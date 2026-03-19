@@ -9,7 +9,12 @@ import "./styles/app.css";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: (failureCount, error: any) => {
+        // Don't retry on client errors (4xx)
+        const status = error?.status ?? error?.response?.status;
+        if (status && status >= 400 && status < 500) return false;
+        return failureCount < 1;
+      },
       refetchOnWindowFocus: false,
     },
   },

@@ -66,6 +66,11 @@ export function useSSEStream() {
       });
 
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          // Session expired — redirect to login
+          window.location.href = "/login";
+          return;
+        }
         setStatus("error");
         return;
       }

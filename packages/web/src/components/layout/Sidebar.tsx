@@ -38,7 +38,7 @@ export function Sidebar() {
   const activeMatch = matchRoute({ to: "/conversations/$id", fuzzy: false });
   const activeConversationId = activeMatch ? (activeMatch as { id: string }).id : null;
 
-  const { data: conversationsData, isLoading: loadingConversations } = useQuery({
+  const { data: conversationsData, isLoading: loadingConversations, isError: conversationsError, refetch: refetchConversations } = useQuery({
     queryKey: queryKeys.conversations.list({ isArchived: false }),
     queryFn: () => api.get<any>(`/api/conversations?isArchived=false`),
     staleTime: 30_000,
@@ -195,6 +195,7 @@ export function Sidebar() {
                   placeholder={t("conversations.search", { defaultValue: "Search conversations..." })}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  aria-label={t("conversations.search", { defaultValue: "Search conversations..." })}
                   className="w-full h-8 pl-8 pr-3 text-xs rounded-lg border border-border bg-surface text-text placeholder:text-text-tertiary"
                 />
               </div>
@@ -270,6 +271,17 @@ export function Sidebar() {
             <nav aria-label={t("nav.conversations", { defaultValue: "Conversations" })} className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
               {loadingConversations ? (
                 <ConversationListSkeleton />
+              ) : conversationsError ? (
+                <div className="px-3 py-10 text-center">
+                  <MessageSquare className="h-8 w-8 text-danger mx-auto mb-2 opacity-50" aria-hidden="true" />
+                  <p className="text-xs font-medium text-text-secondary">{t("conversations.loadError", "Failed to load conversations")}</p>
+                  <button
+                    onClick={() => refetchConversations()}
+                    className="mt-3 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 rounded-lg hover:bg-primary/15 transition-colors"
+                  >
+                    {t("common.retry", "Retry")}
+                  </button>
+                </div>
               ) : filteredConversations.length === 0 ? (
                 <div className="px-3 py-10 text-center">
                   <MessageSquare className="h-8 w-8 text-text-tertiary mx-auto mb-2 opacity-30" aria-hidden="true" />

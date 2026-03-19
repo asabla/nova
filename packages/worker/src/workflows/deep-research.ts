@@ -1,4 +1,4 @@
-import { proxyActivities, sleep } from "@temporalio/workflow";
+import { proxyActivities, sleep, CancellationScope } from "@temporalio/workflow";
 import type * as activities from "../activities";
 
 const {
@@ -35,6 +35,13 @@ export interface DeepResearchInput {
 }
 
 export async function deepResearchWorkflow(input: DeepResearchInput): Promise<void> {
+  // Overall workflow timeout: 30 minutes to prevent indefinite execution
+  await CancellationScope.withTimeout("30 minutes", async () => {
+    await deepResearchWorkflowInner(input);
+  });
+}
+
+async function deepResearchWorkflowInner(input: DeepResearchInput): Promise<void> {
   const srcConfig = input.sources ?? { webSearch: true, knowledgeCollectionIds: [], fileIds: [] };
   const ch = input.streamChannelId;
 

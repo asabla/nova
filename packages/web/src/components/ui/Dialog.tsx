@@ -16,14 +16,25 @@ export function Dialog({ open, onClose, title, children, className, size = "md" 
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
 
     if (open && !dialog.open) {
+      previousFocusRef.current = document.activeElement as HTMLElement | null;
       dialog.showModal();
+      // Focus first interactive element inside the dialog
+      const focusable = dialog.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      focusable?.focus();
     } else if (!open && dialog.open) {
       dialog.close();
+      // Restore focus to the element that opened the dialog
+      previousFocusRef.current?.focus();
+      previousFocusRef.current = null;
     }
   }, [open]);
 

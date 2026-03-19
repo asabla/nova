@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { AppContext } from "../types/context";
 import { agentService } from "../services/agent.service";
 import { writeAuditLog } from "../services/audit.service";
-import { parsePagination } from "@nova/shared/utils";
+import { parsePagination, AppError } from "@nova/shared/utils";
 
 const agentRoutes = new Hono<AppContext>();
 
@@ -73,7 +73,7 @@ agentRoutes.post("/:id/clone", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const original = await agentService.get(orgId, c.req.param("id"));
-  if (!original) return c.json({ error: "Agent not found" }, 404);
+  if (!original) throw AppError.notFound("Agent not found");
 
   const clone = await agentService.create(orgId, userId, {
     name: `${original.name} (Copy)`,
@@ -110,7 +110,7 @@ agentRoutes.post("/:id/trigger", async (c) => {
   const { input } = z.object({ input: z.string().optional() }).parse(await c.req.json());
 
   const agent = await agentService.get(orgId, c.req.param("id"));
-  if (!agent) return c.json({ error: "Agent not found" }, 404);
+  if (!agent) throw AppError.notFound("Agent not found");
 
   await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "agent.trigger", resourceType: "agent", resourceId: agent.id });
 
@@ -151,7 +151,7 @@ agentRoutes.post("/:id/version", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const agent = await agentService.get(orgId, c.req.param("id"));
-  if (!agent) return c.json({ error: "Agent not found" }, 404);
+  if (!agent) throw AppError.notFound("Agent not found");
 
   const { description } = z.object({ description: z.string().max(500).optional() }).parse(await c.req.json());
 
@@ -182,7 +182,7 @@ agentRoutes.get("/:id/versions", async (c) => {
 agentRoutes.post("/:id/test", async (c) => {
   const orgId = c.get("orgId");
   const agent = await agentService.get(orgId, c.req.param("id"));
-  if (!agent) return c.json({ error: "Agent not found" }, 404);
+  if (!agent) throw AppError.notFound("Agent not found");
 
   const { prompt } = z.object({ prompt: z.string().min(1).max(5000) }).parse(await c.req.json());
 

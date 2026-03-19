@@ -1,4 +1,5 @@
 import { eq, and, inArray, isNull, sql, desc } from "drizzle-orm";
+import { Context } from "@temporalio/activity";
 import { db } from "../lib/db";
 import { openai } from "../lib/litellm";
 import { getDefaultChatModel } from "../lib/models";
@@ -6,6 +7,7 @@ import { researchReports, knowledgeChunks, knowledgeDocuments, files, fileChunks
 import { extractFromHtml } from "@nova/shared/content";
 
 export async function searchWeb(query: string, iteration: number): Promise<{ url: string; title: string }[]> {
+  Context.current().heartbeat(`Search iteration ${iteration + 1}`);
   const searxngUrl = process.env.SEARXNG_URL;
 
   // Try SearxNG first (self-hosted search)
@@ -74,6 +76,7 @@ export async function searchWeb(query: string, iteration: number): Promise<{ url
 }
 
 export async function fetchPageContent(url: string): Promise<string> {
+  Context.current().heartbeat(`Fetching ${url}`);
   try {
     const response = await fetch(url, {
       headers: { "User-Agent": "NovaBot/1.0" },
@@ -97,6 +100,7 @@ export async function fetchPageContent(url: string): Promise<string> {
 }
 
 export async function analyzeSource(query: string, content: string): Promise<{ summary: string; relevance: number }> {
+  Context.current().heartbeat("Analyzing source");
   const model = process.env.RESEARCH_MODEL ?? await getDefaultChatModel();
 
   try {
@@ -126,6 +130,7 @@ export async function generateResearchReport(
 
   const sourceSummaries = sources.map((s, i) => `[${i + 1}] ${s.title}\n${s.content}`).join("\n\n");
 
+  Context.current().heartbeat(`Generating report from ${sources.length} sources`);
   const result = await openai.chat.completions.create({
     model,
     messages: [

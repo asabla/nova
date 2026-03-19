@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { Context } from "@temporalio/activity";
 import { db } from "../lib/db";
 import { openai } from "../lib/litellm";
 import { getDefaultEmbeddingModel } from "../lib/models";
@@ -54,6 +55,7 @@ async function extractPdfText(fileBuffer: Buffer): Promise<string> {
 
   try {
     for (let i = 0; i < pageCount; i++) {
+      Context.current().heartbeat(`OCR page ${i + 1}/${pageCount}`);
       const page = doc.loadPage(i);
       // Render at 2x scale for better OCR accuracy
       const pixmap = page.toPixmap(
@@ -160,6 +162,7 @@ async function embedChunks(
   const results: EmbeddedChunk[] = [];
 
   for (let i = 0; i < chunks.length; i += batchSize) {
+    Context.current().heartbeat(`Embedding batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(chunks.length / batchSize)}`);
     const batch = chunks.slice(i, i + batchSize);
     // Prepend section heading for better embedding context
     const texts = batch.map((c) => {
