@@ -1,14 +1,21 @@
-import { createFileRoute, Outlet, Link, useMatchRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, Link, redirect, useMatchRoute, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import {
   Users, BarChart3, Shield, Settings, Activity, Heart, Gauge, AlertTriangle,
   Database, CreditCard, Palette, Link2, FileSearch, UserCog,
-  Code2, GitCompare, Puzzle, Wrench, FileText, Bot,
 } from "lucide-react";
+import { useAuthStore } from "../../stores/auth.store";
 import { clsx } from "clsx";
 import { Select } from "../../components/ui/Select";
 
 export const Route = createFileRoute("/_auth/admin")({
+  beforeLoad: () => {
+    const user = useAuthStore.getState().user;
+    const role = user?.role;
+    if (role !== "org-admin" && role !== "super-admin") {
+      throw redirect({ to: "/" });
+    }
+  },
   component: AdminLayout,
 });
 
@@ -62,18 +69,6 @@ const tabGroupDefs: TabGroupDef[] = [
       { to: "/admin/billing", icon: CreditCard, label: "admin.billing" },
       { to: "/admin/integrations", icon: Link2, label: "admin.integrations" },
       { to: "/admin/data-retention", icon: Database, label: "admin.dataRetention" },
-    ],
-  },
-  {
-    labelKey: "admin.groupDeveloper",
-    labelDefault: "Developer Tools",
-    tabs: [
-      { to: "/agents", icon: Bot, label: "nav.agents" },
-      { to: "/tools", icon: Wrench, label: "nav.tools" },
-      { to: "/prompts", icon: FileText, label: "nav.prompts" },
-      { to: "/playground", icon: Code2, label: "nav.playground" },
-      { to: "/model-compare", icon: GitCompare, label: "nav.compare" },
-      { to: "/mcp", icon: Puzzle, label: "nav.mcp" },
     ],
   },
 ];

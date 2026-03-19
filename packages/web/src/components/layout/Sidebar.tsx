@@ -96,7 +96,7 @@ export function Sidebar() {
     });
   };
 
-  const isAdmin = user?.role === "org-admin" || user?.role === "admin";
+  const isAdmin = user?.role === "org-admin" || user?.role === "super-admin";
 
   // Group conversations by date sections (matching ConversationList story)
   const groupedConversations = (() => {

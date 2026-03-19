@@ -341,7 +341,12 @@ authRoutes.post("/init", async (c) => {
     .where(and(eq(userProfiles.userId, novaUser.id), isNull(userProfiles.deletedAt)));
 
   if (existingProfiles.length > 0) {
-    return c.json({ orgId: existingProfiles[0].orgId });
+    // Fetch the user's role in this org
+    const [profile] = await db
+      .select({ role: userProfiles.role, displayName: userProfiles.displayName })
+      .from(userProfiles)
+      .where(and(eq(userProfiles.userId, novaUser.id), eq(userProfiles.orgId, existingProfiles[0].orgId), isNull(userProfiles.deletedAt)));
+    return c.json({ orgId: existingProfiles[0].orgId, role: profile?.role ?? "member", displayName: profile?.displayName });
   }
 
   // Create a personal org for the user
@@ -364,7 +369,7 @@ authRoutes.post("/init", async (c) => {
     role: "org-admin",
   });
 
-  return c.json({ orgId: org.id });
+  return c.json({ orgId: org.id, role: "org-admin", displayName: userName });
 });
 
 // Better Auth catch-all handler (handles login, register, session, etc.)

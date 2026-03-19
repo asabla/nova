@@ -41,7 +41,10 @@ export const useAuthStore = create<AuthState>((set) => ({
           const data = await res.json();
           if (data.orgId) {
             setActiveOrgId(data.orgId);
-            set({ activeOrgId: data.orgId });
+            set((state) => ({
+              activeOrgId: data.orgId,
+              user: state.user ? { ...state.user, role: data.role, displayName: data.displayName } : state.user,
+            }));
           }
         } else {
           set({ initOrgError: "Failed to initialize organization" });
