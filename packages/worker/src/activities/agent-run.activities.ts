@@ -72,14 +72,14 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
   const toolCallRecords: AgentRunResult["toolCallRecords"] = [];
 
   // Track active tool calls for timing
-  const toolStartTimes = new Map<string, { name: string; startMs: number }>();
+  const toolStartTimes = new Map<string, { name: string; startMs: number; args: Record<string, unknown> }>();
 
   let eventCount = 0;
 
   try {
     const stream = await run(agent, sdkInput, {
       stream: true,
-      maxTurns: input.maxTurns ?? 5,
+      maxTurns: input.maxTurns ?? 12,
     });
     for await (const event of stream as AsyncIterable<RunStreamEvent>) {
       // Heartbeat to Temporal so the activity doesn't time out during long streams
@@ -103,24 +103,26 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
         if (item?.type === "tool_call_item") {
           const rawItem = item.rawItem;
           if (eventCount <= 200) {
-            console.log(`[agent-run] tool_call_item: event=${event.name} rawType=${rawItem?.type} rawName=${rawItem?.name} rawCallId=${rawItem?.callId} itemKeys=${Object.keys(item).join(",")}`);
+            console.log(`[agent-run] tool_call_item: event=${event.name} rawType=${rawItem?.type} rawName=${rawItem?.name} rawCallId=${rawItem?.callId} rawId=${rawItem?.id} itemKeys=${Object.keys(item).join(",")}`);
           }
-          const toolName = rawItem?.name ?? "unknown";
+          const toolName = rawItem?.name ?? rawItem?.function?.name ?? "unknown";
 
           if (event.name === "tool_called") {
-            // Tool call started
-            toolStartTimes.set(rawItem?.id ?? item.id ?? "", {
-              name: toolName,
-              startMs: Date.now(),
-            });
-
             let parsedArgs: Record<string, unknown> = {};
             try {
-              const argsStr = rawItem?.arguments;
+              const argsStr = rawItem?.arguments ?? rawItem?.function?.arguments;
               if (typeof argsStr === "string") parsedArgs = JSON.parse(argsStr);
+              else if (typeof argsStr === "object" && argsStr) parsedArgs = argsStr;
             } catch {
               /* ignore parse errors */
             }
+
+            // Use callId as key (matches what tool_output uses for lookup)
+            toolStartTimes.set(rawItem?.callId ?? rawItem?.id ?? item.id ?? "", {
+              name: toolName,
+              startMs: Date.now(),
+              args: parsedArgs,
+            });
 
             await publishToolStatus(input.streamChannelId, toolName, "running", {
               args: parsedArgs,
@@ -130,17 +132,17 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
 
         if (event.name === "tool_output") {
           const outputItem = item as any;
-          const callId = outputItem.rawItem?.callId ?? "";
+          const callId = outputItem.rawItem?.callId ?? outputItem.rawItem?.id ?? "";
           const tracked = toolStartTimes.get(callId);
-          const toolName = tracked?.name ?? "unknown";
+          const toolName = tracked?.name ?? outputItem.rawItem?.name ?? "unknown";
           const durationMs = tracked ? Date.now() - tracked.startMs : 0;
           toolStartTimes.delete(callId);
 
-          const output = outputItem.rawItem?.output;
-          console.log(`[agent-run] tool_output: tool=${toolName} outputType=${typeof output} outputLen=${typeof output === "string" ? output.length : JSON.stringify(output)?.length ?? 0} preview=${typeof output === "string" ? output.slice(0, 200) : JSON.stringify(output)?.slice(0, 200)}`);
+          const output = outputItem.output ?? outputItem.rawItem?.output;
+          console.log(`[agent-run] tool_output: tool=${toolName} callId=${callId} outputType=${typeof output} outputLen=${typeof output === "string" ? output.length : JSON.stringify(output)?.length ?? 0} preview=${typeof output === "string" ? output.slice(0, 200) : JSON.stringify(output)?.slice(0, 200)}`);
           toolCallRecords.push({
             toolName,
-            input: {},
+            input: tracked?.args ?? {},
             output: output ?? null,
             durationMs,
           });
