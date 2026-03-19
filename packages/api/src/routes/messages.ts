@@ -510,7 +510,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
               model: resolvedModel,
               modelParams: { temperature: body.temperature, maxTokens: body.maxTokens },
               tools: body.enableTools ? DEFAULT_TOOLS : undefined,
-              maxSteps: 5,
+              maxSteps: 12,
             }],
           });
 

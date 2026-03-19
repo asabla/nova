@@ -100,6 +100,18 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
       } else if (event.type === "run_item_stream_event") {
         const item = event.item as any;
 
+        // Capture message output text that wasn't already streamed via output_text_delta
+        if (event.name === "message_output_created") {
+          const rawItem = item?.rawItem;
+          const content = rawItem?.content;
+          const textParts = Array.isArray(content)
+            ? content.filter((c: any) => c.type === "output_text").map((c: any) => c.text).join("")
+            : typeof content === "string" ? content : "";
+          if (textParts && !fullContent.includes(textParts.slice(-100))) {
+            fullContent += textParts;
+          }
+        }
+
         if (item?.type === "tool_call_item") {
           const rawItem = item.rawItem;
           if (eventCount <= 200) {
