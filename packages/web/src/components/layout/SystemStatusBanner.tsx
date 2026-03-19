@@ -16,6 +16,7 @@ interface ServiceStatus {
   name: string;
   status: "healthy" | "degraded" | "down";
   message?: string;
+  critical?: boolean;
 }
 
 interface HealthResponse {
@@ -48,7 +49,7 @@ function getServiceIcon(serviceName: string) {
 export function SystemStatusBanner() {
   const { t } = useTranslation();
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissedKey, setDismissedKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
@@ -64,7 +65,6 @@ export function SystemStatusBanner() {
         try {
           const data: HealthResponse = await response.json();
           setHealth(data);
-          if (data.status !== "healthy") setDismissed(false);
         } catch {
           setHealth({
             status: "down",
@@ -73,21 +73,16 @@ export function SystemStatusBanner() {
                 name: "api",
                 status: "down",
                 message: `HTTP ${response.status}`,
+                critical: true,
               },
             ],
           });
-          setDismissed(false);
         }
         return;
       }
 
       const data: HealthResponse = await response.json();
       setHealth(data);
-
-      // Auto-show banner again if status worsens after dismissal
-      if (data.status !== "healthy") {
-        setDismissed(false);
-      }
     } catch {
       setHealth({
         status: "down",
@@ -96,10 +91,10 @@ export function SystemStatusBanner() {
             name: "api",
             status: "down",
             message: t("systemStatus.unreachable"),
+            critical: true,
           },
         ],
       });
-      setDismissed(false);
     } finally {
       setLoading(false);
       setLastChecked(new Date());
@@ -130,13 +125,16 @@ export function SystemStatusBanner() {
     return () => clearTimeout(timeoutId);
   }, [fetchHealth]);
 
-  // Nothing to show if healthy or dismissed
-  if (!health || health.status === "healthy" || dismissed) return null;
+  // Only show banner for critical service failures
+  const degradedServices = health?.services.filter(
+    (s) => s.status !== "healthy" && s.critical,
+  ) ?? [];
 
-  const degradedServices = health.services.filter(
-    (s) => s.status !== "healthy",
-  );
-  const isDown = health.status === "down";
+  const failingKey = degradedServices.map((s) => s.name).sort().join(",");
+
+  if (!health || degradedServices.length === 0 || dismissedKey === failingKey) return null;
+
+  const isDown = degradedServices.some((s) => s.status === "down");
 
   return (
     <div
@@ -231,7 +229,7 @@ export function SystemStatusBanner() {
             />
           </button>
           <button
-            onClick={() => setDismissed(true)}
+            onClick={() => setDismissedKey(failingKey)}
             className="p-1.5 rounded-lg text-text-secondary hover:text-text hover:bg-surface-secondary transition-colors"
             aria-label={t("common.dismiss")}
           >

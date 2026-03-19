@@ -41,19 +41,6 @@ health.get("/ready", async (c) => {
     checks.minio = { status: "error", error: err.message };
   }
 
-  // LiteLLM check
-  try {
-    const start = performance.now();
-    const litellmUrl = env.LITELLM_API_URL ?? "http://localhost:4000";
-    const res = await fetch(`${litellmUrl}/health`, {
-      headers: { Authorization: `Bearer ${env.LITELLM_MASTER_KEY}` },
-      signal: AbortSignal.timeout(5000),
-    });
-    checks.litellm = { status: res.ok ? "ok" : "error", latencyMs: Math.round(performance.now() - start) };
-  } catch (err: any) {
-    checks.litellm = { status: "error", error: err.message };
-  }
-
   // Temporal check (uses gRPC, so HTTP check is best-effort)
   try {
     const start = performance.now();
@@ -81,6 +68,7 @@ health.get("/ready", async (c) => {
     name,
     status: check.status === "ok" ? "healthy" as const : "down" as const,
     message: check.error ?? (check.latencyMs ? `${check.latencyMs}ms` : undefined),
+    critical: criticalServices.includes(name as any),
   }));
 
   return c.json({
