@@ -29,6 +29,33 @@ import { Dialog } from "../../components/ui/Dialog";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { toast } from "../../components/ui/Toast";
 
+interface Model {
+  id: string;
+  name: string;
+  modelIdExternal: string;
+  modelProviderId: string;
+  isEnabled: boolean;
+  isDefault: boolean;
+  isFallback: boolean;
+  fallbackOrder?: number;
+  contextWindow?: number;
+  capabilities?: string[];
+}
+
+interface ModelProvider {
+  id: string;
+  name: string;
+  type: string;
+  apiBaseUrl?: string;
+}
+
+interface ModelStats {
+  modelId: string;
+  requests: number;
+  avgLatencyMs: number | null;
+  errorRate: number | null;
+}
+
 export const Route = createFileRoute("/_auth/admin/models")({
   component: ModelsPage,
 });
@@ -39,20 +66,22 @@ function ModelsPage() {
   const [showAddProvider, setShowAddProvider] = useState(false);
   const [fallbackExpanded, setFallbackExpanded] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [modelSearch, setModelSearch] = useState("");
+  const [enabledFilter, setEnabledFilter] = useState<"" | "enabled" | "disabled">("");
 
   const { data: modelsData, isLoading: modelsLoading } = useQuery({
     queryKey: ["admin-models"],
-    queryFn: () => api.get<any>("/api/models/all"),
+    queryFn: () => api.get<{ data: Model[] }>("/api/models/all"),
   });
 
   const { data: providersData, isLoading: providersLoading } = useQuery({
     queryKey: ["model-providers"],
-    queryFn: () => api.get<any>("/api/models/providers"),
+    queryFn: () => api.get<{ data: ModelProvider[] }>("/api/models/providers"),
   });
 
   const { data: statsData } = useQuery({
     queryKey: ["model-stats"],
-    queryFn: () => api.get<any>("/api/analytics/models").catch(() => ({ data: [] })),
+    queryFn: () => api.get<{ data: ModelStats[] }>("/api/analytics/models").catch(() => ({ data: [] as ModelStats[] })),
     refetchInterval: 30_000,
   });
 
@@ -76,9 +105,16 @@ function ModelsPage() {
     onError: (err: any) => toast(err.message ?? t("admin.fallbackOrderFailed", { defaultValue: "Failed to update fallback order" }), "error"),
   });
 
-  const allModels: any[] = (modelsData as any)?.data ?? [];
-  const providers: any[] = (providersData as any)?.data ?? [];
-  const stats: any[] = (statsData as any)?.data ?? [];
+  const allModels: Model[] = modelsData?.data ?? [];
+  const providers: ModelProvider[] = providersData?.data ?? [];
+  const stats: ModelStats[] = statsData?.data ?? [];
+
+  const filteredModels = allModels.filter((m) => {
+    if (modelSearch && !m.name?.toLowerCase().includes(modelSearch.toLowerCase()) && !m.modelIdExternal?.toLowerCase().includes(modelSearch.toLowerCase())) return false;
+    if (enabledFilter === "enabled" && !m.isEnabled) return false;
+    if (enabledFilter === "disabled" && m.isEnabled) return false;
+    return true;
+  });
 
   const enabledModels = allModels.filter((m) => m.isEnabled);
   const fallbackModels = allModels
@@ -86,7 +122,7 @@ function ModelsPage() {
     .sort((a, b) => (a.fallbackOrder ?? 999) - (b.fallbackOrder ?? 999));
 
   const getStats = (modelId: string) =>
-    stats.find((s: any) => s.modelId === modelId) ?? { requests: 0, avgLatencyMs: null, errorRate: null };
+    stats.find((s) => s.modelId === modelId) ?? { requests: 0, avgLatencyMs: null, errorRate: null };
 
   const getProviderName = (providerId: string) =>
     providers.find((p) => p.id === providerId)?.name ?? "Unknown";
@@ -188,7 +224,7 @@ function ModelsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {providers.map((p: any) => (
+            {providers.map((p) => (
               <div key={p.id} className="p-4 rounded-xl bg-surface-secondary border border-border">
                 <div className="flex items-center gap-2 mb-2">
                   <Cpu className="h-4 w-4 text-primary" aria-hidden="true" />
@@ -204,9 +240,28 @@ function ModelsPage() {
 
       {/* Models Section */}
       <section>
-        <h3 className="text-sm font-medium text-text mb-3">
-          {t("admin.availableModels", { defaultValue: "Available Models" })} ({allModels.length})
-        </h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium text-text">
+            {t("admin.availableModels", { defaultValue: "Available Models" })} ({allModels.length})
+          </h3>
+          <div className="flex items-center gap-2">
+            <Input
+              value={modelSearch}
+              onChange={(e) => setModelSearch(e.target.value)}
+              placeholder={t("admin.searchModels", { defaultValue: "Search models..." })}
+            />
+            <Select
+              value={enabledFilter}
+              onChange={(value) => setEnabledFilter(value as "" | "enabled" | "disabled")}
+              options={[
+                { value: "", label: t("admin.allModels", { defaultValue: "All" }) },
+                { value: "enabled", label: t("admin.enabledOnly", { defaultValue: "Enabled" }) },
+                { value: "disabled", label: t("admin.disabledOnly", { defaultValue: "Disabled" }) },
+              ]}
+              size="sm"
+            />
+          </div>
+        </div>
         {modelsLoading ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -215,7 +270,7 @@ function ModelsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {allModels.map((m: any) => {
+            {filteredModels.map((m) => {
               const modelStats = getStats(m.id);
               const capabilities: string[] = Array.isArray(m.capabilities) ? m.capabilities : [];
               return (
@@ -287,7 +342,7 @@ function ModelsPage() {
                     </span>
                     <span
                       className={`flex items-center gap-1 ${
-                        modelStats.errorRate > 0.05 ? "text-danger" : ""
+                        (modelStats.errorRate ?? 0) > 0.05 ? "text-danger" : ""
                       }`}
                       title={t("admin.errorRate", { defaultValue: "Error rate" })}
                     >
@@ -326,7 +381,7 @@ function ModelsPage() {
                 </div>
               );
             })}
-            {allModels.length === 0 && (
+            {filteredModels.length === 0 && (
               <p className="text-sm text-text-tertiary text-center py-8 col-span-2">
                 {t("admin.noModels", { defaultValue: "No models configured. Add a provider and configure models." })}
               </p>
@@ -364,7 +419,7 @@ function ModelsPage() {
                   {t("admin.fallbackReorderHelp", { defaultValue: "Drag to reorder, or use the arrow buttons. When the primary model fails, these models are tried in order." })}
                 </p>
                 <div className="space-y-2">
-                  {fallbackModels.map((m: any, idx: number) => (
+                  {fallbackModels.map((m, idx) => (
                     <div
                       key={m.id}
                       draggable
@@ -438,7 +493,7 @@ function AddProviderForm({ onDone }: { onDone: () => void }) {
   const [apiKey, setApiKey] = useState("");
 
   const create = useMutation({
-    mutationFn: (data: any) => api.post("/api/models/providers", data),
+    mutationFn: (data: { name: string; type: string; apiBaseUrl?: string; apiKey?: string }) => api.post("/api/models/providers", data),
     onSuccess: onDone,
     onError: (err: any) => toast(err.message ?? t("admin.addProviderFailed", { defaultValue: "Failed to add provider" }), "error"),
   });
