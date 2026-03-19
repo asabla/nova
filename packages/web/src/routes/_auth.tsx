@@ -22,7 +22,7 @@ export const Route = createFileRoute("/_auth")({
       }
     }
     // Ensure user has an org set up
-    if (!activeOrgId) {
+    if (!activeOrgId || !useAuthStore.getState().user?.role) {
       await initOrg();
     }
   },
