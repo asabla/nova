@@ -11,6 +11,19 @@ import postgres from "postgres";
 const sql = postgres(process.env.DATABASE_URL!);
 
 try {
+  // Check if the migrations table exists (fresh DB won't have it)
+  const [{ exists }] = await sql<{ exists: boolean }[]>`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'drizzle' AND table_name = '__drizzle_migrations'
+    )
+  `;
+  if (!exists) {
+    console.log("  No migrations table yet — skipping backfill (fresh database).");
+    await sql.end();
+    process.exit(0);
+  }
+
   // Get hashes already recorded in the journal
   const existing = await sql<{ hash: string }[]>`
     SELECT hash FROM drizzle.__drizzle_migrations
