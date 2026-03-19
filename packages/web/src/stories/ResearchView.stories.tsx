@@ -47,7 +47,7 @@ interface ResearchSource {
 
 interface ProgressStep {
   message: string;
-  type?: "query" | "source" | "analysis" | "synthesis" | "info";
+  type?: "query" | "source" | "analysis" | "synthesis" | "info" | "error";
   timestamp?: string;
   sourceUrl?: string;
 }
@@ -67,7 +67,7 @@ interface ResearchReport {
   id: string;
   query: string;
   title?: string;
-  status: "pending" | "running" | "completed" | "failed";
+  status: "pending" | "queued" | "running" | "searching" | "analyzing" | "generating" | "completed" | "failed" | "cancelled";
   config: ResearchConfig;
   reportContent?: string;
   structuredReport?: {
@@ -256,6 +256,21 @@ const mockReports: ResearchReport[] = [
     createdAt: "2026-03-12T14:00:00Z",
     completedAt: "2026-03-12T14:05:30Z",
   },
+  {
+    id: "r-006",
+    query: "Neural architecture search for edge deployment",
+    status: "queued",
+    config: { maxSources: 8, maxIterations: 3, sources: { webSearch: true, knowledgeCollectionIds: [], fileIds: [] } },
+    createdAt: "2026-03-13T11:30:00Z",
+  },
+  {
+    id: "r-007",
+    query: "Cancelled research: multi-agent coordination patterns",
+    status: "cancelled",
+    config: { maxSources: 10, maxIterations: 5 },
+    progress: mockProgress.slice(0, 3),
+    createdAt: "2026-03-13T10:00:00Z",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -266,9 +281,14 @@ const mockReports: ResearchReport[] = [
 function StatusIcon({ status }: { status: string }) {
   const config = {
     pending: { bg: "bg-surface-tertiary", icon: <Clock className="h-3.5 w-3.5 text-text-tertiary" /> },
+    queued: { bg: "bg-surface-tertiary", icon: <Clock className="h-3.5 w-3.5 text-text-tertiary" /> },
     running: { bg: "bg-primary/10", icon: <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" /> },
+    searching: { bg: "bg-primary/10", icon: <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" /> },
+    analyzing: { bg: "bg-warning/10", icon: <Loader2 className="h-3.5 w-3.5 text-warning animate-spin" /> },
+    generating: { bg: "bg-primary/10", icon: <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" /> },
     completed: { bg: "bg-success/10", icon: <CheckCircle className="h-3.5 w-3.5 text-success" /> },
     failed: { bg: "bg-danger/10", icon: <XCircle className="h-3.5 w-3.5 text-danger" /> },
+    cancelled: { bg: "bg-surface-tertiary", icon: <XCircle className="h-3.5 w-3.5 text-text-tertiary" /> },
   }[status] ?? { bg: "bg-surface-tertiary", icon: <Clock className="h-3.5 w-3.5 text-text-tertiary" /> };
 
   return (
@@ -498,6 +518,7 @@ function ProgressFeed({
     analysis: { bg: "bg-warning/10", icon: <Zap className="h-3 w-3 text-warning" /> },
     synthesis: { bg: "bg-primary/10", icon: <FileText className="h-3 w-3 text-primary" /> },
     info: { bg: "bg-surface-tertiary", icon: <Hash className="h-3 w-3 text-text-tertiary" /> },
+    error: { bg: "bg-danger/10", icon: <XCircle className="h-3 w-3 text-danger" /> },
   };
 
   return (
@@ -1020,6 +1041,22 @@ export const NewResearch: StoryObj = {
       <div className="w-full max-w-lg p-5">
         <NewResearchForm onSubmit={() => {}} isPending={false} />
       </div>
+    </div>
+  ),
+};
+
+export const ReportDetailQueued: StoryObj = {
+  render: () => (
+    <div className="bg-surface-secondary/30 min-h-screen">
+      <ReportDetailView report={mockReports[5]} />
+    </div>
+  ),
+};
+
+export const ReportDetailCancelled: StoryObj = {
+  render: () => (
+    <div className="bg-surface-secondary/30 min-h-screen">
+      <ReportDetailView report={mockReports[6]} />
     </div>
   ),
 };

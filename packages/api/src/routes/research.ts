@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { eq, and, desc } from "drizzle-orm";
 import type { AppContext } from "../types/context";
@@ -6,6 +7,7 @@ import { db } from "../lib/db";
 import { researchReports } from "@nova/shared/schemas";
 import { getTemporalClient } from "../lib/temporal";
 import { AppError } from "@nova/shared/utils";
+import { relayResearchToSSE } from "../lib/stream-relay";
 
 const researchRoutes = new Hono<AppContext>();
 
@@ -235,6 +237,41 @@ researchRoutes.get("/:id", async (c) => {
   return c.json(report);
 });
 
+// SSE stream for real-time research progress
+researchRoutes.get("/:id/stream", async (c) => {
+  const orgId = c.get("orgId");
+  const [report] = await db.select().from(researchReports)
+    .where(and(eq(researchReports.id, c.req.param("id")), eq(researchReports.orgId, orgId)));
+
+  if (!report) throw AppError.notFound("Research report not found");
+
+  // If already terminal, return current status as a single event
+  if (report.status === "completed" || report.status === "failed") {
+    return streamSSE(c, async (stream) => {
+      await stream.writeSSE({
+        event: report.status === "completed" ? "research.done" : "research.error",
+        data: JSON.stringify(
+          report.status === "completed"
+            ? { reportId: report.id, sourcesCount: (report.sources as unknown[])?.length ?? 0 }
+            : { message: (report.config as any)?.error ?? "Research failed" },
+        ),
+      });
+    });
+  }
+
+  const channelId = `research:${report.id}`;
+
+  return streamSSE(c, async (stream) => {
+    // Send current status as first event
+    await stream.writeSSE({
+      event: "research.status",
+      data: JSON.stringify({ status: report.status }),
+    });
+
+    await relayResearchToSSE(stream, channelId);
+  });
+});
+
 const startResearchSchema = z.object({
   query: z.string().min(3).max(2000),
   conversationId: z.string().uuid().optional(),
@@ -276,6 +313,7 @@ researchRoutes.post("/", async (c) => {
         query: body.query,
         maxSources: body.maxSources,
         maxIterations: body.maxIterations,
+        streamChannelId: `research:${report.id}`,
         sources: body.sources,
       }],
     });
@@ -450,6 +488,7 @@ researchRoutes.post("/:id/rerun", async (c) => {
         query: originalReport.query,
         maxSources: body.maxSources ?? config.maxSources ?? 10,
         maxIterations: body.maxIterations ?? config.maxIterations ?? 3,
+        streamChannelId: `research:${newReport.id}`,
         sources: resolvedSources,
       }],
     });

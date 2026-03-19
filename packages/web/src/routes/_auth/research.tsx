@@ -41,6 +41,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from ".
 import { toast } from "../../components/ui/Toast";
 import { formatDistanceToNow } from "date-fns";
 import { NewResearchForm, type NewResearchFormSubmitData } from "../../components/research/NewResearchForm";
+import { useResearchSSE } from "../../hooks/useResearchSSE";
 
 // ---------------------------------------------------------------------------
 // Route
@@ -63,7 +64,7 @@ interface ResearchSource {
 
 interface ProgressStep {
   message: string;
-  type?: "query" | "source" | "analysis" | "synthesis" | "info";
+  type?: "query" | "source" | "analysis" | "synthesis" | "info" | "error";
   timestamp?: string;
   sourceUrl?: string;
 }
@@ -83,7 +84,7 @@ interface ResearchReport {
   id: string;
   query: string;
   title?: string;
-  status: "pending" | "running" | "completed" | "failed";
+  status: "pending" | "queued" | "running" | "searching" | "analyzing" | "generating" | "completed" | "failed" | "cancelled";
   config: ResearchConfig;
   reportContent?: string;
   structuredReport?: {
@@ -126,7 +127,10 @@ function ResearchPage() {
     enabled: !!selectedReport,
     refetchInterval: (query) => {
       const d = query.state.data as ResearchReport | undefined;
-      return d?.status === "running" || d?.status === "pending" ? 3_000 : false;
+      const active = d?.status === "running" || d?.status === "pending" || d?.status === "queued" ||
+        d?.status === "searching" || d?.status === "analyzing" || d?.status === "generating";
+      // With SSE, we need less frequent polling (just for reconnection fallback)
+      return active ? 10_000 : false;
     },
   });
 
@@ -297,9 +301,14 @@ function ResearchPage() {
 function StatusIcon({ status }: { status: string }) {
   const config = {
     pending: { bg: "bg-surface-tertiary", icon: <Clock className="h-3.5 w-3.5 text-text-tertiary" /> },
+    queued: { bg: "bg-surface-tertiary", icon: <Clock className="h-3.5 w-3.5 text-text-tertiary" /> },
     running: { bg: "bg-primary/10", icon: <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" /> },
+    searching: { bg: "bg-primary/10", icon: <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" /> },
+    analyzing: { bg: "bg-warning/10", icon: <Loader2 className="h-3.5 w-3.5 text-warning animate-spin" /> },
+    generating: { bg: "bg-primary/10", icon: <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" /> },
     completed: { bg: "bg-success/10", icon: <CheckCircle className="h-3.5 w-3.5 text-success" /> },
     failed: { bg: "bg-danger/10", icon: <XCircle className="h-3.5 w-3.5 text-danger" /> },
+    cancelled: { bg: "bg-surface-tertiary", icon: <XCircle className="h-3.5 w-3.5 text-text-tertiary" /> },
   }[status] ?? { bg: "bg-surface-tertiary", icon: <Clock className="h-3.5 w-3.5 text-text-tertiary" /> };
 
   return (
@@ -420,14 +429,29 @@ function ReportDetail({
   const [titleDraft, setTitleDraft] = useState(report.title ?? report.query);
   const progressEndRef = useRef<HTMLDivElement>(null);
 
+  // Real-time SSE for active research reports
+  const sse = useResearchSSE(report.id, report.status);
+
+  // Merge SSE progress events with any existing report.progress
+  const isActive = report.status === "pending" || report.status === "searching" ||
+    report.status === "analyzing" || report.status === "generating" || report.status === "running";
+  const liveProgress: ProgressStep[] = isActive && sse.progress.length > 0
+    ? sse.progress.map((p) => ({
+        message: p.message,
+        type: p.type as ProgressStep["type"],
+        timestamp: p.timestamp,
+        sourceUrl: p.sourceUrl,
+      }))
+    : report.progress ?? [];
+
   const displayTitle = report.title ?? report.query;
 
   // Auto-scroll progress feed when running
   useEffect(() => {
-    if (report.status === "running" && progressEndRef.current) {
+    if (isActive && progressEndRef.current) {
       progressEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [report.progress, report.status]);
+  }, [liveProgress, isActive]);
 
   // Sync title draft when report changes
   useEffect(() => {
@@ -615,10 +639,10 @@ function ReportDetail({
       </Card>
 
       {/* ---- Live progress feed (#78) ---- */}
-      {(report.status === "running" || report.status === "pending") && (
+      {isActive && (
         <ProgressFeed
-          status={report.status}
-          progress={report.progress}
+          status={sse.status !== "idle" ? sse.status : report.status}
+          progress={liveProgress}
           progressEndRef={progressEndRef}
         />
       )}
@@ -832,6 +856,7 @@ function ProgressFeed({
     analysis: { bg: "bg-warning/10", icon: <Zap className="h-3 w-3 text-warning" /> },
     synthesis: { bg: "bg-primary/10", icon: <FileText className="h-3 w-3 text-primary" /> },
     info: { bg: "bg-surface-tertiary", icon: <Hash className="h-3 w-3 text-text-tertiary" /> },
+    error: { bg: "bg-danger/10", icon: <XCircle className="h-3 w-3 text-danger" /> },
   };
 
   return (
@@ -847,7 +872,15 @@ function ProgressFeed({
           </div>
         )}
         <span className="text-sm font-medium text-primary flex-1">
-          {status === "pending" ? "Waiting to start..." : "Research in progress..."}
+          {status === "pending" || status === "queued"
+            ? "Waiting to start..."
+            : status === "searching"
+              ? "Searching sources..."
+              : status === "analyzing"
+                ? "Analyzing sources..."
+                : status === "generating"
+                  ? "Generating report..."
+                  : "Research in progress..."}
         </span>
         {steps.length > 0 && <Badge variant="primary">{steps.length} steps</Badge>}
       </CardHeader>
@@ -890,7 +923,7 @@ function ProgressFeed({
             <div ref={progressEndRef} />
           </div>
         ) : (
-          status === "running" && (
+          status !== "pending" && status !== "queued" && (
             <div className="flex items-center gap-2">
               <ProgressBar indeterminate size="sm" className="flex-1" />
               <span className="text-[10px] text-text-tertiary">Initializing...</span>

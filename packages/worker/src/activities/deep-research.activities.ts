@@ -167,6 +167,55 @@ export async function updateResearchStatus(
   }).where(eq(researchReports.id, reportId));
 }
 
+// --- Redis publishing activities for real-time research SSE ---
+
+import type { ResearchProgressType, ResearchStatus } from "@nova/shared/constants";
+import {
+  publishResearchStatus,
+  publishResearchSource,
+  publishResearchProgress,
+  publishResearchDone,
+  publishResearchError,
+} from "../lib/stream-publisher";
+
+export async function publishResearchStatusActivity(
+  channelId: string,
+  status: ResearchStatus,
+  phase?: string,
+): Promise<void> {
+  await publishResearchStatus(channelId, status, phase);
+}
+
+export async function publishResearchSourceActivity(
+  channelId: string,
+  source: { title: string; url: string; relevance?: number },
+): Promise<void> {
+  await publishResearchSource(channelId, source);
+}
+
+export async function publishResearchProgressActivity(
+  channelId: string,
+  progressType: ResearchProgressType,
+  message: string,
+  extra?: { sourceUrl?: string },
+): Promise<void> {
+  await publishResearchProgress(channelId, progressType, message, extra);
+}
+
+export async function publishResearchDoneActivity(
+  channelId: string,
+  data: { reportId: string; sourcesCount: number },
+): Promise<void> {
+  await publishResearchDone(channelId, data);
+}
+
+export async function publishResearchErrorActivity(
+  channelId: string,
+  message: string,
+): Promise<void> {
+  await publishResearchError(channelId, message);
+}
+
 export async function queryKnowledgeCollections(
   orgId: string,
   collectionIds: string[],
