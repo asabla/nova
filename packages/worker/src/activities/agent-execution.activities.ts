@@ -127,15 +127,68 @@ export async function saveAgentMessage(
   return msg;
 }
 
+export interface StructuredToolResult {
+  tool_call_id: string;
+  success: boolean;
+  data: unknown;
+  summary: string;
+  truncated: boolean;
+  error?: string;
+}
+
+function summarizeToolResult(toolName: string, data: unknown, truncated: boolean): string {
+  try {
+    switch (toolName) {
+      case "web_search": {
+        if (Array.isArray(data)) return `Found ${data.length} search result${data.length === 1 ? "" : "s"}`;
+        if (typeof data === "object" && data !== null && "relatedTopics" in data) {
+          const topics = (data as any).relatedTopics;
+          return `Found ${Array.isArray(topics) ? topics.length : 0} related topics`;
+        }
+        return "Search completed";
+      }
+      case "fetch_url": {
+        const str = typeof data === "string" ? data : JSON.stringify(data);
+        return `Fetched ${str.length.toLocaleString()} chars${truncated ? " (truncated)" : ""}`;
+      }
+      case "code_execute":
+        return "Code execution result";
+      default: {
+        if (data === null || data === undefined) return "No result";
+        const str = typeof data === "string" ? data : JSON.stringify(data);
+        if (str.length > 200) return `Result: ${str.slice(0, 200)}...`;
+        return `Result: ${str}`;
+      }
+    }
+  } catch {
+    return "Done";
+  }
+}
+
+const MAX_TOOL_RESULT_CHARS = 4000;
+
+function truncateData(data: unknown): { data: unknown; truncated: boolean } {
+  const str = typeof data === "string" ? data : JSON.stringify(data);
+  if (str.length <= MAX_TOOL_RESULT_CHARS) return { data, truncated: false };
+
+  if (typeof data === "string") {
+    return { data: data.slice(0, MAX_TOOL_RESULT_CHARS), truncated: true };
+  }
+  // For objects, serialize and truncate the string representation
+  return { data: str.slice(0, MAX_TOOL_RESULT_CHARS), truncated: true };
+}
+
 export async function executeToolCall(
   orgId: string,
   agentId: string,
   toolCallId: string,
   toolName: string,
   toolArguments: string,
-): Promise<{ tool_call_id: string; result: unknown; error?: string }> {
+): Promise<StructuredToolResult> {
   try {
     const args = JSON.parse(toolArguments);
+
+    let rawResult: unknown;
 
     // Built-in tools
     switch (toolName) {
@@ -152,12 +205,12 @@ export async function executeToolCall(
             );
             if (resp.ok) {
               const data = await resp.json() as { results: { url: string; title: string; content: string }[] };
-              const results = (data.results ?? []).slice(0, 5).map((r) => ({
+              rawResult = (data.results ?? []).slice(0, 5).map((r) => ({
                 title: r.title,
                 url: r.url,
                 snippet: (r.content ?? "").slice(0, 300),
               }));
-              return { tool_call_id: toolCallId, result: results };
+              break;
             }
           } catch {
             // Fall through to DuckDuckGo
@@ -170,19 +223,16 @@ export async function executeToolCall(
           { signal: AbortSignal.timeout(10_000) },
         );
         const data = await resp.json() as Record<string, unknown>;
-        // Extract only the useful fields to keep context small
-        return {
-          tool_call_id: toolCallId,
-          result: {
-            abstract: (data.Abstract as string ?? "").slice(0, 500),
-            abstractSource: data.AbstractSource,
-            abstractURL: data.AbstractURL,
-            relatedTopics: ((data.RelatedTopics as any[]) ?? []).slice(0, 5).map((t: any) => ({
-              text: (t.Text ?? "").slice(0, 200),
-              url: t.FirstURL,
-            })),
-          },
+        rawResult = {
+          abstract: (data.Abstract as string ?? "").slice(0, 500),
+          abstractSource: data.AbstractSource,
+          abstractURL: data.AbstractURL,
+          relatedTopics: ((data.RelatedTopics as any[]) ?? []).slice(0, 5).map((t: any) => ({
+            text: (t.Text ?? "").slice(0, 200),
+            url: t.FirstURL,
+          })),
         };
+        break;
       }
       case "fetch_url": {
         const url = args.url ?? "";
@@ -190,13 +240,12 @@ export async function executeToolCall(
           headers: { "User-Agent": "NOVA-Agent/1.0" },
           signal: AbortSignal.timeout(15_000),
         });
-        const text = await resp.text();
-        // Truncate to keep context within model limits
-        return { tool_call_id: toolCallId, result: text.slice(0, 4000) };
+        rawResult = await resp.text();
+        break;
       }
       case "code_execute": {
-        // Sandbox execution would be handled by the sandbox service
-        return { tool_call_id: toolCallId, result: "Code execution requires sandbox service" };
+        rawResult = "Code execution requires sandbox service";
+        break;
       }
       default: {
         // Check if it's a registered tool in the database
@@ -220,17 +269,48 @@ export async function executeToolCall(
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(args),
             });
-            const result = await resp.json();
-            return { tool_call_id: toolCallId, result };
+            rawResult = await resp.json();
+          } else {
+            return {
+              tool_call_id: toolCallId,
+              success: false,
+              data: null,
+              summary: `Tool ${toolName} has no endpoint configured`,
+              truncated: false,
+              error: `Tool ${toolName} has no endpoint configured`,
+            };
           }
-          return { tool_call_id: toolCallId, result: null, error: `Tool ${toolName} has no endpoint configured` };
+        } else {
+          return {
+            tool_call_id: toolCallId,
+            success: false,
+            data: null,
+            summary: `Unknown tool: ${toolName}`,
+            truncated: false,
+            error: `Unknown tool: ${toolName}`,
+          };
         }
-
-        return { tool_call_id: toolCallId, result: null, error: `Unknown tool: ${toolName}` };
+        break;
       }
     }
+
+    const { data, truncated } = truncateData(rawResult);
+    return {
+      tool_call_id: toolCallId,
+      success: true,
+      data,
+      summary: summarizeToolResult(toolName, data, truncated),
+      truncated,
+    };
   } catch (err) {
-    return { tool_call_id: toolCallId, result: null, error: String(err) };
+    return {
+      tool_call_id: toolCallId,
+      success: false,
+      data: null,
+      summary: `Error: ${String(err).slice(0, 200)}`,
+      truncated: false,
+      error: String(err),
+    };
   }
 }
 

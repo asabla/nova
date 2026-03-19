@@ -80,6 +80,36 @@ export async function publishResearchError(channelId: string, message: string) {
   }));
 }
 
+// --- Agent plan & subtask publishers ---
+
+export async function publishPlanStep(
+  channelId: string,
+  data: { step: number; description: string; status: "pending" | "running" | "completed" | "failed" },
+) {
+  await redis.publish(channelId, JSON.stringify({ type: "plan.step", ...data }));
+}
+
+export async function publishPlanGenerated(
+  channelId: string,
+  data: { steps: { number: number; description: string }[]; reasoning: string },
+) {
+  await redis.publish(channelId, JSON.stringify({ type: "plan.generated", ...data }));
+}
+
+export async function publishSubtaskSpawned(
+  channelId: string,
+  data: { subtaskId: string; description: string; step: number },
+) {
+  await redis.publish(channelId, JSON.stringify({ type: "subtask.spawned", ...data }));
+}
+
+export async function publishSubtaskComplete(
+  channelId: string,
+  data: { subtaskId: string; summary: string; status: string },
+) {
+  await redis.publish(channelId, JSON.stringify({ type: "subtask.complete", ...data }));
+}
+
 // --- Retry visibility ---
 
 export async function publishRetry(

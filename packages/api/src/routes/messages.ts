@@ -448,13 +448,15 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
           const relayPromise = relayRedisToSSE(stream, streamChannelId, { timeoutMs: 120_000 });
 
           const client = await getTemporalClient();
-          const workflowId = `smart-chat-${conversationId}-${Date.now()}`;
+          const workflowId = `agent-chat-${conversationId}-${Date.now()}`;
 
-          await client.workflow.start("smartChatWorkflow", {
+          await client.workflow.start("agentWorkflow", {
             taskQueue: "nova-main",
             workflowId,
             args: [{
+              mode: "chat",
               orgId,
+              userId: c.get("userId"),
               conversationId,
               streamChannelId,
               messageHistory: enrichedMessages,

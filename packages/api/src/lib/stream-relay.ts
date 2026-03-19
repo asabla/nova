@@ -79,6 +79,42 @@ export async function relayRedisToSSE(
             });
             break;
 
+          case "plan.generated":
+            stream.writeSSE({
+              event: "plan.generated",
+              data: JSON.stringify({ steps: data.steps, reasoning: data.reasoning }),
+            }).catch(() => {
+              if (!settled) { settled = true; cleanup(); resolve({ content: accumulatedContent, usage: {} }); }
+            });
+            break;
+
+          case "plan.step":
+            stream.writeSSE({
+              event: "plan.step",
+              data: JSON.stringify({ step: data.step, description: data.description, status: data.status }),
+            }).catch(() => {
+              if (!settled) { settled = true; cleanup(); resolve({ content: accumulatedContent, usage: {} }); }
+            });
+            break;
+
+          case "subtask.spawned":
+            stream.writeSSE({
+              event: "subtask.spawned",
+              data: JSON.stringify({ subtaskId: data.subtaskId, description: data.description, step: data.step }),
+            }).catch(() => {
+              if (!settled) { settled = true; cleanup(); resolve({ content: accumulatedContent, usage: {} }); }
+            });
+            break;
+
+          case "subtask.complete":
+            stream.writeSSE({
+              event: "subtask.complete",
+              data: JSON.stringify({ subtaskId: data.subtaskId, summary: data.summary, status: data.status }),
+            }).catch(() => {
+              if (!settled) { settled = true; cleanup(); resolve({ content: accumulatedContent, usage: {} }); }
+            });
+            break;
+
           case "done":
             if (settled) return;
             settled = true;

@@ -63,7 +63,7 @@ Error handler → Security headers → CORS → Request ID → Logger → **Publ
 - **Services**: Named exports of async functions, no default exports. Located in `packages/api/src/services/`
 - **Errors**: Use `AppError` from `@nova/shared/utils` — `AppError.notFound()`, `AppError.unauthorized()`, `AppError.badRequest()`
 - **Shared imports**: `import { conversations } from "@nova/shared/schema"`, `import type { User } from "@nova/shared/types"`
-- **Temporal workflows**: Orchestrate via `proxyActivities()`. Activities are side-effect functions (LLM calls, DB writes). Worker registers both in `src/index.ts`
+- **Temporal workflows**: Orchestrate via `proxyActivities()`. Activities are side-effect functions (LLM calls, DB writes). Worker registers both in `src/index.ts`. The unified `agentWorkflow` (`packages/worker/src/workflows/agent.ts`) handles both chat and execution modes. It auto-summarizes conversation context when history exceeds ~25k tokens (100k chars) to stay within model limits — the middle portion is compressed to a "Previously: ..." summary while preserving system messages, the first user message, and the last 4 messages.
 - **Auth**: Better Auth v1.5.4. Session restored in `_auth.tsx` `beforeLoad` via `authClient.getSession()`. Cookie config uses `advanced.cookiePrefix` / `advanced.cookies.session_token.name` (NOT `session.cookieName` — silently ignored)
 - **Frontend state**: Zustand for client state (auth, UI), TanStack Query for server state
 - **Route generation**: TanStack Router file-based routing, auto-generates `routeTree.gen.ts`
