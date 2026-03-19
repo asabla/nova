@@ -239,7 +239,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   );
 
   return (
-    <div className="nova-markdown max-w-none text-[13.5px] leading-[1.7] text-text">
+    <div className="nova-markdown max-w-none text-[13.5px] leading-[1.7] text-text overflow-hidden break-words">
       <ReactMarkdown
         remarkPlugins={REMARK_PLUGINS}
         rehypePlugins={REHYPE_PLUGINS}

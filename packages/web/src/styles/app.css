@@ -383,6 +383,14 @@ body {
   box-shadow: 0 4px 12px -2px oklch(0 0 0 / 0.08);
 }
 
+/* Prevent KaTeX math overflow */
+.nova-markdown .katex-display,
+.nova-markdown .katex {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+}
+
 /* Sidebar nav item active indicator */
 .nav-active {
   position: relative;
