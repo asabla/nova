@@ -64,7 +64,7 @@ export function InlineToolStatus({ tool }: { tool: ActiveTool }) {
         <span>{label}</span>
         {tool.status === "running" && <Loader2 className="h-3 w-3 animate-spin text-primary ml-0.5" aria-hidden="true" />}
         {tool.status === "completed" && <Check className="h-3 w-3 text-success ml-0.5" aria-hidden="true" />}
-        {tool.status === "error" && <AlertCircle className="h-3 w-3 text-danger ml-0.5" aria-hidden="true" />}
+        {tool.status === "failed" && <AlertCircle className="h-3 w-3 text-danger ml-0.5" aria-hidden="true" />}
       </button>
       {expanded && detail && (
         <div className="ml-5 mt-1 px-2.5 py-1.5 rounded-lg bg-surface-secondary/50 border border-border/30 text-[11px] text-text-tertiary">
@@ -101,7 +101,7 @@ export function ToolSummaryCompact({ tools }: { tools: ActiveTool[] }) {
   const [expanded, setExpanded] = useState(false);
   if (tools.length === 0) return null;
 
-  const hasError = tools.some((t) => t.status === "error");
+  const hasError = tools.some((t) => t.status === "failed");
 
   // Group by tool name
   const groups = new Map<string, number>();

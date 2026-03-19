@@ -281,7 +281,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
               <ToolSummaryCompact
                 tools={(message.metadata.toolSummary as { name: string; durationMs?: number; error?: string }[]).map((t) => ({
                   name: t.name,
-                  status: t.error ? "error" as const : "completed" as const,
+                  status: t.error ? "failed" as const : "completed" as const,
                   resultSummary: t.error ? `Error: ${t.error.slice(0, 40)}` : undefined,
                 }))}
               />

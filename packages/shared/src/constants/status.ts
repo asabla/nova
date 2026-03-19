@@ -11,14 +11,52 @@ export const TOOL_APPROVAL_MODE = ["auto", "always-ask", "never"] as const;
 export type ToolApprovalMode = (typeof TOOL_APPROVAL_MODE)[number];
 
 export const WORKFLOW_STATUS = [
+  "queued",
   "running",
   "waiting_approval",
   "waiting_input",
   "completed",
   "stopped",
   "error",
+  "timeout",
+  "cancelled",
 ] as const;
 export type WorkflowStatus = (typeof WORKFLOW_STATUS)[number];
+
+export const MESSAGE_STATUS = ["streaming", "completed", "failed", "cancelled"] as const;
+export type MessageStatus = (typeof MESSAGE_STATUS)[number];
+
+export const RESEARCH_STATUS = [
+  "pending",
+  "queued",
+  "searching",
+  "analyzing",
+  "generating",
+  "completed",
+  "failed",
+  "cancelled",
+] as const;
+export type ResearchStatus = (typeof RESEARCH_STATUS)[number];
+
+export const RESEARCH_PROGRESS_TYPE = [
+  "query",
+  "source",
+  "analysis",
+  "synthesis",
+  "info",
+  "error",
+] as const;
+export type ResearchProgressType = (typeof RESEARCH_PROGRESS_TYPE)[number];
+
+export const TOOL_CALL_STATUS = [
+  "pending",
+  "running",
+  "completed",
+  "failed",
+  "approval_required",
+  "timeout",
+] as const;
+export type ToolCallStatus = (typeof TOOL_CALL_STATUS)[number];
 
 export const FILE_STATUS = ["uploading", "processing", "ready", "infected", "error"] as const;
 export type FileStatus = (typeof FILE_STATUS)[number];
