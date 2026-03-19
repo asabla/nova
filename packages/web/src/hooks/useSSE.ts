@@ -5,7 +5,7 @@ export type StreamStatus = "idle" | "streaming" | "paused" | "done" | "error";
 
 export interface ActiveTool {
   name: string;
-  status: "running" | "completed" | "error";
+  status: "pending" | "running" | "completed" | "failed" | "approval_required" | "timeout";
   args?: Record<string, unknown>;
   resultSummary?: string;
 }

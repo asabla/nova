@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, ChevronRight, Wrench, Check, X, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Wrench, Check, X, Loader2, Clock } from "lucide-react";
 import { clsx } from "clsx";
 import { Button } from "../ui/Button";
 
@@ -9,7 +9,7 @@ interface ToolCall {
   name: string;
   arguments: Record<string, unknown>;
   result?: string;
-  status: "pending" | "running" | "success" | "failed" | "approval_required";
+  status: "pending" | "running" | "completed" | "failed" | "approval_required" | "timeout";
 }
 
 interface ToolCallDisplayProps {
@@ -41,9 +41,10 @@ function ToolCallItem({ call, onApprove, onReject }: {
   const statusIcon = {
     pending: <Loader2 className="h-3.5 w-3.5 text-text-tertiary animate-spin" aria-hidden="true" />,
     running: <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" aria-hidden="true" />,
-    success: <Check className="h-3.5 w-3.5 text-success" aria-hidden="true" />,
+    completed: <Check className="h-3.5 w-3.5 text-success" aria-hidden="true" />,
     failed: <X className="h-3.5 w-3.5 text-danger" aria-hidden="true" />,
     approval_required: <Wrench className="h-3.5 w-3.5 text-warning" aria-hidden="true" />,
+    timeout: <Clock className="h-3.5 w-3.5 text-warning" aria-hidden="true" />,
   };
 
   return (
@@ -58,10 +59,11 @@ function ToolCallItem({ call, onApprove, onReject }: {
         <span className="text-xs font-mono text-text">{call.name}</span>
         <span className={clsx(
           "ml-auto text-[10px] px-1.5 py-0.5 rounded",
-          call.status === "success" && "bg-success/10 text-success",
+          call.status === "completed" && "bg-success/10 text-success",
           call.status === "failed" && "bg-danger/10 text-danger",
           call.status === "running" && "bg-primary/10 text-primary",
           call.status === "approval_required" && "bg-warning/10 text-warning",
+          call.status === "timeout" && "bg-warning/10 text-warning",
           call.status === "pending" && "bg-surface-tertiary text-text-tertiary",
         )}>
           {t(`tools.status.${call.status}`, call.status)}
