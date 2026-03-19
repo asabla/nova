@@ -279,9 +279,10 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
             {/* Tool summary - ABOVE content like streaming view */}
             {isAssistant && message.metadata?.toolSummary && (
               <ToolSummaryCompact
-                tools={(message.metadata.toolSummary as { name: string; durationMs?: number; error?: string }[]).map((t) => ({
+                tools={(message.metadata.toolSummary as { name: string; durationMs?: number; error?: string; args?: Record<string, unknown> }[]).map((t) => ({
                   name: t.name,
                   status: t.error ? "failed" as const : "completed" as const,
+                  args: t.args,
                   resultSummary: t.error ? `Error: ${t.error.slice(0, 40)}` : undefined,
                 }))}
               />

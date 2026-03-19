@@ -487,7 +487,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
 
           // Build tool call summary for metadata
           const toolSummary = toolCallRecords.length > 0
-            ? toolCallRecords.map((r) => ({ name: r.toolName, durationMs: r.durationMs, error: r.error }))
+            ? toolCallRecords.map((r) => ({ name: r.toolName, durationMs: r.durationMs, error: r.error, args: r.input }))
             : undefined;
 
           const assistantMessage = await messageService.createMessage(orgId, {
