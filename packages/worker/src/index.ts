@@ -29,21 +29,6 @@ async function run() {
     },
   });
 
-  // Set this deployment version as current so workflows get routed to it
-  try {
-    const clientConn = await Connection.connect({ address: env.TEMPORAL_ADDRESS });
-    const client = new Client({ connection: clientConn, namespace: env.TEMPORAL_NAMESPACE });
-    await client.workflowService.setWorkerDeploymentCurrentVersion({
-      namespace: env.TEMPORAL_NAMESPACE,
-      deploymentName: "nova-worker",
-      buildId: env.WORKER_BUILD_ID,
-    });
-    console.log(`Deployment version nova-worker:${env.WORKER_BUILD_ID} set as current`);
-    await clientConn.close();
-  } catch (err) {
-    console.warn("Failed to set deployment version as current:", err);
-  }
-
   console.log("Temporal worker started on task queue: nova-main");
 
   // Register schedules before starting the worker poll loop
@@ -61,7 +46,38 @@ async function run() {
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);
 
-  await worker.run();
+  // Start worker polling in the background, then set deployment version
+  // once pollers are registered (Temporal requires active pollers before
+  // accepting setWorkerDeploymentCurrentVersion).
+  const runPromise = worker.run();
+
+  const setDeploymentVersion = async (retries = 5) => {
+    for (let i = 0; i < retries; i++) {
+      await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
+      try {
+        const clientConn = await Connection.connect({ address: env.TEMPORAL_ADDRESS });
+        const client = new Client({ connection: clientConn, namespace: env.TEMPORAL_NAMESPACE });
+        await client.workflowService.setWorkerDeploymentCurrentVersion({
+          namespace: env.TEMPORAL_NAMESPACE,
+          deploymentName: "nova-worker",
+          buildId: env.WORKER_BUILD_ID,
+        });
+        console.log(`Deployment version nova-worker:${env.WORKER_BUILD_ID} set as current`);
+        await clientConn.close();
+        return;
+      } catch (err) {
+        if (i < retries - 1) {
+          console.warn(`Failed to set deployment version (attempt ${i + 1}/${retries}), retrying...`);
+        } else {
+          console.warn("Failed to set deployment version after all retries:", err);
+        }
+      }
+    }
+  };
+
+  setDeploymentVersion().catch(() => {});
+
+  await runPromise;
 }
 
 run().catch((err) => {
