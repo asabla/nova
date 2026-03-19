@@ -137,6 +137,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
           toolStartTimes.delete(callId);
 
           const output = outputItem.rawItem?.output;
+          console.log(`[agent-run] tool_output: tool=${toolName} outputType=${typeof output} outputLen=${typeof output === "string" ? output.length : JSON.stringify(output)?.length ?? 0} preview=${typeof output === "string" ? output.slice(0, 200) : JSON.stringify(output)?.slice(0, 200)}`);
           toolCallRecords.push({
             toolName,
             input: {},
@@ -182,15 +183,23 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
     }
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
+    const isMaxTurns = errMsg.includes("Max turns") || err?.constructor?.name === "MaxTurnsExceededError";
     const isRateLimit = errMsg.includes("429") || errMsg.toLowerCase().includes("rate limit");
-    console.error(`[agent-run] CATCH: ${errMsg}, rateLimit=${isRateLimit}, channel=${input.streamChannelId}`);
 
-    // Publish rate-limit specific error so frontend can show appropriate state
-    if (isRateLimit) {
-      await publishError(input.streamChannelId, `Rate limited: ${errMsg}`);
+    if (isMaxTurns) {
+      // MaxTurnsExceededError can be thrown during stream iteration (not just at stream.completed).
+      // This is expected behavior — we already accumulated content from the stream, so just log and continue.
+      console.warn(`[agent-run] max turns reached: ${errMsg}, accumulated ${fullContent.length} chars`);
+    } else {
+      console.error(`[agent-run] CATCH: ${errMsg}, rateLimit=${isRateLimit}, channel=${input.streamChannelId}`);
+
+      // Publish rate-limit specific error so frontend can show appropriate state
+      if (isRateLimit) {
+        await publishError(input.streamChannelId, `Rate limited: ${errMsg}`);
+      }
+      // Otherwise don't publish error — Temporal may retry the activity on the same channel.
+      throw err;
     }
-    // Otherwise don't publish error — Temporal may retry the activity on the same channel.
-    throw err;
   }
 
   // Signal completion to the relay

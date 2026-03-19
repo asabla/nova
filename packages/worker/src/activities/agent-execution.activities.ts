@@ -197,20 +197,35 @@ export async function executeToolCall(
         const searxngUrl = process.env.SEARXNG_URL;
 
         // Use SearxNG (self-hosted) if available, fall back to DuckDuckGo
+        // Search both general and news categories for broader coverage
         if (searxngUrl) {
           try {
             const resp = await fetch(
-              `${searxngUrl}/search?q=${encodeURIComponent(query)}&format=json&categories=general`,
+              `${searxngUrl}/search?q=${encodeURIComponent(query)}&format=json&categories=general,news&language=en`,
               { signal: AbortSignal.timeout(10_000) },
             );
             if (resp.ok) {
               const data = await resp.json() as { results: { url: string; title: string; content: string }[] };
-              rawResult = (data.results ?? []).slice(0, 5).map((r) => ({
+              // Deduplicate by URL
+              const seen = new Set<string>();
+              const deduped = (data.results ?? []).filter((r) => {
+                try {
+                  const key = new URL(r.url).hostname + new URL(r.url).pathname;
+                  if (seen.has(key)) return false;
+                  seen.add(key);
+                  return true;
+                } catch { return true; }
+              });
+              const searxResults = deduped.slice(0, 5).map((r) => ({
                 title: r.title,
                 url: r.url,
                 snippet: (r.content ?? "").slice(0, 300),
               }));
-              break;
+              if (searxResults.length > 0) {
+                rawResult = searxResults;
+                break;
+              }
+              // SearxNG returned 0 results — fall through to DuckDuckGo
             }
           } catch {
             // Fall through to DuckDuckGo
@@ -240,7 +255,16 @@ export async function executeToolCall(
           headers: { "User-Agent": "NOVA-Agent/1.0" },
           signal: AbortSignal.timeout(15_000),
         });
-        rawResult = await resp.text();
+        const html = await resp.text();
+        // Extract readable content instead of returning raw HTML
+        const { extractFromHtml } = await import("@nova/shared/content");
+        const extracted = extractFromHtml(html, url);
+        const content = extracted.markdown || extracted.textContent || "";
+        if (content && content.length >= 50) {
+          rawResult = extracted.title ? `# ${extracted.title}\n\n${content}` : content;
+        } else {
+          rawResult = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+        }
         break;
       }
       case "code_execute": {
