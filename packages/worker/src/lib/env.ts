@@ -10,6 +10,8 @@ const envSchema = z.object({
   WORKER_MAX_ACTIVITIES: z.coerce.number().int().positive().default(10),
   WORKER_MAX_WORKFLOWS: z.coerce.number().int().positive().default(40),
 
+  WORKER_BUILD_ID: z.string().default("dev"),
+
   LITELLM_URL: z.string().url().optional(),
   LITELLM_API_KEY: z.string().optional(),
   EMBEDDING_MODEL: z.string().optional(),

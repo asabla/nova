@@ -234,6 +234,7 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
       MINIO_BUCKET: nova-files
+      WORKER_BUILD_ID: ${WORKER_BUILD_ID:-dev}
     depends_on:
       db-init:
         condition: service_completed_successfully
