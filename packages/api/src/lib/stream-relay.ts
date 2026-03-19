@@ -61,6 +61,17 @@ export async function relayRedisToSSE(
             });
             break;
 
+          case "retry":
+            stream.writeSSE({
+              event: "retry",
+              data: JSON.stringify({
+                attempt: data.attempt,
+                maxAttempts: data.maxAttempts,
+                error: data.error,
+              }),
+            });
+            break;
+
           case "done":
             settled = true;
             cleanup();
@@ -96,6 +107,98 @@ export async function relayRedisToSSE(
 
     redisSub.subscribe(channelId).then(() => {
       console.log(`[relay] subscribed to ${channelId.slice(-12)}, timeout=${timeoutMs}ms`);
+      redisSub.on("message", handler);
+    }).catch((err) => {
+      settled = true;
+      clearTimeout(timeout);
+      reject(err);
+    });
+  });
+}
+
+/**
+ * Subscribe to a Redis channel and relay research progress events as SSE.
+ * Resolves when a "research.done" or "research.error" message is received.
+ */
+export async function relayResearchToSSE(
+  stream: { writeSSE: (event: { event: string; data: string }) => Promise<void> },
+  channelId: string,
+  opts: RelayOptions = {},
+): Promise<void> {
+  const timeoutMs = opts.timeoutMs ?? 600_000; // 10 min default for research
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      stream.writeSSE({
+        event: "research.error",
+        data: JSON.stringify({ message: "Research stream timed out" }),
+      }).then(() => resolve());
+    }, timeoutMs);
+
+    const handler = (channel: string, message: string) => {
+      if (channel !== channelId || settled) return;
+
+      try {
+        const data = JSON.parse(message);
+
+        switch (data.type) {
+          case "research.status":
+            stream.writeSSE({
+              event: "research.status",
+              data: JSON.stringify({ status: data.status, phase: data.phase }),
+            });
+            break;
+
+          case "research.source":
+            stream.writeSSE({
+              event: "research.source",
+              data: JSON.stringify({ title: data.title, url: data.url, relevance: data.relevance }),
+            });
+            break;
+
+          case "research.progress":
+            stream.writeSSE({
+              event: "research.progress",
+              data: JSON.stringify({ type: data.progressType, message: data.message, sourceUrl: data.sourceUrl }),
+            });
+            break;
+
+          case "research.done":
+            settled = true;
+            cleanup();
+            stream.writeSSE({
+              event: "research.done",
+              data: JSON.stringify({ reportId: data.reportId, sourcesCount: data.sourcesCount }),
+            }).then(() => resolve());
+            break;
+
+          case "research.error":
+            settled = true;
+            cleanup();
+            stream.writeSSE({
+              event: "research.error",
+              data: JSON.stringify({ message: data.message }),
+            }).then(() => resolve());
+            break;
+        }
+      } catch {
+        // Skip malformed messages
+      }
+    };
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      redisSub.off("message", handler);
+      redisSub.unsubscribe(channelId).catch(() => {});
+    };
+
+    redisSub.subscribe(channelId).then(() => {
+      console.log(`[relay-research] subscribed to ${channelId.slice(-12)}, timeout=${timeoutMs}ms`);
       redisSub.on("message", handler);
     }).catch((err) => {
       settled = true;

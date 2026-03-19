@@ -1,12 +1,16 @@
 import OpenAI from "openai";
+import { eq } from "drizzle-orm";
 import { publishToken, publishToolStatus as pubToolStatus, publishDone as pubDone, publishError } from "../lib/stream-publisher";
 import { openai } from "../lib/litellm";
+import { db } from "../lib/db";
+import { workflows } from "@nova/shared/schemas";
+import type { ToolCallStatus, WorkflowStatus } from "@nova/shared/constants";
 
 // Re-export stream-publisher functions as activities so the workflow can call them
 export async function publishToolStatus(
   channelId: string,
   tool: string,
-  status: "running" | "completed" | "error",
+  status: ToolCallStatus,
   extra?: { args?: Record<string, unknown>; resultSummary?: string },
 ) {
   await pubToolStatus(channelId, tool, status, extra);
@@ -139,4 +143,26 @@ export async function streamingLLMStep(input: {
     await publishError(input.streamChannelId, `LLM API error: ${errMsg}`);
     throw err;
   }
+}
+
+/**
+ * Update workflow status in the DB. Used by both smart-chat and agent-execution workflows.
+ */
+export async function updateWorkflowStatus(
+  workflowId: string,
+  status: WorkflowStatus,
+  extra?: { errorMessage?: string; output?: unknown },
+): Promise<void> {
+  const updates: Record<string, unknown> = {
+    status,
+    updatedAt: new Date(),
+  };
+
+  if (extra?.errorMessage) updates.errorMessage = extra.errorMessage;
+  if (extra?.output) updates.output = extra.output;
+  if (status === "completed" || status === "error" || status === "timeout" || status === "cancelled") {
+    updates.completedAt = new Date();
+  }
+
+  await db.update(workflows).set(updates).where(eq(workflows.id, workflowId));
 }

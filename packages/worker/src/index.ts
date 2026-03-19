@@ -13,6 +13,8 @@ async function run() {
     taskQueue: "nova-main",
     workflowsPath: new URL("./workflows/index.js", import.meta.url).pathname,
     activities,
+    maxConcurrentActivityTaskExecutions: parseInt(process.env.WORKER_MAX_ACTIVITIES ?? "10", 10),
+    maxConcurrentWorkflowTaskExecutions: parseInt(process.env.WORKER_MAX_WORKFLOWS ?? "40", 10),
   });
 
   console.log("Temporal worker started on task queue: nova-main");

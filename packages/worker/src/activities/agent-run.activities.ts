@@ -182,9 +182,14 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
     }
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    console.error(`[agent-run] CATCH: ${errMsg}, channel=${input.streamChannelId}`);
-    // Don't publish error to relay — Temporal may retry the activity on the same channel.
-    // If all retries fail, the relay will timeout gracefully.
+    const isRateLimit = errMsg.includes("429") || errMsg.toLowerCase().includes("rate limit");
+    console.error(`[agent-run] CATCH: ${errMsg}, rateLimit=${isRateLimit}, channel=${input.streamChannelId}`);
+
+    // Publish rate-limit specific error so frontend can show appropriate state
+    if (isRateLimit) {
+      await publishError(input.streamChannelId, `Rate limited: ${errMsg}`);
+    }
+    // Otherwise don't publish error — Temporal may retry the activity on the same channel.
     throw err;
   }
 

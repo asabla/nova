@@ -5,11 +5,14 @@ import { ToolCallPanel } from "@/components/chat/ToolCallPanel";
 
 // ── Mock tool calls ──────────────────────────────────────────────────────
 
+// Status values aligned with TOOL_CALL_STATUS from @nova/shared/constants:
+// "pending" | "running" | "completed" | "failed" | "approval_required" | "timeout"
+
 const searchTool = {
   id: "tc-1",
   name: "web_search",
   arguments: { query: "React 19 new features", max_results: 5 },
-  status: "success" as const,
+  status: "completed" as const,
   result: JSON.stringify([
     { title: "React 19 Release Notes", url: "https://react.dev/blog/react-19" },
     { title: "What's New in React 19", url: "https://example.com/react-19" },
@@ -45,6 +48,14 @@ const approvalTool = {
   status: "approval_required" as const,
 };
 
+const timeoutTool = {
+  id: "tc-6",
+  name: "long_running_analysis",
+  arguments: { dataset: "transactions_2025.csv", model: "anomaly_detector_v3" },
+  status: "timeout" as const,
+  result: "Error: Tool execution exceeded 120s timeout",
+};
+
 // ── ToolCallDisplay stories ──────────────────────────────────────────────
 
 const displayMeta: Meta<typeof ToolCallDisplay> = {
@@ -68,8 +79,8 @@ const displayMeta: Meta<typeof ToolCallDisplay> = {
 export default displayMeta;
 type DisplayStory = StoryObj<typeof ToolCallDisplay>;
 
-/** Single successful tool call */
-export const Success: DisplayStory = {
+/** Single completed tool call */
+export const Completed: DisplayStory = {
   args: {
     toolCalls: [searchTool],
   },
@@ -103,10 +114,17 @@ export const ApprovalRequired: DisplayStory = {
   },
 };
 
+/** Tool call that timed out */
+export const Timeout: DisplayStory = {
+  args: {
+    toolCalls: [timeoutTool],
+  },
+};
+
 /** Multiple tool calls in various states */
 export const MixedStates: DisplayStory = {
   args: {
-    toolCalls: [searchTool, runningTool, failedTool, approvalTool],
+    toolCalls: [searchTool, runningTool, failedTool, approvalTool, timeoutTool],
   },
 };
 

@@ -99,3 +99,73 @@ export const AllStates: Story = {
     layout: "padded",
   },
 };
+
+/** Cancelled mid-stream — partial content with cancellation notice */
+export const Cancelled: Story = {
+  args: {
+    content: "Here's a quick overview of the key differences between React and Vue:\n\n1. **Virtual DOM** — Both use virtual DOM, but React's reconciliation algorithm differs from Vue's reactivity system\n2. **State management** —",
+  },
+  decorators: [
+    (Story) => (
+      <div>
+        <Story />
+        <div className="mt-2 px-3 py-1.5 rounded-lg bg-surface-tertiary text-xs text-text-tertiary italic">
+          Generation cancelled by user
+        </div>
+      </div>
+    ),
+  ],
+};
+
+/** Timeout state — content cut off after timeout */
+export const Timeout: Story = {
+  args: {
+    content: "I'm analyzing the large dataset you provided. The initial findings suggest that there are several patterns worth investigating:\n\n1. **Seasonal trends** — Sales data shows a clear quarterly pattern with peaks in Q4\n2. **Regional variance** —",
+  },
+  decorators: [
+    (Story) => (
+      <div>
+        <Story />
+        <div className="mt-2 px-3 py-1.5 rounded-lg bg-warning/10 text-xs text-warning">
+          Response timed out after 120s. Partial content shown.
+        </div>
+      </div>
+    ),
+  ],
+};
+
+/** Rate limited state */
+export const RateLimited: Story = {
+  args: {
+    content: "",
+  },
+  decorators: [
+    (Story) => (
+      <div>
+        <Story />
+        <div className="mt-2 px-3 py-1.5 rounded-lg bg-warning/10 text-xs text-warning flex items-center gap-1.5">
+          <span className="inline-block h-2 w-2 rounded-full bg-warning animate-pulse" />
+          Rate limited — retrying in 5s...
+        </div>
+      </div>
+    ),
+  ],
+};
+
+/** Retrying state — shows retry attempt info */
+export const Retrying: Story = {
+  args: {
+    content: "",
+  },
+  decorators: [
+    (Story) => (
+      <div>
+        <Story />
+        <div className="mt-2 px-3 py-1.5 rounded-lg bg-primary/10 text-xs text-primary flex items-center gap-1.5">
+          <span className="inline-block h-2 w-2 rounded-full bg-primary animate-pulse" />
+          Retrying (2/3)...
+        </div>
+      </div>
+    ),
+  ],
+};

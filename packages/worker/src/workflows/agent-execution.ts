@@ -1,6 +1,7 @@
 import { proxyActivities, defineSignal, defineQuery, setHandler, sleep, condition, CancellationScope } from "@temporalio/workflow";
 import type * as agentActivities from "../activities/agent-execution.activities";
 import type * as agentStepActivities from "../activities/agent-step.activities";
+import type * as smartChatActivities from "../activities/smart-chat.activities";
 
 const {
   getAgentConfig,
@@ -21,11 +22,17 @@ const { executeAgentStepWithSDK } = proxyActivities<typeof agentStepActivities>(
   retry: { maximumAttempts: 3 },
 });
 
+const { updateWorkflowStatus } = proxyActivities<typeof smartChatActivities>({
+  startToCloseTimeout: "10 seconds",
+  retry: { maximumAttempts: 2 },
+});
+
 export interface AgentExecutionInput {
   orgId: string;
   userId: string;
   agentId: string;
   conversationId?: string;
+  workflowId?: string;
   userMessage: string;
   maxSteps?: number;
   timeoutSeconds?: number;
@@ -68,6 +75,11 @@ export async function agentExecutionWorkflow(input: AgentExecutionInput): Promis
     status: currentStatus,
     pendingToolCalls: pendingToolCallIds,
   }));
+
+  // Track workflow status
+  if (input.workflowId) {
+    await updateWorkflowStatus(input.workflowId, "running");
+  }
 
   // 1. Load agent config
   const agent = await getAgentConfig(input.orgId, input.agentId);
@@ -246,8 +258,26 @@ export async function agentExecutionWorkflow(input: AgentExecutionInput): Promis
     if (err.name === "CancelledFailure" || err.message?.includes("timed out")) {
       finalStatus = cancelled ? "cancelled" : "timeout";
     } else {
+      if (input.workflowId) {
+        await updateWorkflowStatus(input.workflowId, "error", {
+          errorMessage: err.message ?? String(err),
+        });
+      }
       throw err;
     }
+  }
+
+  // Map terminal status to WorkflowStatus for DB tracking
+  if (input.workflowId) {
+    const fs = finalStatus as string;
+    const dbStatus = fs === "max_steps" ? "completed" as const // max_steps is a form of completion
+      : fs === "awaiting_input" ? "waiting_input" as const
+      : fs === "timeout" ? "timeout" as const
+      : fs === "cancelled" ? "cancelled" as const
+      : "completed" as const;
+    await updateWorkflowStatus(input.workflowId, dbStatus, {
+      output: { steps: currentStep, totalTokens, messageIds, terminalReason: finalStatus },
+    });
   }
 
   // 6. Save updated memory

@@ -10,7 +10,7 @@ const { runAgentLoop } = proxyActivities<typeof agentRunActivities>({
 });
 
 // Keep publishDone for the cancellation path where the SDK loop didn't complete
-const { publishDone } = proxyActivities<typeof smartChatActivities>({
+const { publishDone, updateWorkflowStatus } = proxyActivities<typeof smartChatActivities>({
   startToCloseTimeout: "10 seconds",
   retry: { maximumAttempts: 2 },
 });
@@ -21,6 +21,7 @@ export interface SmartChatInput {
   orgId: string;
   conversationId: string;
   streamChannelId: string;
+  workflowId?: string;
   messageHistory: { role: string; content: string }[];
   pendingToolCalls: { id: string; function: { name: string; arguments: string } }[];
   model: string;
@@ -62,6 +63,11 @@ export interface SmartChatResult {
 export async function smartChatWorkflow(input: SmartChatInput): Promise<SmartChatResult> {
   let cancelled = false;
   setHandler(cancelSignal, () => { cancelled = true; });
+
+  // Track workflow status in DB if workflowId is provided
+  if (input.workflowId) {
+    await updateWorkflowStatus(input.workflowId, "running");
+  }
 
   // If we have pending tool calls from the initial API-side LLM call,
   // prepend them as tool-result messages so the SDK picks up from where the API left off.
@@ -124,6 +130,7 @@ export async function smartChatWorkflow(input: SmartChatInput): Promise<SmartCha
     await CancellationScope.withTimeout(120_000, loop);
   } catch (err: any) {
     if (err.name === "CancelledFailure" || err.message?.includes("timed out")) {
+      const isTimeout = err.message?.includes("timed out") && !cancelled;
       cancelled = true;
       result.status = "cancelled";
 
@@ -132,9 +139,24 @@ export async function smartChatWorkflow(input: SmartChatInput): Promise<SmartCha
         content: result.content,
         usage: { prompt_tokens: 0, completion_tokens: 0 },
       });
+
+      if (input.workflowId) {
+        await updateWorkflowStatus(input.workflowId, isTimeout ? "timeout" : "cancelled");
+      }
     } else {
+      if (input.workflowId) {
+        await updateWorkflowStatus(input.workflowId, "error", {
+          errorMessage: err.message ?? String(err),
+        });
+      }
       throw err;
     }
+  }
+
+  if (input.workflowId) {
+    await updateWorkflowStatus(input.workflowId, "completed", {
+      output: { content: result.content, totalTokens: result.totalTokens, steps: result.steps },
+    });
   }
 
   return result;
