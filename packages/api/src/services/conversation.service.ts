@@ -5,6 +5,7 @@ import type { Conversation } from "@nova/shared/schemas";
 import { parsePagination, buildPaginatedResponse, type PaginationInput } from "@nova/shared/utils";
 import { AppError } from "@nova/shared/utils";
 import { chatCompletion } from "../lib/litellm";
+import { syncConversationUpsert, syncConversationDelete } from "../lib/qdrant-sync";
 
 type UpdateConversationData = Partial<{
   title: string;
@@ -105,6 +106,8 @@ export async function createConversation(orgId: string, userId: string, data: {
     role: "owner",
   });
 
+  syncConversationUpsert(conversation as any);
+
   return conversation;
 }
 
@@ -114,7 +117,9 @@ export async function updateConversation(orgId: string, conversationId: string, 
     .set({ ...data, updatedAt: new Date() })
     .where(and(eq(conversations.id, conversationId), eq(conversations.orgId, orgId), isNull(conversations.deletedAt)))
     .returning();
-  return result[0] ?? null;
+  const conv = result[0] ?? null;
+  if (conv) syncConversationUpsert(conv as any);
+  return conv;
 }
 
 export async function archiveConversation(orgId: string, conversationId: string) {
@@ -127,6 +132,7 @@ export async function deleteConversation(orgId: string, conversationId: string) 
     .set({ deletedAt: new Date() })
     .where(and(eq(conversations.id, conversationId), eq(conversations.orgId, orgId), isNull(conversations.deletedAt)))
     .returning();
+  if (result[0]) syncConversationDelete(conversationId);
   return result[0] ?? null;
 }
 

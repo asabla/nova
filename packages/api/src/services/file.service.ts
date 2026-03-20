@@ -4,6 +4,8 @@ import { eq, and, isNull, sql } from "drizzle-orm";
 import { getUploadUrl, getDownloadUrl, deleteObject } from "../lib/minio";
 import { parsePagination, buildPaginatedResponse, type PaginationInput } from "@nova/shared/utils";
 import { env } from "../lib/env";
+import { syncFileUpsert, syncFileDelete } from "../lib/qdrant-sync";
+import { getTemporalClient } from "../lib/temporal";
 
 export async function presignUpload(orgId: string, userId: string, filename: string, contentType: string, sizeBytes: number) {
   const { url, key } = await getUploadUrl(orgId, filename);
@@ -18,7 +20,10 @@ export async function presignUpload(orgId: string, userId: string, filename: str
     storageBucket: env.MINIO_BUCKET,
   }).returning();
 
-  return { uploadUrl: url, fileId: result[0].id, key };
+  const file = result[0];
+  syncFileUpsert(file as any);
+  triggerFileIngestion(file as any);
+  return { uploadUrl: url, fileId: file.id, key };
 }
 
 export async function createFileRecord(orgId: string, userId: string, filename: string, contentType: string, sizeBytes: number, storagePath: string) {
@@ -31,7 +36,10 @@ export async function createFileRecord(orgId: string, userId: string, filename: 
     storagePath,
     storageBucket: env.MINIO_BUCKET,
   }).returning();
-  return result[0];
+  const file = result[0];
+  syncFileUpsert(file as any);
+  triggerFileIngestion(file as any);
+  return file;
 }
 
 export async function confirmUpload(orgId: string, fileId: string) {
@@ -85,6 +93,7 @@ export async function deleteFile(orgId: string, fileId: string) {
     .set({ deletedAt: new Date() })
     .where(eq(files.id, fileId))
     .returning();
+  if (result[0]) syncFileDelete(fileId);
   return result[0] ?? null;
 }
 
@@ -102,4 +111,34 @@ export async function getOrgStorageUsage(orgId: string) {
     .from(files)
     .where(and(eq(files.orgId, orgId), isNull(files.deletedAt)));
   return Number(result[0]?.totalBytes ?? 0);
+}
+
+const INGESTIBLE_TYPES = new Set([
+  "application/pdf",
+  "text/csv",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/markdown",
+  "text/html",
+]);
+
+function isIngestible(contentType: string): boolean {
+  if (INGESTIBLE_TYPES.has(contentType)) return true;
+  if (contentType.startsWith("text/")) return true;
+  if (contentType.startsWith("image/")) return true;
+  return false;
+}
+
+function triggerFileIngestion(file: { id: string; orgId: string; contentType: string }): void {
+  if (!isIngestible(file.contentType)) return;
+  getTemporalClient()
+    .then((client) =>
+      client.workflow.start("fileIngestionWorkflow", {
+        taskQueue: "nova-main",
+        workflowId: `file-ingest-${file.id}`,
+        args: [{ fileId: file.id, orgId: file.orgId }],
+      }),
+    )
+    .catch((err) => console.error("[file] Failed to start ingestion workflow:", err));
 }

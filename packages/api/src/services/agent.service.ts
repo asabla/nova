@@ -2,6 +2,7 @@ import { eq, and, desc, ilike, sql, isNull } from "drizzle-orm";
 import { db } from "../lib/db";
 import { agents, agentVersions } from "@nova/shared/schemas";
 import { AppError } from "@nova/shared/utils";
+import { syncAgentUpsert, syncAgentDelete } from "../lib/qdrant-sync";
 
 export const agentService = {
   async list(orgId: string, opts?: { search?: string; limit?: number; offset?: number }) {
@@ -55,6 +56,8 @@ export const agentService = {
         modelParams: data.modelParams,
       })
       .returning();
+
+    syncAgentUpsert(agent as any);
 
     return agent;
   },
@@ -138,6 +141,7 @@ export const agentService = {
       .returning();
 
     if (!agent) throw AppError.notFound("Agent not found");
+    syncAgentUpsert(agent as any);
     return agent;
   },
 
@@ -149,6 +153,7 @@ export const agentService = {
       .returning();
 
     if (!agent) throw AppError.notFound("Agent not found");
+    syncAgentDelete(agentId);
     return agent;
   },
 };

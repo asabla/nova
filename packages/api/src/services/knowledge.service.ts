@@ -1,9 +1,11 @@
-import { eq, and, desc, isNull, ilike, sql } from "drizzle-orm";
+import { eq, and, desc, isNull, ilike, sql, inArray } from "drizzle-orm";
 import { db } from "../lib/db";
 import { knowledgeCollections, knowledgeDocuments, knowledgeChunks, knowledgeTags, knowledgeDocumentTagAssignments } from "@nova/shared/schemas";
 import { auditLogs } from "@nova/shared/schema";
 import { AppError } from "@nova/shared/utils";
 import { getTemporalClient } from "../lib/temporal";
+import { syncKnowledgeDocUpsert, syncKnowledgeDocDelete, syncKnowledgeChunksByDocumentDelete, syncKnowledgeChunksByCollectionDelete } from "../lib/qdrant-sync";
+import { searchVector, COLLECTIONS } from "../lib/qdrant";
 
 export const knowledgeService = {
   async listCollections(orgId: string, opts?: { search?: string; limit?: number; offset?: number }) {
@@ -86,6 +88,7 @@ export const knowledgeService = {
       .returning();
 
     if (!collection) throw AppError.notFound("Collection not found");
+    syncKnowledgeChunksByCollectionDelete(collectionId);
     return collection;
   },
 
@@ -168,6 +171,8 @@ export const knowledgeService = {
       })
       .returning();
 
+    syncKnowledgeDocUpsert(doc as any);
+
     return doc;
   },
 
@@ -179,6 +184,8 @@ export const knowledgeService = {
       .returning();
 
     if (!doc) throw AppError.notFound("Document not found");
+    syncKnowledgeDocDelete(docId);
+    syncKnowledgeChunksByDocumentDelete(docId);
     return doc;
   },
 
@@ -196,6 +203,9 @@ export const knowledgeService = {
       .update(knowledgeChunks)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(knowledgeChunks.knowledgeDocumentId, docId), eq(knowledgeChunks.orgId, orgId)));
+
+    syncKnowledgeDocDelete(docId);
+    syncKnowledgeChunksByDocumentDelete(docId);
 
     return doc;
   },
@@ -231,7 +241,7 @@ export const knowledgeService = {
     // Verify collection exists and belongs to org
     const collection = await this.getCollection(orgId, collectionId);
 
-    // Generate embedding for the query text using the collection's configured model
+    // Generate embedding for the query text
     let queryEmbedding: number[] | null = null;
     try {
       const { generateEmbedding } = await import("../lib/litellm");
@@ -240,86 +250,102 @@ export const knowledgeService = {
       // Fallback to text similarity if embedding API is unavailable
     }
 
-    // Use pgvector cosine distance if we have an embedding, otherwise pg_trgm text similarity
-    const results = queryEmbedding
-      ? await db.execute(sql`
-          SELECT
-            kc.id,
-            kc.knowledge_document_id AS "documentId",
-            kd.title AS "documentName",
-            kd.summary AS "documentSummary",
-            kc.content,
-            kc.chunk_index AS "chunkIndex",
-            kc.metadata,
-            1 - (kc.embedding <=> ${JSON.stringify(queryEmbedding)}::vector) AS score
-          FROM knowledge_chunks kc
-          JOIN knowledge_documents kd ON kd.id = kc.knowledge_document_id
-          WHERE kc.knowledge_collection_id = ${collectionId}
-            AND kc.org_id = ${orgId}
-            AND kc.deleted_at IS NULL
-            AND kd.deleted_at IS NULL
-            AND kc.embedding IS NOT NULL
-          ORDER BY kc.embedding <=> ${JSON.stringify(queryEmbedding)}::vector
-          LIMIT ${topK}
-        `)
-      : await db.execute(sql`
-          SELECT
-            kc.id,
-            kc.knowledge_document_id AS "documentId",
-            kd.title AS "documentName",
-            kd.summary AS "documentSummary",
-            kc.content,
-            kc.chunk_index AS "chunkIndex",
-            kc.metadata,
-            similarity(kc.content, ${query}) AS score
-          FROM knowledge_chunks kc
-          JOIN knowledge_documents kd ON kd.id = kc.knowledge_document_id
-          WHERE kc.knowledge_collection_id = ${collectionId}
-            AND kc.org_id = ${orgId}
-            AND kc.deleted_at IS NULL
-            AND kd.deleted_at IS NULL
-          ORDER BY score DESC
-          LIMIT ${topK}
-        `);
+    if (queryEmbedding) {
+      // Use Qdrant vector search
+      try {
+        const results = await searchVector(COLLECTIONS.KNOWLEDGE_CHUNKS, queryEmbedding, {
+          filter: {
+            must: [
+              { key: "orgId", match: { value: orgId } },
+              { key: "collectionId", match: { value: collectionId } },
+            ],
+          },
+          limit: topK,
+          scoreThreshold: threshold > 0 ? threshold : undefined,
+        });
 
-    let rows = (results as any[]).filter((r: any) => {
-      const score = parseFloat(r.score);
-      return !isNaN(score) && score >= threshold;
-    });
+        if (results.length > 0) {
+          // Fetch full chunk details from PG
+          const chunkIds = results.map((r) => r.id);
+          const chunks = await db
+            .select({
+              id: knowledgeChunks.id,
+              documentId: knowledgeChunks.knowledgeDocumentId,
+              content: knowledgeChunks.content,
+              chunkIndex: knowledgeChunks.chunkIndex,
+              metadata: knowledgeChunks.metadata,
+            })
+            .from(knowledgeChunks)
+            .where(inArray(knowledgeChunks.id, chunkIds));
 
-    // If vector search returned all NaN scores (e.g. zero vectors), fall back to text similarity
-    if (queryEmbedding && rows.length === 0 && (results as any[]).length > 0) {
-      const fallbackResults = await db.execute(sql`
-        SELECT
-          kc.id,
-          kc.knowledge_document_id AS "documentId",
-          kd.title AS "documentName",
-          kc.content,
-          kc.chunk_index AS "chunkIndex",
-          kc.metadata,
-          similarity(kc.content, ${query}) AS score
-        FROM knowledge_chunks kc
-        JOIN knowledge_documents kd ON kd.id = kc.knowledge_document_id
-        WHERE kc.knowledge_collection_id = ${collectionId}
-          AND kc.org_id = ${orgId}
-          AND kc.deleted_at IS NULL
-          AND kd.deleted_at IS NULL
-        ORDER BY score DESC
-        LIMIT ${topK}
-      `);
-      rows = (fallbackResults as any[]).filter((r: any) => parseFloat(r.score) >= threshold);
+          const chunkMap = new Map(chunks.map((c) => [c.id, c]));
+
+          // Fetch document names
+          const docIds = [...new Set(chunks.map((c) => c.documentId))];
+          const docs = docIds.length > 0
+            ? await db
+                .select({ id: knowledgeDocuments.id, title: knowledgeDocuments.title, summary: knowledgeDocuments.summary })
+                .from(knowledgeDocuments)
+                .where(inArray(knowledgeDocuments.id, docIds))
+            : [];
+          const docMap = new Map(docs.map((d) => [d.id, d]));
+
+          return results
+            .map((r) => {
+              const chunk = chunkMap.get(r.id);
+              if (!chunk) return null;
+              const doc = docMap.get(chunk.documentId);
+              return {
+                id: r.id,
+                documentId: chunk.documentId,
+                documentName: doc?.title ?? null,
+                documentSummary: doc?.summary ?? null,
+                content: chunk.content,
+                chunkIndex: chunk.chunkIndex,
+                score: r.score,
+                metadata: chunk.metadata,
+              };
+            })
+            .filter(Boolean) as any[];
+        }
+      } catch (err) {
+        console.warn("[knowledge] Qdrant search failed, falling back to pg_trgm:", err);
+      }
     }
 
-    return rows.map((r: any) => ({
-      id: r.id,
-      documentId: r.documentId,
-      documentName: r.documentName,
-      documentSummary: r.documentSummary ?? null,
-      content: r.content,
-      chunkIndex: r.chunkIndex,
-      score: parseFloat(r.score) || 0,
-      metadata: r.metadata,
-    }));
+    // Fallback: pg_trgm text similarity
+    const fallbackResults = await db.execute(sql`
+      SELECT
+        kc.id,
+        kc.knowledge_document_id AS "documentId",
+        kd.title AS "documentName",
+        kd.summary AS "documentSummary",
+        kc.content,
+        kc.chunk_index AS "chunkIndex",
+        kc.metadata,
+        similarity(kc.content, ${query}) AS score
+      FROM knowledge_chunks kc
+      JOIN knowledge_documents kd ON kd.id = kc.knowledge_document_id
+      WHERE kc.knowledge_collection_id = ${collectionId}
+        AND kc.org_id = ${orgId}
+        AND kc.deleted_at IS NULL
+        AND kd.deleted_at IS NULL
+      ORDER BY score DESC
+      LIMIT ${topK}
+    `);
+
+    return (fallbackResults as any[])
+      .filter((r: any) => parseFloat(r.score) >= threshold)
+      .map((r: any) => ({
+        id: r.id,
+        documentId: r.documentId,
+        documentName: r.documentName,
+        documentSummary: r.documentSummary ?? null,
+        content: r.content,
+        chunkIndex: r.chunkIndex,
+        score: parseFloat(r.score) || 0,
+        metadata: r.metadata,
+      }));
   },
 
   async getChunks(orgId: string, docId: string) {

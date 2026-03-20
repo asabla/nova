@@ -1,10 +1,12 @@
 import { app } from "./app";
 import { env } from "./lib/env";
 import { ensureBucket } from "./lib/minio";
+import { ensureAllCollections } from "./lib/qdrant";
 import { handleWsUpgrade, handleWsClose, handleWsMessage, initWsPubSub, type WSData } from "./lib/ws";
 
 await ensureBucket();
 initWsPubSub();
+ensureAllCollections().catch((err) => console.error("[startup] Qdrant collection setup failed:", err));
 
 Bun.serve<WSData>({
   fetch(req, server) {
