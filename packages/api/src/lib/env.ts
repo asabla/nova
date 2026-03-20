@@ -19,6 +19,9 @@ const envSchema = z.object({
 
   TEMPORAL_ADDRESS: z.string().default("localhost:7233"),
 
+  QDRANT_URL: z.string().default("http://localhost:6333"),
+  QDRANT_API_KEY: z.string().optional(),
+
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.string().url(),
 

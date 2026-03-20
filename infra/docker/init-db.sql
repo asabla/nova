@@ -1,7 +1,7 @@
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-CREATE EXTENSION IF NOT EXISTS "vector";
+-- pgvector extension removed — vector search moved to Qdrant
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
 -- Ensure tables are created in the public schema (drizzle-kit generates

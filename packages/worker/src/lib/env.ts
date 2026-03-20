@@ -20,6 +20,9 @@ const envSchema = z.object({
 
   SEARXNG_URL: z.string().optional(),
 
+  QDRANT_URL: z.string().default("http://localhost:6333"),
+  QDRANT_API_KEY: z.string().optional(),
+
   SANDBOX_ENABLED: z
     .enum(["true", "false", "1", "0"])
     .default("false")

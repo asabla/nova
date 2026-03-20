@@ -8,7 +8,7 @@
     "packages/worker"
   ],
   "scripts": {
-"dev": "bun run --filter '*' dev",
+    "dev": "bun run --filter '*' dev",
     "dev:api": "bun run --filter @nova/api dev",
     "dev:web": "bun run --filter @nova/web dev",
     "dev:worker": "bun run --filter @nova/worker dev",

@@ -10,23 +10,24 @@
   "dependencies": {
     "@nova/shared": "workspace:*",
     "@openai/agents": "^0.7.0",
+    "@qdrant/js-client-rest": "1.13.0",
     "@temporalio/activity": "^1.11.7",
     "@temporalio/worker": "^1.11.7",
     "@temporalio/workflow": "^1.11.7",
     "drizzle-orm": "^0.39.3",
+    "exif-reader": "^2.0.1",
+    "image-size": "^2.0.1",
     "ioredis": "^5.4.2",
     "minio": "^8.0.4",
     "mupdf": "^1.27.0",
     "openai": "^6.27.0",
+    "papaparse": "^5.5.2",
     "postgres": "^3.4.5",
     "tesseract.js": "^7.0.0",
     "tsx": "^4.19.4",
     "unpdf": "^1.4.0",
-    "zod": "3.24.4",
-    "papaparse": "^5.5.2",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "image-size": "^2.0.1",
-    "exif-reader": "^2.0.1"
+    "zod": "3.24.4"
   },
   "devDependencies": {
     "typescript": "^5.8.3",
