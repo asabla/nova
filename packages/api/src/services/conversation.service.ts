@@ -1,5 +1,5 @@
 import { db } from "../lib/db";
-import { conversations, conversationParticipants, messages } from "@nova/shared/schemas";
+import { conversations, conversationParticipants, conversationTagAssignments, messages } from "@nova/shared/schemas";
 import { eq, and, isNull, desc, ilike, sql, inArray, asc, lte } from "drizzle-orm";
 import type { Conversation } from "@nova/shared/schemas";
 import { parsePagination, buildPaginatedResponse, type PaginationInput } from "@nova/shared/utils";
@@ -14,7 +14,6 @@ type UpdateConversationData = Partial<{
   visibility: string;
   isPinned: boolean;
   isArchived: boolean;
-  workspaceId: string;
   forkedFromMessageId: string;
   publicShareToken: string;
 }>;
@@ -23,7 +22,7 @@ export async function listConversations(
   orgId: string,
   userId: string,
   pagination: PaginationInput,
-  filters?: { search?: string; workspaceId?: string; isArchived?: boolean; isPinned?: boolean },
+  filters?: { search?: string; isArchived?: boolean; isPinned?: boolean },
 ) {
   const { offset, limit, page, pageSize } = parsePagination(pagination);
 
@@ -35,9 +34,6 @@ export async function listConversations(
 
   if (filters?.search) {
     conditions.push(ilike(conversations.title, `%${filters.search}%`));
-  }
-  if (filters?.workspaceId) {
-    conditions.push(eq(conversations.workspaceId, filters.workspaceId));
   }
   if (filters?.isArchived !== undefined) {
     conditions.push(eq(conversations.isArchived, filters.isArchived));
@@ -87,7 +83,6 @@ export async function createConversation(orgId: string, userId: string, data: {
   modelId?: string;
   modelParams?: unknown;
   visibility?: string;
-  workspaceId?: string;
   forkedFromMessageId?: string;
 }) {
   const result = await db.insert(conversations).values({
@@ -98,7 +93,6 @@ export async function createConversation(orgId: string, userId: string, data: {
     modelId: data.modelId,
     modelParams: data.modelParams,
     visibility: data.visibility ?? "private",
-    workspaceId: data.workspaceId,
     forkedFromMessageId: data.forkedFromMessageId,
   }).returning();
 
@@ -168,7 +162,6 @@ export async function forkConversation(orgId: string, userId: string, conversati
     systemPrompt: original.systemPrompt ?? undefined,
     modelId: original.modelId ?? undefined,
     modelParams: original.modelParams,
-    workspaceId: original.workspaceId ?? undefined,
     forkedFromMessageId: messageId,
   });
 
@@ -363,12 +356,28 @@ export async function bulkAction(
       if (!payload?.folderId) {
         throw AppError.badRequest("folderId is required for move-to-folder action");
       }
-      const result = await db
-        .update(conversations)
-        .set({ workspaceId: payload.folderId, updatedAt: new Date() })
-        .where(baseConditions)
-        .returning();
-      return { affected: result.length, action };
+      let moved = 0;
+      for (const convId of ids) {
+        // Remove existing folder assignments
+        await db
+          .update(conversationTagAssignments)
+          .set({ deletedAt: new Date() })
+          .where(
+            and(
+              eq(conversationTagAssignments.conversationId, convId),
+              eq(conversationTagAssignments.orgId, orgId),
+              isNull(conversationTagAssignments.deletedAt),
+              sql`${conversationTagAssignments.conversationFolderId} IS NOT NULL`,
+            ),
+          );
+        // Create new folder assignment
+        const [r] = await db
+          .insert(conversationTagAssignments)
+          .values({ conversationId: convId, conversationFolderId: payload.folderId, orgId })
+          .returning();
+        if (r) moved++;
+      }
+      return { affected: moved, action };
     }
     default:
       throw AppError.badRequest(`Unknown bulk action: ${action}`);

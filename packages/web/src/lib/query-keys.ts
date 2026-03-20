@@ -19,15 +19,6 @@ export const queryKeys = {
     list: () => [...queryKeys.knowledge.all, "list"] as const,
     detail: (id: string) => [...queryKeys.knowledge.all, "detail", id] as const,
   },
-  workspaces: {
-    all: ["workspaces"] as const,
-    list: () => [...queryKeys.workspaces.all, "list"] as const,
-    detail: (id: string) => [...queryKeys.workspaces.all, "detail", id] as const,
-    conversations: (id: string) => [...queryKeys.workspaces.all, id, "conversations"] as const,
-    files: (id: string) => [...queryKeys.workspaces.all, id, "files"] as const,
-    members: (id: string) => [...queryKeys.workspaces.all, id, "members"] as const,
-    activity: (id: string) => [...queryKeys.workspaces.all, id, "activity"] as const,
-  },
   files: {
     all: ["files"] as const,
     list: () => [...queryKeys.files.all, "list"] as const,

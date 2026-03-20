@@ -14,7 +14,6 @@ import { db } from "../lib/db";
 import { userProfiles, users, agents, orgSettings, files, toolCalls as toolCallsTable, messageAttachments, messages as messagesTable } from "@nova/shared/schemas";
 import { eq, and, isNull, inArray } from "drizzle-orm";
 import { extractFileContent } from "../lib/file-extract";
-import { retrieveWorkspaceContext, formatRAGContext } from "../services/knowledge.service";
 import { SKILLS, SANDBOX_PACKAGES_NOTE } from "@nova/shared/skills";
 
 // --- Mention helpers (stories #45, #46) ---
@@ -285,11 +284,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
     resolvedModel = setting?.value ?? body.model;
   }
 
-  // Start RAG retrieval in parallel with file enrichment (zero net latency)
   const lastUserContent = [...body.messages].reverse().find((m) => m.role === "user")?.content;
-  const ragPromise = conversation.workspaceId && lastUserContent
-    ? retrieveWorkspaceContext(orgId, conversation.workspaceId, lastUserContent)
-    : Promise.resolve([]);
 
   // Enrich messages with file content so the LLM can read uploaded files
   const dbMessages = await messageService.listMessages(orgId, conversationId, { page: 1, pageSize: 1000 });
@@ -395,16 +390,6 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
     };
   } else {
     enrichedMessages.unshift(formattingInstruction);
-  }
-
-  // Await RAG results and inject into system message
-  const ragChunks = await ragPromise;
-  const ragContext = formatRAGContext(ragChunks);
-  if (ragContext) {
-    enrichedMessages[0] = {
-      ...enrichedMessages[0],
-      content: `${enrichedMessages[0].content}\n\n${ragContext}`,
-    };
   }
 
   // Fetch available agents and inject into system prompt so the LLM knows about them
@@ -517,17 +502,6 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
     }, DEFAULTS.SSE_HEARTBEAT_INTERVAL_MS);
 
     try {
-      // Emit RAG context event for frontend
-      const ragSources = ragChunks.length > 0
-        ? ragChunks.map((c) => ({ document: c.documentName, score: c.score }))
-        : undefined;
-      if (ragSources) {
-        await stream.writeSSE({
-          event: "rag_context",
-          data: JSON.stringify({ sources: ragSources }),
-        });
-      }
-
       const startTime = Date.now();
       const completionParams: Record<string, unknown> = {
         model: resolvedModel,
@@ -661,7 +635,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
             modelId: conversation.modelId ?? undefined,
             tokenCountPrompt: totalPromptTokens,
             tokenCountCompletion: totalCompletionTokens,
-            metadata: { latencyMs: Date.now() - startTime, model: body.model, smartRouted: true, ragSources, toolSummary },
+            metadata: { latencyMs: Date.now() - startTime, model: body.model, smartRouted: true, toolSummary },
           });
 
           // Persist tool calls to DB
@@ -769,7 +743,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
               modelId: conversation.modelId ?? undefined,
               tokenCountPrompt: promptTokens,
               tokenCountCompletion: completionTokens,
-              metadata: { latencyMs, model: body.model, partial: true, ragSources },
+              metadata: { latencyMs, model: body.model, partial: true },
             });
 
             await stream.writeSSE({
@@ -804,7 +778,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         modelId: conversation.modelId ?? undefined,
         tokenCountPrompt: promptTokens,
         tokenCountCompletion: completionTokens,
-        metadata: { latencyMs, model: body.model, ragSources },
+        metadata: { latencyMs, model: body.model },
       });
 
       // Auto-generate title for untitled conversations
@@ -963,18 +937,6 @@ messagesRouter.post("/:conversationId/messages/:messageId/replay", zValidator("j
     history.unshift({ role: "system", content: replayFormatting });
   }
 
-  // Retrieve and inject RAG context for workspace conversations
-  const lastUserMsg = [...history].reverse().find((m) => m.role === "user")?.content;
-  let replayRagSources: { document: string; score: number }[] | undefined;
-  if (replayConversation.workspaceId && lastUserMsg) {
-    const replayRagChunks = await retrieveWorkspaceContext(orgId, replayConversation.workspaceId, lastUserMsg);
-    const replayRagContext = formatRAGContext(replayRagChunks);
-    if (replayRagContext) {
-      history[0] = { ...history[0], content: `${history[0].content}\n\n${replayRagContext}` };
-      replayRagSources = replayRagChunks.map((c) => ({ document: c.documentName, score: c.score }));
-    }
-  }
-
   // Call the new model
   const result = await chatCompletion({
     model,
@@ -995,7 +957,7 @@ messagesRouter.post("/:conversationId/messages/:messageId/replay", zValidator("j
     modelId: model,
     tokenCountPrompt: data.usage?.prompt_tokens,
     tokenCountCompletion: data.usage?.completion_tokens,
-    metadata: { replayOf: messageId, model, ragSources: replayRagSources },
+    metadata: { replayOf: messageId, model },
   });
 
   return c.json(replayMessage, 201);

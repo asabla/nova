@@ -14,7 +14,6 @@ import {
   FileAudio,
   FileVideo,
   File,
-  FolderKanban,
   BookOpen,
   User,
   Link,
@@ -62,8 +61,6 @@ function getFileIcon(contentType: string) {
 
 function getSourceIcon(source: string) {
   switch (source) {
-    case "workspace":
-      return FolderKanban;
     case "knowledge":
       return BookOpen;
     default:
@@ -73,8 +70,6 @@ function getSourceIcon(source: string) {
 
 function getSourceColor(source: string) {
   switch (source) {
-    case "workspace":
-      return "text-blue-500";
     case "knowledge":
       return "text-amber-500";
     default:
@@ -82,7 +77,7 @@ function getSourceColor(source: string) {
   }
 }
 
-type SourceFilter = "all" | "personal" | "workspace" | "knowledge";
+type SourceFilter = "all" | "personal" | "knowledge";
 
 function FilesPage() {
   const { t } = useTranslation();
@@ -91,7 +86,7 @@ function FilesPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; filename: string; source: string; workspaceId?: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; filename: string; source: string;  } | null>(null);
   const pageSize = 20;
 
   // Debounce search
@@ -128,11 +123,11 @@ function FilesPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (target: { id: string; source: string; workspaceId?: string }) => {
+    mutationFn: (target: { id: string; source: string;  }) => {
       if (target.source === "knowledge") {
         return api.delete(`/api/knowledge/documents/${target.id}`);
       }
-      // Personal and workspace files both go through /api/files/:id
+      // Personal files go through /api/files/:id
       return api.delete(`/api/files/${target.id}`);
     },
     onSuccess: () => {
@@ -172,7 +167,6 @@ function FilesPage() {
   const sourceFilterOptions: { key: SourceFilter; label: string }[] = [
     { key: "all", label: t("files.filterAll", { defaultValue: "All Sources" }) },
     { key: "personal", label: t("files.filterPersonal", { defaultValue: "My Files" }) },
-    { key: "workspace", label: t("files.filterWorkspace", { defaultValue: "Workspaces" }) },
     { key: "knowledge", label: t("files.filterKnowledge", { defaultValue: "Knowledge" }) },
   ];
 
@@ -186,7 +180,7 @@ function FilesPage() {
               {t("files.title", { defaultValue: "Files" })}
             </h1>
             <p className="text-sm text-text-secondary mt-1">
-              {t("files.subtitle", { defaultValue: "All files across conversations, workspaces, and knowledge collections" })}
+              {t("files.subtitle", { defaultValue: "All files across conversations and knowledge collections" })}
             </p>
           </div>
           {usage && (
@@ -256,7 +250,7 @@ function FilesPage() {
             </h2>
             <p className="text-sm text-text-secondary max-w-sm">
               {t("files.emptyDescription", {
-                defaultValue: "Files you upload in conversations, workspaces, or knowledge collections will appear here.",
+                defaultValue: "Files you upload in conversations or knowledge collections will appear here.",
               })}
             </p>
           </div>
@@ -270,7 +264,7 @@ function FilesPage() {
                 const sourceColor = getSourceColor(file.source);
                 const isLink = file.contentType === "link";
                 const canDownload = !isLink || file.sourceUrl;
-                const canDelete = file.source === "personal" || file.source === "knowledge" || file.source === "workspace";
+                const canDelete = file.source === "personal" || file.source === "knowledge";
 
                 return (
                   <div
@@ -327,7 +321,7 @@ function FilesPage() {
                       )}
                       {canDelete && (
                         <button
-                          onClick={() => setDeleteTarget({ id: file.id, filename: file.filename, source: file.source, workspaceId: file.workspaceId })}
+                          onClick={() => setDeleteTarget({ id: file.id, filename: file.filename, source: file.source,  })}
                           className="p-2 rounded-lg text-text-tertiary hover:text-danger hover:bg-danger/5 transition-colors"
                           aria-label={t("files.delete", { defaultValue: "Delete" })}
                           title={t("files.delete", { defaultValue: "Delete" })}
@@ -378,7 +372,7 @@ function FilesPage() {
             size="sm"
             loading={deleteMutation.isPending}
             onClick={() => {
-              if (deleteTarget) deleteMutation.mutate({ id: deleteTarget.id, source: deleteTarget.source, workspaceId: deleteTarget.workspaceId });
+              if (deleteTarget) deleteMutation.mutate({ id: deleteTarget.id, source: deleteTarget.source,  });
             }}
           >
             {t("common.delete", { defaultValue: "Delete" })}

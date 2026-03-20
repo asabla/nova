@@ -1,7 +1,6 @@
 export * from "./organisations";
 export * from "./users";
 export * from "./groups";
-export * from "./workspaces";
 export * from "./conversations";
 export * from "./messages";
 export * from "./files";

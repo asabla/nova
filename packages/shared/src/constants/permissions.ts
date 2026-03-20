@@ -23,11 +23,6 @@ export const PERMISSIONS = {
   "files.delete": "member",
   "files.admin": "org-admin",
 
-  "workspace.create": "power-user",
-  "workspace.read": "viewer",
-  "workspace.update": "power-user",
-  "workspace.delete": "power-user",
-
   "prompts.create": "member",
   "prompts.read": "viewer",
   "prompts.update": "member",

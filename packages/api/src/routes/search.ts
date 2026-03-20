@@ -8,11 +8,10 @@ const searchRoutes = new Hono<AppContext>();
 
 const searchQuerySchema = z.object({
   q: z.string().min(2),
-  type: z.enum(["all", "conversations", "messages", "agents", "knowledge", "files", "workspaces", "research"]).optional(),
+  type: z.enum(["all", "conversations", "messages", "agents", "knowledge", "files", "research"]).optional(),
   mode: z.enum(["keyword", "semantic"]).optional(),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
-  workspaceId: z.string().uuid().optional(),
   model: z.string().optional(),
   participants: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(50).optional(),
@@ -23,7 +22,7 @@ const searchQuerySchema = z.object({
 searchRoutes.get("/", zValidator("query", searchQuerySchema), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
-  const { q, type, mode, dateFrom, dateTo, workspaceId, model, participants, limit, offset } =
+  const { q, type, mode, dateFrom, dateTo, model, participants, limit, offset } =
     c.req.valid("query");
 
   const participantIds = participants ? participants.split(",").filter(Boolean) : undefined;
@@ -35,7 +34,6 @@ searchRoutes.get("/", zValidator("query", searchQuerySchema), async (c) => {
     mode: mode ?? "keyword",
     dateFrom: dateFrom ? new Date(dateFrom) : undefined,
     dateTo: dateTo ? new Date(dateTo) : undefined,
-    workspaceId,
     model,
     participantIds,
     userId,
@@ -50,10 +48,9 @@ searchRoutes.post(
     "json",
     z.object({
       q: z.string().min(2),
-      type: z.enum(["all", "conversations", "messages", "agents", "knowledge", "files", "workspaces", "research"]).optional(),
+      type: z.enum(["all", "conversations", "messages", "agents", "knowledge", "files", "research"]).optional(),
       dateFrom: z.string().optional(),
       dateTo: z.string().optional(),
-      workspaceId: z.string().uuid().optional(),
       model: z.string().optional(),
       participants: z.array(z.string().uuid()).optional(),
       limit: z.number().int().min(1).max(50).optional(),
@@ -63,7 +60,7 @@ searchRoutes.post(
   async (c) => {
     const orgId = c.get("orgId");
     const userId = c.get("userId");
-    const { q, type, dateFrom, dateTo, workspaceId, model, participants, limit, offset } =
+    const { q, type, dateFrom, dateTo, model, participants, limit, offset } =
       c.req.valid("json");
 
     const results = await searchService.globalSearch(orgId, q, {
@@ -73,7 +70,6 @@ searchRoutes.post(
       mode: "semantic",
       dateFrom: dateFrom ? new Date(dateFrom) : undefined,
       dateTo: dateTo ? new Date(dateTo) : undefined,
-      workspaceId,
       model,
       participantIds: participants,
       userId,

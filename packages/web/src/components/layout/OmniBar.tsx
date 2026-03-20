@@ -7,7 +7,6 @@ import {
   Bot,
   BookOpen,
   Settings,
-  FolderKanban,
   Sun,
   Moon,
   Monitor,
@@ -39,7 +38,6 @@ type ResultSection =
   | "messages"
   | "agents"
   | "knowledge"
-  | "workspaces"
   | "research"
   | "navigation"
   | "settings";
@@ -75,7 +73,6 @@ const SECTION_ORDER: ResultSection[] = [
   "messages",
   "agents",
   "knowledge",
-  "workspaces",
   "research",
   "navigation",
   "settings",
@@ -88,7 +85,6 @@ const SECTION_COLORS: Record<ResultSection, string> = {
   messages: "border-l-sky-400",
   agents: "border-l-violet-400",
   knowledge: "border-l-emerald-400",
-  workspaces: "border-l-amber-400",
   research: "border-l-rose-400",
   navigation: "border-l-text-tertiary",
   settings: "border-l-text-tertiary",
@@ -128,7 +124,6 @@ export function OmniBar() {
       messages: t("omnibar.messages", { defaultValue: "Messages" }),
       agents: t("omnibar.agents", { defaultValue: "Agents" }),
       knowledge: t("omnibar.knowledge", { defaultValue: "Knowledge" }),
-      workspaces: t("omnibar.workspaces", { defaultValue: "Workspaces" }),
       research: t("omnibar.research", { defaultValue: "Research" }),
       navigation: t("omnibar.navigation", { defaultValue: "Go to" }),
       settings: t("omnibar.settings", { defaultValue: "Settings & Theme" }),
@@ -282,13 +277,6 @@ export function OmniBar() {
         action: runAndClose(() => navigate({ to: "/explore" })),
       },
       {
-        id: "nav-workspaces",
-        label: t("nav.workspaces", { defaultValue: "Workspaces" }),
-        icon: <FolderKanban className="h-4 w-4" aria-hidden="true" />,
-        section: "navigation" as ResultSection,
-        action: runAndClose(() => navigate({ to: "/workspaces" })),
-      },
-      {
         id: "nav-help",
         label: t("nav.help", { defaultValue: "Help" }),
         icon: <HelpCircle className="h-4 w-4" aria-hidden="true" />,
@@ -432,18 +420,6 @@ export function OmniBar() {
         });
       }
 
-      // Workspaces
-      for (const r of sr.workspaces ?? []) {
-        items.push({
-          id: `search-ws-${r.id}`,
-          label: r.name,
-          description: r.snippet || r.description,
-          icon: <FolderKanban className="h-4 w-4" aria-hidden="true" />,
-          section: "workspaces",
-          action: runAndClose(() => navigate({ to: "/workspaces/$id", params: { id: r.id } })),
-        });
-      }
-
       // Research reports
       for (const r of sr.research ?? []) {
         items.push({
@@ -544,7 +520,7 @@ export function OmniBar() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t("omnibar.placeholder", {
-              defaultValue: "Search conversations, knowledge, workspaces, commands...",
+              defaultValue: "Search conversations, knowledge, commands...",
             })}
             className="flex-1 bg-transparent text-sm text-text placeholder:text-text-tertiary focus:outline-none"
             aria-label={t("omnibar.label", { defaultValue: "Universal search" })}
@@ -676,7 +652,7 @@ export function OmniBarTrigger() {
       <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
       <span className="flex-1 text-left truncate">
         {t("omnibar.placeholder", {
-          defaultValue: "Search conversations, knowledge, workspaces, commands...",
+          defaultValue: "Search conversations, knowledge, commands...",
         })}
       </span>
       <kbd className="hidden sm:inline text-[10px] font-mono bg-surface-tertiary/80 px-1.5 py-0.5 rounded-md border border-border text-text-tertiary">

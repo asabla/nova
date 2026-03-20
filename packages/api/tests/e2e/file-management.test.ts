@@ -219,7 +219,7 @@ describe("File management (e2e)", () => {
 
     // All returned items should have source=personal
     for (const file of body.data) {
-      expect(["personal", "workspace"]).toContain(file.source);
+      expect(["personal", "knowledge"]).toContain(file.source);
     }
   });
 

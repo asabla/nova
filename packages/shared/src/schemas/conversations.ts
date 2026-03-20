@@ -3,12 +3,9 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
-import { workspaces } from "./workspaces";
-
 export const conversations = pgTable("conversations", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
-  workspaceId: uuid("workspace_id").references(() => workspaces.id, { onDelete: "set null" }),
   ownerId: uuid("owner_id").notNull().references(() => users.id, { onDelete: "restrict" }),
   title: text("title"),
   visibility: text("visibility").notNull().default("private"),
@@ -26,7 +23,6 @@ export const conversations = pgTable("conversations", {
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 }, (table) => [
   index("idx_conversations_org_owner").on(table.orgId, table.ownerId),
-  index("idx_conversations_workspace").on(table.workspaceId),
   uniqueIndex("idx_conversations_share_token").on(table.publicShareToken),
   index("idx_conversations_org_active").on(table.orgId),
 ]);

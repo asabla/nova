@@ -9,9 +9,8 @@ import { requireRole } from "../middleware/rbac";
 import { db } from "../lib/db";
 import { files } from "@nova/shared/schemas";
 import { orgSettings } from "@nova/shared/schemas";
-import { workspaceMemberships, workspaces } from "@nova/shared/schemas";
 import { knowledgeDocuments, knowledgeCollections } from "@nova/shared/schemas";
-import { eq, and, isNull, sql, desc, ilike, or, inArray } from "drizzle-orm";
+import { eq, and, isNull, sql, desc, ilike, or } from "drizzle-orm";
 
 const fileRoutes = new Hono<AppContext>();
 
@@ -67,41 +66,19 @@ fileRoutes.post("/:fileId/confirm", async (c) => {
   return c.json(file);
 });
 
-// GET /all - Aggregated view: personal files + workspace files + knowledge docs
+// GET /all - Aggregated view: personal files + knowledge docs
 fileRoutes.get("/all", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const page = Number(c.req.query("page") ?? 1);
   const pageSize = Math.min(Number(c.req.query("pageSize") ?? 20), 100);
   const search = c.req.query("search");
-  const source = c.req.query("source"); // "personal" | "workspace" | "knowledge" | undefined (all)
+  const source = c.req.query("source"); // "personal" | "knowledge" | undefined (all)
   const offset = (page - 1) * pageSize;
-
-  // Get workspace IDs user is a member of
-  const membershipRows = await db
-    .select({ workspaceId: workspaceMemberships.workspaceId })
-    .from(workspaceMemberships)
-    .where(and(
-      eq(workspaceMemberships.orgId, orgId),
-      eq(workspaceMemberships.userId, userId),
-      isNull(workspaceMemberships.deletedAt),
-    ));
-  const memberWorkspaceIds = membershipRows.map((m) => m.workspaceId);
-
-  // Also get workspaces the user owns
-  const ownedRows = await db
-    .select({ id: workspaces.id })
-    .from(workspaces)
-    .where(and(
-      eq(workspaces.orgId, orgId),
-      eq(workspaces.ownerId, userId),
-      isNull(workspaces.deletedAt),
-    ));
-  const allWorkspaceIds = [...new Set([...memberWorkspaceIds, ...ownedRows.map((w) => w.id)])];
 
   const results: any[] = [];
 
-  // 1. Personal files (files owned by user with no workspace)
+  // 1. Personal files (files owned by user)
   if (!source || source === "personal") {
     const personalConditions = [
       eq(files.orgId, orgId),
@@ -114,42 +91,13 @@ fileRoutes.get("/all", async (c) => {
     for (const f of personalFiles) {
       results.push({
         ...f,
-        source: f.workspaceId ? "workspace" : "personal",
+        source: "personal",
         sourceName: null,
       });
     }
   }
 
-  // 2. Workspace files (files in workspaces user is a member of, excluding own uploads already included)
-  if ((!source || source === "workspace") && allWorkspaceIds.length > 0) {
-    const wsConditions = [
-      eq(files.orgId, orgId),
-      inArray(files.workspaceId, allWorkspaceIds),
-      isNull(files.deletedAt),
-    ];
-    if (search) wsConditions.push(ilike(files.filename, `%${search}%`));
-
-    // Exclude files already included from personal query (user's own workspace files)
-    const wsFiles = await db.select({
-      file: files,
-      workspaceName: workspaces.name,
-    }).from(files)
-      .leftJoin(workspaces, eq(files.workspaceId, workspaces.id))
-      .where(and(...wsConditions))
-      .orderBy(desc(files.createdAt));
-
-    for (const row of wsFiles) {
-      // Skip duplicates (user's own files in workspaces already included from personal query)
-      if (!source && row.file.userId === userId) continue;
-      results.push({
-        ...row.file,
-        source: "workspace",
-        sourceName: row.workspaceName ?? "Unknown workspace",
-      });
-    }
-  }
-
-  // 3. Knowledge collection documents (with file references)
+  // 2. Knowledge collection documents (with file references)
   if (!source || source === "knowledge") {
     const knowledgeConditions = [
       eq(knowledgeDocuments.orgId, orgId),

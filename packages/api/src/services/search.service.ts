@@ -10,18 +10,16 @@ import {
   knowledgeTags,
   knowledgeDocumentTagAssignments,
   files,
-  workspaces,
   researchReports,
 } from "@nova/shared/schemas";
 
 interface SearchOptions {
   limit?: number;
   offset?: number;
-  type?: "all" | "conversations" | "messages" | "agents" | "knowledge" | "files" | "workspaces" | "research";
+  type?: "all" | "conversations" | "messages" | "agents" | "knowledge" | "files" | "research";
   mode?: "keyword" | "semantic";
   dateFrom?: Date;
   dateTo?: Date;
-  workspaceId?: string;
   model?: string;
   participantIds?: string[];
   userId?: string;
@@ -64,11 +62,11 @@ export const searchService = {
       participantConvIds = participantRows.map((r) => r.conversationId);
       if (participantConvIds.length === 0) {
         // No conversations match the participant filter
-        return { conversations: [], messages: [], agents: [], knowledge: [], files: [], total: 0 };
+        return { conversations: [], messages: [], agents: [], knowledge: [], files: [], research: [], total: 0 };
       }
     }
 
-    const [convResults, msgResults, agentResults, kbResults, docResults, fileResults, wsResults, researchResults] = await Promise.all([
+    const [convResults, msgResults, agentResults, kbResults, docResults, fileResults, researchResults] = await Promise.all([
       // --- Conversations ---
       shouldSearch("conversations")
         ? db
@@ -76,7 +74,6 @@ export const searchService = {
               id: conversations.id,
               title: conversations.title,
               modelId: conversations.modelId,
-              workspaceId: conversations.workspaceId,
               createdAt: conversations.createdAt,
               updatedAt: conversations.updatedAt,
               type: sql<string>`'conversation'`,
@@ -87,7 +84,6 @@ export const searchService = {
                 eq(conversations.orgId, orgId),
                 isNull(conversations.deletedAt),
                 ilike(conversations.title, pattern),
-                ...(opts.workspaceId ? [eq(conversations.workspaceId, opts.workspaceId)] : []),
                 ...(opts.model ? [eq(conversations.modelId, opts.model)] : []),
                 ...(participantConvIds ? [inArray(conversations.id, participantConvIds)] : []),
                 ...dateConditions(conversations),
@@ -313,34 +309,6 @@ export const searchService = {
             .offset(offset)
         : Promise.resolve([]),
 
-      // --- Workspaces ---
-      shouldSearch("workspaces")
-        ? db
-            .select({
-              id: workspaces.id,
-              name: workspaces.name,
-              description: workspaces.description,
-              createdAt: workspaces.createdAt,
-              type: sql<string>`'workspace'`,
-            })
-            .from(workspaces)
-            .where(
-              and(
-                eq(workspaces.orgId, orgId),
-                isNull(workspaces.deletedAt),
-                eq(workspaces.isArchived, false),
-                or(
-                  ilike(workspaces.name, pattern),
-                  ilike(workspaces.description, pattern),
-                ),
-                ...dateConditions(workspaces),
-              ),
-            )
-            .orderBy(desc(workspaces.createdAt))
-            .limit(limit)
-            .offset(offset)
-        : Promise.resolve([]),
-
       // --- Research reports ---
       shouldSearch("research")
         ? db
@@ -390,11 +358,6 @@ export const searchService = {
       snippet: d.summary ? extractSnippet(d.summary, query, 200) : null,
     }));
 
-    const workspacesWithSnippets = wsResults.map((w: any) => ({
-      ...w,
-      snippet: w.description ? extractSnippet(w.description, query, 200) : null,
-    }));
-
     const researchWithSnippets = researchResults.map((r: any) => ({
       ...r,
       title: r.query,
@@ -408,7 +371,6 @@ export const searchService = {
       knowledge: knowledgeWithSnippets,
       knowledgeDocuments: docsWithSnippets,
       files: fileResults,
-      workspaces: workspacesWithSnippets,
       research: researchWithSnippets,
       total:
         convResults.length +
@@ -417,7 +379,6 @@ export const searchService = {
         kbResults.length +
         docResults.length +
         fileResults.length +
-        wsResults.length +
         researchResults.length,
       query,
       mode,

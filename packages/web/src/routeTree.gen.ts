@@ -14,7 +14,6 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AuthIndexRouteImport } from './routes/_auth/index'
 import { Route as SharedTokenRouteImport } from './routes/shared.$token'
-import { Route as AuthWorkspacesRouteImport } from './routes/_auth/workspaces'
 import { Route as AuthUsageRouteImport } from './routes/_auth/usage'
 import { Route as AuthToolsRouteImport } from './routes/_auth/tools'
 import { Route as AuthSettingsRouteImport } from './routes/_auth/settings'
@@ -36,7 +35,6 @@ import { Route as AuthAgentsRouteImport } from './routes/_auth/agents'
 import { Route as AuthAdminRouteImport } from './routes/_auth/admin'
 import { Route as AuthSettingsIndexRouteImport } from './routes/_auth/settings.index'
 import { Route as AuthAdminIndexRouteImport } from './routes/_auth/admin.index'
-import { Route as AuthWorkspacesIdRouteImport } from './routes/_auth/workspaces.$id'
 import { Route as AuthSettingsShortcutsRouteImport } from './routes/_auth/settings.shortcuts'
 import { Route as AuthSettingsSecurityRouteImport } from './routes/_auth/settings.security'
 import { Route as AuthSettingsProfileRouteImport } from './routes/_auth/settings.profile'
@@ -90,11 +88,6 @@ const SharedTokenRoute = SharedTokenRouteImport.update({
   id: '/shared/$token',
   path: '/shared/$token',
   getParentRoute: () => rootRouteImport,
-} as any)
-const AuthWorkspacesRoute = AuthWorkspacesRouteImport.update({
-  id: '/workspaces',
-  path: '/workspaces',
-  getParentRoute: () => AuthRoute,
 } as any)
 const AuthUsageRoute = AuthUsageRouteImport.update({
   id: '/usage',
@@ -200,11 +193,6 @@ const AuthAdminIndexRoute = AuthAdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthAdminRoute,
-} as any)
-const AuthWorkspacesIdRoute = AuthWorkspacesIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AuthWorkspacesRoute,
 } as any)
 const AuthSettingsShortcutsRoute = AuthSettingsShortcutsRouteImport.update({
   id: '/shortcuts',
@@ -377,7 +365,6 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthSettingsRouteWithChildren
   '/tools': typeof AuthToolsRoute
   '/usage': typeof AuthUsageRoute
-  '/workspaces': typeof AuthWorkspacesRouteWithChildren
   '/shared/$token': typeof SharedTokenRoute
   '/admin/analytics': typeof AuthAdminAnalyticsRoute
   '/admin/audit': typeof AuthAdminAuditRoute
@@ -408,7 +395,6 @@ export interface FileRoutesByFullPath {
   '/settings/profile': typeof AuthSettingsProfileRoute
   '/settings/security': typeof AuthSettingsSecurityRoute
   '/settings/shortcuts': typeof AuthSettingsShortcutsRoute
-  '/workspaces/$id': typeof AuthWorkspacesIdRoute
   '/admin/': typeof AuthAdminIndexRoute
   '/settings/': typeof AuthSettingsIndexRoute
 }
@@ -432,7 +418,6 @@ export interface FileRoutesByTo {
   '/search': typeof AuthSearchRoute
   '/tools': typeof AuthToolsRoute
   '/usage': typeof AuthUsageRoute
-  '/workspaces': typeof AuthWorkspacesRouteWithChildren
   '/shared/$token': typeof SharedTokenRoute
   '/': typeof AuthIndexRoute
   '/admin/analytics': typeof AuthAdminAnalyticsRoute
@@ -464,7 +449,6 @@ export interface FileRoutesByTo {
   '/settings/profile': typeof AuthSettingsProfileRoute
   '/settings/security': typeof AuthSettingsSecurityRoute
   '/settings/shortcuts': typeof AuthSettingsShortcutsRoute
-  '/workspaces/$id': typeof AuthWorkspacesIdRoute
   '/admin': typeof AuthAdminIndexRoute
   '/settings': typeof AuthSettingsIndexRoute
 }
@@ -492,7 +476,6 @@ export interface FileRoutesById {
   '/_auth/settings': typeof AuthSettingsRouteWithChildren
   '/_auth/tools': typeof AuthToolsRoute
   '/_auth/usage': typeof AuthUsageRoute
-  '/_auth/workspaces': typeof AuthWorkspacesRouteWithChildren
   '/shared/$token': typeof SharedTokenRoute
   '/_auth/': typeof AuthIndexRoute
   '/_auth/admin/analytics': typeof AuthAdminAnalyticsRoute
@@ -524,7 +507,6 @@ export interface FileRoutesById {
   '/_auth/settings/profile': typeof AuthSettingsProfileRoute
   '/_auth/settings/security': typeof AuthSettingsSecurityRoute
   '/_auth/settings/shortcuts': typeof AuthSettingsShortcutsRoute
-  '/_auth/workspaces/$id': typeof AuthWorkspacesIdRoute
   '/_auth/admin/': typeof AuthAdminIndexRoute
   '/_auth/settings/': typeof AuthSettingsIndexRoute
 }
@@ -553,7 +535,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tools'
     | '/usage'
-    | '/workspaces'
     | '/shared/$token'
     | '/admin/analytics'
     | '/admin/audit'
@@ -584,7 +565,6 @@ export interface FileRouteTypes {
     | '/settings/profile'
     | '/settings/security'
     | '/settings/shortcuts'
-    | '/workspaces/$id'
     | '/admin/'
     | '/settings/'
   fileRoutesByTo: FileRoutesByTo
@@ -608,7 +588,6 @@ export interface FileRouteTypes {
     | '/search'
     | '/tools'
     | '/usage'
-    | '/workspaces'
     | '/shared/$token'
     | '/'
     | '/admin/analytics'
@@ -640,7 +619,6 @@ export interface FileRouteTypes {
     | '/settings/profile'
     | '/settings/security'
     | '/settings/shortcuts'
-    | '/workspaces/$id'
     | '/admin'
     | '/settings'
   id:
@@ -667,7 +645,6 @@ export interface FileRouteTypes {
     | '/_auth/settings'
     | '/_auth/tools'
     | '/_auth/usage'
-    | '/_auth/workspaces'
     | '/shared/$token'
     | '/_auth/'
     | '/_auth/admin/analytics'
@@ -699,7 +676,6 @@ export interface FileRouteTypes {
     | '/_auth/settings/profile'
     | '/_auth/settings/security'
     | '/_auth/settings/shortcuts'
-    | '/_auth/workspaces/$id'
     | '/_auth/admin/'
     | '/_auth/settings/'
   fileRoutesById: FileRoutesById
@@ -747,13 +723,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/shared/$token'
       preLoaderRoute: typeof SharedTokenRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/_auth/workspaces': {
-      id: '/_auth/workspaces'
-      path: '/workspaces'
-      fullPath: '/workspaces'
-      preLoaderRoute: typeof AuthWorkspacesRouteImport
-      parentRoute: typeof AuthRoute
     }
     '/_auth/usage': {
       id: '/_auth/usage'
@@ -901,13 +870,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthAdminIndexRouteImport
       parentRoute: typeof AuthAdminRoute
-    }
-    '/_auth/workspaces/$id': {
-      id: '/_auth/workspaces/$id'
-      path: '/$id'
-      fullPath: '/workspaces/$id'
-      preLoaderRoute: typeof AuthWorkspacesIdRouteImport
-      parentRoute: typeof AuthWorkspacesRoute
     }
     '/_auth/settings/shortcuts': {
       id: '/_auth/settings/shortcuts'
@@ -1213,18 +1175,6 @@ const AuthSettingsRouteWithChildren = AuthSettingsRoute._addFileChildren(
   AuthSettingsRouteChildren,
 )
 
-interface AuthWorkspacesRouteChildren {
-  AuthWorkspacesIdRoute: typeof AuthWorkspacesIdRoute
-}
-
-const AuthWorkspacesRouteChildren: AuthWorkspacesRouteChildren = {
-  AuthWorkspacesIdRoute: AuthWorkspacesIdRoute,
-}
-
-const AuthWorkspacesRouteWithChildren = AuthWorkspacesRoute._addFileChildren(
-  AuthWorkspacesRouteChildren,
-)
-
 interface AuthRouteChildren {
   AuthAdminRoute: typeof AuthAdminRouteWithChildren
   AuthAgentsRoute: typeof AuthAgentsRouteWithChildren
@@ -1245,7 +1195,6 @@ interface AuthRouteChildren {
   AuthSettingsRoute: typeof AuthSettingsRouteWithChildren
   AuthToolsRoute: typeof AuthToolsRoute
   AuthUsageRoute: typeof AuthUsageRoute
-  AuthWorkspacesRoute: typeof AuthWorkspacesRouteWithChildren
   AuthIndexRoute: typeof AuthIndexRoute
   AuthConversationsIdRoute: typeof AuthConversationsIdRoute
   AuthConversationsNewRoute: typeof AuthConversationsNewRoute
@@ -1271,7 +1220,6 @@ const AuthRouteChildren: AuthRouteChildren = {
   AuthSettingsRoute: AuthSettingsRouteWithChildren,
   AuthToolsRoute: AuthToolsRoute,
   AuthUsageRoute: AuthUsageRoute,
-  AuthWorkspacesRoute: AuthWorkspacesRouteWithChildren,
   AuthIndexRoute: AuthIndexRoute,
   AuthConversationsIdRoute: AuthConversationsIdRoute,
   AuthConversationsNewRoute: AuthConversationsNewRoute,

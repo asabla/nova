@@ -7,7 +7,6 @@ import {
   MessageSquare,
   Bot,
   BookOpen,
-  Users,
   Settings,
   Rocket,
   ChevronDown,
@@ -73,7 +72,7 @@ const helpSections: HelpSection[] = [
       },
       {
         title: "Exporting conversations",
-        body: "Open the conversation menu (three dots icon) to export as Markdown or JSON. You can also share conversations with teammates within your workspace.",
+        body: "Open the conversation menu (three dots icon) to export as Markdown or JSON. You can also share conversations with teammates in your organization.",
       },
     ],
   },
@@ -93,7 +92,7 @@ const helpSections: HelpSection[] = [
       },
       {
         title: "Sharing agents",
-        body: "Agents can be shared within your workspace so your whole team can use them. Set the visibility to \"workspace\" when creating or editing an agent.",
+        body: "Agents can be shared within your organization so your whole team can use them. Set the visibility to \"team\" when creating or editing an agent.",
       },
     ],
   },
@@ -118,22 +117,6 @@ const helpSections: HelpSection[] = [
     ],
   },
   {
-    id: "workspaces",
-    title: "Workspaces",
-    icon: Users,
-    color: "text-success",
-    articles: [
-      {
-        title: "What are workspaces?",
-        body: "Workspaces are shared spaces where team members can collaborate. Each workspace has its own conversations, agents, knowledge bases, and permissions.",
-      },
-      {
-        title: "Inviting members",
-        body: "Workspace admins can invite members by email. Navigate to the workspace settings to manage members, roles, and permissions.",
-      },
-    ],
-  },
-  {
     id: "settings",
     title: "Settings",
     icon: Settings,
@@ -149,7 +132,7 @@ const helpSections: HelpSection[] = [
       },
       {
         title: "Notifications",
-        body: "Configure which notifications you receive and how in Settings > Notifications. You can set preferences per workspace.",
+        body: "Configure which notifications you receive and how in Settings > Notifications.",
       },
     ],
   },

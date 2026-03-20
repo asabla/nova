@@ -20,18 +20,11 @@ function NewConversationPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedModel, setSelectedModel] = useState("");
-  const [selectedWorkspace, setSelectedWorkspace] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
   const { data: modelsData } = useQuery({
     queryKey: queryKeys.models.all,
     queryFn: () => api.get<any>("/api/models"),
-    staleTime: 60_000,
-  });
-
-  const { data: workspacesData } = useQuery({
-    queryKey: queryKeys.workspaces.all,
-    queryFn: () => api.get<any>("/api/workspaces"),
     staleTime: 60_000,
   });
 
@@ -43,7 +36,6 @@ function NewConversationPage() {
   });
 
   const models = (modelsData as any)?.data ?? [];
-  const workspaces = (workspacesData as any)?.data ?? [];
   const starters = (starterTemplates as any)?.data ?? [];
 
   const uploadSingleFile = useCallback(async (file: File) => {
@@ -67,7 +59,6 @@ function NewConversationPage() {
     try {
       const payload: any = {};
       if (selectedModel) payload.modelId = selectedModel;
-      if (selectedWorkspace) payload.workspaceId = selectedWorkspace;
       if (systemPrompt) payload.systemPrompt = systemPrompt;
 
       const conversation = await api.post<{ id: string }>("/api/conversations", payload);
@@ -96,7 +87,7 @@ function NewConversationPage() {
       toast(t("conversations.createFailed", "Failed to create conversation"), "error");
       setIsCreating(false);
     }
-  }, [navigate, queryClient, selectedModel, selectedWorkspace, isCreating, t, uploadSingleFile]);
+  }, [navigate, queryClient, selectedModel, isCreating, t, uploadSingleFile]);
 
   // Check for starter message from explore page or session storage
   useEffect(() => {
@@ -134,7 +125,7 @@ function NewConversationPage() {
           <h2 className="text-xl font-semibold text-text mb-2">{t("conversations.newTitle", "New Conversation")}</h2>
           <p className="text-sm text-text-secondary mb-4">{t("conversations.newDescription", "Start a conversation with an AI assistant")}</p>
 
-          {/* Model & Workspace selectors */}
+          {/* Model selector */}
           <div className="flex flex-col items-center gap-2 mb-6">
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Select
@@ -148,18 +139,6 @@ function NewConversationPage() {
                 size="sm"
               />
 
-              {workspaces.length > 0 && (
-                <Select
-                  options={[
-                    { value: "", label: t("conversations.noWorkspace", "No workspace") },
-                    ...workspaces.map((w: any) => ({ value: w.id, label: w.name })),
-                  ]}
-                  value={selectedWorkspace}
-                  onChange={(val) => setSelectedWorkspace(val)}
-                  disabled={isCreating}
-                  size="sm"
-                />
-              )}
             </div>
 
             {/* Show capability badges for selected model */}

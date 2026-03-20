@@ -5,14 +5,13 @@ import { useTranslation } from "react-i18next";
 import { clsx } from "clsx";
 import {
   Archive, Pin, Trash2, PanelLeft, PanelLeftClose, BookOpen,
-  FolderKanban, Settings, ShieldCheck,
-  Microscope, Compass, HelpCircle, Filter, Search,
-  CheckSquare, Square, FolderOpen, MessageSquare, Zap, HardDrive, Plus,
+  Settings, ShieldCheck,
+  Microscope, Compass, HelpCircle, Search,
+  CheckSquare, Square, MessageSquare, Zap, HardDrive, Plus,
 } from "lucide-react";
 import { isToday, isYesterday, isThisWeek } from "date-fns";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
-import { Select } from "../ui/Select";
 import { useUIStore } from "../../stores/ui.store";
 import { useAuthStore } from "../../stores/auth.store";
 import { Button } from "../ui/Button";
@@ -28,8 +27,6 @@ export function Sidebar() {
   const sidebarWidth = useUIStore((s) => s.sidebarWidth);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const user = useAuthStore((s) => s.user);
-  const [showFilters, setShowFilters] = useState(false);
-  const [filterWorkspace, setFilterWorkspace] = useState("");
   const [bulkMode, setBulkMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -42,12 +39,6 @@ export function Sidebar() {
     queryKey: queryKeys.conversations.list({ isArchived: false }),
     queryFn: () => api.get<any>(`/api/conversations?isArchived=false`),
     staleTime: 30_000,
-  });
-
-  const { data: workspacesData } = useQuery({
-    queryKey: queryKeys.workspaces.all,
-    queryFn: () => api.get<any>("/api/workspaces"),
-    staleTime: 60_000,
   });
 
   const bulkArchive = useMutation({
@@ -79,10 +70,8 @@ export function Sidebar() {
   });
 
   const conversations = conversationsData?.data ?? [];
-  const workspaces = (workspacesData as any)?.data ?? [];
 
   const filteredConversations = conversations.filter((c: any) => {
-    if (filterWorkspace && c.workspaceId !== filterWorkspace) return false;
     if (searchQuery && !(c.title ?? "").toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
@@ -178,7 +167,6 @@ export function Sidebar() {
           <SidebarLink icon={Microscope} label={t("nav.research", { defaultValue: "Research" })} to="/research" collapsed={!sidebarOpen} />
           <SidebarLink icon={BookOpen} label={t("nav.knowledge", { defaultValue: "Knowledge" })} to="/knowledge" collapsed={!sidebarOpen} />
           <SidebarLink icon={Compass} label={t("nav.explore", { defaultValue: "Explore" })} to="/explore" collapsed={!sidebarOpen} />
-          <SidebarLink icon={FolderKanban} label={t("nav.workspaces", { defaultValue: "Workspaces" })} to="/workspaces" collapsed={!sidebarOpen} />
           <SidebarLink icon={HardDrive} label={t("nav.files", { defaultValue: "Files" })} to="/files" collapsed={!sidebarOpen} />
         </nav>
 
@@ -204,17 +192,6 @@ export function Sidebar() {
             {/* Conversation controls */}
             <div className="px-3 pt-3 flex gap-1.5">
               <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={clsx(
-                  "p-1.5 rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-primary",
-                  showFilters ? "bg-primary/10 text-primary" : "text-text-tertiary hover:text-text hover:bg-surface-tertiary",
-                )}
-                aria-label={t("conversations.filter", { defaultValue: "Filter conversations" })}
-                aria-pressed={showFilters}
-              >
-                <Filter className="h-4 w-4" aria-hidden="true" />
-              </button>
-              <button
                 onClick={() => { setBulkMode(!bulkMode); setSelected(new Set()); }}
                 className={clsx(
                   "p-1.5 rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-primary",
@@ -226,24 +203,6 @@ export function Sidebar() {
                 <CheckSquare className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
-
-            {/* Filters */}
-            {showFilters && (
-              <div className="px-3 pt-2 space-y-1.5">
-                {workspaces.length > 0 && (
-                  <Select
-                    value={filterWorkspace}
-                    onChange={(value) => setFilterWorkspace(value)}
-                    placeholder={t("search.filter.allWorkspaces", { defaultValue: "All workspaces" })}
-                    options={[
-                      { value: "", label: t("search.filter.allWorkspaces", { defaultValue: "All workspaces" }) },
-                      ...workspaces.map((w: any) => ({ value: w.id, label: w.name })),
-                    ]}
-                    size="sm"
-                  />
-                )}
-              </div>
-            )}
 
             {/* Bulk Actions — styled bar matching ConversationList story */}
             {bulkMode && selected.size > 0 && (
@@ -325,7 +284,6 @@ export function Sidebar() {
                         )}
                         {!bulkMode && conv.isPinned && <Pin className="h-3 w-3 text-primary shrink-0" aria-hidden="true" />}
                         <span className="truncate flex-1">{conv.title ?? t("conversations.untitled", { defaultValue: "Untitled" })}</span>
-                        {conv.workspaceId && <FolderOpen className="h-3 w-3 text-text-tertiary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true" />}
                       </button>
                     ))}
                   </Fragment>

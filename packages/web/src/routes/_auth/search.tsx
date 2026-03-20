@@ -12,7 +12,6 @@ import {
   X,
   Sparkles,
   Loader2,
-  FolderKanban,
   FlaskConical,
 } from "lucide-react";
 import { api } from "../../lib/api";
@@ -44,7 +43,7 @@ function highlightMatches(text: string, query: string): string {
   return escapeHtml(text).replace(regex, "<mark>$1</mark>");
 }
 
-type ResultType = "all" | "conversations" | "messages" | "agents" | "knowledge" | "files" | "workspaces" | "research";
+type ResultType = "all" | "conversations" | "messages" | "agents" | "knowledge" | "files" | "research";
 
 const TABS: { id: ResultType; labelKey: string; labelDefault: string; icon: React.ReactNode }[] = [
   { id: "all", labelKey: "search.tab.all", labelDefault: "All", icon: null },
@@ -53,7 +52,6 @@ const TABS: { id: ResultType; labelKey: string; labelDefault: string; icon: Reac
   { id: "agents", labelKey: "search.tab.agents", labelDefault: "Agents", icon: <Bot className="h-3.5 w-3.5" aria-hidden="true" /> },
   { id: "knowledge", labelKey: "search.tab.knowledge", labelDefault: "Knowledge", icon: <BookOpen className="h-3.5 w-3.5" aria-hidden="true" /> },
   { id: "files", labelKey: "search.tab.files", labelDefault: "Files", icon: <FileText className="h-3.5 w-3.5" aria-hidden="true" /> },
-  { id: "workspaces", labelKey: "search.tab.workspaces", labelDefault: "Workspaces", icon: <FolderKanban className="h-3.5 w-3.5" aria-hidden="true" /> },
   { id: "research", labelKey: "search.tab.research", labelDefault: "Research", icon: <FlaskConical className="h-3.5 w-3.5" aria-hidden="true" /> },
 ];
 
@@ -73,24 +71,15 @@ function SearchPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [model, setModel] = useState("");
-  const [workspaceId, setWorkspaceId] = useState("");
   const [participants, setParticipants] = useState("");
 
   const hasFilters =
-    dateFrom || dateTo || model || workspaceId || participants || searchMode !== "keyword";
+    dateFrom || dateTo || model || participants || searchMode !== "keyword";
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), 300);
     return () => clearTimeout(timer);
   }, [query]);
-
-  // Fetch workspaces for filter dropdown
-  const { data: workspacesData } = useQuery({
-    queryKey: queryKeys.workspaces.all,
-    queryFn: () => api.get<any>("/api/workspaces"),
-    staleTime: 60_000,
-  });
-  const workspaces = (workspacesData as any)?.data ?? [];
 
   // Main search query
   const { data: results, isLoading, isError } = useQuery({
@@ -102,7 +91,6 @@ function SearchPage() {
       dateFrom,
       dateTo,
       model,
-      workspaceId,
       participants,
     ],
     queryFn: () => {
@@ -112,7 +100,6 @@ function SearchPage() {
       if (dateFrom) params.set("dateFrom", dateFrom);
       if (dateTo) params.set("dateTo", dateTo);
       if (model) params.set("model", model);
-      if (workspaceId) params.set("workspaceId", workspaceId);
       if (participants) params.set("participants", participants);
       return api.get<any>(`/api/search?${params}`);
     },
@@ -123,7 +110,6 @@ function SearchPage() {
     setDateFrom("");
     setDateTo("");
     setModel("");
-    setWorkspaceId("");
     setParticipants("");
     setSearchMode("keyword");
   }, []);
@@ -138,7 +124,6 @@ function SearchPage() {
         ...(results.agents ?? []),
         ...(results.knowledge ?? []),
         ...(results.files ?? []),
-        ...(results.workspaces ?? []),
         ...(results.research ?? []),
       ].sort(
         (a: any, b: any) =>
@@ -156,7 +141,6 @@ function SearchPage() {
     agents: results?.agents?.length ?? 0,
     knowledge: results?.knowledge?.length ?? 0,
     files: results?.files?.length ?? 0,
-    workspaces: results?.workspaces?.length ?? 0,
     research: results?.research?.length ?? 0,
   };
 
@@ -172,8 +156,6 @@ function SearchPage() {
         return <BookOpen className="h-4 w-4 text-green-400" />;
       case "file":
         return <FileText className="h-4 w-4 text-orange-400" />;
-      case "workspace":
-        return <FolderKanban className="h-4 w-4 text-amber-400" />;
       case "research":
         return <FlaskConical className="h-4 w-4 text-rose-400" />;
       default:
@@ -194,9 +176,6 @@ function SearchPage() {
         break;
       case "knowledge":
         navigate({ to: `/knowledge/${result.id}` });
-        break;
-      case "workspace":
-        navigate({ to: `/workspaces/${result.id}` });
         break;
       case "research":
         navigate({ to: "/research" });
@@ -291,17 +270,6 @@ function SearchPage() {
               onChange={(e) => setModel(e.target.value)}
               placeholder="e.g. gpt-4"
               className="h-8 w-32 px-2 text-xs"
-            />
-            <Select
-              label={t("search.filter.workspace", "Workspace")}
-              value={workspaceId}
-              onChange={(value) => setWorkspaceId(value)}
-              placeholder={t("search.filter.allWorkspaces", "All workspaces")}
-              size="sm"
-              options={[
-                { value: "", label: t("search.filter.allWorkspaces", "All workspaces") },
-                ...workspaces.map((ws: any) => ({ value: ws.id, label: ws.name })),
-              ]}
             />
             <Input
               type="text"
@@ -422,12 +390,6 @@ function SearchPage() {
                                 {result.score != null && searchMode === "semantic" && (
                                   <span className="text-[10px] text-primary/70">
                                     {(result.score * 100).toFixed(0)}% match
-                                  </span>
-                                )}
-                                {result.workspaceId && (
-                                  <span className="text-[10px] text-text-tertiary">
-                                    {workspaces.find((w: any) => w.id === result.workspaceId)?.name ??
-                                      "Workspace"}
                                   </span>
                                 )}
                                 {result.senderType && (

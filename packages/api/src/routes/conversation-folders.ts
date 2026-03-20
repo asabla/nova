@@ -78,7 +78,6 @@ folderRoutes.get("/folders/:id", async (c) => {
       updatedAt: conversations.updatedAt,
       isArchived: conversations.isArchived,
       modelId: conversations.modelId,
-      workspaceId: conversations.workspaceId,
     })
     .from(conversationTagAssignments)
     .innerJoin(

@@ -37,7 +37,6 @@ const ACTION_CATEGORIES = [
   { value: "conversation", label: "Conversations" },
   { value: "agent", label: "Agents" },
   { value: "knowledge", label: "Knowledge" },
-  { value: "workspace", label: "Workspaces" },
   { value: "group", label: "Groups" },
   { value: "sso", label: "SSO" },
   { value: "gdpr", label: "GDPR" },

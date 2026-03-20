@@ -7,7 +7,6 @@ import {
   Bot,
   BookOpen,
   Settings,
-  FolderKanban,
   Sun,
   Moon,
   Monitor,
@@ -201,13 +200,6 @@ export function CommandPalette() {
         icon: <BookOpen className="h-4 w-4" aria-hidden="true" />,
         section: "settings",
         action: runAndClose(() => navigate({ to: "/knowledge" })),
-      },
-      {
-        id: "nav-workspaces",
-        label: t("commandPalette.workspaces", { defaultValue: "Workspaces" }),
-        icon: <FolderKanban className="h-4 w-4" aria-hidden="true" />,
-        section: "settings",
-        action: runAndClose(() => navigate({ to: "/workspaces" })),
       },
       {
         id: "nav-settings",

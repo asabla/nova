@@ -61,7 +61,6 @@ const querySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().positive().max(100).optional(),
   search: z.string().optional(),
-  workspaceId: z.string().uuid().optional(),
   isArchived: z.enum(["true", "false"]).transform((v) => v === "true").optional(),
   isPinned: z.enum(["true", "false"]).transform((v) => v === "true").optional(),
 });
@@ -86,7 +85,6 @@ const createSchema = z.object({
   systemPrompt: z.string().max(10_000).optional(),
   modelId: z.string().uuid().optional(),
   visibility: z.enum(["private", "team", "public"]).optional(),
-  workspaceId: z.string().uuid().optional(),
 });
 
 conversations.post("/", zValidator("json", createSchema), async (c) => {

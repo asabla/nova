@@ -56,7 +56,6 @@ interface ConversationData {
   updatedAt: string;
   isArchived: boolean;
   modelId: string | null;
-  workspaceId: string | null;
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
@@ -82,7 +81,6 @@ function FoldersPage() {
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
   const [filterModel, setFilterModel] = useState("");
-  const [filterWorkspace, setFilterWorkspace] = useState("");
   const [filterSearch, setFilterSearch] = useState("");
 
   // Move-to-folder dialog
@@ -116,15 +114,8 @@ function FoldersPage() {
     staleTime: 30_000,
   });
 
-  const { data: workspacesData } = useQuery({
-    queryKey: queryKeys.workspaces.all,
-    queryFn: () => api.get<any>("/api/workspaces"),
-    staleTime: 60_000,
-  });
-
   const folders: FolderData[] = (foldersData as any)?.data ?? [];
   const tagList = (tagsData as any)?.data ?? [];
-  const workspaces = (workspacesData as any)?.data ?? [];
   const allConversations: ConversationData[] = (unfolderedData as any)?.data ?? [];
 
   // Build folder tree
@@ -153,9 +144,6 @@ function FoldersPage() {
     if (filterModel) {
       convs = convs.filter((c: any) => c.modelId === filterModel);
     }
-    if (filterWorkspace) {
-      convs = convs.filter((c: any) => c.workspaceId === filterWorkspace);
-    }
     if (filterDateFrom) {
       const from = new Date(filterDateFrom);
       convs = convs.filter((c: any) => new Date(c.createdAt) >= from);
@@ -166,9 +154,9 @@ function FoldersPage() {
     }
 
     return convs;
-  }, [selectedFolder, folderDetail, allConversations, filterSearch, filterModel, filterWorkspace, filterDateFrom, filterDateTo]);
+  }, [selectedFolder, folderDetail, allConversations, filterSearch, filterModel, filterDateFrom, filterDateTo]);
 
-  const hasActiveFilters = filterDateFrom || filterDateTo || filterModel || filterWorkspace || filterSearch;
+  const hasActiveFilters = filterDateFrom || filterDateTo || filterModel || filterSearch;
 
   // ─── Mutations ───────────────────────────────────────────────────────────
 
@@ -527,26 +515,12 @@ function FoldersPage() {
                     onChange={(e) => setFilterModel(e.target.value)}
                     placeholder="e.g. gpt-4"
                   />
-                  <Select
-                    label={t("folders.filter.workspace", "Workspace")}
-                    value={filterWorkspace}
-                    onChange={(value) => setFilterWorkspace(value)}
-                    size="sm"
-                    options={[
-                      { value: "", label: t("folders.filter.all", "All") },
-                      ...workspaces.map((ws: any) => ({
-                        value: ws.id,
-                        label: ws.name,
-                      })),
-                    ]}
-                  />
                   {hasActiveFilters && (
                     <button
                       onClick={() => {
                         setFilterDateFrom("");
                         setFilterDateTo("");
                         setFilterModel("");
-                        setFilterWorkspace("");
                         setFilterSearch("");
                       }}
                       className="h-8 px-2 text-xs text-text-tertiary hover:text-text-secondary flex items-center gap-1"

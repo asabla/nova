@@ -3,13 +3,10 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
-import { workspaces } from "./workspaces";
-
 export const files = pgTable("files", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
-  workspaceId: uuid("workspace_id").references(() => workspaces.id, { onDelete: "set null" }),
   filename: text("filename").notNull(),
   contentType: text("content_type").notNull(),
   sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
@@ -23,7 +20,6 @@ export const files = pgTable("files", {
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 }, (table) => [
   index("idx_files_org_user").on(table.orgId, table.userId),
-  index("idx_files_workspace").on(table.workspaceId),
   index("idx_files_org_active").on(table.orgId),
 ]);
 
