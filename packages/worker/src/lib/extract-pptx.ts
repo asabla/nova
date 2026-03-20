@@ -1,5 +1,6 @@
 import { openai } from "./litellm";
 import { env } from "./env";
+import { getVisionModel } from "./models";
 import { executeSandboxCode } from "../activities/sandbox.activities";
 
 const MAX_SLIDES = 50;
@@ -123,9 +124,8 @@ async function describeSlideWithVision(
   imageBase64: string,
   slideIndex: number,
   slideTitle: string,
+  visionModel: string,
 ): Promise<string> {
-  const visionModel = env.VISION_MODEL;
-  if (!visionModel) return "";
 
   try {
     const response = await openai.chat.completions.create({
@@ -168,8 +168,9 @@ export async function extractPptxContent(
   if (!env.SANDBOX_ENABLED) {
     throw new Error("PPTX ingestion requires SANDBOX_ENABLED=true");
   }
-  if (!env.VISION_MODEL) {
-    throw new Error("PPTX ingestion requires VISION_MODEL to be configured");
+  const visionModel = await getVisionModel();
+  if (!visionModel) {
+    throw new Error("PPTX ingestion requires VISION_MODEL env var or a vision-capable model in the database");
   }
 
   // Execute Python extraction in sandbox
@@ -210,9 +211,9 @@ export async function extractPptxContent(
     // Try vision description for this slide
     let visionDesc = "";
     const slideFile = result.outputFiles.find((f) => f.name === `slide_${i}.png`);
-    if (slideFile && env.VISION_MODEL) {
+    if (slideFile) {
       const slideBuffer = await getObjectBuffer(slideFile.storageKey);
-      visionDesc = await describeSlideWithVision(slideBuffer.toString("base64"), i, slide.title);
+      visionDesc = await describeSlideWithVision(slideBuffer.toString("base64"), i, slide.title, visionModel);
     }
 
     // Compose slide section

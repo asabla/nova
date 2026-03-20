@@ -120,7 +120,7 @@ async function seed() {
   const providerId = provider?.id ?? (await db.select().from(modelProviders).where(eq(modelProviders.orgId, orgId)).then((r) => r[0]!.id));
 
   const modelDefs = [
-    { name: "Default Model", modelIdExternal: "default-model", capabilities: ["chat"], contextWindow: 32000, isDefault: true },
+    { name: "Default Model", modelIdExternal: "default-model", capabilities: ["chat", "vision"], contextWindow: 32000, isDefault: true },
     { name: "Default Embedding Model", modelIdExternal: "default-embedding-model", capabilities: ["embeddings"], contextWindow: 8192 },
   ];
 

@@ -1,5 +1,5 @@
 import { openai } from "./litellm";
-import { env } from "./env";
+import { getVisionModel } from "./models";
 
 interface ImageMetadata {
   width?: number;
@@ -73,9 +73,9 @@ async function getExifData(buffer: Buffer, contentType: string): Promise<Record<
 }
 
 async function describeWithVision(buffer: Buffer, contentType: string): Promise<string> {
-  const visionModel = env.VISION_MODEL;
+  const visionModel = await getVisionModel();
   if (!visionModel) {
-    throw new Error("Image ingestion requires VISION_MODEL to be configured");
+    throw new Error("Image ingestion requires VISION_MODEL env var or a vision-capable model in the database");
   }
 
   const base64 = buffer.toString("base64");

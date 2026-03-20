@@ -1,9 +1,11 @@
 import { eq, and, isNull } from "drizzle-orm";
 import { db } from "./db";
 import { models } from "@nova/shared/schemas";
+import { env } from "./env";
 
 let cachedDefaultModel: string | null = null;
 let cachedEmbeddingModel: string | null = null;
+let cachedVisionModel: string | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -34,6 +36,18 @@ async function refreshCache(): Promise<void> {
   });
   cachedEmbeddingModel = embeddingModel?.modelIdExternal ?? null;
 
+  // Find vision model: prefer default model if vision-capable, else any vision-capable model
+  const hasVision = (m: { capabilities: unknown }) => {
+    const caps = m.capabilities as string[];
+    return Array.isArray(caps) && caps.includes("vision");
+  };
+  if (defaultChat && hasVision(defaultChat)) {
+    cachedVisionModel = defaultChat.modelIdExternal;
+  } else {
+    const visionModel = enabledModels.find(hasVision);
+    cachedVisionModel = visionModel?.modelIdExternal ?? null;
+  }
+
   cacheTimestamp = Date.now();
 }
 
@@ -53,4 +67,14 @@ export async function getDefaultChatModel(): Promise<string> {
 export async function getDefaultEmbeddingModel(): Promise<string> {
   await refreshCache();
   return cachedEmbeddingModel ?? process.env.EMBEDDING_MODEL ?? "default-embedding-model";
+}
+
+/**
+ * Returns a vision-capable model.
+ * Priority: VISION_MODEL env var → default model (if vision-capable) → any vision-capable model → null
+ */
+export async function getVisionModel(): Promise<string | null> {
+  if (env.VISION_MODEL) return env.VISION_MODEL;
+  await refreshCache();
+  return cachedVisionModel;
 }
