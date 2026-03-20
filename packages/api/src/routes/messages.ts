@@ -11,7 +11,7 @@ import { DEFAULTS } from "@nova/shared/constants";
 import { notificationService } from "../services/notification.service";
 import { getTemporalClient } from "../lib/temporal";
 import { db } from "../lib/db";
-import { userProfiles, users, agents, orgSettings, files, toolCalls as toolCallsTable } from "@nova/shared/schemas";
+import { userProfiles, users, agents, orgSettings, files, toolCalls as toolCallsTable, messageAttachments, messages as messagesTable } from "@nova/shared/schemas";
 import { eq, and, isNull, inArray } from "drizzle-orm";
 import { extractFileContent } from "../lib/file-extract";
 import { retrieveWorkspaceContext, formatRAGContext } from "../services/knowledge.service";
@@ -227,7 +227,7 @@ const DEFAULT_TOOLS = [
     function: {
       name: "code_execute",
       description:
-        "Execute code in a secure sandboxed environment. Returns stdout, stderr, and exit code. Network access is disabled. Supports Python, JavaScript, TypeScript, Bash. Input files are available at /sandbox/input/. Write output files to /sandbox/output/ to return them.",
+        "Execute code in a secure sandboxed environment. Returns stdout, stderr, and exit code. Network access is disabled. Supports Python, JavaScript, TypeScript, Bash. To process uploaded files, pass their IDs (from the conversation file list) via input_file_ids — they will be available at /sandbox/input/<filename>. Write output files to /sandbox/output/ to return them. Never ask the user for file IDs.",
       parameters: {
         type: "object",
         properties: {
@@ -421,6 +421,42 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
       enrichedMessages[0] = {
         ...enrichedMessages[0],
         content: `${enrichedMessages[0].content}\n\n${agentSection}`,
+      };
+    }
+
+    // Build a manifest of all files in this conversation so the agent always
+    // knows what files are available and can pass their IDs to code_execute.
+    const conversationFiles = await db
+      .selectDistinct({
+        fileId: messageAttachments.fileId,
+        filename: files.filename,
+        contentType: files.contentType,
+        sizeBytes: files.sizeBytes,
+      })
+      .from(messageAttachments)
+      .innerJoin(messagesTable, eq(messageAttachments.messageId, messagesTable.id))
+      .innerJoin(files, eq(messageAttachments.fileId, files.id))
+      .where(
+        and(
+          eq(messagesTable.conversationId, conversationId),
+          eq(messageAttachments.orgId, orgId),
+          isNull(files.deletedAt),
+        ),
+      );
+
+    if (conversationFiles.length > 0) {
+      const fileList = conversationFiles
+        .map((f) => `- "${f.filename}" (id: ${f.fileId}, type: ${f.contentType}, ${((f.sizeBytes ?? 0) / 1024).toFixed(1)} KB)`)
+        .join("\n");
+      const filesSection = [
+        "## Files in this conversation",
+        "The following files have been uploaded by the user. When using the code_execute tool, pass file IDs via `input_file_ids` to make them available at `/sandbox/input/<filename>`.",
+        "Do NOT ask the user for file IDs — use the IDs listed below.",
+        fileList,
+      ].join("\n");
+      enrichedMessages[0] = {
+        ...enrichedMessages[0],
+        content: `${enrichedMessages[0].content}\n\n${filesSection}`,
       };
     }
   }

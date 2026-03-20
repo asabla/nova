@@ -224,7 +224,7 @@ export const invokeAgentTool = tool({
 export const codeExecuteTool = tool({
   name: "code_execute",
   description:
-    "Execute code in a secure sandboxed environment. Returns stdout, stderr, and exit code. Network access is disabled. Supports Python, JavaScript, TypeScript, Bash, and more. Input files are available at /sandbox/input/. Write output files to /sandbox/output/ to return them.",
+    "Execute code in a secure sandboxed environment. Returns stdout, stderr, and exit code. Network access is disabled. Supports Python, JavaScript, TypeScript, Bash, and more. To process uploaded files, pass their IDs (from the conversation file list) via input_file_ids — they will be available at /sandbox/input/<filename>. Write output files to /sandbox/output/ to return them. Never ask the user for file IDs.",
   parameters: {
     type: "object" as const,
     properties: {
