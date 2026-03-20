@@ -6,6 +6,7 @@ import { getDefaultEmbeddingModel } from "../lib/models";
 import { knowledgeDocuments, knowledgeChunks, knowledgeCollections, knowledgeTags, knowledgeDocumentTagAssignments } from "@nova/shared/schemas";
 import { files } from "@nova/shared/schema";
 import { extractFromHtml, chunkContent } from "@nova/shared/content";
+import { decodeBuffer, stripNullBytes } from "@nova/shared/utils";
 import type { ContentChunk } from "@nova/shared/content";
 import type { DocumentIngestionInput } from "../workflows/document-ingestion";
 
@@ -158,7 +159,7 @@ async function resolveDocumentContent(input: DocumentIngestionInput): Promise<Re
       return { text };
     }
 
-    const text = fileBuffer.toString("utf-8");
+    const text = decodeBuffer(fileBuffer, { contentType: ct });
     if (isHtmlContent(text, ct)) {
       const extracted = extractFromHtml(text);
       return {
@@ -363,6 +364,8 @@ async function persistEnrichment(
  */
 export async function ingestDocument(input: DocumentIngestionInput): Promise<{ chunkCount: number }> {
   const resolved = await resolveDocumentContent(input);
+  resolved.text = stripNullBytes(resolved.text);
+  if (resolved.title) resolved.title = stripNullBytes(resolved.title);
 
   if (!resolved.text.trim()) {
     throw new Error("No text could be extracted from the document");
