@@ -145,6 +145,24 @@ services:
       timeout: 5s
       retries: 5
 
+  # ─── Sandbox Init (pre-pull runtime images) ─────
+  sandbox-init:
+    image: docker:cli
+    container_name: nova-sandbox-init
+    restart: "no"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Pulling sandbox runtime images..."
+        docker pull python:3.12-slim
+        docker pull node:20-slim
+        docker pull node:22-slim
+        docker pull bash:5.2
+        docker pull alpine:3.19
+        echo "Sandbox runtime images ready"
+
   # ─── DB Init (migrations, seed, bucket) ─────────
   db-init:
     build:
@@ -234,7 +252,10 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
       MINIO_BUCKET: nova-files
+      SANDBOX_ENABLED: ${SANDBOX_ENABLED:-false}
       WORKER_BUILD_ID: ${WORKER_BUILD_ID:-dev}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       db-init:
         condition: service_completed_successfully

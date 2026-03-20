@@ -19,6 +19,12 @@ const envSchema = z.object({
 
   SEARXNG_URL: z.string().optional(),
 
+  SANDBOX_ENABLED: z
+    .enum(["true", "false", "1", "0"])
+    .default("false")
+    .transform((v) => v === "true" || v === "1"),
+  SANDBOX_DOCKER_HOST: z.string().optional(),
+
   MINIO_ENDPOINT: z.string().default("http://minio:9000"),
   MINIO_ROOT_USER: z.string().default("minioadmin"),
   MINIO_ROOT_PASSWORD: z.string().default("minioadmin"),

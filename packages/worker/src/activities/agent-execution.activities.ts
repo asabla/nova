@@ -312,7 +312,64 @@ export async function executeToolCall(
         break;
       }
       case "code_execute": {
-        rawResult = "Code execution requires sandbox service";
+        const sandboxEnabled = process.env.SANDBOX_ENABLED === "true" || process.env.SANDBOX_ENABLED === "1";
+        if (!sandboxEnabled) {
+          rawResult = "Code execution is disabled (SANDBOX_ENABLED is not set)";
+          break;
+        }
+
+        // Resolve input file IDs to storage keys
+        let inputFiles: { name: string; data: Buffer }[] | undefined;
+        const fileIds = args.input_file_ids as string[] | undefined;
+        if (fileIds && fileIds.length > 0) {
+          const { files: filesTable } = await import("@nova/shared/schema");
+          const { inArray } = await import("drizzle-orm");
+          const fileRecords = await db
+            .select()
+            .from(filesTable)
+            .where(inArray(filesTable.id, fileIds));
+
+          const { getObjectBuffer } = await import("../lib/minio");
+          inputFiles = await Promise.all(
+            fileRecords.map(async (f: any) => ({
+              name: f.filename ?? f.id,
+              data: await getObjectBuffer(f.storagePath),
+            })),
+          );
+        }
+
+        const { sandboxExecute } = await import("../lib/docker-sandbox");
+        const result = await sandboxExecute({
+          language: args.language ?? "python",
+          code: args.code ?? "",
+          stdin: args.stdin,
+          runTimeout: Math.min((args.timeout as number) ?? 30000, 300000),
+          inputFiles,
+        });
+
+        // Upload output files to MinIO
+        let outputFileInfo: { name: string; sizeBytes: number; storageKey: string }[] = [];
+        if (result.outputFiles.length > 0) {
+          const { putObjectBuffer } = await import("../lib/minio");
+          const { randomUUID } = await import("node:crypto");
+          const execId = randomUUID();
+          outputFileInfo = await Promise.all(
+            result.outputFiles.map(async (f) => {
+              const key = `${orgId}/sandbox/${execId}/${f.name}`;
+              await putObjectBuffer(key, f.data);
+              return { name: f.name, sizeBytes: f.data.length, storageKey: key };
+            }),
+          );
+        }
+
+        rawResult = {
+          stdout: result.run.stdout.slice(0, 100_000),
+          stderr: result.run.stderr.slice(0, 10_000),
+          exitCode: result.run.code,
+          language: result.language,
+          version: result.version,
+          ...(outputFileInfo.length > 0 ? { outputFiles: outputFileInfo } : {}),
+        };
         break;
       }
       default: {

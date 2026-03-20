@@ -221,5 +221,103 @@ export const invokeAgentTool = tool({
   },
 });
 
+export const codeExecuteTool = tool({
+  name: "code_execute",
+  description:
+    "Execute code in a secure sandboxed environment. Returns stdout, stderr, and exit code. Network access is disabled. Supports Python, JavaScript, TypeScript, Bash, and more. Input files are available at /sandbox/input/. Write output files to /sandbox/output/ to return them.",
+  parameters: {
+    type: "object" as const,
+    properties: {
+      language: {
+        type: "string",
+        description: "Programming language (e.g. python, javascript, typescript, bash)",
+      },
+      code: { type: "string", description: "Source code to execute" },
+      stdin: {
+        type: ["string", "null"],
+        description: "Standard input to provide to the program",
+      },
+      timeout: {
+        type: ["number", "null"],
+        description: "Execution timeout in milliseconds (default 30000, max 300000)",
+      },
+      input_file_ids: {
+        type: ["array", "null"],
+        items: { type: "string" },
+        description: "IDs of uploaded files to make available in /sandbox/input/",
+      },
+    },
+    required: ["language", "code", "stdin", "timeout", "input_file_ids"],
+    additionalProperties: false,
+  },
+  execute: async (args: unknown) => {
+    const { language, code, stdin, timeout, input_file_ids } = args as {
+      language: string;
+      code: string;
+      stdin: string | null;
+      timeout: number | null;
+      input_file_ids: string[] | null;
+    };
+
+    const sandboxEnabled =
+      process.env.SANDBOX_ENABLED === "true" || process.env.SANDBOX_ENABLED === "1";
+    if (!sandboxEnabled) {
+      return { error: "Code execution is disabled (SANDBOX_ENABLED is not set)" };
+    }
+
+    // Resolve file IDs to storage keys + names
+    let inputFiles: { name: string; data: Buffer }[] | undefined;
+    if (input_file_ids && input_file_ids.length > 0 && Array.isArray(input_file_ids)) {
+      const { files: filesTable } = await import("@nova/shared/schema");
+      const { inArray } = await import("drizzle-orm");
+      const fileRecords = await db
+        .select()
+        .from(filesTable)
+        .where(inArray(filesTable.id, input_file_ids));
+
+      const { getObjectBuffer } = await import("../lib/minio");
+      inputFiles = await Promise.all(
+        fileRecords.map(async (f: any) => ({
+          name: f.filename ?? f.id,
+          data: await getObjectBuffer(f.storagePath),
+        })),
+      );
+    }
+
+    const { sandboxExecute } = await import("../lib/docker-sandbox");
+    const result = await sandboxExecute({
+      language,
+      code,
+      stdin: stdin ?? undefined,
+      runTimeout: Math.min(timeout ?? 30_000, 300_000),
+      inputFiles,
+    });
+
+    // Upload output files to MinIO
+    let outputFileInfo: { name: string; sizeBytes: number }[] = [];
+    if (result.outputFiles.length > 0) {
+      const { putObjectBuffer } = await import("../lib/minio");
+      const { randomUUID } = await import("node:crypto");
+      const execId = randomUUID();
+      outputFileInfo = await Promise.all(
+        result.outputFiles.map(async (f) => {
+          const key = `sandbox/${execId}/${f.name}`;
+          await putObjectBuffer(key, f.data);
+          return { name: f.name, sizeBytes: f.data.length, storageKey: key };
+        }),
+      );
+    }
+
+    return {
+      stdout: result.run.stdout.slice(0, 100_000),
+      stderr: result.run.stderr.slice(0, 10_000),
+      exitCode: result.run.code,
+      language: result.language,
+      version: result.version,
+      ...(outputFileInfo.length > 0 ? { outputFiles: outputFileInfo } : {}),
+    };
+  },
+});
+
 /** All built-in tools as an array, ready to attach to an Agent */
-export const builtinTools = [webSearchTool, fetchUrlTool, invokeAgentTool];
+export const builtinTools = [webSearchTool, fetchUrlTool, invokeAgentTool, codeExecuteTool];

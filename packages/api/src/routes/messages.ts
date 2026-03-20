@@ -222,6 +222,38 @@ const DEFAULT_TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "code_execute",
+      description:
+        "Execute code in a secure sandboxed environment. Returns stdout, stderr, and exit code. Network access is disabled. Supports Python, JavaScript, TypeScript, Bash. Input files are available at /sandbox/input/. Write output files to /sandbox/output/ to return them.",
+      parameters: {
+        type: "object",
+        properties: {
+          language: {
+            type: "string",
+            description: "Programming language (e.g. python, javascript, typescript, bash)",
+          },
+          code: { type: "string", description: "Source code to execute" },
+          stdin: {
+            type: ["string", "null"],
+            description: "Standard input to provide to the program",
+          },
+          timeout: {
+            type: ["number", "null"],
+            description: "Execution timeout in milliseconds (default 30000, max 300000)",
+          },
+          input_file_ids: {
+            type: ["array", "null"],
+            items: { type: "string" },
+            description: "IDs of uploaded files to make available in /sandbox/input/",
+          },
+        },
+        required: ["language", "code", "stdin", "timeout", "input_file_ids"],
+      },
+    },
+  },
 ];
 
 /** Fetch enabled agents for the org and return them for system prompt injection */
