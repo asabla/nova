@@ -7,13 +7,33 @@ WORKDIR /app
 
 COPY package.json bun.lock* ./
 COPY packages/shared/package.json packages/shared/
-COPY packages/api/package.json packages/api/
-COPY packages/web/package.json packages/web/
 COPY packages/worker/package.json packages/worker/
+
+# Stubs for unused workspaces (bun.lock references all 4)
+RUN echo '{"name":"@nova/api","version":"0.0.0"}' > packages/api/package.json && \
+    echo '{"name":"@nova/web","version":"0.0.0"}' > packages/web/package.json
 
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile
 
+# Strip TypeScript source from @openai/agents-core to prevent tsx from
+# loading .ts files instead of compiled .js (causes zod v3 compat issues)
+RUN rm -rf node_modules/@openai/agents-core/src \
+           node_modules/@openai/agents-openai/src
+
+# Patch: agents-core uses .superRefine() on ComputerUseCallItem which produces
+# ZodEffects — but zod v3 compat discriminatedUnion requires ZodObject with .shape.
+# Remove the .superRefine() call so the discriminated union can read the discriminator.
+RUN for f in node_modules/@openai/agents-core/dist/types/protocol.mjs \
+             node_modules/@openai/agents-core/dist/types/protocol.js; do \
+      bun -e " \
+        const code = await Bun.file('$f').text(); \
+        const patched = code.replace(/\}\)\.superRefine\(\(value,\s*ctx\)\s*=>\s*\{[\s\S]*?\n\}\);/g, '});'); \
+        await Bun.write('$f', patched); \
+      "; \
+    done
+
+# Copy source (only this invalidates on code changes)
 COPY packages/shared/ packages/shared/
 COPY packages/worker/ packages/worker/
 
@@ -25,14 +45,9 @@ RUN rm -rf packages/shared/dist packages/worker/dist packages/shared/*.tsbuildin
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile --production
 
-# Strip TypeScript source from @openai/agents-core to prevent tsx from
-# loading .ts files instead of compiled .js (causes zod v3 compat issues)
+# Re-patch after production install
 RUN rm -rf node_modules/@openai/agents-core/src \
            node_modules/@openai/agents-openai/src
-
-# Patch: agents-core uses .superRefine() on ComputerUseCallItem which produces
-# ZodEffects — but zod v3 compat discriminatedUnion requires ZodObject with .shape.
-# Remove the .superRefine() call so the discriminated union can read the discriminator.
 RUN for f in node_modules/@openai/agents-core/dist/types/protocol.mjs \
              node_modules/@openai/agents-core/dist/types/protocol.js; do \
       bun -e " \
