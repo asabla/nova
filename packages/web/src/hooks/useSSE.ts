@@ -22,6 +22,7 @@ export function useSSEStream() {
   const [status, setStatus] = useState<StreamStatus>("idle");
   const [activeTools, setActiveTools] = useState<ActiveTool[]>([]);
   const [doneData, setDoneData] = useState<DoneData | null>(null);
+  const [generatedTitle, setGeneratedTitle] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const pausedRef = useRef(false);
   const bufferWhilePausedRef = useRef("");
@@ -126,6 +127,12 @@ export function useSSEStream() {
                 return;
               }
 
+              if (currentEventType === "title_generated" && data.title) {
+                setGeneratedTitle(data.title);
+                currentEventType = "";
+                continue;
+              }
+
               if (currentEventType === "tool_status" && data.tool) {
                 setActiveTools((prev) => {
                   const existing = prev.findIndex((t) => t.name === data.tool);
@@ -221,7 +228,8 @@ export function useSSEStream() {
     setStatus("idle");
     setActiveTools([]);
     setDoneData(null);
+    setGeneratedTitle(null);
   }, []);
 
-  return { tokens, status, activeTools, doneData, startStream, stopStream, pauseStream, resumeStream, resetStream };
+  return { tokens, status, activeTools, doneData, generatedTitle, startStream, stopStream, pauseStream, resumeStream, resetStream };
 }

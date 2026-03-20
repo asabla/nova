@@ -4,6 +4,7 @@ import { eq, and, isNull, desc, ilike, sql, inArray, asc, lte } from "drizzle-or
 import type { Conversation } from "@nova/shared/schemas";
 import { parsePagination, buildPaginatedResponse, type PaginationInput } from "@nova/shared/utils";
 import { AppError } from "@nova/shared/utils";
+import { chatCompletion } from "../lib/litellm";
 
 type UpdateConversationData = Partial<{
   title: string;
@@ -387,4 +388,24 @@ export async function getConversationsByIds(orgId: string, ids: string[]) {
         isNull(conversations.deletedAt),
       ),
     );
+}
+
+export async function generateConversationTitle(
+  msgs: { role: string; content: string }[],
+): Promise<string> {
+  const result = await chatCompletion({
+    model: process.env.SUMMARY_MODEL ?? "default-model",
+    messages: [
+      {
+        role: "system" as const,
+        content: "Generate a short (5-8 word) title for this conversation. Respond with only the title.",
+      },
+      ...msgs.slice(0, 4).map((m) => ({
+        role: m.role as "user" | "assistant" | "system",
+        content: m.content,
+      })),
+    ],
+    max_tokens: 30,
+  });
+  return result.choices?.[0]?.message?.content?.trim() ?? "Untitled Conversation";
 }

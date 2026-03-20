@@ -65,7 +65,7 @@ function NewConversationPage() {
     setIsCreating(true);
 
     try {
-      const payload: any = { title: content.slice(0, 100) };
+      const payload: any = {};
       if (selectedModel) payload.modelId = selectedModel;
       if (selectedWorkspace) payload.workspaceId = selectedWorkspace;
       if (systemPrompt) payload.systemPrompt = systemPrompt;

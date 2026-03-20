@@ -59,6 +59,7 @@ function ConversationPage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.artifacts(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
       resetStream();
     }
   }, [status, id, queryClient, resetStream]);

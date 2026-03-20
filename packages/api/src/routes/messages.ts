@@ -703,6 +703,23 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
             }
           }
 
+          // Auto-generate title for untitled conversations
+          if (!conversation.title) {
+            try {
+              const titleMsgs = [
+                ...body.messages.slice(0, 2).map((m) => ({ role: m.role, content: String(m.content).slice(0, 500) })),
+                { role: "assistant", content: totalContent.slice(0, 500) },
+              ];
+              const title = await conversationService.generateConversationTitle(titleMsgs);
+              if (title && title !== "Untitled Conversation") {
+                await conversationService.updateConversation(orgId, conversationId, { title });
+                await stream.writeSSE({ event: "title_generated", data: JSON.stringify({ title }) });
+              }
+            } catch (e) {
+              console.error("[stream] title generation failed:", e);
+            }
+          }
+
           await stream.writeSSE({
             event: "done",
             data: JSON.stringify({
@@ -762,6 +779,23 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         tokenCountCompletion: completionTokens,
         metadata: { latencyMs, model: body.model, ragSources },
       });
+
+      // Auto-generate title for untitled conversations
+      if (!conversation.title) {
+        try {
+          const titleMsgs = [
+            ...body.messages.slice(0, 2).map((m) => ({ role: m.role, content: String(m.content).slice(0, 500) })),
+            { role: "assistant", content: fullContent.slice(0, 500) },
+          ];
+          const title = await conversationService.generateConversationTitle(titleMsgs);
+          if (title && title !== "Untitled Conversation") {
+            await conversationService.updateConversation(orgId, conversationId, { title });
+            await stream.writeSSE({ event: "title_generated", data: JSON.stringify({ title }) });
+          }
+        } catch (e) {
+          console.error("[stream] title generation failed:", e);
+        }
+      }
 
       await stream.writeSSE({
         event: "done",
