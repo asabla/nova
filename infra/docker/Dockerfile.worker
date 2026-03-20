@@ -8,10 +8,8 @@ WORKDIR /app
 COPY package.json bun.lock* ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/worker/package.json packages/worker/
-
-# Stubs for unused workspaces (bun.lock references all 4)
-RUN echo '{"name":"@nova/api","version":"0.0.0"}' > packages/api/package.json && \
-    echo '{"name":"@nova/web","version":"0.0.0"}' > packages/web/package.json
+COPY packages/api/package.json packages/api/
+COPY packages/web/package.json packages/web/
 
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile
