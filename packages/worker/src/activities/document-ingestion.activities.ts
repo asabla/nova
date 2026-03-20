@@ -26,6 +26,36 @@ async function getMinioClient() {
 const PDF_MIN_TEXT_LENGTH = 50;
 
 /**
+ * Detects garbled text from failed CMap/font encoding in PDF extraction.
+ * Checks for unnatural uppercase ratios, long words, and consonant clusters.
+ */
+export function isLikelyGarbledText(text: string): boolean {
+  const sample = text.replace(/\s+/g, " ").trim().slice(0, 1000);
+  if (sample.length < 50) return false;
+
+  const words = sample.split(/\s+/);
+  if (words.length === 0) return false;
+
+  // 1. Average word length — natural text averages 4-8 chars
+  const avgWordLen = words.reduce((sum, w) => sum + w.length, 0) / words.length;
+  if (avgWordLen > 15) return true;
+
+  // 2. Uppercase ratio — garbled CMap text is often heavily uppercase
+  const alphaChars = sample.replace(/[^a-zA-ZÀ-ÿ]/g, "");
+  if (alphaChars.length > 0) {
+    const upperRatio = alphaChars.replace(/[^A-ZÀ-Ý]/g, "").length / alphaChars.length;
+    if (upperRatio > 0.6) return true;
+  }
+
+  // 3. Consecutive consonant clusters — garbled text has implausible sequences
+  const longConsonantRun = /[^aeiouåäöAEIOUÅÄÖ\s\d.,;:!?()-]{8,}/g;
+  const consonantMatches = sample.match(longConsonantRun);
+  if (consonantMatches && consonantMatches.length > words.length * 0.3) return true;
+
+  return false;
+}
+
+/**
  * Extract text from a PDF buffer. Tries unpdf (pdfjs) first for speed,
  * then falls back to mupdf page rendering + tesseract.js OCR for PDFs
  * that render text as vector paths (e.g. Firefox "Print to PDF" on macOS).
@@ -37,10 +67,10 @@ async function extractPdfText(fileBuffer: Buffer): Promise<string> {
     const result = await extractText(new Uint8Array(fileBuffer));
     const pages = result.text;
     const text = Array.isArray(pages) ? pages.join("\n") : String(pages);
-    if (text.trim().length >= PDF_MIN_TEXT_LENGTH) {
+    if (text.trim().length >= PDF_MIN_TEXT_LENGTH && !isLikelyGarbledText(text)) {
       return text;
     }
-    console.warn("[PDF] unpdf returned insufficient text, trying OCR fallback");
+    console.warn("[PDF] unpdf returned garbled or insufficient text, trying OCR fallback");
   } catch (err) {
     console.warn("[PDF] unpdf extraction failed, trying OCR fallback:", err);
   }
@@ -51,7 +81,8 @@ async function extractPdfText(fileBuffer: Buffer): Promise<string> {
 
   const doc = mupdf.Document.openDocument(fileBuffer, "application/pdf");
   const pageCount = doc.countPages();
-  const ocrWorker = await createWorker("eng");
+  const ocrLangs = process.env.OCR_LANGUAGES ?? "eng+swe";
+  const ocrWorker = await createWorker(ocrLangs);
   const pageTexts: string[] = [];
 
   try {
