@@ -12,6 +12,7 @@ import type { DocumentIngestionInput } from "../workflows/document-ingestion";
 import { extractCsv, extractXlsx, tabularToDescriptor } from "../lib/extract-tabular";
 import { extractImageContent } from "../lib/extract-image";
 import { extractPptxContent } from "../lib/extract-pptx";
+import { upsertPoints, deletePointsByFilter, COLLECTIONS } from "../lib/qdrant";
 
 async function getMinioClient() {
   const { Client: MinioClient } = await import("minio");
@@ -332,14 +333,18 @@ async function persistChunks(
 
   // Delete any existing chunks for this document (handles re-indexing)
   await db.delete(knowledgeChunks).where(eq(knowledgeChunks.knowledgeDocumentId, documentId));
+  await deletePointsByFilter(COLLECTIONS.KNOWLEDGE_CHUNKS, {
+    must: [{ key: "documentId", match: { value: documentId } }],
+  }).catch((err) => console.warn("[qdrant] Failed to delete old chunks:", err));
+
+  const qdrantPoints: Array<{ id: string; vector?: number[]; payload: Record<string, unknown> }> = [];
 
   for (const chunk of chunks) {
-    await db.insert(knowledgeChunks).values({
+    const [row] = await db.insert(knowledgeChunks).values({
       knowledgeDocumentId: documentId,
       knowledgeCollectionId: collectionId,
       orgId,
       content: chunk.text,
-      embedding: chunk.embedding,
       chunkIndex: chunk.index,
       tokenCount: Math.ceil(chunk.text.length / 4),
       metadata: {
@@ -347,7 +352,33 @@ async function persistChunks(
         documentTitle,
         sourceUrl,
       },
-    });
+    }).returning({ id: knowledgeChunks.id });
+
+    if (chunk.embedding && row) {
+      qdrantPoints.push({
+        id: row.id,
+        vector: chunk.embedding,
+        payload: {
+          orgId,
+          collectionId,
+          documentId,
+          chunkIndex: chunk.index,
+          content: chunk.text.slice(0, 10_000),
+          tokenCount: Math.ceil(chunk.text.length / 4),
+          documentTitle: documentTitle ?? null,
+          sourceUrl: sourceUrl ?? null,
+          sectionHeading: chunk.metadata.sectionHeading ?? null,
+          createdAt: new Date().toISOString(),
+        },
+      });
+    }
+  }
+
+  // Upsert to Qdrant
+  if (qdrantPoints.length > 0) {
+    await upsertPoints(COLLECTIONS.KNOWLEDGE_CHUNKS, qdrantPoints).catch((err) =>
+      console.warn("[qdrant] Failed to upsert knowledge chunks:", err),
+    );
   }
 
   // Update document with title, content, tokenCount

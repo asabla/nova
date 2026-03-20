@@ -2,15 +2,16 @@ import { eq, and, isNull, sql, desc } from "drizzle-orm";
 import { db } from "../lib/db";
 import { openai } from "../lib/litellm";
 import { agentMemoryVectors } from "@nova/shared/schemas";
-
-const EMBEDDING_MODEL = "text-embedding-3-small";
+import { upsertPoints, searchVector, COLLECTIONS } from "../lib/qdrant";
+import { getDefaultEmbeddingModel } from "../lib/models";
 
 /**
  * Generate an embedding for the given text via LiteLLM /embeddings endpoint.
  */
 async function generateEmbedding(text: string): Promise<number[]> {
+  const embeddingModel = process.env.EMBEDDING_MODEL ?? await getDefaultEmbeddingModel();
   const response = await openai.embeddings.create({
-    model: EMBEDDING_MODEL,
+    model: embeddingModel,
     input: text.slice(0, 8000), // Limit input length
   });
   return response.data[0].embedding;
@@ -37,11 +38,27 @@ export async function embedAndStoreMemory(input: {
     userId: input.userId,
     scope: input.scope,
     content: input.content,
-    embedding,
     metadata: input.metadata,
     sourceType: input.sourceType,
     sourceId: input.sourceId,
   }).returning({ id: agentMemoryVectors.id });
+
+  // Also upsert to Qdrant for fast vector search
+  await upsertPoints(COLLECTIONS.AGENT_MEMORIES, [{
+    id: row.id,
+    vector: embedding,
+    payload: {
+      orgId: input.orgId,
+      agentId: input.agentId,
+      userId: input.userId ?? null,
+      scope: input.scope,
+      content: input.content,
+      sourceType: input.sourceType ?? null,
+      sourceId: input.sourceId ?? null,
+      metadata: input.metadata ?? null,
+      createdAt: new Date().toISOString(),
+    },
+  }]).catch((err) => console.warn("[qdrant] Failed to upsert agent memory:", err));
 
   return { id: row.id };
 }
@@ -62,38 +79,32 @@ export async function searchSemanticMemory(input: {
   const limit = input.limit ?? 5;
   const minSimilarity = input.minSimilarity ?? 0.5;
 
-  const conditions = [
-    eq(agentMemoryVectors.agentId, input.agentId),
-    eq(agentMemoryVectors.orgId, input.orgId),
-    isNull(agentMemoryVectors.deletedAt),
+  // Use Qdrant vector search
+  const must: any[] = [
+    { key: "agentId", match: { value: input.agentId } },
+    { key: "orgId", match: { value: input.orgId } },
   ];
   if (input.userId) {
-    conditions.push(eq(agentMemoryVectors.userId, input.userId));
+    must.push({ key: "userId", match: { value: input.userId } });
   }
 
-  // Use pgvector cosine similarity operator (<=>)
-  const results = await db.execute(sql`
-    SELECT
-      id,
-      content,
-      metadata,
-      1 - (embedding <=> ${JSON.stringify(queryEmbedding)}::vector) AS similarity
-    FROM agent_memory_vectors
-    WHERE agent_id = ${input.agentId}
-      AND org_id = ${input.orgId}
-      AND deleted_at IS NULL
-      ${input.userId ? sql`AND user_id = ${input.userId}` : sql``}
-      AND 1 - (embedding <=> ${JSON.stringify(queryEmbedding)}::vector) >= ${minSimilarity}
-    ORDER BY similarity DESC
-    LIMIT ${limit}
-  `);
+  try {
+    const results = await searchVector(COLLECTIONS.AGENT_MEMORIES, queryEmbedding, {
+      filter: { must },
+      limit,
+      scoreThreshold: minSimilarity,
+    });
 
-  return (results as any[]).map((row: any) => ({
-    id: row.id,
-    content: row.content,
-    similarity: parseFloat(row.similarity),
-    metadata: row.metadata,
-  }));
+    return results.map((r) => ({
+      id: r.id,
+      content: (r.payload.content as string) ?? "",
+      similarity: r.score,
+      metadata: null,
+    }));
+  } catch (err) {
+    console.warn("[qdrant] Agent memory search failed, returning empty:", err);
+    return [];
+  }
 }
 
 /**
