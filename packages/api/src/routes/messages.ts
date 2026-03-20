@@ -15,6 +15,7 @@ import { userProfiles, users, agents, orgSettings, files, toolCalls as toolCalls
 import { eq, and, isNull, inArray } from "drizzle-orm";
 import { extractFileContent } from "../lib/file-extract";
 import { retrieveWorkspaceContext, formatRAGContext } from "../services/knowledge.service";
+import { SKILLS, SANDBOX_PACKAGES_NOTE } from "@nova/shared/skills";
 
 // --- Mention helpers (stories #45, #46) ---
 
@@ -249,8 +250,12 @@ const DEFAULT_TOOLS = [
             items: { type: "string" },
             description: "IDs of uploaded files to make available in /sandbox/input/",
           },
+          skill: {
+            type: ["string", "null"],
+            description: "Skill for specialized processing. Use 'xlsx' for spreadsheets, 'pdf' for PDFs, 'docx' for Word docs. The Python sandbox always has pandas, openpyxl, pypdf, reportlab, python-docx pre-installed regardless of skill.",
+          },
         },
-        required: ["language", "code", "stdin", "timeout", "input_file_ids"],
+        required: ["language", "code", "stdin", "timeout", "input_file_ids", "skill"],
       },
     },
   },
@@ -458,6 +463,24 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         ...enrichedMessages[0],
         content: `${enrichedMessages[0].content}\n\n${filesSection}`,
       };
+
+      // Inject skill instructions for file types present in the conversation
+      const relevantSkills = Object.values(SKILLS).filter((skill) =>
+        conversationFiles.some((f) => skill.fileTypes.includes(f.contentType ?? "")),
+      );
+      if (relevantSkills.length > 0) {
+        const skillInstructions = relevantSkills.map((s) => s.instructions).join("\n\n");
+        enrichedMessages[0] = {
+          ...enrichedMessages[0],
+          content: `${enrichedMessages[0].content}\n\n${skillInstructions}`,
+        };
+      }
+
+      // Always include the pre-installed packages note when files are present
+      enrichedMessages[0] = {
+        ...enrichedMessages[0],
+        content: `${enrichedMessages[0].content}\n\n${SANDBOX_PACKAGES_NOTE}`,
+      };
     }
   }
 
@@ -632,6 +655,51 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
               );
             } catch (dbErr) {
               console.error("[smart-chat] Failed to persist tool calls:", dbErr);
+            }
+
+            // Extract output files from code_execute results and attach to message
+            try {
+              const { env } = await import("../lib/env");
+              for (const r of toolCallRecords) {
+                if (r.toolName !== "code_execute") continue;
+                const output = r.output as { outputFiles?: { name: string; sizeBytes: number; storageKey: string }[] } | null;
+                if (!output?.outputFiles?.length) continue;
+
+                for (const of of output.outputFiles) {
+                  // Infer content type from extension
+                  const ext = of.name.split(".").pop()?.toLowerCase() ?? "";
+                  const mimeMap: Record<string, string> = {
+                    png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", svg: "image/svg+xml", webp: "image/webp",
+                    pdf: "application/pdf", csv: "text/csv", json: "application/json", txt: "text/plain",
+                    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    html: "text/html", xml: "application/xml", zip: "application/zip",
+                  };
+                  const contentType = mimeMap[ext] ?? "application/octet-stream";
+
+                  // Create file record
+                  const [fileRecord] = await db.insert(files).values({
+                    orgId,
+                    userId,
+                    filename: of.name,
+                    contentType,
+                    sizeBytes: of.sizeBytes,
+                    storagePath: of.storageKey,
+                    storageBucket: env.MINIO_BUCKET,
+                    metadata: { source: "sandbox" },
+                  }).returning();
+
+                  // Attach to assistant message
+                  await db.insert(messageAttachments).values({
+                    messageId: assistantMessage.id,
+                    orgId,
+                    fileId: fileRecord.id,
+                    attachmentType: "file",
+                  });
+                }
+              }
+            } catch (fileErr) {
+              console.error("[smart-chat] Failed to persist output files:", fileErr);
             }
           }
 

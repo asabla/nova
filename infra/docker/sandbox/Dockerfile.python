@@ -1,0 +1,19 @@
+FROM python:3.12-slim
+
+# System tools needed by PDF processing (pdfplumber uses poppler)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# All commonly-needed Python packages
+RUN pip install --no-cache-dir \
+    # Spreadsheets
+    pandas openpyxl xlsxwriter \
+    # PDF
+    pypdf pdfplumber reportlab \
+    # Word docs
+    python-docx \
+    # Data/analysis
+    numpy scipy matplotlib seaborn \
+    # General utilities
+    requests beautifulsoup4 lxml Pillow

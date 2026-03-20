@@ -11,7 +11,8 @@
     "./types": "./src/types/index.ts",
     "./constants": "./src/constants/index.ts",
     "./utils": "./src/utils/index.ts",
-    "./content": "./src/content/index.ts"
+    "./content": "./src/content/index.ts",
+    "./skills": "./src/skills.ts"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",

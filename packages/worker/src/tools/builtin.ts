@@ -246,8 +246,12 @@ export const codeExecuteTool = tool({
         items: { type: "string" },
         description: "IDs of uploaded files to make available in /sandbox/input/",
       },
+      skill: {
+        type: ["string", "null"],
+        description: "Skill for specialized processing. Use 'xlsx' for spreadsheets, 'pdf' for PDFs, 'docx' for Word docs. The Python sandbox always has pandas, openpyxl, pypdf, reportlab, python-docx pre-installed regardless of skill.",
+      },
     },
-    required: ["language", "code", "stdin", "timeout", "input_file_ids"],
+    required: ["language", "code", "stdin", "timeout", "input_file_ids", "skill"],
     additionalProperties: false,
   },
   execute: async (args: unknown) => {

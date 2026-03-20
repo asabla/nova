@@ -145,6 +145,16 @@ services:
       timeout: 5s
       retries: 5
 
+  # ─── Sandbox Python (batteries-included image) ──
+  sandbox-python:
+    build:
+      context: .
+      dockerfile: infra/docker/sandbox/Dockerfile.python
+    image: nova-sandbox-python:latest
+    container_name: nova-sandbox-python-build
+    restart: "no"
+    entrypoint: ["echo", "Image built successfully"]
+
   # ─── Sandbox Init (pre-pull runtime images) ─────
   sandbox-init:
     image: docker:cli
@@ -162,6 +172,9 @@ services:
         docker pull bash:5.2
         docker pull alpine:3.19
         echo "Sandbox runtime images ready"
+    depends_on:
+      sandbox-python:
+        condition: service_completed_successfully
 
   # ─── DB Init (migrations, seed, bucket) ─────────
   db-init:

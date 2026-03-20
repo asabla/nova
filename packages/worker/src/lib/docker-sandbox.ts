@@ -38,13 +38,15 @@ export interface SandboxResult {
 
 interface LangConfig {
   image: string;
+  /** Fallback image if the primary isn't available locally (won't be pulled) */
+  fallbackImage?: string;
   cmd: (codePath: string) => string[];
   ext: string;
   version: string;
 }
 
 const LANGUAGES: Record<string, LangConfig> = {
-  python:     { image: "python:3.12-slim",  cmd: (p) => ["python3", p],                                              ext: "py",  version: "3.12" },
+  python:     { image: "nova-sandbox-python:latest", fallbackImage: "python:3.12-slim", cmd: (p) => ["python3", p],  ext: "py",  version: "3.12" },
   javascript: { image: "node:20-slim",       cmd: (p) => ["node", p],                                                 ext: "js",  version: "20" },
   typescript: { image: "node:22-slim",       cmd: (p) => ["node", "--experimental-strip-types", "--no-warnings", p],   ext: "ts",  version: "22" },
   bash:       { image: "bash:5.2",           cmd: (p) => ["bash", p],                                                 ext: "sh",  version: "5.2" },
@@ -283,11 +285,23 @@ export async function sandboxExecute(params: SandboxExecuteParams): Promise<Sand
 
   const shellCmd = parts.join(" && ");
 
-  await ensureImage(lang.image);
+  // Try primary image (inspect only if there's a fallback — don't waste time pulling a local-only image)
+  let resolvedImage = lang.image;
+  if (lang.fallbackImage) {
+    const encoded = encodeURIComponent(lang.image);
+    const inspect = await dockerRequest("GET", `/images/${encoded}/json`);
+    if (inspect.status === 200) {
+      // Primary image exists locally — use it
+    } else {
+      // Primary image not built — fall back to slim image
+      resolvedImage = lang.fallbackImage;
+    }
+  }
+  await ensureImage(resolvedImage);
 
   // Create container
   const createResp = await dockerRequest("POST", "/containers/create", {
-    Image: lang.image,
+    Image: resolvedImage,
     Cmd: ["sh", "-c", shellCmd],
     NetworkDisabled: true,
     HostConfig: {
