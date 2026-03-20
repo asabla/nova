@@ -14,7 +14,7 @@ import {
 import { AppError } from "@nova/shared/utils";
 import { writeAuditLog } from "../services/audit.service";
 import { requireRole } from "../middleware/rbac";
-import { zValidator } from "@hono/zod-validator";
+import { zValidator } from "../lib/validator";
 
 const superAdminRoutes = new Hono<AppContext>();
 

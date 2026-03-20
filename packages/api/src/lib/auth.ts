@@ -10,6 +10,9 @@ import * as authSchema from "./auth-schema";
 const authClient = postgres(env.DATABASE_URL);
 const authDb = drizzle(authClient, { schema: authSchema });
 
+// Cast cuts tsc's deep inference chain for betterAuth() — without this, tsc
+// computes a massive return type pulling in 136+ better-auth and 251 kysely
+// type files, causing OOM. Only auth.api.getSession() and auth.handler() are used.
 export const auth = betterAuth({
   database: drizzleAdapter(authDb, { provider: "pg", schema: authSchema }),
   secret: env.BETTER_AUTH_SECRET,
@@ -41,4 +44,12 @@ export const auth = betterAuth({
       allowUserToCreateOrganization: true,
     }),
   ],
-});
+}) as unknown as {
+  handler: (request: Request) => Promise<Response>;
+  api: {
+    getSession: (opts: { headers: Headers }) => Promise<{
+      session: { id: string; userId: string; token: string; expiresAt: Date; activeOrganizationId: string | null };
+      user: { id: string; name: string; email: string; emailVerified: boolean; image: string | null; createdAt: Date; updatedAt: Date };
+    } | null>;
+  };
+};

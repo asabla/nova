@@ -82,6 +82,22 @@ Error handler → Security headers → CORS → Request ID → Logger → **Publ
 | Temporal UI | 8233 | Workflow dashboard |
 | SearxNG | 8888 | Web search |
 
+## Typecheck Architecture
+
+`bun run typecheck` first builds `@nova/shared` declarations (`tsc -b`), then typechecks all 4 packages in parallel. Shared uses **conditional exports** — `"types"` points to `dist/*.d.ts` (for tsc), `"default"` points to `src/*.ts` (for Bun/Vite runtime). Consumer tsconfigs use `incremental` for caching.
+
+### Known OOM sources and mitigations
+
+The API package is extremely type-heavy. Three things caused tsc to OOM at 16GB+:
+
+1. **`zValidator` from `@hono/zod-validator`** (root cause, ~95% of the problem). Each of the 110 `zValidator()` calls creates exponentially complex Hono middleware chain types. Use `--generateTrace` to diagnose: `NODE_OPTIONS="--max-old-space-size=12288" npx tsc --noEmit --generateTrace /tmp/tsc-trace -p packages/api/tsconfig.json`. The fix: `packages/api/src/lib/validator.ts` re-exports `zValidator` with simplified types. **All route files must import from `../lib/validator`, never from `@hono/zod-validator` directly.**
+
+2. **`drizzle(client, { schema })` in `db.ts`**. Passing 62 table schemas forces tsc to compute a massive relational type. Since the API only uses the query builder (`.select()`, `.insert()`, etc.) and never `db.query.*`, the schema is omitted: `drizzle(client)`.
+
+3. **`betterAuth()` return type**. The inferred return type pulls in 136+ better-auth and 251 kysely type files. The result is cast to a minimal interface in `auth.ts` covering only `auth.handler()` and `auth.api.getSession()`.
+
+The API's typecheck script uses `NODE_OPTIONS='--max-old-space-size=6144'` (6GB heap). If OOM returns, use `--generateTrace` to find the new hotspot — it's almost always a deeply-inferred generic type that needs an explicit annotation or cast.
+
 ## Gotchas
 
 - **Worker runtime**: Temporal requires Node.js — the worker package uses `tsx` (dev) and compiled JS (Docker), not Bun

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { zValidator } from "@hono/zod-validator";
+import { zValidator } from "../lib/validator";
 import type { AppContext } from "../types/context";
 import { promptService } from "../services/prompt.service";
 import { parsePagination } from "@nova/shared/utils";
