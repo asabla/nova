@@ -47,7 +47,7 @@ export function createResearchTools(opts: {
         query: { type: "string", description: "The search query to find relevant knowledge" },
         topK: { type: "number", description: "Maximum number of results to return (default 10)" },
       },
-      required: ["query"],
+      required: ["query", "topK"],
       additionalProperties: false,
     },
     execute: async (args: unknown) => {
@@ -105,7 +105,7 @@ export function createResearchTools(opts: {
           description: "IDs of files to fetch. If empty, fetches all selected files.",
         },
       },
-      required: [],
+      required: ["fileIds"],
       additionalProperties: false,
     },
     execute: async (args: unknown) => {
