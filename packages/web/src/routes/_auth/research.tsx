@@ -710,12 +710,14 @@ function ReportDetail({
             <span className="text-sm font-semibold text-text flex-1">{t("research.generating", "Generating Report...")}</span>
             <Badge variant="primary">{t("research.live", "Live")}</Badge>
           </CardHeader>
-          <CardContent>
-            <CitationLinkWrapper>
-              <div className="text-sm text-text leading-relaxed">
-                <MarkdownRenderer content={linkifyCitations(sse.streamingContent)} />
-              </div>
-            </CitationLinkWrapper>
+          <CardContent className="py-3">
+            <div className="max-h-96 overflow-y-auto">
+              <CitationLinkWrapper>
+                <div className="text-sm text-text leading-relaxed">
+                  <MarkdownRenderer content={linkifyCitations(sse.streamingContent)} />
+                </div>
+              </CitationLinkWrapper>
+            </div>
           </CardContent>
         </Card>
       )}

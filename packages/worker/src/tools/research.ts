@@ -88,6 +88,7 @@ export function createResearchTools(opts: {
         documentName: r.documentName,
         content: r.content,
         score: r.score,
+        ...(r.fileId ? { fileId: r.fileId, hint: `To analyze this file's raw data, use code_execute with input_file_ids: ["${r.fileId}"]` } : {}),
       }));
     },
   });

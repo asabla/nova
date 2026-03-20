@@ -192,7 +192,7 @@ export function DocumentsPanel({ collectionId }: DocumentsPanelProps) {
           ref={fileInputRef}
           type="file"
           multiple
-          accept=".pdf,.txt,.md,.csv,.json,.html,.docx,.doc,.xlsx,.xls"
+          accept=".pdf,.txt,.md,.csv,.json,.html,.docx,.doc,.xlsx,.xls,.pptx,.png,.jpg,.jpeg,.gif,.webp,.svg"
           className="hidden"
           onChange={handleFilesChosen}
         />

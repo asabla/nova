@@ -112,10 +112,11 @@ N+1. Conclusion — synthesis and implications
 ## Formatting
 - Use standard markdown with ## headings, bullet points, numbered lists
 - Use [N] inline citations referencing your saved sources
-- For data visualizations, use widget code blocks:
+- For data visualizations, use widget code blocks with comma-separated values:
   \`\`\`widget
-  {"type": "chart", "config": {"type": "bar", "data": {...}, "options": {...}}}
+  {"type": "chart", "title": "Revenue by Region", "params": {"chartType": "bar", "data": "1200000,800000,450000", "labels": "West,East,Central"}}
   \`\`\`
+  Supported chartType values: "bar", "line", "pie". Data and labels are comma-separated strings.
 - For Mermaid diagrams, use \`\`\`mermaid code blocks
 - Include relevant quotes with > blockquotes
 - Include specific numbers, percentages, and comparisons — not just qualitative statements
@@ -170,7 +171,7 @@ export async function runResearchAgentLoop(
   }
   if (hasFiles) {
     sourceContext.push(
-      `- ${input.sources.fileIds.length} file(s) attached. Use fetch_files to read them, then code_execute to process and analyze the data (parse CSV/JSON, compute statistics, extract patterns).`,
+      `- ${input.sources.fileIds.length} file(s) attached. Use fetch_files to read them. For tabular files (CSV/XLSX), fetch_files returns schema metadata — to analyze the actual data, use code_execute with input_file_ids to load the file into the sandbox and process it with Python/pandas.`,
     );
   }
   if (input.sources.webSearch) {
