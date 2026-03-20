@@ -256,11 +256,17 @@ Begin by planning your research approach, then gather sources, and finally write
 
             await publishToolStatus(ch, toolName, "running", { args: parsedArgs });
 
-            // Publish research progress for tool start
-            const progressType = toolProgressMap[toolName];
-            if (progressType) {
-              const msg = buildToolProgressMessage(toolName, parsedArgs);
-              await publishResearchProgress(ch, progressType, msg);
+            // Publish research progress for tool start — skip tools that publish
+            // their own progress events from execute() to avoid duplicates
+            const selfPublishing = new Set([
+              "save_source", "write_report_section", "query_knowledge", "fetch_files",
+            ]);
+            if (!selfPublishing.has(toolName)) {
+              const progressType = toolProgressMap[toolName];
+              if (progressType) {
+                const msg = buildToolProgressMessage(toolName, parsedArgs);
+                await publishResearchProgress(ch, progressType, msg);
+              }
             }
           }
         }

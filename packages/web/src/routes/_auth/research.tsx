@@ -691,9 +691,11 @@ function ReportDetail({
             </Button>
           </CardHeader>
           <CardContent>
-            <div className="text-sm text-text leading-relaxed">
-              <MarkdownRenderer content={linkifyCitations(report.reportContent)} />
-            </div>
+            <CitationLinkWrapper>
+              <div className="text-sm text-text leading-relaxed">
+                <MarkdownRenderer content={linkifyCitations(report.reportContent)} />
+              </div>
+            </CitationLinkWrapper>
           </CardContent>
         </Card>
       )}
@@ -709,9 +711,11 @@ function ReportDetail({
             <Badge variant="primary">{t("research.live", "Live")}</Badge>
           </CardHeader>
           <CardContent>
-            <div className="text-sm text-text leading-relaxed">
-              <MarkdownRenderer content={linkifyCitations(sse.streamingContent)} />
-            </div>
+            <CitationLinkWrapper>
+              <div className="text-sm text-text leading-relaxed">
+                <MarkdownRenderer content={linkifyCitations(sse.streamingContent)} />
+              </div>
+            </CitationLinkWrapper>
           </CardContent>
         </Card>
       )}
@@ -1116,9 +1120,33 @@ function EmptyDetailState({
 // Utilities
 // ---------------------------------------------------------------------------
 
-/** Convert [N] citation references to clickable links that scroll to the source */
+/** Convert [N] citation references to markdown links that scroll to the source */
 function linkifyCitations(content: string): string {
   return content.replace(/\[(\d+)\]/g, '[[$1](#source-$1)]');
+}
+
+/**
+ * Wrapper that intercepts clicks on #source-N anchor links and scrolls
+ * to the corresponding source element instead of navigating.
+ */
+function CitationLinkWrapper({ children }: { children: React.ReactNode }) {
+  const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const anchor = target.closest("a");
+    if (!anchor) return;
+    const href = anchor.getAttribute("href");
+    if (!href?.startsWith("#source-")) return;
+    e.preventDefault();
+    const el = document.getElementById(href.slice(1));
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Flash highlight
+      el.classList.add("ring-2", "ring-primary/50");
+      setTimeout(() => el.classList.remove("ring-2", "ring-primary/50"), 1500);
+    }
+  }, []);
+
+  return <div onClick={handleClick}>{children}</div>;
 }
 
 function downloadBlob(content: string, filename: string, mimeType: string) {

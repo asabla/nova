@@ -154,29 +154,21 @@ export function useResearchSSE(reportId: string | null, reportStatus?: string) {
 
                   setState((prev) => {
                     let activeTools = prev.activeTools;
-                    let progress = prev.progress;
 
                     if (toolStatus === "running") {
-                      // Add to active tools
                       activeTools = [
                         ...activeTools,
                         { name: toolName, args: data.args, startedAt: new Date().toISOString() },
                       ];
-                      // Add progress event
-                      const progressType = TOOL_PROGRESS_TYPE[toolName] ?? "info";
-                      const msg = data.args?.query
-                        ? `${toolName}: "${String(data.args.query).slice(0, 80)}"`
-                        : `Running ${toolName}...`;
-                      progress = [
-                        ...progress,
-                        { type: progressType, message: msg, timestamp: new Date().toISOString() },
-                      ];
                     } else if (toolStatus === "completed") {
-                      // Remove from active tools
-                      activeTools = activeTools.filter((t) => t.name !== toolName);
+                      // Remove first matching active tool (not all — there could be concurrent calls)
+                      const idx = activeTools.findIndex((t) => t.name === toolName);
+                      if (idx >= 0) {
+                        activeTools = [...activeTools.slice(0, idx), ...activeTools.slice(idx + 1)];
+                      }
                     }
 
-                    return { ...prev, activeTools, progress };
+                    return { ...prev, activeTools };
                   });
                   break;
                 }
