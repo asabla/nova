@@ -1,11 +1,13 @@
-import { useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { CodeBlock } from "./CodeBlock";
 import { DynamicWidget, type WidgetConfig } from "../chat/DynamicWidget";
+import { ExcalidrawDiagram } from "../chat/ExcalidrawDiagram";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../ui/Table";
+import { PenTool } from "lucide-react";
 
 interface MarkdownRendererProps {
   content: string;
@@ -14,8 +16,11 @@ interface MarkdownRendererProps {
 function MermaidDiagram({ code }: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const id = useMemo(() => `mermaid-${Math.random().toString(36).slice(2, 9)}`, []);
+  const [excalidrawScene, setExcalidrawScene] = useState<string | null>(null);
+  const [converting, setConverting] = useState(false);
 
   useEffect(() => {
+    if (excalidrawScene) return;
     let cancelled = false;
     (async () => {
       try {
@@ -32,11 +37,54 @@ function MermaidDiagram({ code }: { code: string }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [code, id]);
+  }, [code, id, excalidrawScene]);
+
+  const handleConvert = useCallback(async () => {
+    setConverting(true);
+    try {
+      const { parseMermaidToExcalidraw } = await import("@excalidraw/mermaid-to-excalidraw");
+      const { elements, files } = await parseMermaidToExcalidraw(code);
+      setExcalidrawScene(JSON.stringify({
+        type: "excalidraw",
+        version: 2,
+        elements: elements ?? [],
+        appState: { viewBackgroundColor: "#ffffff", gridSize: null },
+        files: files ?? {},
+      }));
+    } catch {
+      // Silently fail — keep mermaid view
+    } finally {
+      setConverting(false);
+    }
+  }, [code]);
+
+  if (excalidrawScene) {
+    return (
+      <div className="my-3 rounded-xl bg-surface-secondary border border-border overflow-hidden">
+        <ExcalidrawDiagram
+          artifactId=""
+          initialScene={excalidrawScene}
+          readOnly
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="my-3 p-4 rounded-xl bg-surface-secondary border border-border overflow-x-auto">
-      <div ref={ref} className="flex justify-center" />
+    <div className="my-3 rounded-xl bg-surface-secondary border border-border overflow-hidden">
+      <div className="p-4 overflow-x-auto">
+        <div ref={ref} className="flex justify-center" />
+      </div>
+      <div className="flex justify-end px-3 py-1 border-t border-border">
+        <button
+          onClick={handleConvert}
+          disabled={converting}
+          className="text-[10px] text-text-tertiary hover:text-text-secondary flex items-center gap-1"
+        >
+          <PenTool className="h-3 w-3" />
+          {converting ? "Converting..." : "Open in Excalidraw"}
+        </button>
+      </div>
     </div>
   );
 }

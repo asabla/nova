@@ -17,16 +17,18 @@ import {
   Music,
   Video,
   Blocks,
+  PenTool,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { CodeBlock } from "../markdown/CodeBlock";
 import { DynamicWidget, type WidgetConfig } from "./DynamicWidget";
+import { ExcalidrawDiagram } from "./ExcalidrawDiagram";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../ui/Table";
 import { Input } from "../ui/Input";
 
 // --- Types ---
 
-export type ArtifactType = "code" | "csv" | "chart" | "image" | "audio" | "video" | "table" | "widget";
+export type ArtifactType = "code" | "csv" | "chart" | "image" | "audio" | "video" | "table" | "widget" | "excalidraw";
 
 export interface ChartDataset {
   label: string;
@@ -76,6 +78,7 @@ const typeConfig: Record<ArtifactType, { icon: typeof Code; label: string; color
   video: { icon: Video, label: "Video", color: "bg-red-500/10 text-red-400 border-red-500/20" },
   table: { icon: Table2, label: "Table", color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
   widget: { icon: Blocks, label: "Widget", color: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20" },
+  excalidraw: { icon: PenTool, label: "Excalidraw", color: "bg-teal-500/10 text-teal-400 border-teal-500/20" },
 };
 
 // --- CSV Table ---
@@ -714,6 +717,7 @@ export function ArtifactRenderer({ artifact, className }: ArtifactRendererProps)
       image: artifact.mimeType ?? "image/png",
       audio: artifact.mimeType ?? "audio/mpeg",
       video: artifact.mimeType ?? "video/mp4",
+      excalidraw: "application/json",
     };
     const mime = mimeMap[artifact.type] ?? "text/plain";
 
@@ -733,7 +737,7 @@ export function ArtifactRenderer({ artifact, className }: ArtifactRendererProps)
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    const extMap: Record<string, string> = { code: "txt", csv: "csv", chart: "csv", table: "csv" };
+    const extMap: Record<string, string> = { code: "txt", csv: "csv", chart: "csv", table: "csv", excalidraw: "excalidraw" };
     const ext = extMap[artifact.type] ?? artifact.type;
     a.download = `${artifact.title || "artifact"}.${ext}`;
     a.click();
@@ -790,7 +794,9 @@ export function ArtifactRenderer({ artifact, className }: ArtifactRendererProps)
       </div>
 
       {/* Content */}
-      <div className={clsx("overflow-auto", fullscreen ? "flex-1" : "max-h-[500px]")}>
+      <div className={clsx(
+        fullscreen ? "flex-1 overflow-auto" : artifact.type === "excalidraw" ? "overflow-hidden" : "overflow-auto max-h-[500px]",
+      )}>
         {/* Code with syntax highlighting */}
         {artifact.type === "code" && (
           <CodeBlock code={artifact.content} language={artifact.language ?? "text"} />
@@ -850,6 +856,14 @@ export function ArtifactRenderer({ artifact, className }: ArtifactRendererProps)
               Your browser does not support the video element.
             </video>
           </div>
+        )}
+
+        {/* Excalidraw diagram */}
+        {artifact.type === "excalidraw" && (
+          <ExcalidrawDiagram
+            artifactId={artifact.id}
+            initialScene={artifact.content}
+          />
         )}
 
         {/* Dynamic widget */}

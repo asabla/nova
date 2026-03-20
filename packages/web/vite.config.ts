@@ -18,6 +18,15 @@ export default defineConfig({
   json: {
     namedExports: false,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          excalidraw: ["@excalidraw/excalidraw"],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

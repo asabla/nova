@@ -9,9 +9,12 @@
     "typecheck": "tsc --noEmit",
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build -o storybook-static",
-    "storybook:gap": "bun run scripts/storybook-gap-analysis.ts"
+    "storybook:gap": "bun run scripts/storybook-gap-analysis.ts",
+    "postinstall": "mkdir -p public/excalidraw-assets && cp -r ../../node_modules/@excalidraw/excalidraw/dist/prod/fonts ../../node_modules/@excalidraw/excalidraw/dist/prod/data public/excalidraw-assets/ 2>/dev/null || true"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.0",
+    "@excalidraw/mermaid-to-excalidraw": "^2.1.1",
     "@fontsource-variable/dm-sans": "^5.2.8",
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@nova/shared": "workspace:*",

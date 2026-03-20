@@ -11,6 +11,7 @@ import {
   Table2,
   GitBranch,
   Globe,
+  PenTool,
   Copy,
   Check,
   ChevronDown,
@@ -24,11 +25,12 @@ import { useMutation } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { toast } from "../ui/Toast";
 import { CodeBlock } from "../markdown/CodeBlock";
+import { ExcalidrawDiagram } from "./ExcalidrawDiagram";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../ui/Table";
 
 interface Artifact {
   id: string;
-  type: "code" | "image" | "document" | "chart" | "table" | "mermaid" | "html" | "audio" | "video";
+  type: "code" | "image" | "document" | "chart" | "table" | "mermaid" | "html" | "audio" | "video" | "excalidraw";
   title: string;
   content: string;
   language?: string;
@@ -49,6 +51,7 @@ const typeIcons: Record<string, typeof Code> = {
   chart: BarChart,
   table: Table2,
   mermaid: GitBranch,
+  excalidraw: PenTool,
   html: Globe,
   audio: FileText,
   video: FileText,
@@ -60,15 +63,17 @@ const typeBadgeColors: Record<string, string> = {
   chart: "bg-amber-500/10 text-amber-400 border-amber-500/20",
   table: "bg-green-500/10 text-green-400 border-green-500/20",
   mermaid: "bg-pink-500/10 text-pink-400 border-pink-500/20",
+  excalidraw: "bg-teal-500/10 text-teal-400 border-teal-500/20",
   html: "bg-orange-500/10 text-orange-400 border-orange-500/20",
   document: "bg-slate-500/10 text-slate-400 border-slate-500/20",
 };
 
 // -- Sub-components --
 
-function MermaidArtifact({ code }: { code: string }) {
+function MermaidArtifact({ code, artifactId, onConvert }: { code: string; artifactId?: string; onConvert?: (scene: string) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const id = useMemo(() => `mermaid-${Math.random().toString(36).slice(2, 9)}`, []);
+  const [converting, setConverting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,9 +96,43 @@ function MermaidArtifact({ code }: { code: string }) {
     return () => { cancelled = true; };
   }, [code, id]);
 
+  const handleConvertToExcalidraw = useCallback(async () => {
+    setConverting(true);
+    try {
+      const { parseMermaidToExcalidraw } = await import("@excalidraw/mermaid-to-excalidraw");
+      const { elements, files } = await parseMermaidToExcalidraw(code);
+      const scene = JSON.stringify({
+        type: "excalidraw",
+        version: 2,
+        elements: elements ?? [],
+        appState: { viewBackgroundColor: "#ffffff", gridSize: null },
+        files: files ?? {},
+      });
+      onConvert?.(scene);
+    } catch {
+      toast.error("Failed to convert to Excalidraw");
+    } finally {
+      setConverting(false);
+    }
+  }, [code, onConvert]);
+
   return (
-    <div className="p-4 flex justify-center overflow-x-auto">
-      <div ref={ref} />
+    <div>
+      <div className="p-4 flex justify-center overflow-x-auto">
+        <div ref={ref} />
+      </div>
+      {onConvert && (
+        <div className="flex justify-end px-3 py-1 border-t border-border">
+          <button
+            onClick={handleConvertToExcalidraw}
+            disabled={converting}
+            className="text-[10px] text-text-tertiary hover:text-text-secondary flex items-center gap-1"
+          >
+            <PenTool className="h-3 w-3" />
+            {converting ? "Converting..." : "Open in Excalidraw"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -272,6 +311,7 @@ export function ArtifactDisplay({ artifact, onSave }: ArtifactDisplayProps) {
   const [fullscreen, setFullscreen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [excalidrawScene, setExcalidrawScene] = useState<string | null>(null);
 
   const Icon = typeIcons[artifact.type] ?? FileText;
   const badgeColor = typeBadgeColors[artifact.type] ?? typeBadgeColors.document;
@@ -378,7 +418,9 @@ export function ArtifactDisplay({ artifact, onSave }: ArtifactDisplayProps) {
 
       {/* Content area */}
       {!collapsed && (
-        <div className={clsx("overflow-auto", fullscreen ? "flex-1" : "max-h-[400px]")}>
+        <div className={clsx(
+          fullscreen ? "flex-1 overflow-auto" : artifact.type === "excalidraw" ? "overflow-hidden" : "overflow-auto max-h-[400px]",
+        )}>
           {/* Code artifacts */}
           {artifact.type === "code" && (
             <CodeBlock code={artifact.content} language={artifact.language ?? "text"} />
@@ -398,8 +440,25 @@ export function ArtifactDisplay({ artifact, onSave }: ArtifactDisplayProps) {
           )}
 
           {/* Mermaid artifacts */}
-          {artifact.type === "mermaid" && (
-            <MermaidArtifact code={artifact.content} />
+          {artifact.type === "mermaid" && !excalidrawScene && (
+            <MermaidArtifact
+              code={artifact.content}
+              onConvert={(scene) => setExcalidrawScene(scene)}
+            />
+          )}
+          {artifact.type === "mermaid" && excalidrawScene && (
+            <ExcalidrawDiagram
+              artifactId={artifact.id}
+              initialScene={excalidrawScene}
+            />
+          )}
+
+          {/* Excalidraw artifacts */}
+          {artifact.type === "excalidraw" && (
+            <ExcalidrawDiagram
+              artifactId={artifact.id}
+              initialScene={artifact.content}
+            />
           )}
 
           {/* HTML artifacts */}
@@ -413,7 +472,7 @@ export function ArtifactDisplay({ artifact, onSave }: ArtifactDisplayProps) {
           )}
 
           {/* Fallback for document and unknown types */}
-          {!["code", "chart", "table", "mermaid", "html", "image"].includes(artifact.type) && (
+          {!["code", "chart", "table", "mermaid", "html", "image", "excalidraw"].includes(artifact.type) && (
             <div className="p-3 text-sm text-text whitespace-pre-wrap">{artifact.content}</div>
           )}
         </div>

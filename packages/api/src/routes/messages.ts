@@ -15,6 +15,7 @@ import { userProfiles, users, agents, orgSettings, files, toolCalls as toolCalls
 import { eq, and, isNull, inArray } from "drizzle-orm";
 import { extractFileContent } from "../lib/file-extract";
 import { SKILLS, SANDBOX_PACKAGES_NOTE } from "@nova/shared/skills";
+import * as artifactService from "../services/artifact.service";
 
 // --- Mention helpers (stories #45, #46) ---
 
@@ -669,6 +670,28 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
                 for (const of of output.outputFiles) {
                   // Infer content type from extension
                   const ext = of.name.split(".").pop()?.toLowerCase() ?? "";
+
+                  // Handle .excalidraw files as artifacts instead of attachments
+                  if (ext === "excalidraw") {
+                    try {
+                      const { getObjectBuffer } = await import("../lib/minio");
+                      const buf = await getObjectBuffer(of.storageKey);
+                      const content = buf.toString("utf-8");
+                      const title = of.name.replace(/\.excalidraw$/, "") || "Diagram";
+                      await artifactService.createArtifact(orgId, {
+                        messageId: assistantMessage.id,
+                        conversationId,
+                        type: "excalidraw",
+                        title,
+                        content,
+                        metadata: { sourceType: "sandbox" },
+                      });
+                    } catch (artifactErr) {
+                      console.error("[smart-chat] Failed to create excalidraw artifact:", artifactErr);
+                    }
+                    continue;
+                  }
+
                   const mimeMap: Record<string, string> = {
                     png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", svg: "image/svg+xml", webp: "image/webp",
                     pdf: "application/pdf", csv: "text/csv", json: "application/json", txt: "text/plain",

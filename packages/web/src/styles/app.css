@@ -383,6 +383,13 @@ body {
   box-shadow: 0 4px 12px -2px oklch(0 0 0 / 0.08);
 }
 
+/* Fix Excalidraw v0.18 canvas height bug — .excalidraw div computes 33M px height
+   without an explicit height constraint from its container */
+.excalidraw-container > .excalidraw {
+  width: 100% !important;
+  height: 100% !important;
+}
+
 /* Prevent KaTeX math overflow */
 .nova-markdown .katex-display,
 .nova-markdown .katex {

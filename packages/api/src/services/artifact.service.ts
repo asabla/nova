@@ -59,6 +59,30 @@ export async function getArtifact(orgId: string, artifactId: string) {
   return artifact ?? null;
 }
 
+export async function updateArtifact(
+  orgId: string,
+  artifactId: string,
+  data: { content?: string; metadata?: Record<string, unknown> },
+) {
+  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  if (data.content !== undefined) updates.content = data.content;
+  if (data.metadata !== undefined) updates.metadata = data.metadata;
+
+  const [artifact] = await db
+    .update(artifacts)
+    .set(updates)
+    .where(
+      and(
+        eq(artifacts.id, artifactId),
+        eq(artifacts.orgId, orgId),
+        isNull(artifacts.deletedAt),
+      ),
+    )
+    .returning();
+
+  return artifact ?? null;
+}
+
 export async function deleteArtifact(orgId: string, artifactId: string) {
   const [artifact] = await db
     .update(artifacts)
@@ -128,6 +152,7 @@ function getExtensionForType(type: string, language?: string | null): string {
     table: ".csv",
     chart: ".json",
     image: ".png",
+    excalidraw: ".excalidraw",
   };
   return typeMap[type] ?? ".txt";
 }
@@ -140,6 +165,7 @@ function getContentTypeForType(type: string, language?: string | null): string {
     table: "text/csv",
     chart: "application/json",
     image: "image/png",
+    excalidraw: "application/json",
   };
   return map[type] ?? "text/plain";
 }

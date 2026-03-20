@@ -315,6 +315,45 @@ Theme definitions at \`/sandbox/skills/theme-factory/themes/\`.
 For usage instructions: \`cat /sandbox/skills/theme-factory/SKILL.md\``,
 };
 
+const excalidraw: SkillDefinition = {
+  name: "excalidraw",
+  description: "Create and transform interactive diagrams using Excalidraw",
+  packages: ["@excalidraw/mermaid-to-excalidraw"],
+  fileTypes: ["application/vnd.excalidraw+json"],
+  triggerKeywords: [
+    "excalidraw", "diagram", "flowchart", "wireframe",
+    "architecture diagram", "sequence diagram", "draw a diagram",
+    "sketch", "whiteboard",
+  ],
+  scriptsDir: "/sandbox/skills/excalidraw/scripts",
+  instructions: `## Skill: Excalidraw Diagrams
+
+Create interactive diagrams that users can edit in the conversation.
+
+### Creating diagrams
+
+**From mermaid** (preferred for structured diagrams):
+1. Write mermaid syntax describing the diagram
+2. Run \`node /sandbox/skills/excalidraw/scripts/mermaid-to-excalidraw.js <mermaid-code>\`
+3. Script outputs Excalidraw scene JSON to stdout
+4. Write the JSON to \`/sandbox/output/diagram.excalidraw\`
+
+**Direct Excalidraw JSON** (for precise layout control):
+1. Construct Excalidraw elements array (rectangles, arrows, text, etc.)
+2. Write valid scene JSON to \`/sandbox/output/diagram.excalidraw\`
+3. Reference: \`cat /sandbox/skills/excalidraw/SKILL.md\` for element schema
+
+### Modifying existing diagrams
+When the user asks to change a diagram, you'll receive the current scene JSON in context.
+Parse it, modify the elements array, and write the updated JSON to \`/sandbox/output/diagram.excalidraw\`.
+
+### Output format
+Always write files with \`.excalidraw\` extension to \`/sandbox/output/\`.
+The frontend automatically renders these as interactive, editable diagrams.
+
+For detailed element reference: \`cat /sandbox/skills/excalidraw/SKILL.md\``,
+};
+
 const canvasDesign: SkillDefinition = {
   name: "canvas-design",
   description: "Create visual art, posters, and designs as PDF/PNG using code",
@@ -348,6 +387,7 @@ export const SKILLS: Record<string, SkillDefinition> = {
   "canvas-design": canvasDesign,
   "claude-api": claudeApi,
   "doc-coauthoring": docCoauthoring,
+  excalidraw,
   "frontend-design": frontendDesign,
   "internal-comms": internalComms,
   "mcp-builder": mcpBuilder,

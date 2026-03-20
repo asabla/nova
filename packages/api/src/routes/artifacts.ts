@@ -55,6 +55,32 @@ artifactRoutes.post("/artifacts", async (c) => {
   return c.json(artifact, 201);
 });
 
+// Update artifact content/metadata
+const updateSchema = z.object({
+  content: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+artifactRoutes.patch("/artifacts/:id", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const body = updateSchema.parse(await c.req.json());
+
+  const artifact = await artifactService.updateArtifact(orgId, c.req.param("id"), body);
+  if (!artifact) throw AppError.notFound("Artifact");
+
+  await writeAuditLog({
+    orgId,
+    actorId: userId,
+    actorType: "user",
+    action: "artifact.update",
+    resourceType: "artifact",
+    resourceId: artifact.id,
+  });
+
+  return c.json(artifact);
+});
+
 // Delete artifact (soft delete)
 artifactRoutes.delete("/artifacts/:id", async (c) => {
   const orgId = c.get("orgId");

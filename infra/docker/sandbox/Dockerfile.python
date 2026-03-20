@@ -34,7 +34,7 @@ RUN pip install --no-cache-dir \
     playwright
 
 # Node.js global packages
-RUN npm install -g pptxgenjs
+RUN npm install -g pptxgenjs @excalidraw/mermaid-to-excalidraw
 
 # Install Playwright Chromium browser
 RUN playwright install chromium --with-deps

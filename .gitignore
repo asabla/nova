@@ -22,6 +22,9 @@ bun.lock
 .playwright-cli/
 coverage/
 
+# Excalidraw assets (copied from node_modules at install)
+packages/web/public/excalidraw-assets/
+
 # Storybook
 storybook-static/
 
