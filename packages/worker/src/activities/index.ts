@@ -10,3 +10,4 @@ export { generatePlan, assessComplexity } from "./agent-planning.activities";
 export { summarizeContext } from "./agent-context.activities";
 export { embedAndStoreMemory, searchSemanticMemory, extractMemoryFacts } from "./agent-memory.activities";
 export { executeSandboxCode } from "./sandbox.activities";
+export { runResearchAgentLoop, persistResearchResult } from "./research-agent.activities";

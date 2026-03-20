@@ -37,12 +37,12 @@ import { ProgressBar } from "../../components/ui/ProgressBar";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { Dialog } from "../../components/ui/Dialog";
 import { Skeleton } from "../../components/ui/Skeleton";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/Table";
 import { toast } from "../../components/ui/Toast";
 import { formatDistanceToNow } from "date-fns";
 import { NewResearchForm, type NewResearchFormSubmitData } from "../../components/research/NewResearchForm";
 import { useResearchSSE } from "../../hooks/useResearchSSE";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
+import { MarkdownRenderer } from "../../components/markdown/MarkdownRenderer";
 
 // ---------------------------------------------------------------------------
 // Route
@@ -655,6 +655,7 @@ function ReportDetail({
         <ProgressFeed
           status={sse.status !== "idle" ? sse.status : report.status}
           progress={liveProgress}
+          activeTools={sse.activeTools}
           progressEndRef={progressEndRef}
         />
       )}
@@ -691,7 +692,25 @@ function ReportDetail({
           </CardHeader>
           <CardContent>
             <div className="text-sm text-text leading-relaxed">
-              <RenderedMarkdown content={report.reportContent} />
+              <MarkdownRenderer content={report.reportContent} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ---- Streaming report preview ---- */}
+      {isActive && sse.streamingContent && (
+        <Card className="border-primary/20">
+          <CardHeader bordered className="flex flex-row items-center gap-2">
+            <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" aria-hidden="true" />
+            </div>
+            <span className="text-sm font-semibold text-text flex-1">{t("research.generating", "Generating Report...")}</span>
+            <Badge variant="primary">{t("research.live", "Live")}</Badge>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm text-text leading-relaxed">
+              <MarkdownRenderer content={sse.streamingContent} />
             </div>
           </CardContent>
         </Card>
@@ -733,7 +752,7 @@ function ReportDetail({
                 {expandedSections.has(idx) && (
                   <div className="px-5 pb-4 border-t border-border">
                     <div className="pt-3 text-sm text-text-secondary leading-relaxed">
-                      <RenderedMarkdown content={section.content} />
+                      <MarkdownRenderer content={section.content} />
                     </div>
                     {section.citations.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-1">
@@ -854,10 +873,12 @@ function QueryMeta({ query }: { query: string }) {
 function ProgressFeed({
   status,
   progress,
+  activeTools,
   progressEndRef,
 }: {
   status: string;
   progress?: ProgressStep[];
+  activeTools?: { name: string; args?: Record<string, unknown>; startedAt: string }[];
   progressEndRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const steps = progress ?? [];
@@ -932,6 +953,19 @@ function ProgressFeed({
                 </div>
               );
             })}
+            {/* Active tool indicators */}
+            {activeTools && activeTools.length > 0 && activeTools.map((t, i) => (
+              <div key={`active-${i}`} className="flex items-center gap-3">
+                <div className="flex flex-col items-center">
+                  <div className="h-6 w-6 rounded-full flex items-center justify-center shrink-0 z-10 bg-primary/10">
+                    <Loader2 className="h-3 w-3 text-primary animate-spin" />
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1 pb-3">
+                  <p className="text-xs text-primary font-medium leading-snug">{t.name}</p>
+                </div>
+              </div>
+            ))}
             <div ref={progressEndRef} />
           </div>
         ) : (
@@ -1076,204 +1110,6 @@ function EmptyDetailState({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Minimal Markdown renderer
-// ---------------------------------------------------------------------------
-
-function RenderedMarkdown({ content }: { content: string }) {
-  const lines = content.split("\n");
-  const elements: React.ReactNode[] = [];
-  let inCodeBlock = false;
-  let codeLines: string[] = [];
-  let codeLang = "";
-
-  const processInline = (text: string): React.ReactNode[] => {
-    const parts: React.ReactNode[] = [];
-    // Normalize HTML line breaks to newlines, then split on them
-    const normalized = text.replace(/<br\s*\/?>/gi, "\n");
-    if (normalized.includes("\n")) {
-      const segments = normalized.split("\n");
-      return segments.flatMap((seg, idx) => [
-        ...(idx > 0 ? [<br key={`br-${idx}`} />] : []),
-        ...processInline(seg),
-      ]);
-    }
-    // Bold, italic, inline code, links, citation references
-    const regex = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)|(\[([^\]]+)\]\(([^)]+)\))|(\[(\d+)\])/g;
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-
-    while ((match = regex.exec(text)) !== null) {
-      if (match.index > lastIndex) {
-        parts.push(text.slice(lastIndex, match.index));
-      }
-
-      if (match[1]) {
-        // Bold
-        parts.push(<strong key={match.index} className="font-semibold text-text">{match[2]}</strong>);
-      } else if (match[3]) {
-        // Italic
-        parts.push(<em key={match.index}>{match[4]}</em>);
-      } else if (match[5]) {
-        // Inline code
-        parts.push(
-          <code key={match.index} className="px-1 py-0.5 rounded bg-surface-tertiary text-xs font-mono">
-            {match[6]}
-          </code>,
-        );
-      } else if (match[7]) {
-        // Link
-        parts.push(
-          <a
-            key={match.index}
-            href={match[9]}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline"
-          >
-            {match[8]}
-          </a>,
-        );
-      } else if (match[10]) {
-        // Citation reference [N]
-        parts.push(
-          <span
-            key={match.index}
-            className="inline-flex items-center px-1 py-0 rounded bg-primary/10 text-primary text-[10px] font-mono align-super cursor-default"
-            title={`Source ${match[11]}`}
-          >
-            {match[10]}
-          </span>,
-        );
-      }
-
-      lastIndex = match.index + match[0].length;
-    }
-
-    if (lastIndex < text.length) {
-      parts.push(text.slice(lastIndex));
-    }
-
-    return parts.length > 0 ? parts : [text];
-  };
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (line.startsWith("```")) {
-      if (inCodeBlock) {
-        elements.push(
-          <pre key={i} className="px-4 py-3 rounded-lg bg-surface-tertiary overflow-x-auto text-xs font-mono my-2">
-            <code>{codeLines.join("\n")}</code>
-          </pre>,
-        );
-        codeLines = [];
-        inCodeBlock = false;
-      } else {
-        inCodeBlock = true;
-        codeLang = line.slice(3).trim();
-      }
-      continue;
-    }
-
-    if (inCodeBlock) {
-      codeLines.push(line);
-      continue;
-    }
-
-    if (line.startsWith("### ")) {
-      elements.push(
-        <h4 key={i} className="text-sm font-semibold text-text mt-4 mb-1">
-          {processInline(line.slice(4))}
-        </h4>,
-      );
-    } else if (line.startsWith("## ")) {
-      elements.push(
-        <h3 key={i} className="text-base font-semibold text-text mt-5 mb-2">
-          {processInline(line.slice(3))}
-        </h3>,
-      );
-    } else if (line.startsWith("# ")) {
-      elements.push(
-        <h2 key={i} className="text-lg font-bold text-text mt-6 mb-2">
-          {processInline(line.slice(2))}
-        </h2>,
-      );
-    } else if (line.startsWith("- ") || line.startsWith("* ")) {
-      elements.push(
-        <li key={i} className="ml-4 list-disc text-text-secondary">
-          {processInline(line.slice(2))}
-        </li>,
-      );
-    } else if (/^\d+\.\s/.test(line)) {
-      const content = line.replace(/^\d+\.\s/, "");
-      elements.push(
-        <li key={i} className="ml-4 list-decimal text-text-secondary">
-          {processInline(content)}
-        </li>,
-      );
-    } else if (line.startsWith("> ")) {
-      elements.push(
-        <blockquote key={i} className="border-l-2 border-primary/40 pl-3 my-2 text-text-secondary italic">
-          {processInline(line.slice(2))}
-        </blockquote>,
-      );
-    } else if (line.trim().startsWith("|") && line.trim().endsWith("|")) {
-      // Markdown table: collect consecutive pipe-delimited rows
-      const tableRows: string[] = [line];
-      while (i + 1 < lines.length && lines[i + 1].trim().startsWith("|") && lines[i + 1].trim().endsWith("|")) {
-        i++;
-        tableRows.push(lines[i]);
-      }
-      const parsedRows = tableRows
-        .filter((r) => !/^\|[\s\-:|]+\|$/.test(r.trim())) // skip separator rows
-        .map((r) =>
-          r.split("|").slice(1, -1).map((cell) => cell.trim()),
-        );
-      const [header, ...body] = parsedRows;
-      elements.push(
-        <div key={i} className="my-3">
-          <Table>
-            {header && (
-              <TableHeader>
-                <TableRow>
-                  {header.map((cell, ci) => (
-                    <TableHead key={ci}>
-                      {processInline(cell)}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-            )}
-            <TableBody>
-              {body.map((row, ri) => (
-                <TableRow key={ri}>
-                  {row.map((cell, ci) => (
-                    <TableCell key={ci} className="text-text-secondary">
-                      {processInline(cell)}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>,
-      );
-    } else if (line.startsWith("---") || line.startsWith("***")) {
-      elements.push(<hr key={i} className="my-4 border-border" />);
-    } else if (line.trim() === "") {
-      elements.push(<div key={i} className="h-2" />);
-    } else {
-      elements.push(
-        <p key={i} className="text-text-secondary leading-relaxed">
-          {processInline(line)}
-        </p>,
-      );
-    }
-  }
-
-  return <>{elements}</>;
-}
 
 // ---------------------------------------------------------------------------
 // Utilities

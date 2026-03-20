@@ -70,6 +70,7 @@ export function Tabs({ tabs, defaultTab, activeTab: controlledTab, onTabChange, 
           const isActive = active === tab.id;
           return (
             <button
+              type="button"
               key={tab.id}
               role="tab"
               id={`${baseId}-tab-${tab.id}`}

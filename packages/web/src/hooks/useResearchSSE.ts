@@ -15,24 +15,45 @@ export interface ResearchSourceEvent {
   relevance?: number;
 }
 
+interface ActiveTool {
+  name: string;
+  args?: Record<string, unknown>;
+  startedAt: string;
+}
+
 interface UseResearchSSEState {
   status: ResearchStatus | "idle";
   phase?: string;
   progress: ResearchProgressEvent[];
   sources: ResearchSourceEvent[];
+  streamingContent: string;
+  activeTools: ActiveTool[];
   error?: string;
   isDone: boolean;
 }
 
+/** Map tool names to research progress types for display */
+const TOOL_PROGRESS_TYPE: Record<string, ResearchProgressType> = {
+  web_search: "query",
+  fetch_url: "source",
+  query_knowledge: "info",
+  fetch_files: "info",
+  code_execute: "analysis",
+  save_source: "source",
+  write_report_section: "synthesis",
+};
+
 /**
  * Hook that connects to the research SSE endpoint for real-time progress updates.
- * Only connects when reportId is provided and the report is in an active state.
+ * Handles both research-specific events and agent-style events (token, tool_status).
  */
 export function useResearchSSE(reportId: string | null, reportStatus?: string) {
   const [state, setState] = useState<UseResearchSSEState>({
     status: "idle",
     progress: [],
     sources: [],
+    streamingContent: "",
+    activeTools: [],
     isDone: false,
   });
   const abortRef = useRef<AbortController | null>(null);
@@ -48,6 +69,8 @@ export function useResearchSSE(reportId: string | null, reportStatus?: string) {
       status: reportStatus as ResearchStatus ?? "pending",
       progress: [],
       sources: [],
+      streamingContent: "",
+      activeTools: [],
       isDone: false,
     });
 
@@ -118,10 +141,51 @@ export function useResearchSSE(reportId: string | null, reportStatus?: string) {
                   }));
                   break;
 
+                case "token":
+                  setState((prev) => ({
+                    ...prev,
+                    streamingContent: prev.streamingContent + (data.content ?? ""),
+                  }));
+                  break;
+
+                case "tool_status": {
+                  const toolName = data.tool ?? "unknown";
+                  const toolStatus = data.status;
+
+                  setState((prev) => {
+                    let activeTools = prev.activeTools;
+                    let progress = prev.progress;
+
+                    if (toolStatus === "running") {
+                      // Add to active tools
+                      activeTools = [
+                        ...activeTools,
+                        { name: toolName, args: data.args, startedAt: new Date().toISOString() },
+                      ];
+                      // Add progress event
+                      const progressType = TOOL_PROGRESS_TYPE[toolName] ?? "info";
+                      const msg = data.args?.query
+                        ? `${toolName}: "${String(data.args.query).slice(0, 80)}"`
+                        : `Running ${toolName}...`;
+                      progress = [
+                        ...progress,
+                        { type: progressType, message: msg, timestamp: new Date().toISOString() },
+                      ];
+                    } else if (toolStatus === "completed") {
+                      // Remove from active tools
+                      activeTools = activeTools.filter((t) => t.name !== toolName);
+                    }
+
+                    return { ...prev, activeTools, progress };
+                  });
+                  break;
+                }
+
                 case "research.done":
                   setState((prev) => ({
                     ...prev,
                     status: "completed",
+                    activeTools: [],
                     isDone: true,
                   }));
                   return;
@@ -131,6 +195,7 @@ export function useResearchSSE(reportId: string | null, reportStatus?: string) {
                     ...prev,
                     status: "failed",
                     error: data.message,
+                    activeTools: [],
                     isDone: true,
                   }));
                   return;

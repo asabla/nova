@@ -200,6 +200,7 @@ export async function relayResearchToSSE(
         const data = JSON.parse(message);
 
         switch (data.type) {
+          // Research-specific events
           case "research.status":
             safeWrite("research.status", JSON.stringify({ status: data.status, phase: data.phase }));
             break;
@@ -223,6 +224,41 @@ export async function relayResearchToSSE(
             break;
 
           case "research.error":
+            if (settled) return;
+            settled = true;
+            cleanup();
+            stream.writeSSE({
+              event: "research.error",
+              data: JSON.stringify({ message: data.message }),
+            }).catch(() => {}).then(() => resolve());
+            break;
+
+          // Agent-style events (from agentic research workflow)
+          case "token":
+            safeWrite("token", JSON.stringify({ content: data.content }));
+            break;
+
+          case "tool_status":
+            safeWrite("tool_status", JSON.stringify({
+              tool: data.tool,
+              status: data.status,
+              ...(data.args ? { args: data.args } : {}),
+              ...(data.resultSummary ? { resultSummary: data.resultSummary } : {}),
+            }));
+            break;
+
+          case "done":
+            // Agent "done" event — treat as research.done for the relay
+            if (settled) return;
+            settled = true;
+            cleanup();
+            stream.writeSSE({
+              event: "research.done",
+              data: JSON.stringify({ reportId: channelId.replace("research:", ""), sourcesCount: 0 }),
+            }).catch(() => {}).then(() => resolve());
+            break;
+
+          case "error":
             if (settled) return;
             settled = true;
             cleanup();

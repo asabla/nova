@@ -303,7 +303,7 @@ researchRoutes.post("/", async (c) => {
   // Start Temporal workflow
   try {
     const client = await getTemporalClient();
-    await client.workflow.start("deepResearchWorkflow", {
+    await client.workflow.start("researchAgentWorkflow", {
       taskQueue: "nova-main",
       workflowId: `research-${report.id}`,
       args: [{
@@ -312,7 +312,7 @@ researchRoutes.post("/", async (c) => {
         reportId: report.id,
         query: body.query,
         maxSources: body.maxSources,
-        maxIterations: body.maxIterations,
+        maxTurns: Math.max(15, body.maxSources * 2),
         streamChannelId: `research:${report.id}`,
         sources: body.sources,
       }],
@@ -477,8 +477,9 @@ researchRoutes.post("/:id/rerun", async (c) => {
   }).returning();
 
   try {
+    const maxSources = body.maxSources ?? config.maxSources ?? 10;
     const client = await getTemporalClient();
-    await client.workflow.start("deepResearchWorkflow", {
+    await client.workflow.start("researchAgentWorkflow", {
       taskQueue: "nova-main",
       workflowId: `research-${newReport.id}`,
       args: [{
@@ -486,8 +487,8 @@ researchRoutes.post("/:id/rerun", async (c) => {
         conversationId: originalReport.conversationId,
         reportId: newReport.id,
         query: originalReport.query,
-        maxSources: body.maxSources ?? config.maxSources ?? 10,
-        maxIterations: body.maxIterations ?? config.maxIterations ?? 3,
+        maxSources,
+        maxTurns: Math.max(15, maxSources * 2),
         streamChannelId: `research:${newReport.id}`,
         sources: resolvedSources,
       }],
