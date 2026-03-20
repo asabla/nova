@@ -1,4 +1,4 @@
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, isNull, sql } from "drizzle-orm";
 import { db } from "../lib/db";
 import { openai } from "../lib/litellm";
 import { getDefaultChatModel } from "../lib/models";
@@ -39,4 +39,22 @@ export async function updateConversationTitle(conversationId: string, title: str
     .update(conversations)
     .set({ title, updatedAt: new Date() })
     .where(eq(conversations.id, conversationId));
+}
+
+export async function getUnsummarizedConversations(batchSize: number): Promise<{ orgId: string; conversationId: string }[]> {
+  const rows = await db
+    .select({
+      id: conversations.id,
+      orgId: conversations.orgId,
+    })
+    .from(conversations)
+    .where(
+      sql`${conversations.title} IS NULL AND ${conversations.deletedAt} IS NULL AND (
+        SELECT count(*) FROM ${messages} WHERE ${messages.conversationId} = ${conversations.id}
+      ) >= 2`
+    )
+    .orderBy(asc(conversations.createdAt))
+    .limit(batchSize);
+
+  return rows.map((r) => ({ orgId: r.orgId, conversationId: r.id }));
 }

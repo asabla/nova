@@ -35,24 +35,39 @@ export async function setupSchedules() {
     }
   }
 
-  // ── 2. Conversation summary schedule (runs every 6 hours) ──
+  // ── 2. Conversation summary batch schedule (runs every 6 hours) ──
   try {
     await client.schedule.create({
       scheduleId: "nova-conversation-summaries",
       spec: { cronExpressions: ["0 */6 * * *"] },
       action: {
         type: "startWorkflow",
-        workflowType: "conversationSummaryWorkflow",
+        workflowType: "conversationSummaryBatchWorkflow",
         taskQueue: TASK_QUEUE,
         workflowId: "summaries-scheduled",
         args: [{ batchSize: 50 }],
       },
       policies: { overlap: ScheduleOverlapPolicy.SKIP },
     });
-    console.log("Registered conversation summary schedule (every 6h)");
+    console.log("Registered conversation summary batch schedule (every 6h)");
   } catch (err: any) {
     if (err.message?.includes("already exists")) {
-      console.log("Conversation summary schedule already registered");
+      try {
+        const handle = client.schedule.getHandle("nova-conversation-summaries");
+        await handle.update((prev) => ({
+          ...prev,
+          action: {
+            type: "startWorkflow" as const,
+            workflowType: "conversationSummaryBatchWorkflow",
+            taskQueue: TASK_QUEUE,
+            workflowId: "summaries-scheduled",
+            args: [{ batchSize: 50 }],
+          },
+        }));
+        console.log("Updated conversation summary schedule to batch workflow");
+      } catch {
+        console.log("Conversation summary schedule already registered");
+      }
     } else {
       console.error("Failed to register summary schedule:", err.message);
     }

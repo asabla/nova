@@ -1,5 +1,6 @@
 export { documentIngestionWorkflow } from "./document-ingestion.js";
 export { conversationSummaryWorkflow } from "./conversation-summary.js";
+export { conversationSummaryBatchWorkflow } from "./conversation-summary-batch.js";
 export { scheduledCleanupWorkflow } from "./scheduled-cleanup.js";
 export { deepResearchWorkflow } from "./deep-research.js";
 export { agentWorkflow } from "./agent.js";
