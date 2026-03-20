@@ -14,7 +14,7 @@
     "dev:worker": "bun run --filter @nova/worker dev",
     "build": "bun run --filter '*' build",
     "lint": "bun run --filter '*' lint",
-    "typecheck": "bun run --filter '*' typecheck",
+    "typecheck": "tsc -b packages/shared/tsconfig.json && bun run --filter '*' typecheck",
     "db:generate": "bun run --filter @nova/api db:generate",
     "db:migrate": "bun run --filter @nova/api db:migrate",
     "db:push": "bun run --filter @nova/api db:push",
@@ -22,11 +22,7 @@
     "storybook": "bun run --filter @nova/web storybook",
     "storybook:build": "bun run --filter @nova/web storybook:build"
   },
-  "dependencies": {
-    "pdf-parse": "1.1.1"
-  },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
-    "@storybook/addon-docs": "^10.2.16"
+    "@playwright/test": "^1.58.2"
   }
 }

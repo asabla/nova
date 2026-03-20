@@ -9,14 +9,6 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "declaration": true,
-    "declarationMap": true,
     "sourceMap": true
-  },
-  "references": [
-    { "path": "packages/shared" },
-    { "path": "packages/api" },
-    { "path": "packages/web" },
-    { "path": "packages/worker" }
-  ]
+  }
 }

@@ -2,17 +2,41 @@
   "name": "@nova/shared",
   "version": "0.0.1",
   "type": "module",
+  "types": "./dist/index.d.ts",
   "main": "./src/index.ts",
-  "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./schema": "./src/schemas/index.ts",
-    "./schemas": "./src/schemas/index.ts",
-    "./types": "./src/types/index.ts",
-    "./constants": "./src/constants/index.ts",
-    "./utils": "./src/utils/index.ts",
-    "./content": "./src/content/index.ts",
-    "./skills": "./src/skills.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./schema": {
+      "types": "./dist/schemas/index.d.ts",
+      "default": "./src/schemas/index.ts"
+    },
+    "./schemas": {
+      "types": "./dist/schemas/index.d.ts",
+      "default": "./src/schemas/index.ts"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "default": "./src/types/index.ts"
+    },
+    "./constants": {
+      "types": "./dist/constants/index.d.ts",
+      "default": "./src/constants/index.ts"
+    },
+    "./utils": {
+      "types": "./dist/utils/index.d.ts",
+      "default": "./src/utils/index.ts"
+    },
+    "./content": {
+      "types": "./dist/content/index.d.ts",
+      "default": "./src/content/index.ts"
+    },
+    "./skills": {
+      "types": "./dist/skills.d.ts",
+      "default": "./src/skills.ts"
+    }
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",

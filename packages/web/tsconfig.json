@@ -14,6 +14,8 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "noEmit": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./tsconfig.tsbuildinfo",
     "paths": {
       "@/*": ["./src/*"]
     }
