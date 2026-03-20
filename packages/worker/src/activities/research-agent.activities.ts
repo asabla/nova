@@ -42,20 +42,71 @@ export interface ResearchAgentResult {
   steps: number;
 }
 
-const RESEARCH_SYSTEM_PROMPT = `You are a Deep Research Agent. Your goal is to produce a comprehensive, well-sourced research report on the given topic.
+const RESEARCH_SYSTEM_PROMPT = `You are a Deep Research Agent. Your goal is to produce a comprehensive, data-driven research report with genuine analytical depth — not just a summary of sources.
 
 ## Workflow
-1. **Plan**: Identify key aspects of the query to research
-2. **Gather**: Use web_search and fetch_url to find relevant sources. Use query_knowledge and fetch_files if internal sources are available.
-3. **Record**: Call save_source for every valuable source you find
-4. **Analyze**: Use code_execute if you need to process data, create charts, or perform calculations
-5. **Write**: Use write_report_section to build the report incrementally, section by section
+
+Your research follows iterative gather → analyze → deepen cycles, not a single pass:
+
+1. **Plan**: Break the query into key research questions
+2. **Gather**: Collect data from available sources (knowledge collections first, then web)
+3. **Analyze**: Use code_execute to process, compare, and quantify what you found
+4. **Deepen**: Based on analysis, identify gaps and run follow-up queries
+5. **Record**: Call save_source for every valuable source
+6. **Write**: Build the report section by section with write_report_section
+
+Repeat steps 2-4 multiple times. A single pass of searching and summarizing is not enough.
+
+## Multi-Tool Integration Patterns
+
+### Data Analysis Pattern
+When you retrieve text data from query_knowledge, fetch_files, or web sources, pass it into code_execute for rigorous analysis. Embed the data as a Python string or JSON literal in your code:
+
+Example flow:
+1. query_knowledge → get results about topic X
+2. code_execute → parse the text, count occurrences, extract dates/numbers, build a comparison table
+3. Use the computed results in your report with specific numbers and statistics
+
+### Chart Generation Pattern
+Use code_execute with Python + matplotlib/json to create data visualizations:
+- Bar/line charts comparing metrics across sources
+- Timeline visualizations of events
+- Distribution analysis of quantitative data
+Output chart data as a JSON object, then embed it in a \`\`\`widget block in your report.
+
+### Iterative Research Pattern
+After initial queries, analyze what you have and what's missing:
+1. First pass: broad queries to map the landscape
+2. code_execute: analyze coverage gaps, contradictions, or patterns needing deeper investigation
+3. Second pass: targeted queries to fill gaps
+4. code_execute: cross-reference and validate findings across sources
+
+### Structured Data Processing
+When you receive text data from query_knowledge or fetch_files, you can pass it into code_execute by embedding it as a Python string or JSON literal. This lets you:
+- Count and aggregate (frequency of terms, timeline of events)
+- Compare and contrast (side-by-side feature/claim matrices)
+- Extract patterns (regex extraction of dates, numbers, names)
+- Build tables (structured comparison from unstructured text)
+- Compute statistics (averages, distributions, trends)
+
+## Using code_execute
+
+Use code_execute freely and often — it's your analytical engine. Good uses include:
+- Parsing and structuring data gathered from web_search, query_knowledge, or fetch_files
+- Building comparison tables from multiple sources
+- Counting occurrences, computing statistics, identifying trends
+- Generating chart data (output as JSON for widget blocks)
+- Cross-referencing findings to find contradictions or consensus
+- Processing CSV/JSON data from attached files
+- Timeline generation from extracted dates
+
+Embed gathered data as string literals in your Python/JS code. Don't hesitate to run multiple code executions throughout your research — each one adds analytical rigor.
 
 ## Report Structure
 Write sections in this order:
-0. Executive Summary — 2-3 paragraph overview
-1. Key Findings — bullet points of the most important discoveries
-2-N. Detailed Analysis sections — deep dives into specific aspects
+0. Executive Summary — 2-3 paragraph overview with key quantitative findings
+1. Key Findings — bullet points with specific data points, not vague claims
+2-N. Detailed Analysis sections — deep dives backed by data analysis
 N+1. Conclusion — synthesis and implications
 
 ## Formatting
@@ -67,11 +118,13 @@ N+1. Conclusion — synthesis and implications
   \`\`\`
 - For Mermaid diagrams, use \`\`\`mermaid code blocks
 - Include relevant quotes with > blockquotes
+- Include specific numbers, percentages, and comparisons — not just qualitative statements
 
 ## Important
 - Be thorough: search multiple queries, cross-reference sources
 - Be factual: cite sources for every major claim
-- Be analytical: don't just summarize — synthesize and identify patterns
+- Be analytical: don't just summarize — synthesize, quantify, and identify patterns
+- Use code_execute to back up claims with data analysis
 - Save all sources before writing the report
 - Write the report section-by-section using write_report_section`;
 
@@ -103,31 +156,49 @@ export async function runResearchAgentLoop(
   const modelId = input.model || process.env.RESEARCH_MODEL || (await getDefaultChatModel());
 
   // Build source context for the initial message
+  const hasKnowledge = input.sources.knowledgeCollectionIds.length > 0;
+  const hasFiles = input.sources.fileIds.length > 0;
+
   const sourceContext: string[] = [];
+  if (hasKnowledge) {
+    sourceContext.push(
+      `- ${input.sources.knowledgeCollectionIds.length} knowledge collection(s) selected. **Start by querying them** with query_knowledge before searching the web — internal data should anchor your analysis.`,
+    );
+    sourceContext.push(
+      `- After retrieving knowledge data, use code_execute to analyze patterns, extract statistics, or build comparison tables from the text.`,
+    );
+  }
+  if (hasFiles) {
+    sourceContext.push(
+      `- ${input.sources.fileIds.length} file(s) attached. Use fetch_files to read them, then code_execute to process and analyze the data (parse CSV/JSON, compute statistics, extract patterns).`,
+    );
+  }
   if (input.sources.webSearch) {
     sourceContext.push("- Web search is ENABLED. Use web_search and fetch_url to find sources.");
   } else {
     sourceContext.push("- Web search is DISABLED. Do NOT use web_search or fetch_url.");
   }
-  if (input.sources.knowledgeCollectionIds.length > 0) {
-    sourceContext.push(
-      `- ${input.sources.knowledgeCollectionIds.length} knowledge collection(s) selected. Use query_knowledge to search them.`,
-    );
-  }
-  if (input.sources.fileIds.length > 0) {
-    sourceContext.push(
-      `- ${input.sources.fileIds.length} file(s) attached. Use fetch_files to read them.`,
-    );
-  }
 
-  const userMessage = `Research this topic thoroughly and produce a comprehensive report:
+  const analyticsGuidance = (hasKnowledge || hasFiles)
+    ? `\n## Analysis Approach
+- Query internal sources first, then supplement with web search
+- After each batch of data retrieval, use code_execute to analyze what you've gathered
+- Look for patterns, contradictions, and gaps that warrant follow-up queries
+- Aim for at least 3-5 code_execute calls to ensure analytical rigor`
+    : `\n## Analysis Approach
+- After gathering sources, use code_execute to analyze and cross-reference findings
+- Don't just summarize — compute comparisons, extract patterns, and quantify claims
+- Aim for multiple code_execute calls throughout your research`;
+
+  const userMessage = `Research this topic thoroughly and produce a comprehensive, data-driven report:
 
 ${input.query}
 
 ## Available Sources
 ${sourceContext.join("\n")}
+${analyticsGuidance}
 
-Begin by planning your research approach, then gather sources, and finally write the report section by section.`;
+Begin by planning your research approach, then iterate through gather → analyze → deepen cycles before writing the report section by section.`;
 
   const agent = new Agent({
     name: "nova-research",

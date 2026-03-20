@@ -303,6 +303,8 @@ researchRoutes.post("/", async (c) => {
   // Start Temporal workflow
   try {
     const client = await getTemporalClient();
+    const hasKnowledge = body.sources.knowledgeCollectionIds.length > 0;
+    const hasFiles = body.sources.fileIds.length > 0;
     await client.workflow.start("researchAgentWorkflow", {
       taskQueue: "nova-main",
       workflowId: `research-${report.id}`,
@@ -312,7 +314,7 @@ researchRoutes.post("/", async (c) => {
         reportId: report.id,
         query: body.query,
         maxSources: body.maxSources,
-        maxTurns: Math.max(15, body.maxSources * 2),
+        maxTurns: Math.max(20, body.maxSources * 2 + (hasKnowledge ? 10 : 0) + (hasFiles ? 5 : 0)),
         streamChannelId: `research:${report.id}`,
         sources: body.sources,
       }],
@@ -478,6 +480,8 @@ researchRoutes.post("/:id/rerun", async (c) => {
 
   try {
     const maxSources = body.maxSources ?? config.maxSources ?? 10;
+    const rerunHasKnowledge = resolvedSources.knowledgeCollectionIds.length > 0;
+    const rerunHasFiles = resolvedSources.fileIds.length > 0;
     const client = await getTemporalClient();
     await client.workflow.start("researchAgentWorkflow", {
       taskQueue: "nova-main",
@@ -488,7 +492,7 @@ researchRoutes.post("/:id/rerun", async (c) => {
         reportId: newReport.id,
         query: originalReport.query,
         maxSources,
-        maxTurns: Math.max(15, maxSources * 2),
+        maxTurns: Math.max(20, maxSources * 2 + (rerunHasKnowledge ? 10 : 0) + (rerunHasFiles ? 5 : 0)),
         streamChannelId: `research:${newReport.id}`,
         sources: resolvedSources,
       }],
