@@ -400,6 +400,7 @@ function buildResultSummary(toolName: string, result: unknown): string {
  */
 export async function persistResearchResult(
   reportId: string,
+  query: string,
   reportContent: string,
   sources: ResearchSource[],
   sections: ReportSection[],
@@ -408,16 +409,26 @@ export async function persistResearchResult(
   let finalContent: string;
   if (sections.length > 0) {
     const sorted = [...sections].sort((a, b) => a.order - b.order);
-    finalContent = sorted.map((s) => `## ${s.heading}\n\n${s.content}`).join("\n\n");
+    finalContent = sorted.map((s) => {
+      // Avoid duplicate headings if the content already starts with one
+      const trimmed = s.content.trimStart();
+      if (trimmed.startsWith("## ") || trimmed.startsWith("# ")) {
+        return s.content;
+      }
+      return `## ${s.heading}\n\n${s.content}`;
+    }).join("\n\n");
   } else {
     finalContent = reportContent;
   }
 
-  // Extract title from first heading if present
+  // Generate a title from the content or fall back to the query
   let title: string | null = null;
-  const titleMatch = finalContent.match(/^#\s+(.+)/m);
-  if (titleMatch) {
-    title = titleMatch[1].trim().slice(0, 80);
+  const h1Match = finalContent.match(/^#\s+(.+)/m);
+  if (h1Match) {
+    title = h1Match[1].trim().slice(0, 80);
+  } else {
+    // Use the query — it's the most meaningful identifier
+    title = query.slice(0, 80);
   }
 
   await db

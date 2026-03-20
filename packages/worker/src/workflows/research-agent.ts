@@ -72,6 +72,7 @@ async function researchAgentWorkflowInner(input: ResearchAgentWorkflowInput): Pr
     // Persist the assembled report to database
     await persistResearchResult(
       input.reportId,
+      input.query,
       result.reportContent,
       result.sources,
       result.sections,

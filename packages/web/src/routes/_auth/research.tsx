@@ -1033,9 +1033,9 @@ function SourcesList({ sources }: { sources: ResearchSource[] }) {
                 )}
                 {source.relevance != null && (
                   <div className="mt-1.5 flex items-center gap-2">
-                    <ProgressBar value={source.relevance * 100} size="sm" className="w-20" />
+                    <ProgressBar value={source.relevance > 1 ? source.relevance : source.relevance * 100} size="sm" className="w-20" />
                     <span className="text-[10px] text-text-tertiary">
-                      {Math.round(source.relevance * 100)}% relevant
+                      {Math.round(source.relevance > 1 ? source.relevance : source.relevance * 100)}% relevant
                     </span>
                   </div>
                 )}
