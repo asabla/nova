@@ -16,6 +16,7 @@ const envSchema = z.object({
   LITELLM_API_KEY: z.string().optional(),
   EMBEDDING_MODEL: z.string().optional(),
   RESEARCH_MODEL: z.string().optional(),
+  VISION_MODEL: z.string().optional(),
 
   SEARXNG_URL: z.string().optional(),
 

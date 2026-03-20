@@ -17,7 +17,7 @@ export interface ChunkMetadata {
   headingHierarchy: string[];
   sectionHeading?: string;
   positionRatio: number;
-  chunkType: "text" | "code" | "table" | "mixed";
+  chunkType: "text" | "code" | "table" | "mixed" | "image";
 }
 
 export interface ContentChunk {

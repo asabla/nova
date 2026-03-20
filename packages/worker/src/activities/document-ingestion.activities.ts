@@ -9,6 +9,9 @@ import { extractFromHtml, chunkContent } from "@nova/shared/content";
 import { decodeBuffer, stripNullBytes } from "@nova/shared/utils";
 import type { ContentChunk } from "@nova/shared/content";
 import type { DocumentIngestionInput } from "../workflows/document-ingestion";
+import { extractCsv, extractXlsx, tabularToDescriptor } from "../lib/extract-tabular";
+import { extractImageContent } from "../lib/extract-image";
+import { extractPptxContent } from "../lib/extract-pptx";
 
 async function getMinioClient() {
   const { Client: MinioClient } = await import("minio");
@@ -125,6 +128,8 @@ interface ResolvedContent {
   title?: string;
   sourceUrl?: string;
   extractedMetadata?: ExtractedMetadata;
+  documentMetadata?: Record<string, unknown>;
+  fileType?: string;
 }
 
 function isHtmlContent(text: string, contentType?: string): boolean {
@@ -188,6 +193,74 @@ async function resolveDocumentContent(input: DocumentIngestionInput): Promise<Re
     if (ct === "application/pdf" || fileRecord.filename?.toLowerCase().endsWith(".pdf")) {
       const text = await extractPdfText(fileBuffer);
       return { text };
+    }
+
+    // Tabular data — CSV
+    if (ct === "text/csv" || fileRecord.filename?.toLowerCase().endsWith(".csv")) {
+      const data = await extractCsv(fileBuffer, fileRecord.filename ?? undefined);
+      const descriptor = tabularToDescriptor(data);
+      const codeHint = `\n\nFile ID: ${fileId}\nTo analyze this data, use code_execute with input_file_ids: ["${fileId}"] and read /sandbox/input/${fileRecord.filename} with Python/pandas.`;
+      return {
+        text: descriptor + codeHint,
+        fileType: "tabular",
+        documentMetadata: {
+          fileType: "tabular",
+          format: "csv",
+          fileId,
+          sheetCount: data.metadata.sheetCount,
+          totalRows: data.metadata.totalRows,
+          sheets: data.sheets.map((s) => ({
+            name: s.name,
+            rowCount: s.rowCount,
+            columns: s.columns,
+            dataTypes: s.dataTypes,
+          })),
+        },
+      };
+    }
+
+    // Tabular data — XLSX
+    if (ct === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || fileRecord.filename?.toLowerCase().endsWith(".xlsx")) {
+      const data = await extractXlsx(fileBuffer, fileRecord.filename ?? undefined);
+      const descriptor = tabularToDescriptor(data);
+      const codeHint = `\n\nFile ID: ${fileId}\nTo analyze this data, use code_execute with input_file_ids: ["${fileId}"] and read /sandbox/input/${fileRecord.filename} with Python/pandas or openpyxl.`;
+      return {
+        text: descriptor + codeHint,
+        fileType: "tabular",
+        documentMetadata: {
+          fileType: "tabular",
+          format: "xlsx",
+          fileId,
+          sheetCount: data.metadata.sheetCount,
+          totalRows: data.metadata.totalRows,
+          sheets: data.sheets.map((s) => ({
+            name: s.name,
+            rowCount: s.rowCount,
+            columns: s.columns,
+            dataTypes: s.dataTypes,
+          })),
+        },
+      };
+    }
+
+    // PPTX presentations
+    if (ct === "application/vnd.openxmlformats-officedocument.presentationml.presentation" || fileRecord.filename?.toLowerCase().endsWith(".pptx")) {
+      const result = await extractPptxContent(fileBuffer, ct, fileRecord.filename ?? "presentation.pptx", input.orgId, fileRecord.storagePath);
+      return {
+        text: result.text,
+        fileType: "presentation",
+        documentMetadata: result.documentMetadata as Record<string, unknown>,
+      };
+    }
+
+    // Images — vision + OCR
+    if (ct.startsWith("image/")) {
+      const result = await extractImageContent(fileBuffer, ct, fileRecord.filename ?? undefined);
+      return {
+        text: result.text,
+        fileType: "image",
+        documentMetadata: result.documentMetadata as Record<string, unknown>,
+      };
     }
 
     const text = decodeBuffer(fileBuffer, { contentType: ct });
@@ -301,15 +374,25 @@ interface EnrichmentResult {
   category: string;
 }
 
-async function enrichDocument(text: string, title?: string): Promise<EnrichmentResult | null> {
+async function enrichDocument(text: string, title?: string, fileType?: string): Promise<EnrichmentResult | null> {
   try {
     const model = process.env.ENRICHMENT_MODEL ?? "default-model";
     const snippet = text.slice(0, 4000);
+
+    let typeSpecificInstructions = "";
+    if (fileType === "tabular") {
+      typeSpecificInstructions = `\nThis is tabular/spreadsheet data. Focus tags on: data domain, column topics, data category (e.g. "financial-data", "sales", "quarterly-report").`;
+    } else if (fileType === "image") {
+      typeSpecificInstructions = `\nThis is an image description. Focus tags on: content type, subjects, visual style (e.g. "photograph", "chart", "diagram", "screenshot").`;
+    } else if (fileType === "presentation") {
+      typeSpecificInstructions = `\nThis is a presentation/slideshow. Focus tags on: topic, audience, presentation type (e.g. "quarterly-review", "product-roadmap", "training").`;
+    }
+
     const prompt = `Analyze this document and return a JSON object with:
 - "summary": a 2-3 sentence summary of the document
 - "tags": an array of 3-7 descriptive tags (lowercase, no #)
-- "category": a single category label (e.g. "tutorial", "research", "news", "documentation", "blog", "reference")
-
+- "category": a single category label (e.g. "tutorial", "research", "news", "documentation", "blog", "reference", "dataset", "image", "presentation")
+${typeSpecificInstructions}
 ${title ? `Title: ${title}\n` : ""}Content:
 ${snippet}`;
 
@@ -341,9 +424,13 @@ async function persistEnrichment(
   orgId: string,
   extractedMetadata: ExtractedMetadata | undefined,
   enrichment: EnrichmentResult | null,
+  documentMetadata?: Record<string, unknown>,
 ): Promise<void> {
   const updates: Record<string, unknown> = { updatedAt: new Date() };
-  if (extractedMetadata) updates.metadata = extractedMetadata;
+  const mergedMetadata: Record<string, unknown> = {};
+  if (extractedMetadata) Object.assign(mergedMetadata, extractedMetadata);
+  if (documentMetadata) Object.assign(mergedMetadata, documentMetadata);
+  if (Object.keys(mergedMetadata).length > 0) updates.metadata = mergedMetadata;
   if (enrichment?.summary) updates.summary = enrichment.summary;
 
   await db.update(knowledgeDocuments).set(updates).where(eq(knowledgeDocuments.id, documentId));
@@ -426,8 +513,8 @@ export async function ingestDocument(input: DocumentIngestionInput): Promise<{ c
 
   // LLM enrichment (non-blocking — failure just skips enrichment)
   Context.current().heartbeat("Enriching document with LLM");
-  const enrichment = await enrichDocument(resolved.text, resolved.title);
-  await persistEnrichment(input.documentId, input.orgId, resolved.extractedMetadata, enrichment);
+  const enrichment = await enrichDocument(resolved.text, resolved.title, resolved.fileType);
+  await persistEnrichment(input.documentId, input.orgId, resolved.extractedMetadata, enrichment, resolved.documentMetadata);
 
   return { chunkCount: withEmbeddings.length };
 }

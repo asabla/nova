@@ -47,6 +47,25 @@ const TEXT_MIME_TYPES = new Set([
   "text/xml",
 ]);
 
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+async function parseXlsxToText(buffer: Buffer): Promise<string> {
+  const XLSX = await import("xlsx");
+  const workbook = XLSX.read(buffer, { type: "buffer" });
+  const parts: string[] = [];
+
+  for (const sheetName of workbook.SheetNames) {
+    const ws = workbook.Sheets[sheetName];
+    if (!ws) continue;
+    if (workbook.SheetNames.length > 1) {
+      parts.push(`## ${sheetName}\n`);
+    }
+    parts.push(XLSX.utils.sheet_to_csv(ws));
+  }
+
+  return parts.join("\n\n");
+}
+
 export async function extractFileContent(
   storagePath: string,
   contentType: string,
@@ -58,6 +77,8 @@ export async function extractFileContent(
 
     if (contentType === "application/pdf") {
       text = await parsePdf(buffer);
+    } else if (contentType === XLSX_MIME) {
+      text = await parseXlsxToText(buffer);
     } else if (contentType === "text/html" || contentType === "application/xhtml+xml") {
       const html = decodeBuffer(buffer, { contentType, isHtml: true });
       const extracted = extractFromHtml(html);
