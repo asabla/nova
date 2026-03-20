@@ -863,6 +863,7 @@ export function ArtifactRenderer({ artifact, className }: ArtifactRendererProps)
           <ExcalidrawDiagram
             artifactId={artifact.id}
             initialScene={artifact.content}
+            fullscreen={fullscreen}
           />
         )}
 

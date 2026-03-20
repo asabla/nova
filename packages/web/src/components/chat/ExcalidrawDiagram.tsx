@@ -88,6 +88,7 @@ interface ExcalidrawDiagramProps {
   artifactId: string;
   initialScene: string; // JSON string
   readOnly?: boolean;
+  fullscreen?: boolean;
   onSceneUpdate?: (json: string) => void;
 }
 
@@ -114,6 +115,7 @@ export function ExcalidrawDiagram({
   artifactId,
   initialScene,
   readOnly = false,
+  fullscreen = false,
   onSceneUpdate,
 }: ExcalidrawDiagramProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -177,7 +179,7 @@ export function ExcalidrawDiagram({
           svgRef.current.innerHTML = "";
           svg.style.width = "100%";
           svg.style.height = "auto";
-          svg.style.maxHeight = "400px";
+          if (!fullscreen) svg.style.maxHeight = "400px";
           svgRef.current.appendChild(svg);
         }
       } catch {
@@ -322,7 +324,7 @@ export function ExcalidrawDiagram({
   }, [isEditing, saveMutation, onSceneUpdate]);
 
   return (
-    <div ref={containerRef} className="relative w-full min-w-0">
+    <div ref={containerRef} className={clsx("relative w-full min-w-0", fullscreen && "flex flex-col h-full")}>
       {/* Toolbar */}
       <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border bg-surface-tertiary/30">
         {!readOnly && (
@@ -384,15 +386,15 @@ export function ExcalidrawDiagram({
       {isEditing ? (
         <Suspense
           fallback={
-            <div className="flex items-center justify-center h-[400px] text-text-tertiary">
+            <div className={clsx("flex items-center justify-center text-text-tertiary", fullscreen ? "flex-1" : "h-[400px]")}>
               <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading editor...
             </div>
           }
         >
           {containerWidth > 0 ? (
             <div
-              className="excalidraw-container"
-              style={{ width: containerWidth, height: 500, position: "relative", overflow: "hidden" }}
+              className={clsx("excalidraw-container", fullscreen && "flex-1")}
+              style={{ width: containerWidth, height: fullscreen ? undefined : 500, position: "relative", overflow: "hidden" }}
             >
               <Excalidraw
                 initialData={initialData}
@@ -419,7 +421,7 @@ export function ExcalidrawDiagram({
       ) : (
         <div
           ref={svgRef}
-          className="flex justify-center p-4 overflow-auto cursor-pointer min-h-[100px]"
+          className={clsx("flex justify-center p-4 overflow-auto cursor-pointer min-h-[100px]", fullscreen && "flex-1 items-center")}
           onClick={() => !readOnly && handleToggleEdit()}
           title={readOnly ? undefined : "Click to edit"}
         />

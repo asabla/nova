@@ -419,7 +419,9 @@ export function ArtifactDisplay({ artifact, onSave }: ArtifactDisplayProps) {
       {/* Content area */}
       {!collapsed && (
         <div className={clsx(
-          fullscreen ? "flex-1 overflow-auto" : artifact.type === "excalidraw" ? "overflow-hidden" : "overflow-auto max-h-[400px]",
+          fullscreen
+            ? (artifact.type === "excalidraw" ? "flex-1 overflow-hidden flex flex-col" : "flex-1 overflow-auto")
+            : (artifact.type === "excalidraw" ? "overflow-hidden" : "overflow-auto max-h-[400px]"),
         )}>
           {/* Code artifacts */}
           {artifact.type === "code" && (
@@ -450,6 +452,7 @@ export function ArtifactDisplay({ artifact, onSave }: ArtifactDisplayProps) {
             <ExcalidrawDiagram
               artifactId={artifact.id}
               initialScene={excalidrawScene}
+              fullscreen={fullscreen}
             />
           )}
 
@@ -458,6 +461,7 @@ export function ArtifactDisplay({ artifact, onSave }: ArtifactDisplayProps) {
             <ExcalidrawDiagram
               artifactId={artifact.id}
               initialScene={artifact.content}
+              fullscreen={fullscreen}
             />
           )}
 
