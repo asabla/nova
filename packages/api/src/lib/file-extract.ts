@@ -1,5 +1,6 @@
 import { getObjectBuffer } from "./minio";
 import { extractFromHtml } from "@nova/shared/content";
+import { decodeBuffer } from "@nova/shared/utils";
 
 let _pdfParse: ((buf: Buffer) => Promise<{ text: string }>) | null = null;
 
@@ -58,11 +59,11 @@ export async function extractFileContent(
     if (contentType === "application/pdf") {
       text = await parsePdf(buffer);
     } else if (contentType === "text/html" || contentType === "application/xhtml+xml") {
-      const html = buffer.toString("utf-8");
+      const html = decodeBuffer(buffer, { contentType, isHtml: true });
       const extracted = extractFromHtml(html);
       text = extracted.markdown;
     } else if (TEXT_MIME_TYPES.has(contentType)) {
-      text = buffer.toString("utf-8");
+      text = decodeBuffer(buffer, { contentType });
     }
 
     if (!text || text.trim().length === 0) return null;
