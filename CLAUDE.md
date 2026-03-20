@@ -68,6 +68,7 @@ Error handler → Security headers → CORS → Request ID → Logger → **Publ
 - **Frontend state**: Zustand for client state (auth, UI), TanStack Query for server state
 - **Route generation**: TanStack Router file-based routing, auto-generates `routeTree.gen.ts`
 - **Attachment previews**: `AttachmentPreview` component (`components/common/AttachmentPreview.tsx`) renders inline previews for images, HTML, PDF, video, audio, CSV, and text/code files. Uses `usePresignedUrl` hook with IntersectionObserver for lazy loading. Falls back to download button for unsupported types or on error.
+- **Agent skills**: 15 skills defined in `packages/shared/src/skills.ts` (xlsx, pdf, docx, pptx, algorithmic-art, brand-guidelines, canvas-design, claude-api, doc-coauthoring, frontend-design, internal-comms, mcp-builder, theme-factory, web-artifacts-builder, webapp-testing). Skills are triggered by file MIME types or keyword matching in user messages. Full SKILL.md instructions, scripts, and docs are baked into the sandbox Docker image at `/sandbox/skills/{name}/`. Compact instruction summaries are injected into the agent prompt. Skill content source: `packages/shared/skills/`.
 
 ### Infrastructure services
 

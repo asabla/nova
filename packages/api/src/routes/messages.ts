@@ -252,7 +252,7 @@ const DEFAULT_TOOLS = [
           },
           skill: {
             type: ["string", "null"],
-            description: "Skill for specialized processing. Use 'xlsx' for spreadsheets, 'pdf' for PDFs, 'docx' for Word docs. The Python sandbox always has pandas, openpyxl, pypdf, reportlab, python-docx pre-installed regardless of skill.",
+            description: "Skill for specialized processing: 'xlsx' (spreadsheets), 'pdf' (PDFs), 'docx' (Word), 'pptx' (PowerPoint), 'algorithmic-art' (generative art), 'brand-guidelines' (brand styling), 'canvas-design' (visual art), 'claude-api' (Claude SDK), 'doc-coauthoring' (writing), 'frontend-design' (UI), 'internal-comms' (org comms), 'mcp-builder' (MCP servers), 'theme-factory' (themes), 'web-artifacts-builder' (React artifacts), 'webapp-testing' (Playwright). Scripts at /sandbox/skills/{name}/.",
           },
         },
         required: ["language", "code", "stdin", "timeout", "input_file_ids", "skill"],
@@ -465,11 +465,24 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
       };
 
       // Inject skill instructions for file types present in the conversation
-      const relevantSkills = Object.values(SKILLS).filter((skill) =>
+      const fileTypeSkills = Object.values(SKILLS).filter((skill) =>
+        skill.fileTypes.length > 0 &&
         conversationFiles.some((f) => skill.fileTypes.includes(f.contentType ?? "")),
       );
-      if (relevantSkills.length > 0) {
-        const skillInstructions = relevantSkills.map((s) => s.instructions).join("\n\n");
+
+      // Keyword-triggered skills (deduplicated with file-type triggers)
+      const injectedNames = new Set(fileTypeSkills.map((s) => s.name));
+      const userContent = (lastUserContent ?? "").toLowerCase();
+      const keywordSkills = Object.values(SKILLS).filter((skill) =>
+        !injectedNames.has(skill.name) &&
+        skill.triggerKeywords?.some((kw) => userContent.includes(kw.toLowerCase())),
+      );
+
+      // Cap total injected skills at 4 to limit prompt bloat
+      const allSkills = [...fileTypeSkills, ...keywordSkills].slice(0, 4);
+
+      if (allSkills.length > 0) {
+        const skillInstructions = allSkills.map((s) => s.instructions).join("\n\n");
         enrichedMessages[0] = {
           ...enrichedMessages[0],
           content: `${enrichedMessages[0].content}\n\n${skillInstructions}`,
@@ -481,6 +494,20 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         ...enrichedMessages[0],
         content: `${enrichedMessages[0].content}\n\n${SANDBOX_PACKAGES_NOTE}`,
       };
+    } else {
+      // Even without files, check for keyword-triggered skills
+      const userContent = (lastUserContent ?? "").toLowerCase();
+      const keywordSkills = Object.values(SKILLS).filter((skill) =>
+        skill.triggerKeywords?.some((kw) => userContent.includes(kw.toLowerCase())),
+      ).slice(0, 4);
+
+      if (keywordSkills.length > 0) {
+        const skillInstructions = keywordSkills.map((s) => s.instructions).join("\n\n");
+        enrichedMessages[0] = {
+          ...enrichedMessages[0],
+          content: `${enrichedMessages[0].content}\n\n${skillInstructions}\n\n${SANDBOX_PACKAGES_NOTE}`,
+        };
+      }
     }
   }
 
