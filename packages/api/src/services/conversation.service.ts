@@ -1,5 +1,5 @@
 import { db } from "../lib/db";
-import { conversations, conversationParticipants, conversationTagAssignments, messages } from "@nova/shared/schemas";
+import { conversations, conversationParticipants, conversationTagAssignments, conversationTags, messages } from "@nova/shared/schemas";
 import { eq, and, isNull, desc, ilike, sql, inArray, asc, lte } from "drizzle-orm";
 import type { Conversation } from "@nova/shared/schemas";
 import { parsePagination, buildPaginatedResponse, type PaginationInput } from "@nova/shared/utils";
@@ -417,4 +417,98 @@ export async function generateConversationTitle(
     max_tokens: 30,
   });
   return result.choices?.[0]?.message?.content?.trim() ?? "Untitled Conversation";
+}
+
+export async function generateConversationTags(
+  msgs: { role: string; content: string }[],
+): Promise<string[]> {
+  const result = await chatCompletion({
+    model: process.env.SUMMARY_MODEL ?? "default-model",
+    messages: [
+      {
+        role: "system" as const,
+        content:
+          "Generate 1-3 lowercase topic tags for this conversation. " +
+          "Respond with a JSON array of strings only, e.g. [\"python\",\"web-scraping\"]. " +
+          "Tags should be short (1-2 words, kebab-case). No explanation.",
+      },
+      ...msgs.slice(0, 4).map((m) => ({
+        role: m.role as "user" | "assistant" | "system",
+        content: m.content,
+      })),
+    ],
+    max_tokens: 60,
+  });
+  const raw = result.choices?.[0]?.message?.content?.trim() ?? "[]";
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .filter((t: unknown) => typeof t === "string")
+        .map((t: string) => t.toLowerCase().trim())
+        .filter((t: string) => t.length > 0)
+        .slice(0, 3);
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return [];
+}
+
+export async function assignTagsToConversation(
+  orgId: string,
+  userId: string,
+  conversationId: string,
+  tagNames: string[],
+) {
+  const tags: { id: string; name: string; color: string | null }[] = [];
+
+  for (const name of tagNames) {
+    // Upsert: find existing tag by org+user+name, or create
+    const existing = await db
+      .select()
+      .from(conversationTags)
+      .where(
+        and(
+          eq(conversationTags.orgId, orgId),
+          eq(conversationTags.userId, userId),
+          eq(conversationTags.name, name),
+          isNull(conversationTags.deletedAt),
+        ),
+      );
+
+    let tag = existing[0];
+    if (!tag) {
+      const [created] = await db
+        .insert(conversationTags)
+        .values({ orgId, userId, name })
+        .returning();
+      tag = created;
+    }
+
+    tags.push({ id: tag.id, name: tag.name, color: tag.color });
+
+    // Check if assignment already exists
+    const existingAssignment = await db
+      .select()
+      .from(conversationTagAssignments)
+      .where(
+        and(
+          eq(conversationTagAssignments.conversationId, conversationId),
+          eq(conversationTagAssignments.conversationTagId, tag.id),
+          eq(conversationTagAssignments.orgId, orgId),
+          isNull(conversationTagAssignments.deletedAt),
+        ),
+      );
+
+    if (existingAssignment.length === 0) {
+      await db.insert(conversationTagAssignments).values({
+        conversationId,
+        conversationTagId: tag.id,
+        orgId,
+      });
+    }
+  }
+
+  return tags;
 }

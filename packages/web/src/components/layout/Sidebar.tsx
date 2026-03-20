@@ -10,10 +10,10 @@ import {
   CheckSquare, Square, FolderOpen, MessageSquare, Zap, HardDrive, Plus,
   X, Loader2, ChevronRight, ChevronDown,
 } from "lucide-react";
-import { isToday, isYesterday, isThisWeek, formatDistanceToNow } from "date-fns";
+import { isToday, isYesterday, isThisWeek } from "date-fns";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
-import { Select } from "../ui/Select";
+import { formatRelativeTime } from "../../lib/format";
 import { useUIStore } from "../../stores/ui.store";
 import { useAuthStore } from "../../stores/auth.store";
 import { Button } from "../ui/Button";
@@ -24,15 +24,6 @@ import { ConversationListSkeleton } from "../ui/Skeleton";
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Shorten a model ID to a human-friendly label */
-function modelShortName(modelId: string | undefined, modelsMap: Map<string, string>): string | null {
-  if (!modelId) return null;
-  if (modelsMap.has(modelId)) return modelsMap.get(modelId)!;
-  // Fallback: extract recognisable part from ID
-  const m = modelId.match(/(?:claude-|gpt-|gemini-|llama-)([\w.-]+)/i);
-  return m ? m[1] : modelId.split("/").pop()?.slice(0, 12) ?? null;
-}
 
 type DateRange = "all" | "today" | "week" | "month";
 
@@ -47,7 +38,6 @@ export function Sidebar() {
   const [showFilters, setShowFilters] = useState(false);
   const [filterDateRange, setFilterDateRange] = useState<DateRange>("all");
   const [filterTags, setFilterTags] = useState<Set<string>>(new Set());
-  const [filterModel, setFilterModel] = useState("");
   const [filterFolderId, setFilterFolderId] = useState<string | null>(null);
   const [bulkMode, setBulkMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -68,12 +58,6 @@ export function Sidebar() {
     staleTime: 30_000,
   });
 
-  const { data: modelsData } = useQuery({
-    queryKey: queryKeys.models.list(),
-    queryFn: () => api.get<any>("/api/models"),
-    staleTime: 120_000,
-  });
-
   const { data: tagsData } = useQuery({
     queryKey: queryKeys.tags.list(),
     queryFn: () => api.get<any>("/api/conversations/tags"),
@@ -84,7 +68,7 @@ export function Sidebar() {
   const { data: foldersData } = useQuery({
     queryKey: queryKeys.folders.list(),
     queryFn: () => api.get<any>("/api/conversations/folders"),
-    staleTime: 60_000,
+    staleTime: 0,
     enabled: foldersOpen || !!filterFolderId,
   });
 
@@ -132,22 +116,8 @@ export function Sidebar() {
 
   // ── Derived data ─────────────────────────────────────────────────────
   const conversations = conversationsData?.data ?? [];
-  const models = (modelsData as any)?.data ?? [];
   const tags: any[] = (tagsData as any)?.data ?? [];
   const folders: any[] = (foldersData as any)?.data ?? [];
-
-  const modelsMap = new Map<string, string>();
-  for (const m of models) {
-    modelsMap.set(m.modelId ?? m.id, m.displayName ?? m.name ?? m.modelId ?? m.id);
-  }
-
-  const modelOptions = [
-    { value: "", label: t("search.filter.allModels", { defaultValue: "All models" }) },
-    ...models.map((m: any) => ({
-      value: m.modelId ?? m.id,
-      label: m.displayName ?? m.name ?? m.modelId ?? m.id,
-    })),
-  ];
 
   // ── Debounced server search ──────────────────────────────────────────
   useEffect(() => {
@@ -177,13 +147,11 @@ export function Sidebar() {
   const activeFilterCount =
     (filterDateRange !== "all" ? 1 : 0) +
     (filterTags.size > 0 ? 1 : 0) +
-    (filterModel ? 1 : 0) +
     (filterFolderId ? 1 : 0);
 
   const clearAllFilters = useCallback(() => {
     setFilterDateRange("all");
     setFilterTags(new Set());
-    setFilterModel("");
     setFilterFolderId(null);
   }, []);
 
@@ -191,7 +159,6 @@ export function Sidebar() {
   const isSearchActive = searchQuery.trim().length >= 2;
 
   const filteredConversations = conversations.filter((c: any) => {
-    if (filterModel && c.modelId !== filterModel) return false;
     if (folderConversationIds && !folderConversationIds.has(c.id)) return false;
     if (filterDateRange !== "all") {
       const date = new Date(c.updatedAt ?? c.createdAt);
@@ -489,17 +456,6 @@ export function Sidebar() {
                   </div>
                 )}
 
-                {/* Model filter */}
-                {models.length > 0 && (
-                  <Select
-                    value={filterModel}
-                    onChange={(value) => setFilterModel(value)}
-                    placeholder={t("search.filter.allModels", { defaultValue: "All models" })}
-                    options={modelOptions}
-                    size="sm"
-                  />
-                )}
-
               </div>
             )}
 
@@ -571,7 +527,7 @@ export function Sidebar() {
                         <span className="text-[10px] text-text-tertiary truncate">{result.snippet}</span>
                       )}
                       <span className="text-[10px] text-text-tertiary">
-                        {result.updatedAt && formatDistanceToNow(new Date(result.updatedAt), { addSuffix: true })}
+                        {result.updatedAt && formatRelativeTime(result.updatedAt)}
                       </span>
                     </button>
                   ))
@@ -602,7 +558,6 @@ export function Sidebar() {
                         active={!bulkMode && activeConversationId === conv.id}
                         bulkMode={bulkMode}
                         selected={selected.has(conv.id)}
-                        modelsMap={modelsMap}
                         onClick={() => {
                           if (bulkMode) {
                             toggleSelect(conv.id);
@@ -673,19 +628,16 @@ function ConversationItem({
   active,
   bulkMode,
   selected,
-  modelsMap,
   onClick,
 }: {
   conv: any;
   active?: boolean;
   bulkMode?: boolean;
   selected?: boolean;
-  modelsMap: Map<string, string>;
   onClick: () => void;
 }) {
-  const shortModel = modelShortName(conv.modelId, modelsMap);
   const relTime = conv.updatedAt
-    ? formatDistanceToNow(new Date(conv.updatedAt), { addSuffix: true })
+    ? formatRelativeTime(conv.updatedAt)
     : null;
   const convTags: any[] = conv.tags ?? [];
 
@@ -709,8 +661,6 @@ function ConversationItem({
         <span className="block truncate text-sm">{conv.title ?? "Untitled"}</span>
         <span className="flex items-center gap-1.5 mt-0.5 text-[10px] text-text-tertiary">
           {relTime && <span>{relTime}</span>}
-          {relTime && shortModel && <span aria-hidden="true">&middot;</span>}
-          {shortModel && <span className="truncate">{shortModel}</span>}
           {convTags.length > 0 && (
             <>
               <span aria-hidden="true">&middot;</span>

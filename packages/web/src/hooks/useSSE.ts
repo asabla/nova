@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { getActiveOrgId } from "../lib/api";
+import { queryKeys } from "../lib/query-keys";
 
 export type StreamStatus = "idle" | "streaming" | "paused" | "done" | "error";
 
@@ -18,6 +20,7 @@ export interface DoneData {
 }
 
 export function useSSEStream() {
+  const queryClient = useQueryClient();
   const [tokens, setTokens] = useState("");
   const [status, setStatus] = useState<StreamStatus>("idle");
   const [activeTools, setActiveTools] = useState<ActiveTool[]>([]);
@@ -129,6 +132,13 @@ export function useSSEStream() {
 
               if (currentEventType === "title_generated" && data.title) {
                 setGeneratedTitle(data.title);
+                currentEventType = "";
+                continue;
+              }
+
+              if (currentEventType === "tags_generated" && data.tags) {
+                queryClient.invalidateQueries({ queryKey: queryKeys.tags.all });
+                queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
                 currentEventType = "";
                 continue;
               }

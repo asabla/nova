@@ -9,6 +9,7 @@ import { Select } from "../ui/Select";
 import { toast } from "../ui/Toast";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
+import { formatDateTime } from "../../lib/format";
 import type { KnowledgeCollection } from "./types";
 
 interface SettingsTabProps {
@@ -139,9 +140,9 @@ export function SettingsTab({ collectionId, collection, onDelete }: SettingsTabP
       {/* Save + metadata */}
       <div className="flex items-center justify-between pt-4 border-t border-border">
         <div className="text-xs text-text-tertiary space-y-1">
-          <p>{t("common.created", { defaultValue: "Created" })}: {new Date(collection.createdAt).toLocaleDateString()}</p>
-          <p>{t("common.updated", { defaultValue: "Updated" })}: {new Date(collection.updatedAt).toLocaleDateString()}</p>
-          {collection.lastIndexedAt && <p>{t("knowledge.lastIndexed", { defaultValue: "Last indexed" })}: {new Date(collection.lastIndexedAt).toLocaleDateString()}</p>}
+          <p>{t("common.created", { defaultValue: "Created" })}: {formatDateTime(collection.createdAt)}</p>
+          <p>{t("common.updated", { defaultValue: "Updated" })}: {formatDateTime(collection.updatedAt)}</p>
+          {collection.lastIndexedAt && <p>{t("knowledge.lastIndexed", { defaultValue: "Last indexed" })}: {formatDateTime(collection.lastIndexedAt)}</p>}
           <p>{t("knowledge.version", { defaultValue: "Version" })}: {collection.version}</p>
         </div>
         <Button

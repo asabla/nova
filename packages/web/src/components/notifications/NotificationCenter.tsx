@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { clsx } from "clsx";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelativeTime } from "../../lib/format";
 import { api } from "../../lib/api";
 import { queryKeys, notificationUnreadCountOptions } from "../../lib/query-keys";
 
@@ -268,10 +268,7 @@ export function NotificationCenter() {
                         </p>
                       )}
                       <p className="text-[10px] text-text-tertiary mt-1">
-                        {notification.createdAt &&
-                          formatDistanceToNow(new Date(notification.createdAt), {
-                            addSuffix: true,
-                          })}
+                        {notification.createdAt && formatRelativeTime(notification.createdAt)}
                       </p>
                     </div>
                   </button>

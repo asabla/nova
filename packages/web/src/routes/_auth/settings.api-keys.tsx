@@ -8,7 +8,7 @@ import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Dialog } from "../../components/ui/Dialog";
 import { toast } from "../../components/ui/Toast";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelativeTime } from "../../lib/format";
 
 export const Route = createFileRoute("/_auth/settings/api-keys")({
   component: ApiKeysSettings,
@@ -123,7 +123,7 @@ function ApiKeysSettings() {
               <p className="text-sm font-medium text-text">{key.name}</p>
               <p className="text-xs text-text-tertiary">
                 {key.prefix}{"••••••••"}
-                {key.lastUsedAt && ` - ${t("settings.lastUsed", "Last used")} ${formatDistanceToNow(new Date(key.lastUsedAt), { addSuffix: true })}`}
+                {key.lastUsedAt && ` - ${t("settings.lastUsed", "Last used")} ${formatRelativeTime(key.lastUsedAt)}`}
               </p>
             </div>
             <button

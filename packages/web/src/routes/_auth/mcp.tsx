@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { formatDateTime } from "../../lib/format";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Puzzle,
@@ -945,7 +946,7 @@ function WhitelistDialog({
                     </p>
                   )}
                   <p className="text-xs text-text-tertiary mt-0.5">
-                    Added {new Date(entry.createdAt).toLocaleDateString()}
+                    Added {formatDateTime(entry.createdAt)}
                   </p>
                 </div>
                 <button

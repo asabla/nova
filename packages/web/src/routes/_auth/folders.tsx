@@ -31,7 +31,7 @@ import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
 import { Dropdown, DropdownItem } from "../../components/ui/Dropdown";
 import { toast } from "../../components/ui/Toast";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelativeTime } from "../../lib/format";
 
 export const Route = createFileRoute("/_auth/folders")({
   component: FoldersPage,
@@ -80,7 +80,6 @@ function FoldersPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
-  const [filterModel, setFilterModel] = useState("");
   const [filterSearch, setFilterSearch] = useState("");
 
   // Move-to-folder dialog
@@ -141,9 +140,6 @@ function FoldersPage() {
         (c: any) => (c.title ?? "").toLowerCase().includes(q),
       );
     }
-    if (filterModel) {
-      convs = convs.filter((c: any) => c.modelId === filterModel);
-    }
     if (filterDateFrom) {
       const from = new Date(filterDateFrom);
       convs = convs.filter((c: any) => new Date(c.createdAt) >= from);
@@ -154,9 +150,9 @@ function FoldersPage() {
     }
 
     return convs;
-  }, [selectedFolder, folderDetail, allConversations, filterSearch, filterModel, filterDateFrom, filterDateTo]);
+  }, [selectedFolder, folderDetail, allConversations, filterSearch, filterDateFrom, filterDateTo]);
 
-  const hasActiveFilters = filterDateFrom || filterDateTo || filterModel || filterSearch;
+  const hasActiveFilters = filterDateFrom || filterDateTo || filterSearch;
 
   // ─── Mutations ───────────────────────────────────────────────────────────
 
@@ -508,19 +504,11 @@ function FoldersPage() {
                     value={filterDateTo}
                     onChange={(e) => setFilterDateTo(e.target.value)}
                   />
-                  <Input
-                    label={t("folders.filter.model", "Model")}
-                    type="text"
-                    value={filterModel}
-                    onChange={(e) => setFilterModel(e.target.value)}
-                    placeholder="e.g. gpt-4"
-                  />
                   {hasActiveFilters && (
                     <button
                       onClick={() => {
                         setFilterDateFrom("");
                         setFilterDateTo("");
-                        setFilterModel("");
                         setFilterSearch("");
                       }}
                       className="h-8 px-2 text-xs text-text-tertiary hover:text-text-secondary flex items-center gap-1"
@@ -654,10 +642,7 @@ function FoldersPage() {
                               </Badge>
                             )}
                             <span className="text-[10px] text-text-tertiary">
-                              {conv.updatedAt &&
-                                formatDistanceToNow(new Date(conv.updatedAt), {
-                                  addSuffix: true,
-                                })}
+                              {conv.updatedAt && formatRelativeTime(conv.updatedAt)}
                             </span>
                           </div>
                         </button>

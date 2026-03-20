@@ -13,7 +13,7 @@ import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { Avatar } from "../../components/ui/Avatar";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { toast } from "../../components/ui/Toast";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelativeTime } from "../../lib/format";
 
 interface OrgMember {
   id: string;
@@ -193,7 +193,7 @@ function MembersPage() {
                   <div>
                     <p className="text-sm text-text">{inv.email}</p>
                     <p className="text-xs text-text-tertiary">
-                      {t("admin.invited", { defaultValue: "Invited {{time}}", time: formatDistanceToNow(new Date(inv.createdAt), { addSuffix: true }) })}
+                      {t("admin.invited", { defaultValue: "Invited {{time}}", time: formatRelativeTime(inv.createdAt) })}
                     </p>
                   </div>
                 </div>

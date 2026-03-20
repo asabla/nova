@@ -11,7 +11,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { Select } from "../../components/ui/Select";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/Table";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelativeTime } from "../../lib/format";
 
 interface AuditLog {
   id: string;
@@ -171,7 +171,7 @@ function AdminAuditPage() {
                     <TableCell className="text-xs text-text-tertiary whitespace-nowrap">
                       <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3" aria-hidden="true" />
-                        {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}
+                        {formatRelativeTime(log.createdAt)}
                       </div>
                     </TableCell>
                     <TableCell className="text-xs">

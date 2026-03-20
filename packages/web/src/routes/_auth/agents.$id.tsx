@@ -11,6 +11,7 @@ import { Dialog } from "../../components/ui/Dialog";
 import { toast } from "../../components/ui/Toast";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { api } from "../../lib/api";
+import { formatDateTime } from "../../lib/format";
 
 export const Route = createFileRoute("/_auth/agents/$id")({
   component: AgentDetailPage,
@@ -277,8 +278,8 @@ function AgentDetailPage() {
             {agent && (
               <div className="pt-4 border-t border-border text-xs text-text-tertiary space-y-1">
                 <p>{t("agents.version", { defaultValue: "Version" })}: {agent.currentVersion}</p>
-                <p>{t("common.created", { defaultValue: "Created" })}: {new Date(agent.createdAt).toLocaleDateString()}</p>
-                <p>{t("common.updated", { defaultValue: "Updated" })}: {new Date(agent.updatedAt).toLocaleDateString()}</p>
+                <p>{t("common.created", { defaultValue: "Created" })}: {formatDateTime(agent.createdAt)}</p>
+                <p>{t("common.updated", { defaultValue: "Updated" })}: {formatDateTime(agent.updatedAt)}</p>
               </div>
             )}
           </div>
@@ -657,7 +658,7 @@ function AgentMemoryTab({ agentId }: { agentId: string }) {
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-[10px] text-text-tertiary">
                       {entry.scope && `${entry.scope} | `}
-                      {entry.createdAt && new Date(entry.createdAt).toLocaleDateString()}
+                      {entry.createdAt && formatDateTime(entry.createdAt)}
                     </span>
                     <div className="flex gap-2">
                       <button

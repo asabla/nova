@@ -765,6 +765,9 @@ function ReportDetailView({ report }: { report: ResearchReport }) {
         </CardHeader>
       </Card>
 
+      {/* Action bar */}
+      {(report.status === "completed" || report.status === "failed") && <ActionBar status={report.status} />}
+
       {/* Progress feed (running/pending) */}
       {(report.status === "running" || report.status === "pending") && (
         <ProgressFeed status={report.status} progress={report.progress} />
@@ -889,9 +892,6 @@ function ReportDetailView({ report }: { report: ResearchReport }) {
 
       {/* Sources */}
       {report.sources && report.sources.length > 0 && <SourcesList sources={report.sources} />}
-
-      {/* Action bar */}
-      {(report.status === "completed" || report.status === "failed") && <ActionBar status={report.status} />}
     </div>
   );
 }

@@ -23,7 +23,7 @@ import {
   FlaskConical,
 } from "lucide-react";
 import { clsx } from "clsx";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelativeTime } from "../../lib/format";
 import { useUIStore } from "../../stores/ui.store";
 import { api } from "../../lib/api";
 import { useAuthStore } from "../../stores/auth.store";
@@ -342,7 +342,7 @@ export function OmniBar() {
     if (!hasSearch) {
       for (const conv of recentConversations) {
         const relTime = conv.updatedAt
-          ? formatDistanceToNow(new Date(conv.updatedAt), { addSuffix: true })
+          ? formatRelativeTime(conv.updatedAt)
           : undefined;
         items.push({
           id: `recent-conv-${conv.id}`,
@@ -371,7 +371,7 @@ export function OmniBar() {
       // Conversations
       for (const r of sr.conversations ?? []) {
         const relTime = r.updatedAt
-          ? formatDistanceToNow(new Date(r.updatedAt), { addSuffix: true })
+          ? formatRelativeTime(r.updatedAt)
           : undefined;
         items.push({
           id: `search-conv-${r.id}`,

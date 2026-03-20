@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { formatDateTime } from "../../lib/format";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -295,7 +296,7 @@ function FilesPage() {
                             <span aria-hidden="true">&middot;</span>
                           </>
                         )}
-                        <span>{new Date(file.createdAt).toLocaleDateString()}</span>
+                        <span>{formatDateTime(file.createdAt)}</span>
                         <span aria-hidden="true">&middot;</span>
                         <span className={`flex items-center gap-1 ${sourceColor}`}>
                           <SourceIcon className="h-3 w-3" aria-hidden="true" />

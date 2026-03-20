@@ -20,7 +20,7 @@ import { Input } from "../../components/ui/Input";
 import { Select } from "../../components/ui/Select";
 import { Badge } from "../../components/ui/Badge";
 import { Tabs } from "../../components/ui/Tabs";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelativeTime } from "../../lib/format";
 
 export const Route = createFileRoute("/_auth/search")({
   component: SearchPage,
@@ -396,8 +396,7 @@ function SearchPage() {
                                   <Badge variant="default">{result.senderType}</Badge>
                                 )}
                                 <span className="text-[10px] text-text-tertiary">
-                                  {result.createdAt &&
-                                    formatDistanceToNow(new Date(result.createdAt), { addSuffix: true })}
+                                  {result.createdAt && formatRelativeTime(result.createdAt)}
                                 </span>
                               </div>
                             </div>

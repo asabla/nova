@@ -1,3 +1,17 @@
+function pad(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`;
+}
+
+export function formatDate(dateStr: string | Date): string {
+  const d = typeof dateStr === "string" ? new Date(dateStr) : dateStr;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+export function formatDateTime(dateStr: string | Date): string {
+  const d = typeof dateStr === "string" ? new Date(dateStr) : dateStr;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function formatRelativeTime(dateStr: string | Date): string {
   const date = typeof dateStr === "string" ? new Date(dateStr) : dateStr;
   const now = new Date();
@@ -9,7 +23,7 @@ export function formatRelativeTime(dateStr: string | Date): string {
   if (diffHours < 24) return `${diffHours}h ago`;
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 30) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
+  return formatDateTime(date);
 }
 
 export function formatFileSize(bytes: number): string {

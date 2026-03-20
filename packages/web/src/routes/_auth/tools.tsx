@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { formatDateTime } from "../../lib/format";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
@@ -457,7 +458,7 @@ function MarketplaceTab() {
                 <div className="flex items-center gap-3 text-[10px] text-text-tertiary mb-4">
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" aria-hidden="true" />
-                    {new Date(tool.createdAt).toLocaleDateString()}
+                    {formatDateTime(tool.createdAt)}
                   </span>
                   {tool.isApproved && (
                     <span className="flex items-center gap-1 text-success">
@@ -880,7 +881,7 @@ function AdminReviewTab() {
                     <div className="flex items-center gap-3 mt-2 text-[10px] text-text-tertiary">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" aria-hidden="true" />
-                        {t("tools.admin.submitted", "Submitted")} {new Date(tool.createdAt).toLocaleDateString()}
+                        {t("tools.admin.submitted", "Submitted")} {formatDateTime(tool.createdAt)}
                       </span>
                     </div>
                   </div>

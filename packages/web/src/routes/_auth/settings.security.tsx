@@ -10,7 +10,7 @@ import { Input } from "../../components/ui/Input";
 import { Dialog } from "../../components/ui/Dialog";
 import { toast } from "../../components/ui/Toast";
 import { QRCode } from "../../components/ui/QRCode";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelativeTime } from "../../lib/format";
 
 export const Route = createFileRoute("/_auth/settings/security")({
   component: SecuritySettings,
@@ -355,7 +355,7 @@ function SecuritySettings() {
                       {session.userAgent ?? t("settings.unknownDevice", "Unknown device")}
                     </p>
                     <p className="text-xs text-text-tertiary">
-                      {session.ipAddress} - {formatDistanceToNow(new Date(session.createdAt), { addSuffix: true })}
+                      {session.ipAddress} - {formatRelativeTime(session.createdAt)}
                       {session.isCurrent && (
                         <span className="text-primary ml-1">
                           ({t("settings.currentSession", "current")})

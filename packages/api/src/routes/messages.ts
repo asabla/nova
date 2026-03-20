@@ -729,11 +729,11 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
 
           // Auto-generate title for untitled conversations
           if (!conversation.title) {
+            const titleMsgs = [
+              ...body.messages.slice(0, 2).map((m) => ({ role: m.role, content: String(m.content).slice(0, 500) })),
+              { role: "assistant", content: totalContent.slice(0, 500) },
+            ];
             try {
-              const titleMsgs = [
-                ...body.messages.slice(0, 2).map((m) => ({ role: m.role, content: String(m.content).slice(0, 500) })),
-                { role: "assistant", content: totalContent.slice(0, 500) },
-              ];
               const title = await conversationService.generateConversationTitle(titleMsgs);
               if (title && title !== "Untitled Conversation") {
                 await conversationService.updateConversation(orgId, conversationId, { title });
@@ -741,6 +741,15 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
               }
             } catch (e) {
               console.error("[stream] title generation failed:", e);
+            }
+            try {
+              const tagNames = await conversationService.generateConversationTags(titleMsgs);
+              if (tagNames.length > 0) {
+                const tags = await conversationService.assignTagsToConversation(orgId, userId, conversationId, tagNames);
+                await stream.writeSSE({ event: "tags_generated", data: JSON.stringify({ tags }) });
+              }
+            } catch (e) {
+              console.error("[stream] tag generation failed:", e);
             }
           }
 
@@ -806,11 +815,11 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
 
       // Auto-generate title for untitled conversations
       if (!conversation.title) {
+        const titleMsgs = [
+          ...body.messages.slice(0, 2).map((m) => ({ role: m.role, content: String(m.content).slice(0, 500) })),
+          { role: "assistant", content: fullContent.slice(0, 500) },
+        ];
         try {
-          const titleMsgs = [
-            ...body.messages.slice(0, 2).map((m) => ({ role: m.role, content: String(m.content).slice(0, 500) })),
-            { role: "assistant", content: fullContent.slice(0, 500) },
-          ];
           const title = await conversationService.generateConversationTitle(titleMsgs);
           if (title && title !== "Untitled Conversation") {
             await conversationService.updateConversation(orgId, conversationId, { title });
@@ -818,6 +827,15 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
           }
         } catch (e) {
           console.error("[stream] title generation failed:", e);
+        }
+        try {
+          const tagNames = await conversationService.generateConversationTags(titleMsgs);
+          if (tagNames.length > 0) {
+            const tags = await conversationService.assignTagsToConversation(orgId, userId, conversationId, tagNames);
+            await stream.writeSSE({ event: "tags_generated", data: JSON.stringify({ tags }) });
+          }
+        } catch (e) {
+          console.error("[stream] tag generation failed:", e);
         }
       }
 

@@ -16,7 +16,7 @@ import { Input } from "../ui/Input";
 import { Textarea } from "../ui/Textarea";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelativeTime } from "../../lib/format";
 
 interface EditHistoryEntry {
   content: string;
@@ -413,7 +413,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[10px] font-semibold text-text-tertiary">{t("messages.version", { number: versionNum, defaultValue: `Version ${versionNum}` })}</span>
                         <span className="text-[10px] text-text-tertiary">
-                          {formatDistanceToNow(new Date(entry.editedAt), { addSuffix: true })}
+                          {formatRelativeTime(entry.editedAt)}
                         </span>
                       </div>
                       <p className="text-text-secondary whitespace-pre-wrap line-clamp-4">{entry.content}</p>

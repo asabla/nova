@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { formatDateTime } from "../../lib/format";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -673,7 +674,7 @@ function VersionEntry({ version }: { version: PromptVersion }) {
         <div className="flex items-center gap-2">
           <Badge variant="primary">v{version.version}</Badge>
           <span className="text-xs text-text-tertiary">
-            {new Date(version.createdAt).toLocaleDateString()}
+            {formatDateTime(version.createdAt)}
           </span>
         </div>
         {expanded ? (

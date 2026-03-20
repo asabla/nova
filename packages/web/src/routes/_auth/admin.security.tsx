@@ -10,7 +10,7 @@ import { Skeleton } from "../../components/ui/Skeleton";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/Table";
 import { toast } from "../../components/ui/Toast";
 import { Switch } from "../../components/ui/Switch";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelativeTime } from "../../lib/format";
 
 interface SecurityPolicies {
   mfaRequired: boolean;
@@ -182,7 +182,7 @@ function SecurityPage() {
                     <TableCell className="text-text-secondary">{log.userId?.slice(0, 8)}...</TableCell>
                     <TableCell className="text-text-secondary">{log.resourceType}</TableCell>
                     <TableCell className="text-text-tertiary text-xs">
-                      {log.createdAt && formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}
+                      {log.createdAt && formatRelativeTime(log.createdAt)}
                     </TableCell>
                   </TableRow>
                 ))}

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell, Check, CheckCheck, X } from "lucide-react";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
-import { formatDistanceToNow } from "date-fns";
+import { formatRelativeTime } from "../../lib/format";
 
 interface NotificationPanelProps {
   open: boolean;
@@ -74,7 +74,7 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
                   <p className="text-sm text-text">{n.title}</p>
                   <p className="text-xs text-text-tertiary mt-0.5 truncate">{n.body}</p>
                   <p className="text-[10px] text-text-tertiary mt-1">
-                    {n.createdAt && formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+                    {n.createdAt && formatRelativeTime(n.createdAt)}
                   </p>
                 </div>
               </div>
