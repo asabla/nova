@@ -1,23 +1,8 @@
-import { pgTable, text, uuid, timestamp, integer, jsonb, index, uniqueIndex, customType } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, integer, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
-
-// pgvector column with no fixed dimension — accepts any embedding size
-const vector = customType<{ data: number[]; driverParam: string }>({
-  dataType() {
-    return "vector";
-  },
-  toDriver(value: number[]) {
-    return JSON.stringify(value);
-  },
-  fromDriver(value: unknown) {
-    if (typeof value === "string") return JSON.parse(value) as number[];
-    if (Array.isArray(value)) return value as number[];
-    return [];
-  },
-});
 
 export const knowledgeCollections = pgTable("knowledge_collections", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -71,7 +56,6 @@ export const knowledgeChunks = pgTable("knowledge_chunks", {
   orgId: uuid("org_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
   chunkIndex: integer("chunk_index").notNull(),
   content: text("content").notNull(),
-  embedding: vector("embedding"),
   tokenCount: integer("token_count"),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -43,6 +43,13 @@
       "when": 1774033986188,
       "tag": "0005_optimal_terror",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1774043961582,
+      "tag": "0006_volatile_thing",
+      "breakpoints": true
     }
   ]
 }

@@ -1,24 +1,9 @@
-import { pgTable, text, uuid, timestamp, jsonb, index, customType } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { createSelectSchema, createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 import { agents } from "./agents";
-
-// pgvector column — reuse same pattern as knowledge.ts
-const vector = customType<{ data: number[]; driverParam: string }>({
-  dataType() {
-    return "vector";
-  },
-  toDriver(value: number[]) {
-    return JSON.stringify(value);
-  },
-  fromDriver(value: unknown) {
-    if (typeof value === "string") return JSON.parse(value) as number[];
-    if (Array.isArray(value)) return value as number[];
-    return [];
-  },
-});
 
 export const agentMemoryVectors = pgTable("agent_memory_vectors", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -27,7 +12,6 @@ export const agentMemoryVectors = pgTable("agent_memory_vectors", {
   userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
   scope: text("scope").notNull().default("global"),
   content: text("content").notNull(),
-  embedding: vector("embedding"),
   metadata: jsonb("metadata").$type<Record<string, unknown>>(),
   sourceType: text("source_type"), // "conversation", "manual", "extracted"
   sourceId: text("source_id"),
