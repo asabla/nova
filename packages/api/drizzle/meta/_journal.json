@@ -36,6 +36,13 @@
       "when": 1773949485424,
       "tag": "0004_premium_blacklash",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1774033986188,
+      "tag": "0005_optimal_terror",
+      "breakpoints": true
     }
   ]
 }

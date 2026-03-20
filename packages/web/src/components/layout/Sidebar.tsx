@@ -1,4 +1,4 @@
-import { Fragment, useState, useRef, useEffect, useCallback } from "react";
+import { Fragment, useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useMatchRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -76,17 +76,30 @@ export function Sidebar() {
 
   const { data: tagsData } = useQuery({
     queryKey: queryKeys.tags.list(),
-    queryFn: () => api.get<any>("/api/conversation-folders/tags"),
+    queryFn: () => api.get<any>("/api/conversations/tags"),
     staleTime: 60_000,
     enabled: showFilters,
   });
 
   const { data: foldersData } = useQuery({
     queryKey: queryKeys.folders.list(),
-    queryFn: () => api.get<any>("/api/conversation-folders/folders"),
+    queryFn: () => api.get<any>("/api/conversations/folders"),
     staleTime: 60_000,
-    enabled: foldersOpen,
+    enabled: foldersOpen || !!filterFolderId,
   });
+
+  const { data: folderDetailData } = useQuery({
+    queryKey: queryKeys.folders.detail(filterFolderId!),
+    queryFn: () => api.get<any>(`/api/conversations/folders/${filterFolderId}`),
+    staleTime: 30_000,
+    enabled: !!filterFolderId,
+  });
+
+  const folderConversationIds = useMemo(() => {
+    if (!filterFolderId || !folderDetailData) return null;
+    const convs: any[] = (folderDetailData as any)?.conversations ?? [];
+    return new Set(convs.map((c: any) => c.conversationId ?? c.id));
+  }, [filterFolderId, folderDetailData]);
 
   // ── Mutations ────────────────────────────────────────────────────────
   const bulkArchive = useMutation({
@@ -179,7 +192,7 @@ export function Sidebar() {
 
   const filteredConversations = conversations.filter((c: any) => {
     if (filterModel && c.modelId !== filterModel) return false;
-    if (filterFolderId && c.folderId !== filterFolderId) return false;
+    if (folderConversationIds && !folderConversationIds.has(c.id)) return false;
     if (filterDateRange !== "all") {
       const date = new Date(c.updatedAt ?? c.createdAt);
       const now = new Date();

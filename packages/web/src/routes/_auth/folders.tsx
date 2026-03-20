@@ -90,17 +90,17 @@ function FoldersPage() {
   // ─── Queries ─────────────────────────────────────────────────────────────
 
   const { data: foldersData } = useQuery({
-    queryKey: ["conversation-folders"],
+    queryKey: queryKeys.folders.list(),
     queryFn: () => api.get<{ data: FolderData[] }>("/api/conversations/folders"),
   });
 
   const { data: tagsData } = useQuery({
-    queryKey: ["conversation-tags"],
+    queryKey: queryKeys.tags.list(),
     queryFn: () => api.get<any>("/api/conversations/tags"),
   });
 
   const { data: folderDetail } = useQuery({
-    queryKey: ["conversation-folders", "detail", selectedFolder],
+    queryKey: queryKeys.folders.detail(selectedFolder!),
     queryFn: () =>
       api.get<FolderData & { conversations: any[] }>(
         `/api/conversations/folders/${selectedFolder}`,
@@ -161,10 +161,10 @@ function FoldersPage() {
   // ─── Mutations ───────────────────────────────────────────────────────────
 
   const invalidateFolders = () => {
-    queryClient.invalidateQueries({ queryKey: ["conversation-folders"] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.folders.all });
     if (selectedFolder) {
       queryClient.invalidateQueries({
-        queryKey: ["conversation-folders", "detail", selectedFolder],
+        queryKey: queryKeys.folders.detail(selectedFolder),
       });
     }
   };
@@ -235,7 +235,7 @@ function FoldersPage() {
     mutationFn: (data: { name: string; color?: string }) =>
       api.post("/api/conversations/tags", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["conversation-tags"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tags.all });
       toast(t("folders.tagCreated", "Tag created"), "success");
     },
     onError: (err: any) =>
@@ -245,7 +245,7 @@ function FoldersPage() {
   const deleteTagMut = useMutation({
     mutationFn: (id: string) => api.delete(`/api/conversations/tags/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["conversation-tags"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tags.all });
       toast(t("folders.tagDeleted", "Tag deleted"), "success");
     },
     onError: (err: any) =>

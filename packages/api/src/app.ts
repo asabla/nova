@@ -107,6 +107,7 @@ app.use("/api/sandbox/*", budgetGuard());
 app.use("/api/research/*", budgetGuard());
 
 // 12. Authenticated routes
+app.route("/api/conversations", folderRoutes);
 app.route("/api/conversations", conversationRoutes);
 app.route("/api/conversations", messageRoutes);
 app.route("/api/files", fileRoutes);
@@ -130,7 +131,6 @@ app.route("/api", artifactRoutes);
 app.route("/api/research", researchRoutes);
 app.route("/api/import", importRoutes);
 app.route("/api/groups", groupRoutes);
-app.route("/api/conversations", folderRoutes);
 app.route("/api/sso", ssoRoutes);
 app.route("/api/gdpr", gdprRoutes);
 app.route("/api/agents", memoryRoutes);
