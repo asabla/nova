@@ -141,9 +141,47 @@ Begin by planning your research approach, then gather sources, and finally write
   });
 
   let fullContent = "";
+  let rawContent = ""; // includes think tags, for debug
   let totalTokens = 0;
   let steps = 0;
   const toolStartTimes = new Map<string, { name: string; startMs: number }>();
+
+  // State machine for stripping <think>...</think> from streaming tokens
+  let inThinkBlock = false;
+  let pendingBuffer = ""; // buffered text that might be start of a <think> tag
+
+  /**
+   * Process a streaming delta, stripping <think>...</think> blocks.
+   * Returns the clean text to publish (may be empty if inside a think block).
+   */
+  function stripThinkTag(delta: string): string {
+    let output = "";
+    for (let i = 0; i < delta.length; i++) {
+      const ch = delta[i];
+      if (inThinkBlock) {
+        pendingBuffer += ch;
+        if (pendingBuffer.endsWith("</think>")) {
+          inThinkBlock = false;
+          pendingBuffer = "";
+        }
+      } else {
+        pendingBuffer += ch;
+        if (pendingBuffer === "<think>".slice(0, pendingBuffer.length)) {
+          // Could be the start of <think>
+          if (pendingBuffer === "<think>") {
+            inThinkBlock = true;
+            pendingBuffer = "";
+          }
+          // else keep buffering
+        } else {
+          // Not a <think> tag — flush buffer
+          output += pendingBuffer;
+          pendingBuffer = "";
+        }
+      }
+    }
+    return output;
+  }
 
   // Map tool names to research progress types
   const toolProgressMap: Record<string, ResearchProgressType> = {
@@ -171,8 +209,12 @@ Begin by planning your research approach, then gather sources, and finally write
       if (event.type === "raw_model_stream_event") {
         const data = event.data as any;
         if (data?.type === "output_text_delta" && data.delta) {
-          fullContent += data.delta;
-          await publishToken(ch, data.delta);
+          rawContent += data.delta;
+          const clean = stripThinkTag(data.delta);
+          if (clean) {
+            fullContent += clean;
+            await publishToken(ch, clean);
+          }
         }
       } else if (event.type === "run_item_stream_event") {
         const item = event.item as any;
@@ -180,7 +222,7 @@ Begin by planning your research approach, then gather sources, and finally write
         if (event.name === "message_output_created") {
           const rawItem = item?.rawItem;
           const content = rawItem?.content;
-          const textParts = Array.isArray(content)
+          let textParts = Array.isArray(content)
             ? content
                 .filter((c: any) => c.type === "output_text")
                 .map((c: any) => c.text)
@@ -188,6 +230,8 @@ Begin by planning your research approach, then gather sources, and finally write
             : typeof content === "string"
               ? content
               : "";
+          // Strip think blocks from bulk content
+          textParts = textParts.replace(/<think>[\s\S]*?<\/think>/g, "");
           if (textParts && !fullContent.includes(textParts.slice(-100))) {
             fullContent += textParts;
           }
@@ -253,10 +297,11 @@ Begin by planning your research approach, then gather sources, and finally write
     if (!fullContent) {
       try {
         if (stream.finalOutput) {
-          fullContent =
+          let final =
             typeof stream.finalOutput === "string"
               ? stream.finalOutput
               : JSON.stringify(stream.finalOutput);
+          fullContent = final.replace(/<think>[\s\S]*?<\/think>/g, "");
         }
       } catch {
         // finalOutput may not be available

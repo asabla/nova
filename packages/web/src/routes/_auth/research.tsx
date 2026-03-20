@@ -692,7 +692,7 @@ function ReportDetail({
           </CardHeader>
           <CardContent>
             <div className="text-sm text-text leading-relaxed">
-              <MarkdownRenderer content={report.reportContent} />
+              <MarkdownRenderer content={linkifyCitations(report.reportContent)} />
             </div>
           </CardContent>
         </Card>
@@ -710,7 +710,7 @@ function ReportDetail({
           </CardHeader>
           <CardContent>
             <div className="text-sm text-text leading-relaxed">
-              <MarkdownRenderer content={sse.streamingContent} />
+              <MarkdownRenderer content={linkifyCitations(sse.streamingContent)} />
             </div>
           </CardContent>
         </Card>
@@ -1004,7 +1004,8 @@ function SourcesList({ sources }: { sources: ResearchSource[] }) {
         {visible.map((source, i) => (
           <div
             key={i}
-            className="p-3 rounded-xl bg-surface border border-border hover:border-border-strong transition-colors"
+            id={`source-${i + 1}`}
+            className="p-3 rounded-xl bg-surface border border-border hover:border-border-strong transition-colors scroll-mt-4"
           >
             <div className="flex items-start gap-2.5">
               <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -1114,6 +1115,11 @@ function EmptyDetailState({
 // ---------------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------------
+
+/** Convert [N] citation references to clickable links that scroll to the source */
+function linkifyCitations(content: string): string {
+  return content.replace(/\[(\d+)\]/g, '[[$1](#source-$1)]');
+}
 
 function downloadBlob(content: string, filename: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType });
