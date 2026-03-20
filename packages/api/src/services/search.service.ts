@@ -1,17 +1,17 @@
-import { eq, and, or, ilike, isNull, sql, gte, lte, inArray, desc } from "drizzle-orm";
+import { eq, and, isNull, sql, inArray, desc } from "drizzle-orm";
 import { db } from "../lib/db";
 import {
   conversations,
   conversationParticipants,
   messages,
-  agents,
-  knowledgeCollections,
-  knowledgeDocuments,
-  knowledgeTags,
-  knowledgeDocumentTagAssignments,
-  files,
   researchReports,
 } from "@nova/shared/schemas";
+import { generateEmbedding } from "../lib/litellm";
+import {
+  COLLECTIONS,
+  searchVector,
+  scrollFullText,
+} from "../lib/qdrant";
 
 interface SearchOptions {
   limit?: number;
@@ -28,25 +28,13 @@ interface SearchOptions {
 export const searchService = {
   async globalSearch(orgId: string, query: string, opts: SearchOptions = {}) {
     const limit = opts.limit ?? 20;
-    const offset = opts.offset ?? 0;
     const type = opts.type ?? "all";
     const mode = opts.mode ?? "keyword";
-    const pattern = `%${query}%`;
+    const isSemantic = mode === "semantic";
 
     const shouldSearch = (t: string) => type === "all" || type === t;
 
-    const dateConditions = (table: any) => {
-      const conds = [];
-      if (opts.dateFrom) conds.push(gte(table.createdAt, opts.dateFrom));
-      if (opts.dateTo) conds.push(lte(table.createdAt, opts.dateTo));
-      return conds;
-    };
-
-    // If semantic mode, try to use pgvector similarity search on messages
-    // Falls back to keyword search if embeddings are not available
-    const isSemantic = mode === "semantic";
-
-    // Build participant filter: find conversation IDs where these users participate
+    // Build participant filter
     let participantConvIds: string[] | undefined;
     if (opts.participantIds && opts.participantIds.length > 0) {
       const participantRows = await db
@@ -61,255 +49,190 @@ export const searchService = {
         );
       participantConvIds = participantRows.map((r) => r.conversationId);
       if (participantConvIds.length === 0) {
-        // No conversations match the participant filter
-        return { conversations: [], messages: [], agents: [], knowledge: [], files: [], research: [], total: 0 };
+        return { conversations: [], messages: [], agents: [], knowledge: [], knowledgeDocuments: [], files: [], research: [], total: 0, query, mode };
       }
     }
 
-    const [convResults, msgResults, agentResults, kbResults, docResults, fileResults, researchResults] = await Promise.all([
-      // --- Conversations ---
+    // Generate embedding for semantic mode
+    let queryEmbedding: number[] | null = null;
+    if (isSemantic) {
+      queryEmbedding = await generateEmbedding(query);
+    }
+
+    const orgFilter = { key: "orgId", match: { value: orgId } };
+
+    const [
+      convResults,
+      msgResults,
+      agentResults,
+      kbDocResults,
+      fileResults,
+      fileChunkResults,
+      knowledgeChunkResults,
+      researchResults,
+    ] = await Promise.all([
+      // Conversations — full-text search
       shouldSearch("conversations")
-        ? db
-            .select({
-              id: conversations.id,
-              title: conversations.title,
-              modelId: conversations.modelId,
-              createdAt: conversations.createdAt,
-              updatedAt: conversations.updatedAt,
-              type: sql<string>`'conversation'`,
-            })
-            .from(conversations)
-            .where(
-              and(
-                eq(conversations.orgId, orgId),
-                isNull(conversations.deletedAt),
-                ilike(conversations.title, pattern),
-                ...(opts.model ? [eq(conversations.modelId, opts.model)] : []),
-                ...(participantConvIds ? [inArray(conversations.id, participantConvIds)] : []),
-                ...dateConditions(conversations),
-              ),
-            )
-            .orderBy(desc(conversations.updatedAt))
-            .limit(limit)
-            .offset(offset)
+        ? scrollFullText(COLLECTIONS.CONVERSATIONS, "title", query, {
+            filter: { must: [orgFilter] },
+            limit,
+          }).then((pts) =>
+            pts.map((p) => ({
+              id: p.id,
+              title: p.payload.title as string,
+              modelId: p.payload.modelId as string,
+              type: "conversation" as const,
+            })),
+          )
         : Promise.resolve([]),
 
-      // --- Messages ---
+      // Messages — vector or full-text
       shouldSearch("messages")
         ? (async () => {
-            if (isSemantic) {
-              // Attempt semantic search using pgvector cosine similarity
-              // This requires the messages table to have an `embedding` vector column
-              // If the column doesn't exist, fall back to keyword search
-              try {
-                const semanticResults = await db.execute(
-                  sql`
-                    SELECT
-                      m.id,
-                      m.content,
-                      m.conversation_id AS "conversationId",
-                      m.sender_type AS "senderType",
-                      m.created_at AS "createdAt",
-                      'message' AS type,
-                      1 - (m.embedding <=> (
-                        SELECT embedding FROM messages
-                        WHERE org_id = ${orgId}
-                          AND content ILIKE ${pattern}
-                          AND embedding IS NOT NULL
-                          AND deleted_at IS NULL
-                        LIMIT 1
-                      )) AS score
-                    FROM messages m
-                    WHERE m.org_id = ${orgId}
-                      AND m.deleted_at IS NULL
-                      AND m.embedding IS NOT NULL
-                      ${opts.dateFrom ? sql`AND m.created_at >= ${opts.dateFrom}` : sql``}
-                      ${opts.dateTo ? sql`AND m.created_at <= ${opts.dateTo}` : sql``}
-                      ${
-                        participantConvIds
-                          ? sql`AND m.conversation_id = ANY(${participantConvIds})`
-                          : sql``
-                      }
-                    ORDER BY score DESC
-                    LIMIT ${limit}
-                    OFFSET ${offset}
-                  `,
-                );
-                return (Array.isArray(semanticResults) ? semanticResults : []) as any[];
-              } catch {
-                // Fall back to keyword search if embedding column doesn't exist
-              }
-            }
-
-            // Keyword search
-            const baseConditions = [
-              eq(messages.orgId, orgId),
-              isNull(messages.deletedAt),
-              ilike(messages.content, pattern),
-              ...dateConditions(messages),
-            ];
+            const msgFilter: any[] = [orgFilter];
             if (participantConvIds) {
-              baseConditions.push(inArray(messages.conversationId, participantConvIds));
+              msgFilter.push({
+                key: "conversationId",
+                match: { any: participantConvIds },
+              });
             }
 
-            return db
-              .select({
-                id: messages.id,
-                content: messages.content,
-                conversationId: messages.conversationId,
-                senderType: messages.senderType,
-                createdAt: messages.createdAt,
-                type: sql<string>`'message'`,
-              })
-              .from(messages)
-              .where(and(...baseConditions))
-              .orderBy(desc(messages.createdAt))
-              .limit(limit)
-              .offset(offset);
+            if (isSemantic && queryEmbedding) {
+              const results = await searchVector(COLLECTIONS.MESSAGES, queryEmbedding, {
+                filter: { must: msgFilter },
+                limit,
+              });
+              return results.map((r) => ({
+                id: r.id,
+                content: r.payload.content as string,
+                conversationId: r.payload.conversationId as string,
+                senderType: r.payload.senderType as string,
+                score: r.score,
+                type: "message" as const,
+              }));
+            }
+
+            // Keyword mode — full-text
+            const results = await scrollFullText(COLLECTIONS.MESSAGES, "content", query, {
+              filter: { must: msgFilter },
+              limit,
+            });
+            return results.map((p) => ({
+              id: p.id,
+              content: p.payload.content as string,
+              conversationId: p.payload.conversationId as string,
+              senderType: p.payload.senderType as string,
+              type: "message" as const,
+            }));
           })()
         : Promise.resolve([]),
 
-      // --- Agents ---
+      // Agents — full-text search on name + description
       shouldSearch("agents")
-        ? db
-            .select({
-              id: agents.id,
-              name: agents.name,
-              description: agents.description,
-              visibility: agents.visibility,
-              createdAt: agents.createdAt,
-              type: sql<string>`'agent'`,
-            })
-            .from(agents)
-            .where(
-              and(
-                eq(agents.orgId, orgId),
-                isNull(agents.deletedAt),
-                or(ilike(agents.name, pattern), ilike(agents.description, pattern)),
-                ...dateConditions(agents),
-              ),
-            )
-            .orderBy(desc(agents.createdAt))
-            .limit(limit)
-            .offset(offset)
-        : Promise.resolve([]),
-
-      // --- Knowledge collections ---
-      shouldSearch("knowledge")
-        ? db
-            .select({
-              id: knowledgeCollections.id,
-              name: knowledgeCollections.name,
-              description: knowledgeCollections.description,
-              createdAt: knowledgeCollections.createdAt,
-              type: sql<string>`'knowledge'`,
-            })
-            .from(knowledgeCollections)
-            .where(
-              and(
-                eq(knowledgeCollections.orgId, orgId),
-                isNull(knowledgeCollections.deletedAt),
-                or(
-                  ilike(knowledgeCollections.name, pattern),
-                  ilike(knowledgeCollections.description, pattern),
-                ),
-                ...dateConditions(knowledgeCollections),
-              ),
-            )
-            .orderBy(desc(knowledgeCollections.createdAt))
-            .limit(limit)
-            .offset(offset)
-        : Promise.resolve([]),
-
-      // --- Knowledge documents (by title, summary, tags) ---
-      shouldSearch("knowledge")
         ? (async () => {
-            const byTitleSummary = await db
-              .select({
-                id: knowledgeDocuments.id,
-                title: knowledgeDocuments.title,
-                summary: knowledgeDocuments.summary,
-                collectionId: knowledgeDocuments.knowledgeCollectionId,
-                createdAt: knowledgeDocuments.createdAt,
-                type: sql<string>`'knowledge_document'`,
-              })
-              .from(knowledgeDocuments)
-              .where(
-                and(
-                  eq(knowledgeDocuments.orgId, orgId),
-                  isNull(knowledgeDocuments.deletedAt),
-                  or(
-                    ilike(knowledgeDocuments.title, pattern),
-                    ilike(knowledgeDocuments.summary, pattern),
-                  ),
-                  ...dateConditions(knowledgeDocuments),
-                ),
-              )
-              .orderBy(desc(knowledgeDocuments.createdAt))
-              .limit(limit);
-
-            const byTag = await db
-              .selectDistinct({
-                id: knowledgeDocuments.id,
-                title: knowledgeDocuments.title,
-                summary: knowledgeDocuments.summary,
-                collectionId: knowledgeDocuments.knowledgeCollectionId,
-                createdAt: knowledgeDocuments.createdAt,
-                type: sql<string>`'knowledge_document'`,
-              })
-              .from(knowledgeDocuments)
-              .innerJoin(knowledgeDocumentTagAssignments, eq(knowledgeDocumentTagAssignments.knowledgeDocumentId, knowledgeDocuments.id))
-              .innerJoin(knowledgeTags, eq(knowledgeDocumentTagAssignments.knowledgeTagId, knowledgeTags.id))
-              .where(
-                and(
-                  eq(knowledgeDocuments.orgId, orgId),
-                  isNull(knowledgeDocuments.deletedAt),
-                  ilike(knowledgeTags.name, pattern),
-                  ...dateConditions(knowledgeDocuments),
-                ),
-              )
-              .orderBy(desc(knowledgeDocuments.createdAt))
-              .limit(limit);
-
+            const byName = await scrollFullText(COLLECTIONS.AGENTS, "name", query, {
+              filter: { must: [orgFilter] },
+              limit,
+            });
+            const byDesc = await scrollFullText(COLLECTIONS.AGENTS, "description", query, {
+              filter: { must: [orgFilter] },
+              limit,
+            });
             // Deduplicate
             const seen = new Set<string>();
             const merged = [];
-            for (const doc of [...byTitleSummary, ...byTag]) {
-              if (!seen.has(doc.id)) {
-                seen.add(doc.id);
-                merged.push(doc);
+            for (const p of [...byName, ...byDesc]) {
+              if (!seen.has(p.id)) {
+                seen.add(p.id);
+                merged.push({
+                  id: p.id,
+                  name: p.payload.name as string,
+                  description: p.payload.description as string,
+                  type: "agent" as const,
+                });
               }
             }
             return merged.slice(0, limit);
           })()
         : Promise.resolve([]),
 
-      // --- Files ---
-      shouldSearch("files")
-        ? db
-            .select({
-              id: files.id,
-              filename: files.filename,
-              contentType: files.contentType,
-              sizeBytes: files.sizeBytes,
-              createdAt: files.createdAt,
-              type: sql<string>`'file'`,
-            })
-            .from(files)
-            .where(
-              and(
-                eq(files.orgId, orgId),
-                isNull(files.deletedAt),
-                ilike(files.filename, pattern),
-                ...dateConditions(files),
-              ),
-            )
-            .orderBy(desc(files.createdAt))
-            .limit(limit)
-            .offset(offset)
+      // Knowledge documents — full-text on title + summary
+      shouldSearch("knowledge")
+        ? (async () => {
+            const byTitle = await scrollFullText(COLLECTIONS.KNOWLEDGE_DOCS, "title", query, {
+              filter: { must: [orgFilter] },
+              limit,
+            });
+            const bySummary = await scrollFullText(COLLECTIONS.KNOWLEDGE_DOCS, "summary", query, {
+              filter: { must: [orgFilter] },
+              limit,
+            });
+            const seen = new Set<string>();
+            const merged = [];
+            for (const p of [...byTitle, ...bySummary]) {
+              if (!seen.has(p.id)) {
+                seen.add(p.id);
+                merged.push({
+                  id: p.id,
+                  title: p.payload.title as string,
+                  name: p.payload.title as string,
+                  summary: p.payload.summary as string,
+                  collectionId: p.payload.collectionId as string,
+                  type: "knowledge_document" as const,
+                });
+              }
+            }
+            return merged.slice(0, limit);
+          })()
         : Promise.resolve([]),
 
-      // --- Research reports ---
+      // Files — full-text on filename
+      shouldSearch("files")
+        ? scrollFullText(COLLECTIONS.FILES, "filename", query, {
+            filter: { must: [orgFilter] },
+            limit,
+          }).then((pts) =>
+            pts.map((p) => ({
+              id: p.id,
+              filename: p.payload.filename as string,
+              type: "file" as const,
+            })),
+          )
+        : Promise.resolve([]),
+
+      // File chunks — vector search (semantic only)
+      shouldSearch("files") && isSemantic && queryEmbedding
+        ? searchVector(COLLECTIONS.FILE_CHUNKS, queryEmbedding, {
+            filter: { must: [orgFilter] },
+            limit,
+          }).then((results) =>
+            results.map((r) => ({
+              id: r.id,
+              fileId: r.payload.fileId as string,
+              content: r.payload.content as string,
+              score: r.score,
+              type: "file_chunk" as const,
+            })),
+          )
+        : Promise.resolve([]),
+
+      // Knowledge chunks — vector search (semantic only)
+      shouldSearch("knowledge") && isSemantic && queryEmbedding
+        ? searchVector(COLLECTIONS.KNOWLEDGE_CHUNKS, queryEmbedding, {
+            filter: { must: [orgFilter] },
+            limit,
+          }).then((results) =>
+            results.map((r) => ({
+              id: r.id,
+              documentId: r.payload.documentId as string,
+              content: r.payload.content as string,
+              score: r.score,
+              type: "knowledge_chunk" as const,
+            })),
+          )
+        : Promise.resolve([]),
+
+      // Research reports — still from PG (no Qdrant collection, low volume)
       shouldSearch("research")
         ? db
             .select({
@@ -325,36 +248,27 @@ export const searchService = {
               and(
                 eq(researchReports.orgId, orgId),
                 isNull(researchReports.deletedAt),
-                ilike(researchReports.query, pattern),
-                ...dateConditions(researchReports),
+                sql`${researchReports.query} ILIKE ${"%" + query + "%"}`,
               ),
             )
             .orderBy(desc(researchReports.createdAt))
             .limit(limit)
-            .offset(offset)
         : Promise.resolve([]),
     ]);
 
-    // Add context snippets with match highlighting to message results
+    // Add snippets
     const messagesWithSnippets = msgResults.map((m: any) => ({
       ...m,
       snippet: m.content ? extractSnippet(m.content, query, 200) : null,
     }));
 
-    // Add snippets to agent/knowledge descriptions
     const agentsWithSnippets = agentResults.map((a: any) => ({
       ...a,
       snippet: a.description ? extractSnippet(a.description, query, 200) : null,
     }));
 
-    const knowledgeWithSnippets = kbResults.map((k: any) => ({
-      ...k,
-      snippet: k.description ? extractSnippet(k.description, query, 200) : null,
-    }));
-
-    const docsWithSnippets = docResults.map((d: any) => ({
+    const docsWithSnippets = kbDocResults.map((d: any) => ({
       ...d,
-      name: d.title,
       snippet: d.summary ? extractSnippet(d.summary, query, 200) : null,
     }));
 
@@ -368,17 +282,20 @@ export const searchService = {
       conversations: convResults,
       messages: messagesWithSnippets,
       agents: agentsWithSnippets,
-      knowledge: knowledgeWithSnippets,
+      knowledge: [], // Collections not searched directly — docs + chunks cover it
       knowledgeDocuments: docsWithSnippets,
+      knowledgeChunks: knowledgeChunkResults,
       files: fileResults,
+      fileChunks: fileChunkResults,
       research: researchWithSnippets,
       total:
         convResults.length +
         msgResults.length +
         agentResults.length +
-        kbResults.length +
-        docResults.length +
+        kbDocResults.length +
         fileResults.length +
+        fileChunkResults.length +
+        knowledgeChunkResults.length +
         researchResults.length,
       query,
       mode,
