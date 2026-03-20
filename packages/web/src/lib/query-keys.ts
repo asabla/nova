@@ -41,6 +41,15 @@ export const queryKeys = {
     all: ["search"] as const,
     query: (...args: unknown[]) => [...queryKeys.search.all, ...args] as const,
   },
+  folders: {
+    all: ["folders"] as const,
+    list: () => [...queryKeys.folders.all, "list"] as const,
+    detail: (id: string) => [...queryKeys.folders.all, "detail", id] as const,
+  },
+  tags: {
+    all: ["tags"] as const,
+    list: () => [...queryKeys.tags.all, "list"] as const,
+  },
   prompts: {
     all: ["prompts"] as const,
     starters: () => [...queryKeys.prompts.all, "starters"] as const,

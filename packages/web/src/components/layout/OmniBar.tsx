@@ -23,6 +23,7 @@ import {
   FlaskConical,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { formatDistanceToNow } from "date-fns";
 import { useUIStore } from "../../stores/ui.store";
 import { api } from "../../lib/api";
 import { useAuthStore } from "../../stores/auth.store";
@@ -340,9 +341,13 @@ export function OmniBar() {
 
     if (!hasSearch) {
       for (const conv of recentConversations) {
+        const relTime = conv.updatedAt
+          ? formatDistanceToNow(new Date(conv.updatedAt), { addSuffix: true })
+          : undefined;
         items.push({
           id: `recent-conv-${conv.id}`,
           label: conv.title || t("omnibar.untitled", { defaultValue: "Untitled Conversation" }),
+          description: relTime,
           icon: <MessageSquare className="h-4 w-4" aria-hidden="true" />,
           section: "recent",
           action: runAndClose(() => navigate({ to: "/conversations/$id", params: { id: conv.id } })),
@@ -365,9 +370,13 @@ export function OmniBar() {
 
       // Conversations
       for (const r of sr.conversations ?? []) {
+        const relTime = r.updatedAt
+          ? formatDistanceToNow(new Date(r.updatedAt), { addSuffix: true })
+          : undefined;
         items.push({
           id: `search-conv-${r.id}`,
           label: r.title || t("omnibar.untitled", { defaultValue: "Untitled Conversation" }),
+          description: [r.snippet, relTime].filter(Boolean).join(" · ") || relTime,
           icon: <MessageSquare className="h-4 w-4" aria-hidden="true" />,
           section: "conversations",
           action: runAndClose(() => navigate({ to: "/conversations/$id", params: { id: r.id } })),
@@ -419,6 +428,7 @@ export function OmniBar() {
           action: runAndClose(() => navigate({ to: "/knowledge" })),
         });
       }
+
 
       // Research reports
       for (const r of sr.research ?? []) {
@@ -520,7 +530,7 @@ export function OmniBar() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t("omnibar.placeholder", {
-              defaultValue: "Search conversations, knowledge, commands...",
+              defaultValue: "Search conversations, knowledge, agents, commands...",
             })}
             className="flex-1 bg-transparent text-sm text-text placeholder:text-text-tertiary focus:outline-none"
             aria-label={t("omnibar.label", { defaultValue: "Universal search" })}
@@ -652,7 +662,7 @@ export function OmniBarTrigger() {
       <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
       <span className="flex-1 text-left truncate">
         {t("omnibar.placeholder", {
-          defaultValue: "Search conversations, knowledge, commands...",
+          defaultValue: "Search conversations, knowledge, agents, commands...",
         })}
       </span>
       <kbd className="hidden sm:inline text-[10px] font-mono bg-surface-tertiary/80 px-1.5 py-0.5 rounded-md border border-border text-text-tertiary">
