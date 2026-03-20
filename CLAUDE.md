@@ -67,6 +67,7 @@ Error handler → Security headers → CORS → Request ID → Logger → **Publ
 - **Auth**: Better Auth v1.5.4. Session restored in `_auth.tsx` `beforeLoad` via `authClient.getSession()`. Cookie config uses `advanced.cookiePrefix` / `advanced.cookies.session_token.name` (NOT `session.cookieName` — silently ignored)
 - **Frontend state**: Zustand for client state (auth, UI), TanStack Query for server state
 - **Route generation**: TanStack Router file-based routing, auto-generates `routeTree.gen.ts`
+- **Attachment previews**: `AttachmentPreview` component (`components/common/AttachmentPreview.tsx`) renders inline previews for images, HTML, PDF, video, audio, CSV, and text/code files. Uses `usePresignedUrl` hook with IntersectionObserver for lazy loading. Falls back to download button for unsupported types or on error.
 
 ### Infrastructure services
 

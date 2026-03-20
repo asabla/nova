@@ -8,7 +8,7 @@ interface DialogProps {
   title?: string;
   children: React.ReactNode;
   className?: string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "full";
 }
 
 export function Dialog({ open, onClose, title, children, className, size = "md" }: DialogProps) {
@@ -42,6 +42,7 @@ export function Dialog({ open, onClose, title, children, className, size = "md" 
     sm: "max-w-sm",
     md: "max-w-lg",
     lg: "max-w-2xl",
+    full: "max-w-5xl",
   };
 
   return (

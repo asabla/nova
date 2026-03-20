@@ -31,6 +31,7 @@ export const queryKeys = {
   files: {
     all: ["files"] as const,
     list: () => [...queryKeys.files.all, "list"] as const,
+    download: (fileId: string) => [...queryKeys.files.all, "download", fileId] as const,
   },
   notifications: {
     all: ["notifications"] as const,

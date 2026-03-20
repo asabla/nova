@@ -126,6 +126,23 @@ Required for production:
 - `BETTER_AUTH_URL` — API base URL
 - At least one LLM API key (`OPENAI_API_KEY` or `ANTHROPIC_API_KEY`)
 
+## Sandbox Output File Previews
+
+Files produced by sandbox code execution (or user uploads) are rendered inline in the conversation:
+
+| Category | Content Types | Rendering |
+|----------|--------------|-----------|
+| Images | `image/png`, `image/jpeg`, `image/gif`, `image/svg+xml`, `image/webp` | Thumbnail with click-to-expand lightbox |
+| HTML | `text/html` | Sandboxed `<iframe>` with expand to fullscreen |
+| PDF | `application/pdf` | Browser PDF viewer iframe with expand |
+| Video | `video/mp4`, `video/webm` | `<video>` with native controls |
+| Audio | `audio/mpeg`, `audio/wav`, `audio/ogg` | `<audio>` with native controls |
+| CSV | `text/csv` | Sortable table with expand to fullscreen |
+| Text/Code | `text/plain`, `application/json`, `application/xml` | Syntax-highlighted code block |
+| Other | Everything else | Download button |
+
+Presigned URLs are fetched lazily via IntersectionObserver and cached for 45 minutes.
+
 ## Documentation
 
 - [System Plan](docs/REFINED_SYSTEM_PLAN.md)
