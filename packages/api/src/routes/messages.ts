@@ -17,6 +17,13 @@ import { extractFileContent } from "../lib/file-extract";
 import { SKILLS, SANDBOX_PACKAGES_NOTE } from "@nova/shared/skills";
 import * as artifactService from "../services/artifact.service";
 
+/** Strip <think>...</think> reasoning blocks from model output */
+function stripThinkBlocks(text: string): string {
+  const stripped = text.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<think>[\s\S]*$/g, "").trim();
+  // If stripping removed all content, return the original with tags removed but text preserved
+  return stripped || text.replace(/<\/?think>/g, "").trim();
+}
+
 // --- Mention helpers (stories #45, #46) ---
 
 /** Extract all @mentions from message content */
@@ -478,6 +485,13 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
       "- QUIZ: Use when the user wants to test knowledge, create study material, or make a quiz. questions is a JSON array of {question, options[], correctIndex}. Users can save quizzes as standalone HTML files.",
       "- Do not overuse widgets — only include them when they enhance the response.",
       "- When you can answer a question directly or use a widget, do NOT call tools. Only use tools (web_search, fetch_url) when you genuinely need external information that no widget can provide.",
+      "",
+      "## Response Style",
+      "Be concise. Answer directly without unnecessary preamble, filler, or restating the question.",
+      "Match response length to question complexity — short questions get short answers.",
+      "Use structured formatting (lists, headings) to be scannable rather than writing long paragraphs.",
+      "Never narrate your thought process, internal reasoning, or what you are 'considering'. Just give the answer.",
+      "If a file operation (read_file, code_execute) fails, tell the user the file could not be accessed and suggest re-uploading. Do NOT fall back to web search as a workaround.",
     ].join("\n"),
   };
 
@@ -737,8 +751,9 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
 
           const relayResult = await relayPromise;
 
-          // Combine initial content + relay content for the final message
-          const totalContent = fullContent + (relayResult?.content ?? "");
+          // Combine initial content + relay content for the final message, stripping reasoning traces
+          // Strip each part separately to avoid unclosed <think> in fullContent eating relay content
+          const totalContent = stripThinkBlocks(fullContent) + stripThinkBlocks(relayResult?.content ?? "");
           const totalPromptTokens = promptTokens + (relayResult?.usage?.prompt_tokens ?? 0);
           const totalCompletionTokens = completionTokens + (relayResult?.usage?.completion_tokens ?? 0);
 
@@ -931,6 +946,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
       }
 
       // --- Normal path: no tool calls, save message as before ---
+      fullContent = stripThinkBlocks(fullContent);
       const assistantMessage = await messageService.createMessage(orgId, {
         conversationId,
         senderType: "assistant",

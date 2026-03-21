@@ -218,6 +218,9 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
     }
   }
 
+  // Strip <think> reasoning blocks before returning
+  fullContent = stripThinkBlocks(fullContent);
+
   // Signal completion to the relay
   console.log(`[agent-run] done: ${eventCount} events, ${fullContent.length} chars content, channel=${input.streamChannelId}`);
   await publishDone(input.streamChannelId, {
@@ -231,6 +234,16 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
     steps,
     toolCallRecords,
   };
+}
+
+/**
+ * Strip <think>...</think> reasoning blocks from model output.
+ * These are chain-of-thought traces that should not be shown to the user.
+ */
+function stripThinkBlocks(text: string): string {
+  const stripped = text.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<think>[\s\S]*$/g, "").trim();
+  // If stripping removed all content, return the original with tags removed but text preserved
+  return stripped || text.replace(/<\/?think>/g, "").trim();
 }
 
 function buildResultSummary(toolName: string, result: unknown): string {
