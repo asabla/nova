@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { clsx } from "clsx";
-import { Plus, X, GripVertical } from "lucide-react";
+import { Plus, X, GripVertical, Maximize2, Minimize2, Download } from "lucide-react";
 import { api } from "@/lib/api";
 
 interface KanbanColumn {
@@ -54,6 +54,7 @@ export function KanbanWidget({ params, artifactId }: KanbanWidgetProps) {
   const [newCardTitle, setNewCardTitle] = useState("");
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestStateRef = useRef({ columns, cards });
@@ -81,11 +82,15 @@ export function KanbanWidget({ params, artifactId }: KanbanWidgetProps) {
       const { columns: cols, cards: crds } = latestStateRef.current;
       api
         .patch(`/api/artifacts/${artifactId}`, {
-          metadata: { type: "kanban", columns: cols, cards: crds },
+          metadata: {
+            type: "kanban",
+            title: params?.title ?? "Kanban",
+            params: { columns: JSON.stringify(cols), cards: JSON.stringify(crds) },
+          },
         })
         .catch(console.error);
     }, 500);
-  }, [artifactId]);
+  }, [artifactId, params]);
 
   const updateCards = useCallback(
     (updater: (prev: KanbanCard[]) => KanbanCard[]) => {
@@ -168,6 +173,19 @@ export function KanbanWidget({ params, artifactId }: KanbanWidgetProps) {
     updateCards((prev) => prev.filter((c) => c.id !== cardId));
   }
 
+  function exportAsJSON() {
+    const data = { columns, cards };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(params?.title ?? "kanban").toLowerCase().replace(/\s+/g, "-")}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   if (parseError) {
     return (
       <div className="px-4 py-3 text-xs text-red-500">
@@ -177,9 +195,41 @@ export function KanbanWidget({ params, artifactId }: KanbanWidgetProps) {
   }
 
   return (
-    <div className="px-4 py-3">
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        {columns.map((col) => {
+    <>
+      {isFullscreen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60"
+          onClick={() => setIsFullscreen(false)}
+        />
+      )}
+      <div
+        className={clsx(
+          "px-4 py-3",
+          isFullscreen && "fixed inset-4 z-50 bg-surface rounded-xl shadow-2xl overflow-auto flex flex-col",
+        )}
+      >
+        {/* Toolbar */}
+        <div className="flex items-center justify-end gap-1 mb-2">
+          <button
+            type="button"
+            onClick={exportAsJSON}
+            className="p-1.5 rounded-md text-text-tertiary hover:text-text hover:bg-surface-tertiary transition-colors"
+            title="Export as JSON"
+          >
+            <Download className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsFullscreen((v) => !v)}
+            className="p-1.5 rounded-md text-text-tertiary hover:text-text hover:bg-surface-tertiary transition-colors"
+            title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+          >
+            {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+          </button>
+        </div>
+
+        <div className="flex gap-3 overflow-x-auto pb-2 flex-1">
+          {columns.map((col) => {
           const columnCards = cards.filter((c) => c.columnId === col.id);
           const isDropTarget = dragOverColumnId === col.id;
 
@@ -299,7 +349,8 @@ export function KanbanWidget({ params, artifactId }: KanbanWidgetProps) {
             </div>
           );
         })}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

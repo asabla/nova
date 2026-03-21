@@ -247,8 +247,8 @@ export const Dice: Story = {
   args: {
     config: {
       type: "dice",
-      title: "D20 Roller",
-      params: { type: "d20", count: "2" },
+      title: "Dice Roller",
+      params: { type: "d6", count: "2" },
     } satisfies WidgetConfig,
   },
 };

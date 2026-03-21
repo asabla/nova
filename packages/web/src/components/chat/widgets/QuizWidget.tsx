@@ -253,6 +253,13 @@ export function QuizWidget({ params }: { params?: Record<string, string> }) {
           >
             Start Quiz
           </button>
+          <button
+            onClick={handleDownload}
+            className="mt-2 flex items-center gap-1.5 mx-auto rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:text-text"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Save as HTML
+          </button>
         </div>
       </div>
     );

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { clsx } from "clsx";
-import { Check, Square, CheckSquare } from "lucide-react";
+import { Check, Square, CheckSquare, Download } from "lucide-react";
 
 export function ChecklistWidget({ params }: { params?: Record<string, string> }) {
   const items = (params?.items ?? "Item 1,Item 2,Item 3").split(",").map((s) => s.trim());
@@ -27,6 +27,19 @@ export function ChecklistWidget({ params }: { params?: Record<string, string> })
   };
 
   const completedCount = checked.size;
+
+  const handleExport = () => {
+    const md = items
+      .map((item, i) => `- [${checked.has(i) ? "x" : " "}] ${item}`)
+      .join("\n");
+    const blob = new Blob([md], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "checklist.md";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="px-4 py-3">
@@ -65,8 +78,17 @@ export function ChecklistWidget({ params }: { params?: Record<string, string> })
           );
         })}
       </div>
-      <div className="text-[10px] text-text-tertiary mt-2">
-        {completedCount}/{items.length} complete
+      <div className="mt-2 flex items-center justify-between">
+        <div className="text-[10px] text-text-tertiary">
+          {completedCount}/{items.length} complete
+        </div>
+        <button
+          onClick={handleExport}
+          className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] text-text-tertiary transition-colors hover:text-text hover:bg-surface-secondary cursor-pointer"
+          title="Export as Markdown"
+        >
+          <Download className="size-3" />
+        </button>
       </div>
     </div>
   );
