@@ -65,6 +65,38 @@ function ConversationPage() {
   }, [status, id, queryClient, resetStream]);
 
 
+  // --- Slash command handlers ---
+  const handleClearConversation = useCallback(async () => {
+    if (!window.confirm(t("conversations.confirmClear", "Clear all messages in this conversation?"))) return;
+    try {
+      await api.delete(`/api/conversations/${id}/messages`);
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
+      toast(t("conversations.cleared", "Conversation cleared"), "success");
+    } catch {
+      toast(t("conversations.clearFailed", "Failed to clear conversation"), "error");
+    }
+  }, [id, queryClient, t]);
+
+  const handleExportConversation = useCallback(() => {
+    if (!messages.length) {
+      toast(t("conversations.noMessages", "No messages to export"), "info");
+      return;
+    }
+    const title = conversation?.title ?? "conversation";
+    const lines = messages.map((m: any) => {
+      const role = m.senderType === "user" ? "User" : "Assistant";
+      return `## ${role}\n\n${m.content ?? ""}\n`;
+    });
+    const md = `# ${title}\n\n${lines.join("\n---\n\n")}`;
+    const blob = new Blob([md], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [messages, conversation]);
+
   const editMessage = useMutation({
     mutationFn: ({ messageId, content }: { messageId: string; content: string }) =>
       api.patch(`/api/conversations/${id}/messages/${messageId}`, { content }),
@@ -382,6 +414,8 @@ function ConversationPage() {
         onTyping={onKeystroke}
         disabled={isLoading}
         conversationId={id}
+        onClearConversation={handleClearConversation}
+        onExportConversation={handleExportConversation}
       />
     </div>
   );

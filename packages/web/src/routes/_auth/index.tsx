@@ -15,6 +15,8 @@ import { setPendingFiles as storePendingFiles } from "../../lib/pending-files";
 import { ALLOWED_MIME_TYPES } from "@nova/shared/constants";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { MentionPopup, useMentionTrigger, type MentionCandidate } from "../../components/chat/MentionPopup";
+import { SlashCommand } from "../../components/chat/SlashCommand";
+import { useSlashCommandTrigger } from "../../components/chat/useSlashCommandTrigger";
 
 export const Route = createFileRoute("/_auth/")({
   component: () => (
@@ -52,6 +54,17 @@ function HomePage() {
       requestAnimationFrame(() => textareaRef.current?.focus());
     },
     [mention.handleSelect],
+  );
+
+  // --- /slash command support ---
+  const slash = useSlashCommandTrigger(message, textareaRef);
+  const handleSlashSelect = useCallback(
+    (command: string) => {
+      const newValue = slash.handleSelect(command);
+      setMessage(newValue);
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    },
+    [slash.handleSelect],
   );
 
   const quickStarters = [
@@ -123,6 +136,15 @@ function HomePage() {
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (mention.active || slash.active) {
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Escape") {
+        return;
+      }
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -161,6 +183,10 @@ function HomePage() {
             <MentionPopup
               {...mention.popupProps}
               onSelect={handleMentionSelect}
+            />
+            <SlashCommand
+              {...slash.popupProps}
+              onSelect={handleSlashSelect}
             />
             {pendingFiles.length > 0 && (
               <div className="flex flex-wrap gap-1.5 px-4 pt-3">

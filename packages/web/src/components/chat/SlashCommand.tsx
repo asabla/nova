@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   Bot,
   FileText,
-  Settings,
   Wrench,
   Search,
   Trash2,
@@ -28,28 +27,28 @@ export interface SlashCommandProps {
   onSelect: (command: string) => void;
   onClose: () => void;
   position: { top: number; left: number };
+  visible: boolean;
 }
 
 // ---------------------------------------------------------------------------
 // Command registry
 // ---------------------------------------------------------------------------
 
-const commands: SlashCommandDef[] = [
-  { command: "/model",   description: "Switch the active model",          icon: Settings },
+export const commands: SlashCommandDef[] = [
   { command: "/agent",   description: "Use a specific agent",             icon: Bot },
   { command: "/clear",   description: "Clear the current conversation",   icon: Trash2,     clientOnly: true },
   { command: "/help",    description: "Show available commands & help",    icon: HelpCircle, clientOnly: true },
   { command: "/export",  description: "Export conversation as Markdown",   icon: Download,   clientOnly: true },
   { command: "/prompt",  description: "Use a prompt template",            icon: FileText },
   { command: "/tool",    description: "Use a specific tool",              icon: Wrench },
-  { command: "/search",  description: "Search your conversations",        icon: Search },
+  { command: "/search",  description: "Search conversations & knowledge",  icon: Search },
 ];
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function SlashCommand({ query, onSelect, onClose, position }: SlashCommandProps) {
+export function SlashCommand({ query, onSelect, onClose, position, visible }: SlashCommandProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -66,30 +65,39 @@ export function SlashCommand({ query, onSelect, onClose, position }: SlashComman
     setSelectedIndex(0);
   }, [query]);
 
-  // Keyboard navigation
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setSelectedIndex((i) => Math.min(i + 1, filtered.length - 1));
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setSelectedIndex((i) => Math.max(i - 1, 0));
-      } else if (e.key === "Enter" && filtered[selectedIndex]) {
-        e.preventDefault();
-        onSelect(filtered[selectedIndex].command);
-      } else if (e.key === "Escape") {
-        onClose();
-      } else if (e.key === "Tab" && filtered[selectedIndex]) {
-        // Tab completes the selected command
-        e.preventDefault();
-        onSelect(filtered[selectedIndex].command);
-      }
-    };
+  // Keyboard navigation (capture phase — matches MentionPopup pattern)
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (!visible || filtered.length === 0) return;
 
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [filtered, selectedIndex, onSelect, onClose]);
+      switch (e.key) {
+        case "ArrowDown":
+          e.preventDefault();
+          setSelectedIndex((i) => (i + 1) % filtered.length);
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          setSelectedIndex((i) => (i - 1 + filtered.length) % filtered.length);
+          break;
+        case "Enter":
+        case "Tab":
+          e.preventDefault();
+          e.stopPropagation();
+          onSelect(filtered[selectedIndex].command);
+          break;
+        case "Escape":
+          e.preventDefault();
+          onClose();
+          break;
+      }
+    },
+    [visible, filtered, selectedIndex, onSelect, onClose],
+  );
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
+  }, [handleKeyDown]);
 
   // Scroll selected into view
   useEffect(() => {
@@ -98,13 +106,16 @@ export function SlashCommand({ query, onSelect, onClose, position }: SlashComman
     el?.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
 
-  if (filtered.length === 0) return null;
+  if (!visible || filtered.length === 0) return null;
 
   return (
     <div
       ref={ref}
-      className="absolute z-50 w-72 bg-surface border border-border rounded-xl shadow-lg overflow-hidden"
-      style={{ bottom: position.top, left: position.left }}
+      className={clsx(
+        "absolute z-50 w-72 bg-surface border border-border rounded-xl shadow-lg overflow-hidden",
+        "animate-in fade-in zoom-in-95 duration-100",
+      )}
+      style={{ bottom: "100%", left: position.left, marginBottom: 8 }}
     >
       <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
         Slash Commands

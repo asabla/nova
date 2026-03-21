@@ -5,6 +5,9 @@ import { clsx } from "clsx";
 import { VoiceInput } from "./VoiceInput";
 import { AttachmentBar } from "./AttachmentBar";
 import { MentionPopup, useMentionTrigger, type MentionCandidate } from "./MentionPopup";
+import { SlashCommand, getSlashCommand } from "./SlashCommand";
+import { useSlashCommandTrigger } from "./useSlashCommandTrigger";
+import { HelpDialog } from "./HelpDialog";
 
 interface MessageInputProps {
   onSend: (content: string, files?: File[]) => void;
@@ -17,13 +20,17 @@ interface MessageInputProps {
   onFileUpload?: (files: File[]) => void;
   onTyping?: () => void;
   conversationId?: string;
+  onSlashCommand?: (command: string, args?: string) => void;
+  onClearConversation?: () => void;
+  onExportConversation?: () => void;
 }
 
-export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, isPaused, disabled, onFileUpload, onTyping, conversationId }: MessageInputProps) {
+export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, isPaused, disabled, onFileUpload, onTyping, conversationId, onSlashCommand, onClearConversation, onExportConversation }: MessageInputProps) {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   // Auto-save draft on disconnect / page unload (story #202)
   const draftKey = conversationId ? `nova:message-draft:${conversationId}` : "nova:message-draft";
@@ -45,6 +52,42 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
 
   // --- @mention system (stories #45, #46) ---
   const mention = useMentionTrigger(content, textareaRef);
+
+  // --- /slash command system ---
+  const slash = useSlashCommandTrigger(content, textareaRef);
+
+  const handleSlashSelect = useCallback(
+    (command: string) => {
+      const def = getSlashCommand(command);
+      if (!def) return;
+
+      if (def.clientOnly) {
+        if (command === "/help") {
+          setContent("");
+          saveDraft("");
+          setHelpOpen(true);
+        } else {
+          setContent("");
+          saveDraft("");
+          switch (command) {
+            case "/clear":
+              onClearConversation?.();
+              break;
+            case "/export":
+              onExportConversation?.();
+              break;
+          }
+        }
+      } else {
+        const newValue = slash.handleSelect(command);
+        setContent(newValue);
+        saveDraft(newValue);
+        onSlashCommand?.(command);
+      }
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    },
+    [slash.handleSelect, saveDraft, onClearConversation, onExportConversation, onSlashCommand],
+  );
 
   const handleMentionSelect = useCallback(
     (candidate: MentionCandidate) => {
@@ -88,6 +131,17 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
     // ArrowUp/ArrowDown/Enter/Tab/Escape, so we just need to prevent
     // the textarea from treating Enter as "submit message".
     if (mention.active) {
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Escape") {
+        return;
+      }
+    }
+
+    // When the slash command popup is active, let it handle navigation keys
+    if (slash.active) {
       if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
         return;
@@ -152,6 +206,12 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
             {...mention.popupProps}
             onSelect={handleMentionSelect}
             conversationId={conversationId}
+          />
+
+          {/* /slash command popup - positioned above the input area */}
+          <SlashCommand
+            {...slash.popupProps}
+            onSelect={handleSlashSelect}
           />
 
           {onFileUpload && (
@@ -256,6 +316,8 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
           <span>{t("messages.disclaimer")}</span>
         </div>
       </div>
+
+      <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }

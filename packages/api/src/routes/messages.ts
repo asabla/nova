@@ -259,6 +259,48 @@ const DEFAULT_TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "search_workspace",
+      description:
+        "Search the workspace for information across past conversations, messages, knowledge base documents, and files. " +
+        "Supports keyword (full-text) and semantic (embedding-based) search, plus date range filtering. " +
+        "Use this when the user wants to find something from earlier conversations, stored knowledge, or uploaded files. " +
+        "IMPORTANT: Always use type 'all' unless the user specifically asks to search only one type. " +
+        "For temporal queries like 'yesterday' or 'last week', use dateFrom/dateTo to filter by time range. " +
+        "You can combine date filters with a broad query (e.g. query='' with dateFrom to list recent activity).",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "The search query. Can be empty when using date filters to browse recent content." },
+          type: {
+            type: ["string", "null"],
+            enum: ["all", "conversations", "messages", "knowledge", "files", null],
+            description: "Type of content to search (default: all)",
+          },
+          mode: {
+            type: ["string", "null"],
+            enum: ["keyword", "semantic", null],
+            description: "Search mode: keyword for exact matches, semantic for meaning-based matches (default: semantic). When using date filters without a meaningful query, use 'keyword'.",
+          },
+          limit: {
+            type: ["number", "null"],
+            description: "Maximum number of results per type (default: 10, max: 20)",
+          },
+          dateFrom: {
+            type: ["string", "null"],
+            description: "ISO 8601 date string (e.g. '2025-03-20T00:00:00Z'). Only return results created on or after this date.",
+          },
+          dateTo: {
+            type: ["string", "null"],
+            description: "ISO 8601 date string (e.g. '2025-03-21T00:00:00Z'). Only return results created before this date.",
+          },
+        },
+        required: ["query", "type", "mode", "limit", "dateFrom", "dateTo"],
+      },
+    },
+  },
 ];
 
 /** Fetch enabled agents for the org and return them for system prompt injection */
@@ -869,6 +911,12 @@ messagesRouter.patch("/:conversationId/messages/:messageId", zValidator("json", 
   const message = await messageService.editMessage(orgId, c.req.param("messageId"), c.req.valid("json").content);
   if (!message) throw AppError.notFound("Message");
   return c.json(message);
+});
+
+messagesRouter.delete("/:conversationId/messages", async (c) => {
+  const orgId = c.get("orgId");
+  const count = await messageService.clearMessages(orgId, c.req.param("conversationId"));
+  return c.json({ ok: true, deleted: count });
 });
 
 messagesRouter.delete("/:conversationId/messages/:messageId", async (c) => {

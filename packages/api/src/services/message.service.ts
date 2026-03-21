@@ -162,6 +162,16 @@ export async function deleteMessage(orgId: string, messageId: string) {
   return result[0] ?? null;
 }
 
+export async function clearMessages(orgId: string, conversationId: string) {
+  const result = await db
+    .update(messages)
+    .set({ deletedAt: new Date() })
+    .where(and(eq(messages.conversationId, conversationId), eq(messages.orgId, orgId), isNull(messages.deletedAt)))
+    .returning({ id: messages.id });
+  for (const row of result) syncMessageDelete(row.id);
+  return result.length;
+}
+
 export async function rateMessage(orgId: string, messageId: string, userId: string, rating: 1 | -1, feedback?: string) {
   const existing = await db
     .select()
