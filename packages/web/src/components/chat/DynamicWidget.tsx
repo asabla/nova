@@ -9,7 +9,7 @@ import { WIDGET_REGISTRY } from "./widgets/registry";
  */
 
 export interface WidgetConfig {
-  type: "weather" | "iframe" | "api" | "countdown" | "poll" | "chart" | "progress" | "timer" | "map" | "math";
+  type: "weather" | "iframe" | "api" | "countdown" | "poll" | "chart" | "progress" | "timer" | "map" | "math" | "diff" | "timeline" | "checklist" | "colorpalette" | "qrcode" | "calendar" | "dice" | "unitconverter" | "currency" | "stock" | "kanban" | "quiz" | "jsonexplorer" | "youtube" | "codedisplay";
   title?: string;
   /** For iframe widgets */
   src?: string;
@@ -26,9 +26,10 @@ export interface WidgetConfig {
 interface DynamicWidgetProps {
   config: WidgetConfig;
   className?: string;
+  artifactId?: string;
 }
 
-export function DynamicWidget({ config, className }: DynamicWidgetProps) {
+export function DynamicWidget({ config, className, artifactId }: DynamicWidgetProps) {
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Auto-refresh
@@ -95,7 +96,7 @@ export function DynamicWidget({ config, className }: DynamicWidgetProps) {
             title={config.title ?? "Embedded content"}
           />
         ) : WidgetComponent ? (
-          <WidgetComponent params={config.params} endpoint={config.endpoint} />
+          <WidgetComponent params={config.params} endpoint={config.endpoint} artifactId={artifactId} />
         ) : null}
       </div>
     </div>

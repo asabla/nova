@@ -124,6 +124,178 @@ const SAMPLE_WIDGETS: { label: string; config: WidgetConfig }[] = [
       params: { expression: "e^{i\\pi} + 1 = 0", displayMode: "true" },
     },
   },
+  {
+    label: "Color Palette",
+    config: {
+      type: "colorpalette",
+      title: "Brand Colors",
+      params: { colors: "#6366f1,#ec4899,#14b8a6,#f59e0b,#ef4444,#8b5cf6", labels: "Primary,Pink,Teal,Amber,Red,Purple" },
+    },
+  },
+  {
+    label: "Checklist",
+    config: {
+      type: "checklist",
+      title: "Sprint Tasks",
+      params: { items: "Design mockups,Implement API,Write tests,Code review,Deploy to staging", checked: "0,1" },
+    },
+  },
+  {
+    label: "Timeline",
+    config: {
+      type: "timeline",
+      title: "Project Milestones",
+      params: {
+        events: JSON.stringify([
+          { date: "2025-01-15", title: "Kickoff", description: "Project initiated" },
+          { date: "2025-03-01", title: "Alpha Release" },
+          { date: "2025-06-15", title: "Beta Release", description: "Public beta" },
+          { date: "2025-09-01", title: "GA Launch" },
+        ]),
+      },
+    },
+  },
+  {
+    label: "Dice (D20)",
+    config: {
+      type: "dice",
+      title: "D20 Roller",
+      params: { type: "d20", count: "2" },
+    },
+  },
+  {
+    label: "Unit Converter",
+    config: {
+      type: "unitconverter",
+      title: "Length Converter",
+      params: { category: "length", from: "km", to: "mi", value: "10" },
+    },
+  },
+  {
+    label: "Calendar",
+    config: {
+      type: "calendar",
+      title: "March 2026",
+      params: {
+        month: "2026-03",
+        highlights: "2026-03-05,2026-03-15,2026-03-21",
+        labels: JSON.stringify({ "2026-03-05": "Sprint Start", "2026-03-15": "Demo Day", "2026-03-21": "Retro" }),
+      },
+    },
+  },
+  {
+    label: "QR Code",
+    config: {
+      type: "qrcode",
+      title: "QR Code",
+      params: { data: "https://nova.dev", size: "200" },
+    },
+  },
+  {
+    label: "Diff (Unified)",
+    config: {
+      type: "diff",
+      title: "Code Changes",
+      params: {
+        original: "function greet(name) {\n  console.log('Hello ' + name);\n  return true;\n}",
+        modified: "function greet(name: string) {\n  console.log(`Hello ${name}`);\n  return true;\n}",
+        language: "typescript",
+        mode: "unified",
+      },
+    },
+  },
+  {
+    label: "JSON Explorer",
+    config: {
+      type: "jsonexplorer",
+      title: "API Response",
+      params: {
+        data: JSON.stringify({
+          status: "ok",
+          data: { users: [{ id: 1, name: "Alice", active: true }, { id: 2, name: "Bob" }], total: 2 },
+          meta: { page: 1, limit: 10 },
+        }),
+      },
+    },
+  },
+  {
+    label: "Code Display",
+    config: {
+      type: "codedisplay",
+      title: "Python Execution",
+      params: {
+        code: "import pandas as pd\ndf = pd.read_csv('data.csv')\nprint(df.head())",
+        language: "python",
+        output: "   name  age\n0  Alice   30\n1  Bob     25",
+        status: "success",
+      },
+    },
+  },
+  {
+    label: "Currency (USD → EUR)",
+    config: {
+      type: "currency",
+      title: "USD to EUR",
+      params: { from: "USD", to: "EUR", amount: "100" },
+    },
+  },
+  {
+    label: "Stock (AAPL)",
+    config: {
+      type: "stock",
+      title: "AAPL",
+      params: {
+        symbol: "AAPL",
+        price: "178.72",
+        change: "+2.35",
+        changePercent: "+1.33",
+        range: "1m",
+        sparkline: "165,168,170,169,172,175,173,176,178,177,179,178",
+      },
+    },
+  },
+  {
+    label: "YouTube",
+    config: {
+      type: "youtube",
+      title: "Video",
+      params: { videoId: "dQw4w9WgXcQ" },
+    },
+  },
+  {
+    label: "Kanban Board",
+    config: {
+      type: "kanban",
+      title: "Sprint Board",
+      params: {
+        columns: JSON.stringify([
+          { id: "todo", title: "To Do" },
+          { id: "progress", title: "In Progress" },
+          { id: "done", title: "Done" },
+        ]),
+        cards: JSON.stringify([
+          { id: "1", title: "Design mockups", columnId: "todo" },
+          { id: "2", title: "API endpoints", description: "REST + WebSocket", columnId: "progress" },
+          { id: "3", title: "Auth flow", columnId: "done" },
+        ]),
+      },
+    },
+  },
+  {
+    label: "Quiz",
+    config: {
+      type: "quiz",
+      title: "JavaScript Quiz",
+      params: {
+        title: "JavaScript Basics",
+        questions: JSON.stringify([
+          { question: "Which keyword declares a block-scoped variable?", options: ["var", "let", "both", "neither"], correctIndex: 1 },
+          { question: "What does '===' check?", options: ["Value only", "Type only", "Value and type", "Reference"], correctIndex: 2 },
+          { question: "Which is NOT a primitive type?", options: ["string", "number", "object", "boolean"], correctIndex: 2 },
+        ]),
+      },
+    },
+  },
 ];
 
 // Wrap a widget config as an ArtifactData to test the ArtifactRenderer pipeline
@@ -269,7 +441,11 @@ function DevWidgetsPage() {
           <pre className="p-4 rounded-xl border border-border bg-surface-secondary text-xs text-text-secondary font-mono overflow-x-auto">
 {`interface WidgetConfig {
   type: "weather" | "iframe" | "api" | "countdown" | "poll"
-       | "chart" | "progress" | "timer" | "map" | "math";
+       | "chart" | "progress" | "timer" | "map" | "math"
+       | "colorpalette" | "checklist" | "timeline" | "dice"
+       | "unitconverter" | "calendar" | "qrcode" | "diff"
+       | "jsonexplorer" | "codedisplay" | "currency" | "stock"
+       | "youtube" | "kanban" | "quiz";
   title?: string;
   src?: string;              // iframe widgets
   endpoint?: string;         // api widgets
@@ -279,14 +455,29 @@ function DevWidgetsPage() {
 }
 
 // Widget param reference:
-// weather:   { location }
-// countdown: { date, label }
-// poll:      { question, options (comma-sep) }
-// chart:     { chartType (bar|line|pie), data (comma-sep numbers), labels (comma-sep) }
-// progress:  { steps (comma-sep), current (0-based index), status (in-progress|completed|failed) }
-// timer:     { autoStart (true|false), label }
-// map:       { lat, lon, zoom, query }
-// math:      { expression (LaTeX), displayMode (true|false) }`}
+// weather:       { location }
+// countdown:     { date, label }
+// poll:          { question, options (comma-sep) }
+// chart:         { chartType (bar|line|pie), data (comma-sep numbers), labels (comma-sep) }
+// progress:      { steps (comma-sep), current (0-based index), status (in-progress|completed|failed) }
+// timer:         { autoStart (true|false), label }
+// map:           { lat, lon, zoom, query }
+// math:          { expression (LaTeX), displayMode (true|false) }
+// colorpalette:  { colors (comma-sep hex), labels (comma-sep) }
+// checklist:     { items (comma-sep), checked (comma-sep indices) }
+// timeline:      { events (JSON: [{date,title,description?}]) }
+// dice:          { type (d6|d20|coin|custom), sides, count }
+// unitconverter: { category (length|weight|temperature|volume|speed), from, to, value }
+// calendar:      { month (YYYY-MM), highlights (comma-sep dates), labels (JSON date→label) }
+// qrcode:        { data, size }
+// diff:          { original, modified, language, mode (unified|split) }
+// jsonexplorer:  { data (JSON string) }
+// codedisplay:   { code, language, output, status (success|error) }
+// currency:      { from, to, amount }
+// stock:         { symbol, price, change, changePercent, range, sparkline (comma-sep) }
+// youtube:       { videoId, url, start (seconds) }
+// kanban:        { columns (JSON), cards (JSON) }
+// quiz:          { title, questions (JSON: [{question,options[],correctIndex}]) }`}
           </pre>
         </section>
       </div>
