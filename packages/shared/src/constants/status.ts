@@ -84,3 +84,15 @@ export type Theme = (typeof THEME)[number];
 
 export const FONT_SIZE = ["small", "medium", "large"] as const;
 export type FontSize = (typeof FONT_SIZE)[number];
+
+// Re-export agent flow constants (canonical definitions live in types/agent-flow.ts)
+export {
+  EXECUTION_TIERS,
+  type ExecutionTier,
+  EFFORT_LEVELS,
+  type EffortLevel,
+  PLAN_NODE_STATUSES,
+  type PlanNodeStatus,
+  INTERACTION_TYPES,
+  type InteractionType,
+} from "../types/agent-flow";

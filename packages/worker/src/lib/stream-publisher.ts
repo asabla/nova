@@ -1,4 +1,11 @@
 import type { ResearchProgressType, ResearchStatus, ToolCallStatus } from "@nova/shared/constants";
+import type {
+  ExecutionTier,
+  Plan,
+  PlanNodeStatus,
+  UserInteractionRequest,
+  UserInteractionResponse,
+} from "@nova/shared/types";
 import { redis } from "./redis";
 
 export async function publishToken(channelId: string, token: string) {
@@ -80,25 +87,57 @@ export async function publishResearchError(channelId: string, message: string) {
   }));
 }
 
-// --- Agent plan & subtask publishers ---
+// --- Agent flow: tier & plan publishers ---
 
-export async function publishPlanStep(
+export async function publishTierAssessed(
   channelId: string,
-  data: { step: number; description: string; status: "pending" | "running" | "completed" | "failed" },
+  data: { tier: ExecutionTier; reasoning: string },
 ) {
-  await redis.publish(channelId, JSON.stringify({ type: "plan.step", ...data }));
+  await redis.publish(channelId, JSON.stringify({ type: "tier.assessed", ...data }));
 }
 
-export async function publishPlanGenerated(
+export async function publishPlanGeneratedV2(
   channelId: string,
-  data: { steps: { number: number; description: string }[]; reasoning: string },
+  plan: Plan,
 ) {
-  await redis.publish(channelId, JSON.stringify({ type: "plan.generated", ...data }));
+  await redis.publish(channelId, JSON.stringify({ type: "plan.generated", plan }));
 }
+
+export async function publishPlanApproved(
+  channelId: string,
+  planId: string,
+) {
+  await redis.publish(channelId, JSON.stringify({ type: "plan.approved", planId }));
+}
+
+export async function publishPlanNodeStatus(
+  channelId: string,
+  data: { nodeId: string; status: PlanNodeStatus; detail?: string },
+) {
+  await redis.publish(channelId, JSON.stringify({ type: "plan.node.status", ...data }));
+}
+
+// --- Agent flow: user interaction publishers ---
+
+export async function publishInteractionRequest(
+  channelId: string,
+  request: UserInteractionRequest,
+) {
+  await redis.publish(channelId, JSON.stringify({ type: "interaction.request", request }));
+}
+
+export async function publishInteractionResponse(
+  channelId: string,
+  response: UserInteractionResponse,
+) {
+  await redis.publish(channelId, JSON.stringify({ type: "interaction.response", response }));
+}
+
+// --- Agent plan & subtask publishers (legacy, kept for subtask workflow) ---
 
 export async function publishSubtaskSpawned(
   channelId: string,
-  data: { subtaskId: string; description: string; step: number },
+  data: { subtaskId: string; description: string; nodeId: string },
 ) {
   await redis.publish(channelId, JSON.stringify({ type: "subtask.spawned", ...data }));
 }

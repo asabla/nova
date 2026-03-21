@@ -6,7 +6,8 @@ export { getAgentConfig, loadAgentMemory, saveAgentMemory, executeAgentStep, sav
 export { streamingLLMStep, publishToolStatus, publishDone, updateWorkflowStatus } from "./smart-chat.activities";
 export { runAgentLoop } from "./agent-run.activities";
 export { executeAgentStepWithSDK } from "./agent-step.activities";
-export { generatePlan, assessComplexity } from "./agent-planning.activities";
+export { assessTier, generateDAGPlan } from "./agent-planning.activities";
+export { publishTierAssessedActivity, publishPlanGeneratedActivity, publishPlanApprovedActivity, publishPlanNodeStatusActivity, publishInteractionRequestActivity, publishTokenActivity, publishDoneActivity } from "./stream.activities";
 export { summarizeContext } from "./agent-context.activities";
 export { embedAndStoreMemory, searchSemanticMemory, extractMemoryFacts } from "./agent-memory.activities";
 export { executeSandboxCode } from "./sandbox.activities";
