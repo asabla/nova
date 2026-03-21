@@ -34,11 +34,12 @@ async function parsePdf(buffer: Buffer): Promise<string> {
 }
 
 const MAX_CHARS = 60_000; // ~15k tokens, keeps context manageable
+const TABULAR_INLINE_MAX_ROWS = 50;
+const TABULAR_PREVIEW_ROWS = 10;
 
 const TEXT_MIME_TYPES = new Set([
   "text/plain",
   "text/markdown",
-  "text/csv",
   "text/html",
   "text/javascript",
   "text/typescript",
@@ -48,37 +49,116 @@ const TEXT_MIME_TYPES = new Set([
 ]);
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const TABULAR_MIMES = new Set([
+  "text/csv",
+  XLSX_MIME,
+  "application/vnd.ms-excel",
+]);
 
-async function parseXlsxToText(buffer: Buffer): Promise<string> {
+function inferColumnType(values: unknown[]): string {
+  const nonNull = values.filter((v) => v != null && v !== "");
+  if (nonNull.length === 0) return "string";
+  for (const v of nonNull) {
+    if (typeof v === "boolean" || v === "true" || v === "false") return "boolean";
+    if (typeof v === "number") return "number";
+    if (v instanceof Date) return "date";
+    if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v)) return "date";
+  }
+  return "string";
+}
+
+/**
+ * Parse a tabular file (CSV/XLSX) and return either full content (small files)
+ * or a structured preview with explicit instructions (large files).
+ */
+async function parseTabularPreview(buffer: Buffer, contentType: string, filename?: string): Promise<string> {
   const XLSX = await import("xlsx");
-  const workbook = XLSX.read(buffer, { type: "buffer" });
-  const parts: string[] = [];
+  const workbook = contentType === "text/csv" || filename?.toLowerCase().endsWith(".csv")
+    ? XLSX.read(buffer.toString("utf-8"), { type: "string" })
+    : XLSX.read(buffer, { type: "buffer" });
+
+  let totalRows = 0;
+  const sheetInfos: { name: string; rows: Record<string, unknown>[]; columns: string[] }[] = [];
 
   for (const sheetName of workbook.SheetNames) {
     const ws = workbook.Sheets[sheetName];
     if (!ws) continue;
-    if (workbook.SheetNames.length > 1) {
-      parts.push(`## ${sheetName}\n`);
-    }
-    parts.push(XLSX.utils.sheet_to_csv(ws));
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null });
+    const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+    sheetInfos.push({ name: sheetName, rows, columns });
+    totalRows += rows.length;
   }
 
-  return parts.join("\n\n");
+  // Small files: return full CSV text (existing behavior)
+  if (totalRows <= TABULAR_INLINE_MAX_ROWS) {
+    const parts: string[] = [];
+    for (const sheetName of workbook.SheetNames) {
+      const ws = workbook.Sheets[sheetName];
+      if (!ws) continue;
+      if (workbook.SheetNames.length > 1) {
+        parts.push(`## ${sheetName}\n`);
+      }
+      parts.push(XLSX.utils.sheet_to_csv(ws));
+    }
+    return parts.join("\n\n");
+  }
+
+  // Large files: return structured preview
+  const lines: string[] = [];
+  const format = contentType === "text/csv" ? "CSV" : "XLSX";
+  lines.push(`Tabular data (${format}): ${totalRows} total rows across ${sheetInfos.length} sheet(s).`);
+  lines.push("");
+
+  for (const sheet of sheetInfos) {
+    lines.push(`### Sheet "${sheet.name}" (${sheet.rows.length} rows, ${sheet.columns.length} columns)`);
+    lines.push("");
+
+    // Schema with types
+    lines.push("**Columns:**");
+    for (const col of sheet.columns) {
+      const sampleValues = sheet.rows.slice(0, 10).map((r) => r[col]);
+      const type = inferColumnType(sampleValues);
+      lines.push(`- ${col} (${type})`);
+    }
+    lines.push("");
+
+    // First N rows as CSV
+    const previewRows = sheet.rows.slice(0, TABULAR_PREVIEW_ROWS);
+    if (previewRows.length > 0) {
+      lines.push(`**First ${previewRows.length} rows:**`);
+      // Header
+      lines.push(sheet.columns.join(","));
+      for (const row of previewRows) {
+        lines.push(sheet.columns.map((c) => {
+          const v = row[c];
+          if (v == null) return "";
+          const s = String(v);
+          return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+        }).join(","));
+      }
+    }
+    lines.push("");
+  }
+
+  lines.push(`[TABULAR DATA PREVIEW: Showing first ${TABULAR_PREVIEW_ROWS} of ${totalRows} rows. The complete data is NOT in this message. To analyze the full dataset, use code_execute with pandas (pass the file ID via input_file_ids) or read_file. Do NOT answer data questions from this preview alone.]`);
+
+  return lines.join("\n");
 }
 
 export async function extractFileContent(
   storagePath: string,
   contentType: string,
+  filename?: string,
 ): Promise<string | null> {
   try {
     const buffer = await getObjectBuffer(storagePath);
 
     let text: string | null = null;
 
-    if (contentType === "application/pdf") {
+    if (TABULAR_MIMES.has(contentType)) {
+      text = await parseTabularPreview(buffer, contentType, filename);
+    } else if (contentType === "application/pdf") {
       text = await parsePdf(buffer);
-    } else if (contentType === XLSX_MIME) {
-      text = await parseXlsxToText(buffer);
     } else if (contentType === "text/html" || contentType === "application/xhtml+xml") {
       const html = decodeBuffer(buffer, { contentType, isHtml: true });
       const extracted = extractFromHtml(html);

@@ -370,11 +370,11 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
   }
 
   // Fetch storagePath for all attached files
-  let fileRecords: Record<string, { storagePath: string; contentType: string }> = {};
+  let fileRecords: Record<string, { storagePath: string; contentType: string; filename: string | null }> = {};
   if (fileIdsNeeded.length > 0) {
-    const rows = await db.select({ id: files.id, storagePath: files.storagePath, contentType: files.contentType }).from(files).where(inArray(files.id, fileIdsNeeded));
+    const rows = await db.select({ id: files.id, storagePath: files.storagePath, contentType: files.contentType, filename: files.filename }).from(files).where(inArray(files.id, fileIdsNeeded));
     for (const r of rows) {
-      fileRecords[r.id] = { storagePath: r.storagePath, contentType: r.contentType };
+      fileRecords[r.id] = { storagePath: r.storagePath, contentType: r.contentType, filename: r.filename };
     }
   }
 
@@ -395,7 +395,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
     for (const a of atts) {
       const file = a.fileId ? fileRecords[a.fileId] : null;
       if (file) {
-        const text = await extractFileContent(file.storagePath, file.contentType);
+        const text = await extractFileContent(file.storagePath, file.contentType, file.filename ?? undefined);
         if (text) {
           fileSections.push(`--- File: ${a.filename ?? "attachment"} ---\n${text}\n--- End of file ---`);
         } else {
@@ -485,12 +485,19 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
 
     // Build a manifest of all files in this conversation so the agent always
     // knows what files are available and can pass their IDs to code_execute.
+    const TABULAR_MIMES = new Set([
+      "text/csv",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+    ]);
+
     const conversationFiles = await db
       .selectDistinct({
         fileId: messageAttachments.fileId,
         filename: files.filename,
         contentType: files.contentType,
         sizeBytes: files.sizeBytes,
+        metadata: files.metadata,
       })
       .from(messageAttachments)
       .innerJoin(messagesTable, eq(messageAttachments.messageId, messagesTable.id))
@@ -504,15 +511,39 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
       );
 
     if (conversationFiles.length > 0) {
+      const hasTabularFiles = conversationFiles.some((f) => TABULAR_MIMES.has(f.contentType ?? ""));
       const fileList = conversationFiles
-        .map((f) => `- "${f.filename}" (id: ${f.fileId}, type: ${f.contentType}, ${((f.sizeBytes ?? 0) / 1024).toFixed(1)} KB)`)
+        .map((f) => {
+          const sizeStr = `${((f.sizeBytes ?? 0) / 1024).toFixed(1)} KB`;
+          const isTabular = TABULAR_MIMES.has(f.contentType ?? "");
+          const meta = f.metadata as any;
+          const rowInfo = meta?.tabular?.totalRows ? `, ~${meta.tabular.totalRows} rows` : "";
+          const tabularHint = isTabular ? " [TABULAR — use code_execute for analysis]" : "";
+          return `- "${f.filename}" (id: ${f.fileId}, type: ${f.contentType}, ${sizeStr}${rowInfo})${tabularHint}`;
+        })
         .join("\n");
-      const filesSection = [
+
+      const filesSectionParts = [
         "## Files in this conversation",
         "The following files have been uploaded by the user. When using the code_execute tool, pass file IDs via `input_file_ids` to make them available at `/sandbox/input/<filename>`.",
         "Do NOT ask the user for file IDs — use the IDs listed below.",
         fileList,
-      ].join("\n");
+      ];
+
+      if (hasTabularFiles) {
+        filesSectionParts.push(
+          "",
+          "### Working with tabular data",
+          "CSV/XLSX file content shown in messages is only a PREVIEW (schema + first ~10 rows).",
+          "The actual data is NOT in the conversation — it is stored in MinIO and must be accessed via tools.",
+          "For complete data analysis:",
+          "1. **PREFERRED**: Use `code_execute` with `input_file_ids` to load the file with pandas in the sandbox",
+          "2. **Alternative**: Use `read_file` to retrieve full text content",
+          "NEVER answer data analysis questions (counts, aggregations, filtering, statistics) based solely on the preview content in messages.",
+        );
+      }
+
+      const filesSection = filesSectionParts.join("\n");
       enrichedMessages[0] = {
         ...enrichedMessages[0],
         content: `${enrichedMessages[0].content}\n\n${filesSection}`,

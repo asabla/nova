@@ -54,13 +54,41 @@ export async function ingestFileContent(fileId: string, orgId: string): Promise<
       return;
     }
   } else if (ct === "text/csv" || file.filename?.toLowerCase().endsWith(".csv")) {
-    text = decodeBuffer(fileBuffer, { contentType: ct });
+    // CSV — extract descriptor (schema + samples) for RAG, not raw row data
+    try {
+      const { extractCsv, tabularToDescriptor } = await import("../lib/extract-tabular");
+      const data = await extractCsv(fileBuffer, file.filename ?? undefined);
+      text = tabularToDescriptor(data);
+      // Store tabular metadata on the file record
+      await db.update(files).set({
+        metadata: {
+          tabular: {
+            totalRows: data.metadata.totalRows,
+            sheetCount: data.metadata.sheetCount,
+            columns: data.sheets[0]?.columns.length ?? 0,
+          },
+        },
+      }).where(eq(files.id, fileId));
+    } catch {
+      console.warn(`[file-ingest] CSV extraction failed for ${fileId}, falling back to raw text`);
+      text = decodeBuffer(fileBuffer, { contentType: ct });
+    }
   } else if (ct === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") {
-    // XLSX — extract as text representation
+    // XLSX — extract descriptor (schema + samples) for RAG
     try {
       const { extractXlsx, tabularToDescriptor } = await import("../lib/extract-tabular");
       const data = await extractXlsx(fileBuffer, file.filename ?? undefined);
       text = tabularToDescriptor(data);
+      // Store tabular metadata on the file record
+      await db.update(files).set({
+        metadata: {
+          tabular: {
+            totalRows: data.metadata.totalRows,
+            sheetCount: data.metadata.sheetCount,
+            columns: data.sheets[0]?.columns.length ?? 0,
+          },
+        },
+      }).where(eq(files.id, fileId));
     } catch {
       console.warn(`[file-ingest] XLSX extraction failed for ${fileId}`);
       return;
