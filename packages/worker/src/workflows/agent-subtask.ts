@@ -1,8 +1,18 @@
-import { proxyActivities, CancellationScope } from "@temporalio/workflow";
+import {
+  proxyActivities,
+  CancellationScope,
+  defineSignal,
+  setHandler,
+} from "@temporalio/workflow";
 import type * as agentStepActivities from "../activities/agent-step.activities";
 import type * as agentActivities from "../activities/agent-execution.activities";
-import type * as smartChatActivities from "../activities/smart-chat.activities";
-
+import type * as streamActivities from "../activities/stream.activities";
+import type {
+  PlanNode,
+  ToolCallRecord,
+  UserInteractionRequest,
+  UserInteractionResponse,
+} from "@nova/shared/types";
 const { executeAgentStepWithSDK } = proxyActivities<typeof agentStepActivities>({
   startToCloseTimeout: "2 minutes",
   heartbeatTimeout: "30 seconds",
@@ -14,10 +24,18 @@ const { executeToolCall } = proxyActivities<typeof agentActivities>({
   retry: { maximumAttempts: 3 },
 });
 
-const { publishDone } = proxyActivities<typeof smartChatActivities>({
+const {
+  publishPlanNodeStatusActivity,
+  publishInteractionRequestActivity,
+} = proxyActivities<typeof streamActivities>({
   startToCloseTimeout: "10 seconds",
   retry: { maximumAttempts: 2 },
 });
+
+// --- Signals ---
+
+export const cancelSubtaskSignal = defineSignal("cancel");
+export const interactionResponseSignal = defineSignal<[UserInteractionResponse]>("userInteractionResponse");
 
 // --- Types ---
 
@@ -36,6 +54,8 @@ export interface SubtaskInput {
   model: string;
   modelParams?: { temperature?: number; maxTokens?: number };
   maxSteps?: number;
+  /** If provided, the subtask executes this sub-plan instead of a single agent loop. */
+  subPlan?: PlanNode[];
 }
 
 export interface SubtaskResult {
@@ -46,23 +66,24 @@ export interface SubtaskResult {
   status: "completed" | "failed" | "timeout";
 }
 
-interface ToolCallRecord {
-  toolName: string;
-  input: Record<string, unknown>;
-  output: unknown;
-  error?: string;
-  durationMs: number;
-}
-
 /**
  * Child workflow for executing a single subtask as part of a larger plan.
- * Runs a focused agent loop with a specific task and context from the parent.
+ * Supports both simple task execution and nested sub-plan execution.
  */
 export async function agentSubtaskWorkflow(input: SubtaskInput): Promise<SubtaskResult> {
+  let cancelled = false;
+  const interactionResponses = new Map<string, UserInteractionResponse>();
+
+  setHandler(cancelSubtaskSignal, () => { cancelled = true; });
+  setHandler(interactionResponseSignal, (response) => {
+    interactionResponses.set(response.requestId, response);
+  });
+
   const maxSteps = input.maxSteps ?? 10;
   let totalTokens = 0;
-  let currentStep = 0;
   const toolCallRecords: ToolCallRecord[] = [];
+  let finalContent = "";
+  let finalStatus: SubtaskResult["status"] = "completed";
 
   const messageHistory: { role: string; content: string }[] = [
     {
@@ -71,11 +92,10 @@ export async function agentSubtaskWorkflow(input: SubtaskInput): Promise<Subtask
     },
   ];
 
-  let finalContent = "";
-  let finalStatus: SubtaskResult["status"] = "completed";
-
   const subtaskLoop = async () => {
-    while (currentStep < maxSteps) {
+    let currentStep = 0;
+
+    while (currentStep < maxSteps && !cancelled) {
       currentStep++;
 
       const result = await executeAgentStepWithSDK({
@@ -99,7 +119,7 @@ export async function agentSubtaskWorkflow(input: SubtaskInput): Promise<Subtask
         const startTime = Date.now();
         const results = await Promise.all(
           result.toolCalls.map((tc) =>
-            executeToolCall(input.orgId, input.agentId, tc.id, tc.name, tc.arguments)
+            executeToolCall(input.orgId, input.agentId, tc.id, tc.name, tc.arguments),
           ),
         );
         const durationMs = Date.now() - startTime;
@@ -131,7 +151,7 @@ export async function agentSubtaskWorkflow(input: SubtaskInput): Promise<Subtask
     await CancellationScope.withTimeout(120_000, subtaskLoop);
   } catch (err: any) {
     if (err.name === "CancelledFailure" || err.message?.includes("timed out")) {
-      finalStatus = "timeout";
+      finalStatus = cancelled ? "failed" : "timeout";
     } else {
       finalStatus = "failed";
       finalContent = `Subtask failed: ${err.message ?? String(err)}`;

@@ -626,7 +626,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         try {
           // Subscribe to Redis BEFORE starting workflow to avoid race condition
           const { relayRedisToSSE } = await import("../lib/stream-relay");
-          const relayPromise = relayRedisToSSE(stream, streamChannelId, { timeoutMs: 120_000 });
+          const relayPromise = relayRedisToSSE(stream, streamChannelId, { timeoutMs: 600_000 });
 
           const client = await getTemporalClient();
           const workflowId = `agent-chat-${conversationId}-${Date.now()}`;
@@ -635,7 +635,6 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
             taskQueue: "nova-main",
             workflowId,
             args: [{
-              mode: "chat",
               orgId,
               userId: c.get("userId"),
               conversationId,

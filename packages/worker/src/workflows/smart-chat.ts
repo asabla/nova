@@ -1,9 +1,9 @@
 /**
- * @deprecated Use `agentWorkflow` with `mode: "chat"` instead.
+ * @deprecated Use `agentWorkflow` directly instead.
  * This wrapper exists for backward compatibility with existing workflow references.
  */
 import { agentWorkflow } from "./agent.js";
-import type { AgentWorkflowResult } from "./agent.js";
+import type { AgentWorkflowResult } from "@nova/shared/types";
 
 export { cancelSignal } from "./agent.js";
 
@@ -38,7 +38,6 @@ export interface SmartChatResult {
 
 export async function smartChatWorkflow(input: SmartChatInput): Promise<SmartChatResult> {
   const result = await agentWorkflow({
-    mode: "chat",
     orgId: input.orgId,
     userId: "",
     conversationId: input.conversationId,
