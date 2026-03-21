@@ -22,7 +22,6 @@ export async function presignUpload(orgId: string, userId: string, filename: str
 
   const file = result[0];
   syncFileUpsert(file as any);
-  triggerFileIngestion(file as any);
   return { uploadUrl: url, fileId: file.id, key };
 }
 
@@ -47,7 +46,9 @@ export async function confirmUpload(orgId: string, fileId: string) {
     .select()
     .from(files)
     .where(and(eq(files.id, fileId), eq(files.orgId, orgId), isNull(files.deletedAt)));
-  return result[0] ?? null;
+  const file = result[0] ?? null;
+  if (file) triggerFileIngestion(file as any);
+  return file;
 }
 
 export async function getFile(orgId: string, fileId: string) {
