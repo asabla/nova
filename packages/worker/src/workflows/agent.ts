@@ -197,6 +197,7 @@ async function runChatMode(input: AgentWorkflowInput): Promise<AgentWorkflowResu
       maxTokens: input.modelParams?.maxTokens,
       maxTurns: input.maxSteps ?? 5,
       agentId: input.agentId,
+      orgId: input.orgId,
     });
 
     result = {

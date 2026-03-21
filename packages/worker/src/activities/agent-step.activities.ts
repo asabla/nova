@@ -3,7 +3,7 @@ import type { FunctionTool } from "@openai/agents";
 import { heartbeat } from "@temporalio/activity";
 import { createLiteLLMModel } from "../lib/agent-sdk-model";
 import { toAgentInput } from "../lib/message-convert";
-import { builtinTools } from "../tools/builtin";
+import { getBuiltinTools } from "../tools/builtin";
 import { loadCustomTools } from "../tools/custom";
 
 export interface AgentStepInput {
@@ -12,6 +12,7 @@ export interface AgentStepInput {
   modelParams: unknown;
   messageHistory: { role: string; content: string }[];
   agentId?: string;
+  orgId?: string;
   /** Run a single turn (no tool loop) -- useful when the workflow needs to intercept between turns */
   singleTurn?: boolean;
 }
@@ -45,7 +46,7 @@ export interface AgentStepResult {
 export async function executeAgentStepWithSDK(
   input: AgentStepInput,
 ): Promise<AgentStepResult> {
-  const tools: FunctionTool<any, any>[] = [...builtinTools];
+  const tools: FunctionTool<any, any>[] = getBuiltinTools(input.orgId);
   if (input.agentId && !input.singleTurn) {
     const custom = await loadCustomTools(input.agentId);
     tools.push(...custom);

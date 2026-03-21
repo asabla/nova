@@ -9,7 +9,7 @@ import {
   publishDone,
   publishError,
 } from "../lib/stream-publisher";
-import { builtinTools } from "../tools/builtin";
+import { getBuiltinTools } from "../tools/builtin";
 import { loadCustomTools } from "../tools/custom";
 
 export interface AgentRunInput {
@@ -22,6 +22,8 @@ export interface AgentRunInput {
   maxTurns?: number;
   /** Agent ID for loading custom tools from DB. If empty, only built-in tools are used. */
   agentId?: string;
+  /** Org ID for org-scoped tools like search_workspace */
+  orgId?: string;
 }
 
 export interface AgentRunResult {
@@ -45,8 +47,8 @@ export interface AgentRunResult {
  * (call LLM -> detect tool_calls -> execute -> repeat).
  */
 export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult> {
-  // Build tools list: built-in + any custom tools from DB
-  const tools: FunctionTool<any, any>[] = [...builtinTools];
+  // Build tools list: built-in (with org-scoped tools) + any custom tools from DB
+  const tools: FunctionTool<any, any>[] = getBuiltinTools(input.orgId);
   if (input.agentId) {
     const custom = await loadCustomTools(input.agentId);
     tools.push(...custom);

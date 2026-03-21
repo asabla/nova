@@ -1,9 +1,11 @@
 import { tool } from "@openai/agents";
+import type { FunctionTool } from "@openai/agents";
 import { extractFromHtml } from "@nova/shared/content";
 import { eq, and, isNull } from "drizzle-orm";
 import { db } from "../lib/db";
 import { openai } from "../lib/litellm";
-import { getDefaultChatModel } from "../lib/models";
+import { getDefaultChatModel, getDefaultEmbeddingModel } from "../lib/models";
+import { COLLECTIONS, searchVector, scrollFullText, scrollFiltered } from "../lib/qdrant";
 
 /**
  * Built-in tools extracted from agent-execution.activities.ts,
@@ -323,5 +325,271 @@ export const codeExecuteTool = tool({
   },
 });
 
-/** All built-in tools as an array, ready to attach to an Agent */
+/**
+ * Factory: creates a search_workspace tool scoped to a specific org.
+ * Searches across conversations, messages, knowledge docs, knowledge chunks, and files.
+ */
+export function createSearchWorkspaceTool(orgId: string) {
+  return tool({
+    name: "search_workspace",
+    description:
+      "Search the workspace for information across past conversations, messages, knowledge base documents, and files. " +
+      "Supports keyword (full-text) and semantic (embedding-based) search, plus date range filtering. " +
+      "Use this when the user wants to find something from earlier conversations, stored knowledge, or uploaded files. " +
+      "IMPORTANT: Always use type 'all' unless the user specifically asks to search only one type. " +
+      "For temporal queries like 'yesterday' or 'last week', use dateFrom/dateTo to filter by time range. " +
+      "You can combine date filters with a broad query (e.g. query='' with dateFrom to list recent activity).",
+    parameters: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "The search query. Can be empty when using date filters to browse recent content." },
+        type: {
+          type: ["string", "null"],
+          enum: ["all", "conversations", "messages", "knowledge", "files", null],
+          description: "Type of content to search (default: all)",
+        },
+        mode: {
+          type: ["string", "null"],
+          enum: ["keyword", "semantic", null],
+          description: "Search mode: keyword for exact matches, semantic for meaning-based matches (default: semantic). When using date filters without a meaningful query, use 'keyword'.",
+        },
+        limit: {
+          type: ["number", "null"],
+          description: "Maximum number of results per type (default: 10, max: 20)",
+        },
+        dateFrom: {
+          type: ["string", "null"],
+          description: "ISO 8601 date string (e.g. '2025-03-20T00:00:00Z'). Only return results created on or after this date.",
+        },
+        dateTo: {
+          type: ["string", "null"],
+          description: "ISO 8601 date string (e.g. '2025-03-21T00:00:00Z'). Only return results created before this date.",
+        },
+      },
+      required: ["query", "type", "mode", "limit", "dateFrom", "dateTo"],
+      additionalProperties: false,
+    },
+    execute: async (args: unknown) => {
+      const raw = args as {
+        query: string;
+        type?: string | null;
+        mode?: string | null;
+        limit?: number | null;
+        dateFrom?: string | null;
+        dateTo?: string | null;
+      };
+
+      const query = raw.query;
+      const type = raw.type ?? "all";
+      const mode = raw.mode ?? "semantic";
+      const limit = Math.min(raw.limit ?? 10, 20);
+      const dateFrom = raw.dateFrom ?? null;
+      const dateTo = raw.dateTo ?? null;
+
+      // Build base filters
+      const mustFilters: Record<string, unknown>[] = [
+        { key: "orgId", match: { value: orgId } },
+      ];
+      if (dateFrom) {
+        mustFilters.push({ key: "createdAt", range: { gte: dateFrom } });
+      }
+      if (dateTo) {
+        mustFilters.push({ key: "createdAt", range: { lt: dateTo } });
+      }
+      const baseFilter = { must: mustFilters };
+
+      const shouldSearch = (t: string) => type === "all" || type === t;
+
+      console.log(`[search_workspace] query="${query}" type=${type} mode=${mode} limit=${limit} dateFrom=${dateFrom} dateTo=${dateTo} orgId=${orgId}`);
+
+      // Use date-only browsing when query is empty
+      const hasQuery = query.trim().length > 0;
+
+      // Generate embedding for semantic search (only if there's a query)
+      let queryEmbedding: number[] | null = null;
+      if (mode === "semantic" && hasQuery) {
+        try {
+          const embeddingModel = process.env.EMBEDDING_MODEL ?? await getDefaultEmbeddingModel();
+          console.log(`[search_workspace] generating embedding with model=${embeddingModel}`);
+          const resp = await openai.embeddings.create({
+            model: embeddingModel,
+            input: query.slice(0, 8000),
+          });
+          queryEmbedding = resp.data[0]?.embedding ?? null;
+          console.log(`[search_workspace] embedding generated: ${queryEmbedding ? queryEmbedding.length + ' dims' : 'null'}`);
+        } catch (err) {
+          console.error(`[search_workspace] embedding failed:`, err instanceof Error ? err.message : err);
+          // Fall back to keyword if embedding fails
+        }
+      }
+
+      const results: Record<string, unknown[]> = {};
+
+      // Conversations — full-text on title or date-filtered browse
+      if (shouldSearch("conversations")) {
+        try {
+          const convs = hasQuery
+            ? await scrollFullText(COLLECTIONS.CONVERSATIONS, "title", query, { filter: baseFilter, limit })
+            : await scrollFiltered(COLLECTIONS.CONVERSATIONS, { filter: baseFilter, limit });
+          results.conversations = convs.map((p) => ({
+            id: p.id,
+            title: p.payload.title,
+            createdAt: p.payload.createdAt,
+          }));
+        } catch (err) {
+          console.error(`[search_workspace] conversations search failed:`, err instanceof Error ? err.message : err);
+          results.conversations = [];
+        }
+      }
+
+      // Messages — semantic (vector), keyword (full-text), or date-filtered browse
+      if (shouldSearch("messages")) {
+        try {
+          if (queryEmbedding) {
+            const msgs = await searchVector(COLLECTIONS.MESSAGES, queryEmbedding, {
+              filter: baseFilter,
+              limit,
+            });
+            results.messages = msgs.map((r) => ({
+              id: r.id,
+              conversationId: r.payload.conversationId,
+              senderType: r.payload.senderType,
+              content: truncate(r.payload.content as string, 300),
+              createdAt: r.payload.createdAt,
+              score: r.score,
+            }));
+          } else if (hasQuery) {
+            const msgs = await scrollFullText(COLLECTIONS.MESSAGES, "content", query, {
+              filter: baseFilter,
+              limit,
+            });
+            results.messages = msgs.map((p) => ({
+              id: p.id,
+              conversationId: p.payload.conversationId,
+              senderType: p.payload.senderType,
+              content: truncate(p.payload.content as string, 300),
+              createdAt: p.payload.createdAt,
+            }));
+          } else {
+            // Date-only browse — no query text, just filter
+            const msgs = await scrollFiltered(COLLECTIONS.MESSAGES, { filter: baseFilter, limit });
+            results.messages = msgs.map((p) => ({
+              id: p.id,
+              conversationId: p.payload.conversationId,
+              senderType: p.payload.senderType,
+              content: truncate(p.payload.content as string, 300),
+              createdAt: p.payload.createdAt,
+            }));
+          }
+        } catch (err) {
+          console.error(`[search_workspace] messages search failed:`, err instanceof Error ? err.message : err);
+          results.messages = [];
+        }
+      }
+
+      // Knowledge docs — full-text on title + summary, or date-filtered browse
+      if (shouldSearch("knowledge")) {
+        try {
+          let docs: unknown[];
+          if (hasQuery) {
+            const byTitle = await scrollFullText(COLLECTIONS.KNOWLEDGE_DOCS, "title", query, { filter: baseFilter, limit });
+            const bySummary = await scrollFullText(COLLECTIONS.KNOWLEDGE_DOCS, "summary", query, { filter: baseFilter, limit });
+            const seen = new Set<string>();
+            docs = [];
+            for (const p of [...byTitle, ...bySummary]) {
+              if (!seen.has(p.id)) {
+                seen.add(p.id);
+                docs.push({ id: p.id, title: p.payload.title, summary: truncate(p.payload.summary as string, 200) });
+              }
+            }
+          } else {
+            const all = await scrollFiltered(COLLECTIONS.KNOWLEDGE_DOCS, { filter: baseFilter, limit });
+            docs = all.map((p) => ({ id: p.id, title: p.payload.title, summary: truncate(p.payload.summary as string, 200) }));
+          }
+          results.knowledge = docs.slice(0, limit);
+        } catch (err) {
+          console.error(`[search_workspace] knowledge search failed:`, err instanceof Error ? err.message : err);
+          results.knowledge = [];
+        }
+
+        // Knowledge chunks — semantic only
+        if (queryEmbedding) {
+          try {
+            const chunks = await searchVector(COLLECTIONS.KNOWLEDGE_CHUNKS, queryEmbedding, {
+              filter: baseFilter,
+              limit,
+            });
+            results.knowledgeChunks = chunks.map((r) => ({
+              id: r.id,
+              documentId: r.payload.documentId,
+              content: truncate(r.payload.content as string, 500),
+              score: r.score,
+            }));
+          } catch (err) {
+            console.error(`[search_workspace] knowledge chunks search failed:`, err instanceof Error ? err.message : err);
+            results.knowledgeChunks = [];
+          }
+        }
+      }
+
+      // Files — full-text on filename or date-filtered browse + semantic on file chunks
+      if (shouldSearch("files")) {
+        try {
+          const fileResults = hasQuery
+            ? await scrollFullText(COLLECTIONS.FILES, "filename", query, { filter: baseFilter, limit })
+            : await scrollFiltered(COLLECTIONS.FILES, { filter: baseFilter, limit });
+          results.files = fileResults.map((p) => ({
+            id: p.id,
+            filename: p.payload.filename,
+          }));
+        } catch (err) {
+          console.error(`[search_workspace] files search failed:`, err instanceof Error ? err.message : err);
+          results.files = [];
+        }
+
+        if (queryEmbedding) {
+          try {
+            const chunks = await searchVector(COLLECTIONS.FILE_CHUNKS, queryEmbedding, {
+              filter: baseFilter,
+              limit,
+            });
+            results.fileChunks = chunks.map((r) => ({
+              id: r.id,
+              fileId: r.payload.fileId,
+              content: truncate(r.payload.content as string, 500),
+              score: r.score,
+            }));
+          } catch (err) {
+            console.error(`[search_workspace] file chunks search failed:`, err instanceof Error ? err.message : err);
+            results.fileChunks = [];
+          }
+        }
+      }
+
+      const total = Object.values(results).reduce((sum, arr) => sum + (arr as unknown[]).length, 0);
+      const breakdown = Object.entries(results).map(([k, v]) => `${k}:${(v as unknown[]).length}`).join(" ");
+      console.log(`[search_workspace] done: total=${total} ${breakdown}`);
+      return { query, mode: queryEmbedding ? "semantic" : "keyword", total, results };
+    },
+  });
+}
+
+function truncate(text: string | undefined | null, maxLen: number): string {
+  if (!text) return "";
+  return text.length > maxLen ? text.slice(0, maxLen) + "..." : text;
+}
+
+/** Static built-in tools (no org context needed) */
 export const builtinTools = [webSearchTool, fetchUrlTool, invokeAgentTool, codeExecuteTool];
+
+/**
+ * All built-in tools for a given org context.
+ * Includes org-scoped tools like search_workspace.
+ */
+export function getBuiltinTools(orgId?: string): FunctionTool<any, any>[] {
+  const tools: FunctionTool<any, any>[] = [...builtinTools];
+  if (orgId) {
+    tools.push(createSearchWorkspaceTool(orgId));
+  }
+  return tools;
+}

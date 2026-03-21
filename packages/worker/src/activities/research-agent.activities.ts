@@ -13,7 +13,7 @@ import {
   publishResearchDone,
   publishResearchError,
 } from "../lib/stream-publisher";
-import { builtinTools } from "../tools/builtin";
+import { getBuiltinTools } from "../tools/builtin";
 import { createResearchTools, type ResearchSource, type ReportSection } from "../tools/research";
 import { getDefaultChatModel } from "../lib/models";
 import type { ResearchProgressType, ResearchStatus } from "@nova/shared/constants";
@@ -150,7 +150,7 @@ export async function runResearchAgentLoop(
   // Build tools list: research tools + builtins (minus invoke_agent which isn't useful for research)
   const tools: FunctionTool<any, any>[] = [
     ...researchTools,
-    ...builtinTools.filter((t) => (t as any).name !== "invoke_agent"),
+    ...getBuiltinTools(input.orgId).filter((t) => (t as any).name !== "invoke_agent"),
   ];
 
   // Resolve model

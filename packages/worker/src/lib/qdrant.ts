@@ -96,3 +96,61 @@ export async function searchVector(
     payload: (r.payload ?? {}) as Record<string, unknown>,
   }));
 }
+
+export async function scrollFullText(
+  collection: string,
+  field: string,
+  query: string,
+  opts: {
+    filter?: Record<string, unknown>;
+    limit?: number;
+  } = {},
+): Promise<Array<{ id: string; payload: Record<string, unknown> }>> {
+  const qdrant = getQdrantClient();
+
+  const must: any[] = [
+    {
+      key: field,
+      match: { text: query },
+    },
+  ];
+
+  if (opts.filter && (opts.filter as any).must) {
+    must.push(...(opts.filter as any).must);
+  }
+
+  const results = await qdrant.scroll(collection, {
+    filter: { must },
+    limit: opts.limit ?? 20,
+    with_payload: true,
+  });
+
+  return (results.points ?? []).map((p) => ({
+    id: typeof p.id === "string" ? p.id : String(p.id),
+    payload: (p.payload ?? {}) as Record<string, unknown>,
+  }));
+}
+
+/**
+ * Scroll points with only a filter (no text match). Useful for date-range browsing.
+ */
+export async function scrollFiltered(
+  collection: string,
+  opts: {
+    filter: Record<string, unknown>;
+    limit?: number;
+  },
+): Promise<Array<{ id: string; payload: Record<string, unknown> }>> {
+  const qdrant = getQdrantClient();
+
+  const results = await qdrant.scroll(collection, {
+    filter: opts.filter as any,
+    limit: opts.limit ?? 20,
+    with_payload: true,
+  });
+
+  return (results.points ?? []).map((p) => ({
+    id: typeof p.id === "string" ? p.id : String(p.id),
+    payload: (p.payload ?? {}) as Record<string, unknown>,
+  }));
+}
