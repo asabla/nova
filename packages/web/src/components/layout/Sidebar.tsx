@@ -238,7 +238,7 @@ export function Sidebar() {
         {/* Brand header */}
         <div className={clsx(
           "flex items-center border-b border-border",
-          sidebarOpen ? "justify-between px-4 py-3.5" : "justify-center py-3.5",
+          sidebarOpen ? "justify-between px-4 py-2.5" : "justify-center py-2.5",
         )}>
           {sidebarOpen ? (
             <>
@@ -273,7 +273,7 @@ export function Sidebar() {
         </div>
 
         {/* Primary Navigation */}
-        <nav className={clsx("pt-3 pb-2 space-y-0.5", sidebarOpen ? "px-2" : "px-1.5")} aria-label={t("nav.main", { defaultValue: "Main navigation" })}>
+        <nav className={clsx("pt-2 pb-1 space-y-0.5", sidebarOpen ? "px-2" : "px-1.5")} aria-label={t("nav.main", { defaultValue: "Main navigation" })}>
           <SidebarLink icon={MessageSquare} label={t("nav.conversations", { defaultValue: "Conversations" })} to="/" exact collapsed={!sidebarOpen} />
           <SidebarLink icon={Microscope} label={t("nav.research", { defaultValue: "Research" })} to="/research" collapsed={!sidebarOpen} />
           <SidebarLink icon={BookOpen} label={t("nav.knowledge", { defaultValue: "Knowledge" })} to="/knowledge" collapsed={!sidebarOpen} />
@@ -287,7 +287,7 @@ export function Sidebar() {
             <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mx-4" />
 
             {/* Folders Quick Access */}
-            <div className="px-3 pt-2">
+            <div className="px-3 pt-1.5">
               <button
                 onClick={() => setFoldersOpen(!foldersOpen)}
                 className="flex items-center gap-1.5 w-full text-[10px] font-semibold uppercase tracking-widest text-text-tertiary hover:text-text-secondary transition-colors py-1"
@@ -328,10 +328,10 @@ export function Sidebar() {
               )}
             </div>
 
-            <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mx-4 mt-2" />
+            <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mx-4 mt-1.5" />
 
             {/* Search */}
-            <div className="px-3 pt-3 pb-1">
+            <div className="px-3 pt-2 pb-0.5">
               <div className="relative input-glow rounded-lg">
                 {searchLoading ? (
                   <Loader2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary animate-spin" />
@@ -364,7 +364,7 @@ export function Sidebar() {
             </div>
 
             {/* Conversation controls */}
-            <div className="px-3 pt-2 flex items-center gap-1.5">
+            <div className="px-3 pt-1 flex items-center gap-1.5">
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className={clsx(
@@ -404,7 +404,7 @@ export function Sidebar() {
 
             {/* Expanded Filters */}
             {showFilters && (
-              <div className="px-3 pt-2 space-y-2">
+              <div className="px-3 pt-1 space-y-1.5">
                 {/* Date range toggles */}
                 <div>
                   <p className="text-[10px] font-medium text-text-tertiary mb-1">{t("search.filter.dateRange", { defaultValue: "Date range" })}</p>
@@ -516,13 +516,13 @@ export function Sidebar() {
                       key={result.id}
                       onClick={() => navigate({ to: `/conversations/${result.id}` })}
                       className={clsx(
-                        "w-full flex flex-col gap-0.5 px-3 py-2 rounded-lg text-left transition-colors group",
+                        "w-full flex flex-col gap-0.5 px-3 py-1.5 rounded-lg text-left transition-colors group",
                         activeConversationId === result.id
                           ? "bg-primary/10 text-primary"
                           : "text-text-secondary hover:bg-surface-tertiary hover:text-text",
                       )}
                     >
-                      <span className="text-sm truncate">{result.title ?? t("conversations.untitled", { defaultValue: "Untitled" })}</span>
+                      <span className="text-xs truncate">{result.title ?? t("conversations.untitled", { defaultValue: "Untitled" })}</span>
                       {result.snippet && (
                         <span className="text-[10px] text-text-tertiary truncate">{result.snippet}</span>
                       )}
@@ -548,7 +548,7 @@ export function Sidebar() {
               ) : (
                 groupedConversations.map((group) => (
                   <Fragment key={group.label}>
-                    <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+                    <p className="px-3 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
                       {group.label}
                     </p>
                     {group.conversations.map((conv: any) => (
@@ -578,7 +578,7 @@ export function Sidebar() {
         {!sidebarOpen && <div className="flex-1" />}
 
         {/* Bottom Navigation */}
-        <div className={clsx("border-t border-border py-2 space-y-0.5", sidebarOpen ? "px-2" : "px-1.5")}>
+        <div className={clsx("border-t border-border py-1.5 space-y-0.5", sidebarOpen ? "px-2" : "px-1.5")}>
           <SidebarLink icon={Settings} label={t("nav.settings", "Settings")} to="/settings" collapsed={!sidebarOpen} />
           <SidebarLink icon={HelpCircle} label={t("nav.help", "Help")} to="/help" collapsed={!sidebarOpen} />
           {isAdmin && <SidebarLink icon={ShieldCheck} label={t("nav.admin", "Admin")} to="/admin" collapsed={!sidebarOpen} />}
@@ -645,7 +645,7 @@ function ConversationItem({
     <button
       onClick={onClick}
       className={clsx(
-        "w-full flex items-start gap-2 px-3 py-2 rounded-lg text-left transition-colors group",
+        "w-full flex items-start gap-2 px-3 py-1.5 rounded-lg text-left transition-colors group",
         active
           ? "bg-primary/10 text-primary"
           : "text-text-secondary hover:bg-surface-tertiary hover:text-text",
@@ -658,7 +658,7 @@ function ConversationItem({
       )}
       {!bulkMode && conv.isPinned && <Pin className="h-3 w-3 text-primary shrink-0 mt-1" aria-hidden="true" />}
       <div className="flex-1 min-w-0">
-        <span className="block truncate text-sm">{conv.title ?? "Untitled"}</span>
+        <span className="block truncate text-xs">{conv.title ?? "Untitled"}</span>
         <span className="flex items-center gap-1.5 mt-0.5 text-[10px] text-text-tertiary">
           {relTime && <span>{relTime}</span>}
           {convTags.length > 0 && (
@@ -713,7 +713,7 @@ function SidebarLink({ icon: Icon, label, to, exact, collapsed }: { icon: any; l
       to={to}
       aria-current={isActive ? "page" : undefined}
       className={clsx(
-        "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all duration-150 relative no-underline",
+        "w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-150 relative no-underline",
         isActive
           ? "bg-primary/10 text-primary font-medium nav-active"
           : "text-text-secondary hover:bg-surface-tertiary hover:text-text hover:translate-x-0.5",
