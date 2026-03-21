@@ -37,7 +37,6 @@ export function Sidebar() {
   const user = useAuthStore((s) => s.user);
   const [showFilters, setShowFilters] = useState(false);
   const [filterDateRange, setFilterDateRange] = useState<DateRange>("all");
-  const [filterTags, setFilterTags] = useState<Set<string>>(new Set());
   const [filterFolderId, setFilterFolderId] = useState<string | null>(null);
   const [bulkMode, setBulkMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -56,13 +55,6 @@ export function Sidebar() {
     queryKey: queryKeys.conversations.list({ isArchived: false }),
     queryFn: () => api.get<any>(`/api/conversations?isArchived=false`),
     staleTime: 30_000,
-  });
-
-  const { data: tagsData } = useQuery({
-    queryKey: queryKeys.tags.list(),
-    queryFn: () => api.get<any>("/api/conversations/tags"),
-    staleTime: 60_000,
-    enabled: showFilters,
   });
 
   const { data: foldersData } = useQuery({
@@ -116,7 +108,6 @@ export function Sidebar() {
 
   // ── Derived data ─────────────────────────────────────────────────────
   const conversations = conversationsData?.data ?? [];
-  const tags: any[] = (tagsData as any)?.data ?? [];
   const folders: any[] = (foldersData as any)?.data ?? [];
 
   // ── Debounced server search ──────────────────────────────────────────
@@ -146,12 +137,10 @@ export function Sidebar() {
   // ── Active filter count ──────────────────────────────────────────────
   const activeFilterCount =
     (filterDateRange !== "all" ? 1 : 0) +
-    (filterTags.size > 0 ? 1 : 0) +
     (filterFolderId ? 1 : 0);
 
   const clearAllFilters = useCallback(() => {
     setFilterDateRange("all");
-    setFilterTags(new Set());
     setFilterFolderId(null);
   }, []);
 
@@ -170,10 +159,14 @@ export function Sidebar() {
         if (date < monthAgo) return false;
       }
     }
-    // Tag filtering – if tags are active, conversation must have at least one matching tag
-    if (filterTags.size > 0 && c.tags) {
-      const convTagIds = (c.tags as any[]).map((t: any) => t.id ?? t.tagId);
-      if (!convTagIds.some((id: string) => filterTags.has(id))) return false;
+    // When search is active, match conversations by title or tag name locally
+    if (isSearchActive) {
+      const q = searchQuery.trim().toLowerCase();
+      const titleMatch = (c.title ?? "").toLowerCase().includes(q);
+      const tagMatch = Array.isArray(c.tags) && c.tags.some((t: any) =>
+        (t.name ?? "").toLowerCase().includes(q),
+      );
+      if (!titleMatch && !tagMatch) return false;
     }
     return true;
   });
@@ -183,15 +176,6 @@ export function Sidebar() {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleTag = (tagId: string) => {
-    setFilterTags((prev) => {
-      const next = new Set(prev);
-      if (next.has(tagId)) next.delete(tagId);
-      else next.add(tagId);
       return next;
     });
   };
@@ -429,33 +413,6 @@ export function Sidebar() {
                   </div>
                 </div>
 
-                {/* Tags */}
-                {tags.length > 0 && (
-                  <div>
-                    <p className="text-[10px] font-medium text-text-tertiary mb-1">{t("search.filter.tags", { defaultValue: "Tags" })}</p>
-                    <div className="flex flex-wrap gap-1">
-                      {tags.map((tag: any) => (
-                        <button
-                          key={tag.id}
-                          onClick={() => toggleTag(tag.id)}
-                          className={clsx(
-                            "inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full transition-colors",
-                            filterTags.has(tag.id)
-                              ? "bg-primary/10 text-primary ring-1 ring-primary/30"
-                              : "bg-surface-tertiary text-text-secondary hover:text-text",
-                          )}
-                        >
-                          <span
-                            className="h-1.5 w-1.5 rounded-full shrink-0"
-                            style={{ backgroundColor: tag.color ?? "var(--color-text-tertiary)" }}
-                          />
-                          {tag.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
               </div>
             )}
 
@@ -497,41 +454,72 @@ export function Sidebar() {
                   </button>
                 </div>
               ) : isSearchActive ? (
-                /* Search results — flat list with snippets */
-                searchLoading ? (
-                  <ConversationListSkeleton />
-                ) : searchResults && searchResults.length === 0 ? (
-                  <div className="px-3 py-10 text-center">
-                    <Search className="h-8 w-8 text-text-tertiary mx-auto mb-2 opacity-30" aria-hidden="true" />
-                    <p className="text-xs font-medium text-text-secondary">
-                      {t("conversations.noSearchResults", { defaultValue: "No results found" })}
-                    </p>
-                    <p className="text-[10px] text-text-tertiary mt-1">
-                      {t("conversations.tryDifferentSearch", { defaultValue: "Try a different search term" })}
-                    </p>
-                  </div>
-                ) : (
-                  (searchResults ?? []).map((result: any) => (
-                    <button
-                      key={result.id}
-                      onClick={() => navigate({ to: `/conversations/${result.id}` })}
-                      className={clsx(
-                        "w-full flex flex-col gap-0.5 px-3 py-1.5 rounded-lg text-left transition-colors group",
-                        activeConversationId === result.id
-                          ? "bg-primary/10 text-primary"
-                          : "text-text-secondary hover:bg-surface-tertiary hover:text-text",
+                /* Search results — local title/tag matches + server message matches */
+                (() => {
+                  const localMatchIds = new Set(filteredConversations.map((c: any) => c.id));
+                  const serverOnly = (searchResults ?? []).filter((r: any) => !localMatchIds.has(r.id));
+                  const hasLocal = filteredConversations.length > 0;
+                  const hasServer = serverOnly.length > 0;
+                  const noResults = !hasLocal && !hasServer && !searchLoading;
+
+                  return (
+                    <>
+                      {hasLocal && (
+                        <>
+                          {filteredConversations.map((conv: any) => (
+                            <ConversationItem
+                              key={conv.id}
+                              conv={conv}
+                              active={activeConversationId === conv.id}
+                              onClick={() => navigate({ to: `/conversations/${conv.id}` })}
+                            />
+                          ))}
+                        </>
                       )}
-                    >
-                      <span className="text-xs truncate">{result.title ?? t("conversations.untitled", { defaultValue: "Untitled" })}</span>
-                      {result.snippet && (
-                        <span className="text-[10px] text-text-tertiary truncate">{result.snippet}</span>
+                      {searchLoading && !hasLocal && <ConversationListSkeleton />}
+                      {hasServer && (
+                        <>
+                          {hasLocal && (
+                            <p className="px-3 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+                              {t("conversations.messageMatches", { defaultValue: "In messages" })}
+                            </p>
+                          )}
+                          {serverOnly.map((result: any) => (
+                            <button
+                              key={result.id}
+                              onClick={() => navigate({ to: `/conversations/${result.id}` })}
+                              className={clsx(
+                                "w-full flex flex-col gap-0.5 px-3 py-1.5 rounded-lg text-left transition-colors group",
+                                activeConversationId === result.id
+                                  ? "bg-primary/10 text-primary"
+                                  : "text-text-secondary hover:bg-surface-tertiary hover:text-text",
+                              )}
+                            >
+                              <span className="text-xs truncate">{result.title ?? t("conversations.untitled", { defaultValue: "Untitled" })}</span>
+                              {result.snippet && (
+                                <span className="text-[10px] text-text-tertiary truncate">{result.snippet}</span>
+                              )}
+                              <span className="text-[10px] text-text-tertiary">
+                                {result.updatedAt && formatRelativeTime(result.updatedAt)}
+                              </span>
+                            </button>
+                          ))}
+                        </>
                       )}
-                      <span className="text-[10px] text-text-tertiary">
-                        {result.updatedAt && formatRelativeTime(result.updatedAt)}
-                      </span>
-                    </button>
-                  ))
-                )
+                      {noResults && (
+                        <div className="px-3 py-10 text-center">
+                          <Search className="h-8 w-8 text-text-tertiary mx-auto mb-2 opacity-30" aria-hidden="true" />
+                          <p className="text-xs font-medium text-text-secondary">
+                            {t("conversations.noSearchResults", { defaultValue: "No results found" })}
+                          </p>
+                          <p className="text-[10px] text-text-tertiary mt-1">
+                            {t("conversations.tryDifferentSearch", { defaultValue: "Try a different search term" })}
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()
               ) : filteredConversations.length === 0 ? (
                 <div className="px-3 py-10 text-center">
                   <MessageSquare className="h-8 w-8 text-text-tertiary mx-auto mb-2 opacity-30" aria-hidden="true" />
