@@ -301,6 +301,32 @@ const DEFAULT_TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "read_file",
+      description:
+        "Read the full content of an uploaded file by its file ID or filename. " +
+        "Returns raw text content with full row/column data for spreadsheets (xlsx/csv). " +
+        "Use this when you need the complete file content rather than semantic search snippets. " +
+        "File IDs are available from the conversation context (look for attached files). " +
+        "You can also search by filename if you don't have the ID.",
+      parameters: {
+        type: "object",
+        properties: {
+          file_id: {
+            type: ["string", "null"],
+            description: "The UUID of the file to read",
+          },
+          filename: {
+            type: ["string", "null"],
+            description: "Search for a file by name if you don't have the file ID",
+          },
+        },
+        required: ["file_id", "filename"],
+      },
+    },
+  },
 ];
 
 /** Fetch enabled agents for the org and return them for system prompt injection */

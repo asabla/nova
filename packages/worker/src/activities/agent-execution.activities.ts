@@ -159,6 +159,13 @@ function summarizeToolResult(toolName: string, data: unknown, truncated: boolean
       }
       case "code_execute":
         return "Code execution result";
+      case "read_file": {
+        if (typeof data === "object" && data !== null && "filename" in data) {
+          const d = data as any;
+          return `Read file: ${d.filename} (${d.characterCount?.toLocaleString() ?? "?"} chars)`;
+        }
+        return "File read result";
+      }
       default: {
         if (data === null || data === undefined) return "No result";
         const str = typeof data === "string" ? data : JSON.stringify(data);
@@ -369,6 +376,78 @@ export async function executeToolCall(
           language: result.language,
           version: result.version,
           ...(outputFileInfo.length > 0 ? { outputFiles: outputFileInfo } : {}),
+        };
+        break;
+      }
+      case "read_file": {
+        const { files: filesTable } = await import("@nova/shared/schema");
+        const { getObjectBuffer } = await import("../lib/minio");
+
+        let fileRecord: any;
+
+        if (args.file_id) {
+          const [record] = await db
+            .select()
+            .from(filesTable)
+            .where(and(eq(filesTable.id, args.file_id), isNull(filesTable.deletedAt)));
+          fileRecord = record;
+        } else if (args.filename) {
+          const { ilike } = await import("drizzle-orm");
+          const [record] = await db
+            .select()
+            .from(filesTable)
+            .where(and(ilike(filesTable.filename, `%${args.filename}%`), isNull(filesTable.deletedAt)));
+          fileRecord = record;
+        }
+
+        if (!fileRecord) {
+          rawResult = { error: `File not found${args.file_id ? ` (id: ${args.file_id})` : ` (name: ${args.filename})`}` };
+          break;
+        }
+
+        const fileBuffer = await getObjectBuffer(fileRecord.storagePath);
+        const ct: string = fileRecord.contentType ?? "";
+        let fileText: string | null = null;
+
+        const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        if (ct === XLSX_MIME || fileRecord.filename?.endsWith(".xlsx")) {
+          const XLSX = await import("xlsx");
+          const workbook = XLSX.read(fileBuffer, { type: "buffer" });
+          const parts: string[] = [];
+          for (const sheetName of workbook.SheetNames) {
+            const ws = workbook.Sheets[sheetName];
+            if (!ws) continue;
+            if (workbook.SheetNames.length > 1) parts.push(`## Sheet: ${sheetName}\n`);
+            parts.push(XLSX.utils.sheet_to_csv(ws));
+          }
+          fileText = parts.join("\n\n");
+        } else if (ct === "text/csv" || fileRecord.filename?.endsWith(".csv")) {
+          fileText = fileBuffer.toString("utf-8");
+        } else if (ct === "application/pdf") {
+          try {
+            const { createRequire } = await import("node:module");
+            const req = createRequire(import.meta.url);
+            const pdfParse = req("pdf-parse/lib/pdf-parse.js");
+            const result = await pdfParse(fileBuffer);
+            fileText = result.text;
+          } catch { fileText = "[PDF extraction failed]"; }
+        } else if (ct?.startsWith("text/") || ct === "application/json" || ct === "application/xml") {
+          fileText = fileBuffer.toString("utf-8");
+        } else {
+          rawResult = { error: `Cannot extract content from type "${ct}"`, fileId: fileRecord.id, filename: fileRecord.filename };
+          break;
+        }
+
+        if (fileText && fileText.length > 100_000) {
+          fileText = fileText.slice(0, 100_000) + `\n[... truncated at 100k chars, total: ${fileText.length}]`;
+        }
+
+        rawResult = {
+          fileId: fileRecord.id,
+          filename: fileRecord.filename,
+          contentType: ct,
+          content: fileText ?? "",
+          characterCount: fileText?.length ?? 0,
         };
         break;
       }

@@ -579,8 +579,139 @@ function truncate(text: string | undefined | null, maxLen: number): string {
   return text.length > maxLen ? text.slice(0, maxLen) + "..." : text;
 }
 
+// --- read_file tool ---
+
+const READ_FILE_MAX_CHARS = 100_000; // ~25k tokens
+
+const readFileTool = tool({
+  name: "read_file",
+  description:
+    "Read the full content of an uploaded file by its file ID. Returns the raw text content. " +
+    "For spreadsheets (xlsx/csv), returns the data as CSV text preserving all rows and columns. " +
+    "For PDFs, returns extracted text. Use this when you need to access the complete content of a file " +
+    "rather than semantic search snippets. File IDs are available from the conversation context " +
+    "(look for file attachments or file references in the messages). " +
+    "You can also pass a filename to search for matching files in the organization.",
+  parameters: {
+    type: "object" as const,
+    properties: {
+      file_id: {
+        type: ["string", "null"],
+        description: "The UUID of the file to read. Use this if you have the file ID from the conversation.",
+      },
+      filename: {
+        type: ["string", "null"],
+        description: "Search for a file by name if you don't have the file ID. Returns the best match.",
+      },
+    },
+    required: ["file_id", "filename"],
+    additionalProperties: false,
+  },
+  execute: async (args: unknown) => {
+    const { file_id, filename } = args as { file_id: string | null; filename: string | null };
+
+    if (!file_id && !filename) {
+      return { error: "Provide either file_id or filename to read a file." };
+    }
+
+    try {
+      const { files: filesTable } = await import("@nova/shared/schema");
+      const { getObjectBuffer } = await import("../lib/minio");
+
+      let fileRecord: any;
+
+      if (file_id) {
+        const [record] = await db
+          .select()
+          .from(filesTable)
+          .where(and(eq(filesTable.id, file_id), isNull(filesTable.deletedAt)))
+          .limit(1);
+        fileRecord = record;
+      } else if (filename) {
+        // Search by filename (case-insensitive partial match)
+        const { ilike } = await import("drizzle-orm");
+        const [record] = await db
+          .select()
+          .from(filesTable)
+          .where(and(ilike(filesTable.filename, `%${filename}%`), isNull(filesTable.deletedAt)))
+          .limit(1);
+        fileRecord = record;
+      }
+
+      if (!fileRecord) {
+        return { error: `File not found${file_id ? ` (id: ${file_id})` : ` (name: ${filename})`}. Check the file ID or name and try again.` };
+      }
+
+      const buffer = await getObjectBuffer(fileRecord.storagePath);
+      const contentType: string = fileRecord.contentType ?? "";
+      let text: string | null = null;
+
+      // Extract content based on type
+      const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+      if (contentType === XLSX_MIME || fileRecord.filename?.endsWith(".xlsx")) {
+        const XLSX = await import("xlsx");
+        const workbook = XLSX.read(buffer, { type: "buffer" });
+        const parts: string[] = [];
+        for (const sheetName of workbook.SheetNames) {
+          const ws = workbook.Sheets[sheetName];
+          if (!ws) continue;
+          if (workbook.SheetNames.length > 1) {
+            parts.push(`## Sheet: ${sheetName}\n`);
+          }
+          parts.push(XLSX.utils.sheet_to_csv(ws));
+        }
+        text = parts.join("\n\n");
+      } else if (contentType === "text/csv" || fileRecord.filename?.endsWith(".csv")) {
+        text = buffer.toString("utf-8");
+      } else if (contentType === "application/pdf") {
+        // Use the same pdf-parse approach as file-extract
+        try {
+          const { createRequire } = await import("node:module");
+          const req = createRequire(import.meta.url);
+          const pdfParse = req("pdf-parse/lib/pdf-parse.js");
+          const result = await pdfParse(buffer);
+          text = result.text;
+        } catch {
+          text = "[PDF text extraction failed]";
+        }
+      } else if (contentType?.startsWith("text/") || contentType === "application/json" || contentType === "application/xml") {
+        text = buffer.toString("utf-8");
+      } else {
+        return {
+          error: `Cannot read file content for type "${contentType}". Supported: xlsx, csv, pdf, text, json, xml, html, markdown.`,
+          fileId: fileRecord.id,
+          filename: fileRecord.filename,
+          contentType,
+          sizeBytes: fileRecord.sizeBytes,
+        };
+      }
+
+      if (!text || text.trim().length === 0) {
+        return { error: "File exists but content extraction returned empty.", fileId: fileRecord.id, filename: fileRecord.filename };
+      }
+
+      // Truncate very large files
+      if (text.length > READ_FILE_MAX_CHARS) {
+        text = text.slice(0, READ_FILE_MAX_CHARS) + `\n\n[... truncated at ${READ_FILE_MAX_CHARS} characters, total: ${text.length}]`;
+      }
+
+      return {
+        fileId: fileRecord.id,
+        filename: fileRecord.filename,
+        contentType,
+        sizeBytes: fileRecord.sizeBytes,
+        content: text,
+        characterCount: text.length,
+      };
+    } catch (err: any) {
+      return { error: `Failed to read file: ${err.message ?? String(err)}` };
+    }
+  },
+});
+
 /** Static built-in tools (no org context needed) */
-export const builtinTools = [webSearchTool, fetchUrlTool, invokeAgentTool, codeExecuteTool];
+export const builtinTools = [webSearchTool, fetchUrlTool, invokeAgentTool, codeExecuteTool, readFileTool];
 
 /**
  * All built-in tools for a given org context.
