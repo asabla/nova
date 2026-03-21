@@ -160,6 +160,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
   let currentStep = 0;
   let totalTokens = 0;
   let currentStatus = "running";
+  let finalContent = "";
   const messageIds: string[] = [];
   const toolCallRecords: ToolCallRecord[] = [];
   const interactionResponses = new Map<string, UserInteractionResponse>();
@@ -202,33 +203,45 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
   // ------------------------------------------------------------------
   // Tier assessment
   // ------------------------------------------------------------------
-  try {
-    // Build context summary from conversation history so the assessor can
-    // distinguish complex first messages from simple follow-ups.
-    const history = input.messageHistory ?? [];
-    const priorTurns = history.filter((m) => m.role === "user" || m.role === "assistant");
-    const contextSummary = priorTurns.length > 1
-      ? priorTurns.slice(-6).map((m) => `${m.role}: ${m.content.slice(0, 200)}`).join("\n")
-      : undefined;
 
-    const assessment = await assessTier({
-      userMessage: input.userMessage ?? history.find((m) => m.role === "user")?.content ?? "",
-      model: input.model,
-      context: contextSummary,
-    });
-    tier = assessment.tier;
+  // When the workflow is invoked from the chat stream with pending tool calls,
+  // the LLM already decided what tools to call — skip planning and run direct.
+  const hasPendingToolCalls = input.pendingToolCalls && input.pendingToolCalls.length > 0;
 
-    if (ch) {
-      await publishTierAssessedActivity(ch, { tier, reasoning: assessment.reasoning });
-    }
-
-    // Apply suggested effort if none provided
-    if (!input.effort && assessment.suggestedEffort) {
-      input.effort = { level: assessment.suggestedEffort };
-    }
-  } catch {
-    // Default to direct on assessment failure
+  if (hasPendingToolCalls) {
     tier = "direct";
+    if (ch) {
+      await publishTierAssessedActivity(ch, { tier, reasoning: "Tool calls already requested by LLM" });
+    }
+  } else {
+    try {
+      // Build context summary from conversation history so the assessor can
+      // distinguish complex first messages from simple follow-ups.
+      const history = input.messageHistory ?? [];
+      const priorTurns = history.filter((m) => m.role === "user" || m.role === "assistant");
+      const contextSummary = priorTurns.length > 1
+        ? priorTurns.slice(-6).map((m) => `${m.role}: ${m.content.slice(0, 200)}`).join("\n")
+        : undefined;
+
+      const assessment = await assessTier({
+        userMessage: input.userMessage ?? history.find((m) => m.role === "user")?.content ?? "",
+        model: input.model,
+        context: contextSummary,
+      });
+      tier = assessment.tier;
+
+      if (ch) {
+        await publishTierAssessedActivity(ch, { tier, reasoning: assessment.reasoning });
+      }
+
+      // Apply suggested effort if none provided
+      if (!input.effort && assessment.suggestedEffort) {
+        input.effort = { level: assessment.suggestedEffort };
+      }
+    } catch {
+      // Default to direct on assessment failure
+      tier = "direct";
+    }
   }
 
   // ------------------------------------------------------------------
@@ -262,9 +275,8 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
   // Finalize
   // ------------------------------------------------------------------
 
-  // Collect final content from plan node results
-  let finalContent = "";
-  if (plan) {
+  // Collect final content from plan node results (only if synthesis didn't already set it)
+  if (plan && !finalContent) {
     const completedNodes = plan.nodes.filter((n) => n.status === "completed" && n.result?.content);
     finalContent = completedNodes.map((n) => n.result!.content).filter(Boolean).join("\n\n");
   }
@@ -331,6 +343,17 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
           content: JSON.stringify({ status: "pending", message: "Tool execution was deferred to workflow" }),
         } as any);
       }
+    }
+
+    // Compress context if it exceeds the token budget
+    const contextChars = estimateContextSize(messageHistory);
+    if (contextChars > MAX_CONTEXT_CHARS) {
+      const summarized = await summarizeContext({
+        messages: messageHistory,
+        maxTokens: 500,
+        model: input.model,
+      });
+      messageHistory.splice(0, messageHistory.length, ...summarized);
     }
 
     const systemPrompt = messageHistory.find((m) => m.role === "system")?.content;
@@ -418,6 +441,17 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
       messageHistory.push({ role: "user", content: input.userMessage });
     }
 
+    // Compress context if it exceeds the token budget
+    const contextChars = estimateContextSize(messageHistory);
+    if (contextChars > MAX_CONTEXT_CHARS) {
+      const summarized = await summarizeContext({
+        messages: messageHistory,
+        maxTokens: 500,
+        model: input.model,
+      });
+      messageHistory.splice(0, messageHistory.length, ...summarized);
+    }
+
     // Generate plan
     const availableTools = [
       { name: "web_search", description: "Search the web" },
@@ -426,12 +460,21 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
       { name: "search_workspace", description: "Search organization workspace" },
     ];
 
+    // Build a context summary of prior turns so the planner knows what was already done
+    const priorTurns = messageHistory.filter(
+      (m) => (m.role === "assistant" || m.role === "user") && m.content.length > 0,
+    );
+    const conversationContext = priorTurns.length > 1
+      ? priorTurns.slice(-8).map((m) => `${m.role}: ${m.content.slice(0, 300)}`).join("\n")
+      : undefined;
+
     plan = await generateDAGPlan({
       systemPrompt: agent?.systemPrompt ?? "",
       userMessage: input.userMessage ?? messageHistory.find((m) => m.role === "user")?.content ?? "",
       availableTools,
       model: input.model,
       tier,
+      conversationContext,
     });
 
     if (ch) {
@@ -543,12 +586,12 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         .join("\n\n");
 
       const synthesis = await executeAgentStepWithSDK({
-        systemPrompt: "You are a helpful assistant. Synthesize the gathered information into a clear, direct response. Do not mention steps, subtasks, plans, or the synthesis process. Just answer the user's question naturally.",
+        systemPrompt: "You are a helpful assistant. Synthesize the gathered information into a clear, concise response. Do not mention steps, subtasks, plans, or the synthesis process. Just answer the user's question naturally. Be brief — avoid repeating information, unnecessary preamble, or filler. Short questions deserve short answers.",
         modelId: input.model,
         modelParams: agent?.modelParams ?? {},
         messageHistory: [
           { role: "assistant" as const, content: nodeResults },
-          { role: "user" as const, content: `Based on the information above, provide a clear response to: "${input.userMessage}"` },
+          { role: "user" as const, content: `Based on the information above, provide a clear response to: "${input.userMessage ?? messageHistory.filter((m) => m.role === "user").pop()?.content ?? "the user's request"}"` },
         ],
         singleTurn: true,
       });
@@ -556,6 +599,9 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
       totalTokens += (synthesis.usage.prompt_tokens ?? 0) + (synthesis.usage.completion_tokens ?? 0);
 
       if (synthesis.content) {
+        // Use synthesis as the final content (not raw node concatenation)
+        finalContent = synthesis.content;
+
         // Stream the final synthesized response
         if (ch) await publishTokenActivity(ch, synthesis.content);
 
@@ -608,11 +654,22 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
       // Use a silent channel for node execution (don't stream intermediate tokens to user)
       const nodeChannelId = `stream:node:${conversationId}:${node.id}:${Date.now()}`;
 
-      // Build node-specific messages: system prompt + plan context + node instruction
-      const nodeMessages = messageHistory.filter((m) => m.role !== "system");
+      // Build node-specific messages: use only recent history to reduce noise
+      const allNonSystem = messageHistory.filter((m) => m.role !== "system");
+      const nodeMessages = allNonSystem.slice(-4);
+
+      // Summarize completed nodes so this step doesn't repeat prior work
+      const completedSummary = plan!.nodes
+        .filter((n) => n.status === "completed" && n.result?.content)
+        .map((n) => `- ${n.id} (${n.description}): done`)
+        .join("\n");
+      const continuationNote = completedSummary
+        ? `\n\nAlready completed steps (do NOT repeat this work):\n${completedSummary}`
+        : "";
+
       const systemPrompt = agent?.systemPrompt
-        ? `${agent.systemPrompt}\n\nYou are executing step "${node.id}": ${node.description}\nBe focused and concise. Complete this specific step only.`
-        : `You are executing step "${node.id}": ${node.description}\nBe focused and concise. Complete this specific step only.`;
+        ? `${agent.systemPrompt}\n\nYou are executing step "${node.id}": ${node.description}\nBe focused and concise. Complete this specific step only.${continuationNote}`
+        : `You are executing step "${node.id}": ${node.description}\nBe focused and concise. Complete this specific step only.${continuationNote}`;
 
       // Run the agent loop with tools — this handles tool calls natively
       const agentResult = await runAgentLoop({

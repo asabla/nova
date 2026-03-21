@@ -88,6 +88,8 @@ export interface GenerateDAGPlanInput {
   availableTools: { name: string; description: string }[];
   model: string;
   tier: ExecutionTier;
+  /** Summary of prior conversation turns so the planner knows what was already done. */
+  conversationContext?: string;
 }
 
 /**
@@ -145,8 +147,15 @@ Rules:
 - The first step(s) always have "dependencies": [].${parallelInstructions}
 - Keep plans concise: 2-8 nodes maximum.
 - Only reference tools from the available list.
-- Every node must be reachable from a root node (no cycles).`,
+- Every node must be reachable from a root node (no cycles).
+- If prior conversation context is provided, do NOT plan steps for work already completed. Only plan NEW work needed.`,
       },
+      ...(input.conversationContext
+        ? [{
+            role: "system" as const,
+            content: `Prior conversation context (already completed — do NOT re-do these):\n${input.conversationContext}`,
+          }]
+        : []),
       { role: "user", content: input.userMessage },
     ],
     temperature: 0.3,
