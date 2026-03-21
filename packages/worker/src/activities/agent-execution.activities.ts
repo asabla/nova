@@ -442,12 +442,14 @@ export async function executeToolCall(
           fileText = fileText.slice(0, 100_000) + `\n[... truncated at 100k chars, total: ${fileText.length}]`;
         }
 
+        const isTabular = ct === XLSX_MIME || ct === "text/csv" || fileRecord.filename?.endsWith(".csv") || fileRecord.filename?.endsWith(".xlsx");
         rawResult = {
           fileId: fileRecord.id,
           filename: fileRecord.filename,
           contentType: ct,
           content: fileText ?? "",
           characterCount: fileText?.length ?? 0,
+          ...(isTabular ? { displayHint: "When presenting this data to the user, wrap it in a ```csv code fence for proper table rendering." } : {}),
         };
         break;
       }

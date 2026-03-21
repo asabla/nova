@@ -89,35 +89,112 @@ function MermaidDiagram({ code }: { code: string }) {
   );
 }
 
+const CSV_PAGE_SIZE = 50;
+
+function parseCsvLine(line: string): string[] {
+  const cells: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if (ch === "," && !inQuotes) {
+      cells.push(current.trim());
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
 function CsvTable({ csv }: { csv: string }) {
-  const rows = useMemo(() => {
+  const [page, setPage] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { header, allRows } = useMemo(() => {
     const lines = csv.trim().split("\n").filter(Boolean);
-    return lines.map((line) => line.split(",").map((cell) => cell.trim().replace(/^"|"$/g, "")));
+    const parsed = lines.map(parseCsvLine);
+    if (parsed.length === 0) return { header: [], allRows: [] };
+    return { header: parsed[0], allRows: parsed.slice(1) };
   }, [csv]);
 
-  if (rows.length === 0) return null;
-  const [header, ...body] = rows;
+  const filteredRows = useMemo(() => {
+    if (!searchTerm) return allRows;
+    const lower = searchTerm.toLowerCase();
+    return allRows.filter((row) => row.some((cell) => cell.toLowerCase().includes(lower)));
+  }, [allRows, searchTerm]);
+
+  if (header.length === 0) return null;
+
+  const totalRows = filteredRows.length;
+  const totalPages = Math.ceil(totalRows / CSV_PAGE_SIZE);
+  const isLarge = allRows.length > CSV_PAGE_SIZE;
+  const pageRows = isLarge ? filteredRows.slice(page * CSV_PAGE_SIZE, (page + 1) * CSV_PAGE_SIZE) : filteredRows;
 
   return (
-    <div className="my-3 rounded-xl border border-border">
-      <Table className="text-xs">
-        <TableHeader>
-          <TableRow className="border-b border-border">
-            {header.map((cell, i) => (
-              <TableHead key={i} className="px-3 py-2 text-left font-medium text-text normal-case tracking-normal">{cell}</TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {body.map((row, i) => (
-            <TableRow key={i}>
-              {row.map((cell, j) => (
-                <TableCell key={j} className="px-3 py-1.5 text-text-secondary">{cell}</TableCell>
+    <div className="my-3 rounded-xl border border-border overflow-hidden">
+      {/* Header bar for large tables */}
+      {isLarge && (
+        <div className="flex items-center gap-3 px-3 py-2 bg-surface-secondary border-b border-border text-xs">
+          <span className="text-text-secondary font-medium">
+            {totalRows.toLocaleString()} rows
+            {searchTerm && totalRows !== allRows.length && ` (filtered from ${allRows.length.toLocaleString()})`}
+          </span>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
+            placeholder="Filter rows..."
+            className="flex-1 max-w-xs h-6 px-2 text-xs rounded border border-border bg-surface text-text placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1.5 ml-auto">
+              <button
+                onClick={() => setPage(Math.max(0, page - 1))}
+                disabled={page === 0}
+                className="px-1.5 py-0.5 rounded border border-border text-text-secondary hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                &lsaquo;
+              </button>
+              <span className="text-text-tertiary tabular-nums">
+                {page + 1}/{totalPages}
+              </span>
+              <button
+                onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
+                disabled={page >= totalPages - 1}
+                className="px-1.5 py-0.5 rounded border border-border text-text-secondary hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                &rsaquo;
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+        <Table className="text-xs">
+          <TableHeader className="sticky top-0 bg-surface-secondary z-10">
+            <TableRow className="border-b border-border">
+              {header.map((cell, i) => (
+                <TableHead key={i} className="px-3 py-2 text-left font-medium text-text normal-case tracking-normal whitespace-nowrap">{cell}</TableHead>
               ))}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {pageRows.map((row, i) => (
+              <TableRow key={i} className="hover:bg-muted/30">
+                {row.map((cell, j) => (
+                  <TableCell key={j} className="px-3 py-1.5 text-text-secondary whitespace-nowrap max-w-[300px] truncate" title={cell}>{cell}</TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
@@ -279,10 +356,98 @@ const MD_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>["components"] = 
   },
 };
 
+/**
+ * Detect large blocks of CSV-like content (many comma-separated lines not in a code fence)
+ * and wrap them in ```csv fences so the CsvTable renderer handles them with pagination.
+ */
+function wrapLargeCsvBlocks(text: string): string {
+  // Don't process if already mostly code fences
+  if ((text.match(/```/g) || []).length > 4) return text;
+
+  const lines = text.split("\n");
+  let result: string[] = [];
+  let csvBlock: string[] = [];
+  let inCodeFence = false;
+
+  const flushCsv = () => {
+    if (csvBlock.length > 20) {
+      // Large CSV block detected — wrap in fence
+      result.push("```csv");
+      result.push(...csvBlock);
+      result.push("```");
+    } else {
+      // Small block — keep as-is
+      result.push(...csvBlock);
+    }
+    csvBlock = [];
+  };
+
+  const isCsvLine = (line: string) => {
+    // A line is CSV-like if it has 2+ commas and no markdown formatting
+    const commas = (line.match(/,/g) || []).length;
+    if (commas < 2) return false;
+    // Skip lines that look like markdown (headers, lists, links)
+    if (/^#{1,6}\s|^\s*[-*]\s|^\s*\d+\.\s|^\[/.test(line)) return false;
+    return true;
+  };
+
+  for (const line of lines) {
+    if (line.startsWith("```")) {
+      flushCsv();
+      inCodeFence = !inCodeFence;
+      result.push(line);
+      continue;
+    }
+
+    if (inCodeFence) {
+      result.push(line);
+      continue;
+    }
+
+    if (isCsvLine(line)) {
+      csvBlock.push(line);
+    } else {
+      flushCsv();
+      result.push(line);
+    }
+  }
+
+  flushCsv();
+  return result.join("\n");
+}
+
+const MAX_MARKDOWN_CHARS = 30_000; // Beyond this, markdown parsing becomes sluggish
+
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
-  // Normalize HTML <br> tags to newlines (LLMs sometimes emit them)
   const normalized = useMemo(
-    () => content.replace(/<br\s*\/?>/gi, "\n"),
+    () => {
+      let text = content.replace(/<br\s*\/?>/gi, "\n");
+      // Auto-detect and wrap large inline CSV blocks for paginated rendering
+      text = wrapLargeCsvBlocks(text);
+      // If content is still extremely large after CSV wrapping, truncate the non-fenced parts
+      if (text.length > MAX_MARKDOWN_CHARS) {
+        // Keep code fences intact (they use efficient paginated renderers) but truncate prose
+        const parts = text.split(/(```[\s\S]*?```)/g);
+        let budget = MAX_MARKDOWN_CHARS;
+        const kept: string[] = [];
+        for (const part of parts) {
+          if (part.startsWith("```")) {
+            // Code fences are rendered efficiently — always keep
+            kept.push(part);
+          } else if (budget > 0) {
+            if (part.length <= budget) {
+              kept.push(part);
+              budget -= part.length;
+            } else {
+              kept.push(part.slice(0, budget) + "\n\n*[... content truncated for display]*");
+              budget = 0;
+            }
+          }
+        }
+        text = kept.join("");
+      }
+      return text;
+    },
     [content],
   );
 
