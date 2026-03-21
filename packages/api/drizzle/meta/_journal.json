@@ -50,6 +50,13 @@
       "when": 1774043961582,
       "tag": "0006_volatile_thing",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1774121428431,
+      "tag": "0007_material_mindworm",
+      "breakpoints": true
     }
   ]
 }

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { eq, and, desc } from "drizzle-orm";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
-import { researchReports } from "@nova/shared/schemas";
+import { researchReports, researchReportVersions } from "@nova/shared/schemas";
 import { getTemporalClient } from "../lib/temporal";
 import { AppError } from "@nova/shared/utils";
 import { relayResearchToSSE } from "../lib/stream-relay";
@@ -502,6 +502,136 @@ researchRoutes.post("/:id/rerun", async (c) => {
   }
 
   return c.json(newReport, 201);
+});
+
+// --- Research report versions ---
+
+researchRoutes.get("/:id/versions", async (c) => {
+  const orgId = c.get("orgId");
+  const reportId = c.req.param("id");
+
+  const [report] = await db
+    .select({ id: researchReports.id })
+    .from(researchReports)
+    .where(and(eq(researchReports.id, reportId), eq(researchReports.orgId, orgId)))
+    .limit(1);
+
+  if (!report) throw AppError.notFound("Research report");
+
+  const versions = await db
+    .select()
+    .from(researchReportVersions)
+    .where(eq(researchReportVersions.reportId, reportId))
+    .orderBy(desc(researchReportVersions.version));
+
+  return c.json({ data: versions });
+});
+
+researchRoutes.get("/:id/versions/:version", async (c) => {
+  const orgId = c.get("orgId");
+  const reportId = c.req.param("id");
+  const version = parseInt(c.req.param("version"), 10);
+
+  const [report] = await db
+    .select({ id: researchReports.id })
+    .from(researchReports)
+    .where(and(eq(researchReports.id, reportId), eq(researchReports.orgId, orgId)))
+    .limit(1);
+
+  if (!report) throw AppError.notFound("Research report");
+
+  const [reportVersion] = await db
+    .select()
+    .from(researchReportVersions)
+    .where(
+      and(
+        eq(researchReportVersions.reportId, reportId),
+        eq(researchReportVersions.version, version),
+      ),
+    )
+    .limit(1);
+
+  if (!reportVersion) throw AppError.notFound("Report version");
+
+  return c.json(reportVersion);
+});
+
+// --- Research refinement ---
+
+researchRoutes.post("/:id/refine", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const reportId = c.req.param("id");
+  const body = await c.req.json();
+
+  const refinementPrompt = z.string().min(1).max(2000).parse(body.refinementPrompt);
+
+  // Get the existing report
+  const [report] = await db
+    .select()
+    .from(researchReports)
+    .where(and(eq(researchReports.id, reportId), eq(researchReports.orgId, orgId)))
+    .limit(1);
+
+  if (!report) throw AppError.notFound("Research report");
+  if (report.status !== "completed") throw AppError.badRequest("Can only refine completed reports");
+
+  const newVersion = (report.currentVersion ?? 1) + 1;
+
+  // Create version entry
+  const [versionEntry] = await db.insert(researchReportVersions).values({
+    reportId,
+    version: newVersion,
+    refinementPrompt,
+    parentVersionId: null, // Could track previous version ID
+    status: "running",
+  }).returning();
+
+  // Update report's current version
+  await db.update(researchReports).set({
+    currentVersion: newVersion,
+    status: "running",
+    updatedAt: new Date(),
+  }).where(eq(researchReports.id, reportId));
+
+  // Start refinement workflow
+  try {
+    const client = await getTemporalClient();
+    const streamChannelId = `research:${reportId}:v${newVersion}`;
+
+    await client.workflow.start("researchRefinementWorkflow", {
+      taskQueue: "nova-main",
+      workflowId: `research-refine-${reportId}-v${newVersion}`,
+      args: [{
+        orgId,
+        conversationId: report.conversationId,
+        reportId,
+        versionId: versionEntry.id,
+        refinementPrompt,
+        previousContent: report.reportContent ?? "",
+        previousSources: (report.sources as any[]) ?? [],
+        maxSources: 10,
+        streamChannelId,
+      }],
+    });
+
+    return c.json({
+      versionId: versionEntry.id,
+      version: newVersion,
+      streamChannelId,
+    }, 201);
+  } catch {
+    await db.update(researchReportVersions)
+      .set({ status: "failed" })
+      .where(eq(researchReportVersions.id, versionEntry.id));
+
+    await db.update(researchReports).set({
+      currentVersion: report.currentVersion,
+      status: "completed",
+    }).where(eq(researchReports.id, reportId));
+
+    throw AppError.badRequest("Failed to start refinement workflow");
+  }
 });
 
 export { researchRoutes };

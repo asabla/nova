@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, integer, jsonb, boolean, index, bigint } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, integer, jsonb, boolean, index, uniqueIndex, bigint } from "drizzle-orm/pg-core";
 import { organisations } from "./organisations";
 import { users } from "./users";
 import { files } from "./files";
@@ -140,10 +140,27 @@ export const researchReports = pgTable("research_reports", {
   reportContent: text("report_content"),
   sources: jsonb("sources"),
   status: text("status").notNull().default("running"),
+  currentVersion: integer("current_version").notNull().default(1),
   fileId: uuid("file_id").references(() => files.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 }, (table) => [
   index("idx_research_reports_org_id").on(table.orgId),
+]);
+
+export const researchReportVersions = pgTable("research_report_versions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  reportId: uuid("report_id").notNull().references(() => researchReports.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  refinementPrompt: text("refinement_prompt"),
+  parentVersionId: uuid("parent_version_id"),
+  reportContent: text("report_content"),
+  sources: jsonb("sources"),
+  status: text("status").notNull().default("running"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("idx_report_versions_report_id").on(table.reportId),
+  uniqueIndex("idx_report_versions_report_version").on(table.reportId, table.version),
 ]);

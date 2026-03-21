@@ -1,5 +1,12 @@
-import { proxyActivities, sleep, CancellationScope } from "@temporalio/workflow";
+import {
+  proxyActivities,
+  CancellationScope,
+  defineSignal,
+  setHandler,
+  condition,
+} from "@temporalio/workflow";
 import type * as activities from "../activities";
+import type { UserInteractionResponse } from "@nova/shared/types";
 
 const {
   searchWeb,
@@ -19,6 +26,20 @@ const {
   retry: { maximumAttempts: 3 },
 });
 
+const {
+  publishInteractionRequestActivity,
+} = proxyActivities<typeof activities>({
+  startToCloseTimeout: "10 seconds",
+  retry: { maximumAttempts: 2 },
+});
+
+// --- Signals ---
+
+export const cancelResearchSignal = defineSignal("cancel");
+export const interactionResponseSignal = defineSignal<[UserInteractionResponse]>("userInteractionResponse");
+
+// --- Types ---
+
 export interface DeepResearchInput {
   orgId: string;
   conversationId: string;
@@ -27,6 +48,8 @@ export interface DeepResearchInput {
   maxSources: number;
   maxIterations: number;
   streamChannelId?: string;
+  /** Enable interactive checkpoints (user can guide the research). */
+  interactive?: boolean;
   sources?: {
     webSearch: boolean;
     knowledgeCollectionIds: string[];
@@ -35,15 +58,23 @@ export interface DeepResearchInput {
 }
 
 export async function deepResearchWorkflow(input: DeepResearchInput): Promise<void> {
-  // Overall workflow timeout: 30 minutes to prevent indefinite execution
   await CancellationScope.withTimeout("30 minutes", async () => {
     await deepResearchWorkflowInner(input);
   });
 }
 
 async function deepResearchWorkflowInner(input: DeepResearchInput): Promise<void> {
+  let cancelled = false;
+  const interactionResponses = new Map<string, UserInteractionResponse>();
+
+  setHandler(cancelResearchSignal, () => { cancelled = true; });
+  setHandler(interactionResponseSignal, (response) => {
+    interactionResponses.set(response.requestId, response);
+  });
+
   const srcConfig = input.sources ?? { webSearch: true, knowledgeCollectionIds: [], fileIds: [] };
   const ch = input.streamChannelId;
+  const interactive = input.interactive ?? false;
 
   await updateResearchStatus(input.reportId, "searching", { query: input.query });
   if (ch) {
@@ -117,6 +148,8 @@ async function deepResearchWorkflowInner(input: DeepResearchInput): Promise<void
   // ---- Web search ----
   if (srcConfig.webSearch) {
     for (let iteration = 0; iteration < input.maxIterations; iteration++) {
+      if (cancelled) break;
+
       await updateResearchStatus(input.reportId, "searching", {
         phase: "web",
         iteration: iteration + 1,
@@ -131,7 +164,6 @@ async function deepResearchWorkflowInner(input: DeepResearchInput): Promise<void
       try {
         searchResults = await searchWeb(input.query, iteration);
       } catch {
-        // Partial failure: web search failed but other sources may have succeeded
         if (ch) await publishResearchProgressActivity(ch, "error", `Web search iteration ${iteration + 1} failed`);
         continue;
       }
@@ -168,11 +200,86 @@ async function deepResearchWorkflowInner(input: DeepResearchInput): Promise<void
     }
   }
 
+  if (cancelled) return;
+
   if (sources.length === 0) {
     const errMsg = "No sources found. Enable web search or select internal sources with relevant content.";
     await updateResearchStatus(input.reportId, "failed", { error: errMsg });
     if (ch) await publishResearchErrorActivity(ch, errMsg);
     return;
+  }
+
+  // ---- CHECKPOINT 1: After source discovery ----
+  // Ask user which angles/sources to focus on
+  if (interactive && ch && sources.length > 3) {
+    const topAngles = sources
+      .sort((a, b) => b.relevance - a.relevance)
+      .slice(0, 5)
+      .map((s, i) => ({
+        id: `source-${i}`,
+        label: s.title,
+        description: `Relevance: ${s.relevance.toFixed(0)}%`,
+      }));
+
+    const checkpointId = `checkpoint-sources-${input.reportId}`;
+    await publishInteractionRequestActivity(ch, {
+      id: checkpointId,
+      type: "option_selection",
+      prompt: `Found ${sources.length} sources. Which areas should the report focus on? (Select one, or wait for auto-continue)`,
+      options: [
+        { id: "all", label: "All sources", description: "Use all discovered sources" },
+        ...topAngles,
+      ],
+      timeoutMs: 120_000, // 2 minutes
+    });
+
+    // Wait for response or timeout (auto-continue with all sources)
+    const gotResponse = await condition(
+      () => interactionResponses.has(checkpointId) || cancelled,
+      "2 minutes",
+    );
+
+    if (cancelled) return;
+
+    if (gotResponse && interactionResponses.has(checkpointId)) {
+      const response = interactionResponses.get(checkpointId)!;
+      if (response.selectedOptionId && response.selectedOptionId !== "all") {
+        // Filter to selected source's topic
+        const selectedIdx = parseInt(response.selectedOptionId.replace("source-", ""), 10);
+        if (!isNaN(selectedIdx) && selectedIdx < sources.length) {
+          if (ch) await publishResearchProgressActivity(ch, "info", `Focusing on: ${sources[selectedIdx].title}`);
+        }
+      }
+    }
+  }
+
+  // ---- CHECKPOINT 2: Before report generation ----
+  // Ask user to approve or adjust before generating
+  if (interactive && ch) {
+    const checkpointId = `checkpoint-generate-${input.reportId}`;
+    await publishInteractionRequestActivity(ch, {
+      id: checkpointId,
+      type: "approval_gate",
+      prompt: `Ready to generate report from ${sources.length} sources. Proceed?`,
+      timeoutMs: 60_000, // 1 minute
+    });
+
+    const gotApproval = await condition(
+      () => interactionResponses.has(checkpointId) || cancelled,
+      "1 minute",
+    );
+
+    if (cancelled) return;
+
+    if (gotApproval && interactionResponses.has(checkpointId)) {
+      const response = interactionResponses.get(checkpointId)!;
+      if (response.approved === false) {
+        await updateResearchStatus(input.reportId, "cancelled", { reason: "User rejected report generation" });
+        if (ch) await publishResearchErrorActivity(ch, "Report generation cancelled by user");
+        return;
+      }
+    }
+    // If no response within timeout, auto-proceed
   }
 
   await updateResearchStatus(input.reportId, "generating", { totalSources: sources.length });
