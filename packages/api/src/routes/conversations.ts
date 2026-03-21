@@ -9,6 +9,7 @@ import { AppError } from "@nova/shared/utils";
 import { db } from "../lib/db";
 import { userProfiles, users, agents } from "@nova/shared/schemas";
 import { eq, and, isNull } from "drizzle-orm";
+import { getTemporalClient } from "../lib/temporal";
 
 const conversations = new Hono<AppContext>();
 
@@ -349,6 +350,83 @@ conversations.get("/:id/mentionables", async (c) => {
   return c.json({
     data: [...mentionableUsers, ...mentionableAgents],
   });
+});
+
+// --- Interaction response (send user interaction response to active workflow) ---
+
+const interactionResponseSchema = z.object({
+  requestId: z.string(),
+  type: z.enum(["option_selection", "feedback_prompt", "approval_gate", "text_input"]),
+  selectedOptionId: z.string().optional(),
+  textInput: z.string().optional(),
+  approved: z.boolean().optional(),
+});
+
+conversations.post("/:id/interaction-response", zValidator("json", interactionResponseSchema), async (c) => {
+  const conversationId = c.req.param("id");
+  const body = c.req.valid("json");
+
+  try {
+    const client = await getTemporalClient();
+
+    // Find running workflow for this conversation by listing with ID prefix
+    const workflows = client.workflow.list({
+      query: `WorkflowId STARTS_WITH 'agent-chat-${conversationId}' AND ExecutionStatus = 'Running'`,
+    });
+
+    let workflowId: string | null = null;
+    for await (const wf of workflows) {
+      workflowId = wf.workflowId;
+      break; // Take the first (most recent) running workflow
+    }
+
+    if (!workflowId) {
+      throw AppError.notFound("No active workflow for this conversation");
+    }
+
+    const handle = client.workflow.getHandle(workflowId);
+    await handle.signal("userInteractionResponse", body);
+    return c.json({ ok: true });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw AppError.badRequest("Failed to send interaction response to workflow");
+  }
+});
+
+// --- Plan approval (approve/reject a plan for an active workflow) ---
+
+const planApprovalSchema = z.object({
+  approved: z.boolean(),
+});
+
+conversations.post("/:id/plan-approval", zValidator("json", planApprovalSchema), async (c) => {
+  const conversationId = c.req.param("id");
+  const body = c.req.valid("json");
+
+  try {
+    const client = await getTemporalClient();
+
+    const wfList = client.workflow.list({
+      query: `WorkflowId STARTS_WITH 'agent-chat-${conversationId}' AND ExecutionStatus = 'Running'`,
+    });
+
+    let workflowId: string | null = null;
+    for await (const wf of wfList) {
+      workflowId = wf.workflowId;
+      break;
+    }
+
+    if (!workflowId) {
+      throw AppError.notFound("No active workflow for this conversation");
+    }
+
+    const handle = client.workflow.getHandle(workflowId);
+    await handle.signal("planApproval", { approved: body.approved });
+    return c.json({ ok: true });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw AppError.badRequest("Failed to send plan approval to workflow");
+  }
 });
 
 export { conversations as conversationRoutes };

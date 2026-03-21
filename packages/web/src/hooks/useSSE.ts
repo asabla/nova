@@ -2,6 +2,12 @@ import { useCallback, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getActiveOrgId } from "../lib/api";
 import { queryKeys } from "../lib/query-keys";
+import type {
+  ExecutionTier,
+  Plan,
+  PlanNodeStatus,
+  UserInteractionRequest,
+} from "@nova/shared/types";
 
 export type StreamStatus = "idle" | "streaming" | "paused" | "done" | "error";
 
@@ -19,6 +25,13 @@ export interface DoneData {
   latencyMs?: number;
 }
 
+export interface AgentFlowState {
+  tier: ExecutionTier | null;
+  tierReasoning: string | null;
+  plan: Plan | null;
+  pendingInteraction: UserInteractionRequest | null;
+}
+
 export function useSSEStream() {
   const queryClient = useQueryClient();
   const [tokens, setTokens] = useState("");
@@ -26,6 +39,12 @@ export function useSSEStream() {
   const [activeTools, setActiveTools] = useState<ActiveTool[]>([]);
   const [doneData, setDoneData] = useState<DoneData | null>(null);
   const [generatedTitle, setGeneratedTitle] = useState<string | null>(null);
+  const [agentFlow, setAgentFlow] = useState<AgentFlowState>({
+    tier: null,
+    tierReasoning: null,
+    plan: null,
+    pendingInteraction: null,
+  });
   const abortRef = useRef<AbortController | null>(null);
   const pausedRef = useRef(false);
   const bufferWhilePausedRef = useRef("");
@@ -52,6 +71,7 @@ export function useSSEStream() {
     setStatus("streaming");
     setActiveTools([]);
     setDoneData(null);
+    setAgentFlow({ tier: null, tierReasoning: null, plan: null, pendingInteraction: null });
     pausedRef.current = false;
     bufferWhilePausedRef.current = "";
     abortRef.current = new AbortController();
@@ -167,6 +187,58 @@ export function useSSEStream() {
                 continue;
               }
 
+              // --- Agent flow events ---
+              if (currentEventType === "tier.assessed") {
+                setAgentFlow((prev) => ({ ...prev, tier: data.tier, tierReasoning: data.reasoning }));
+                currentEventType = "";
+                continue;
+              }
+
+              if (currentEventType === "plan.generated") {
+                setAgentFlow((prev) => ({ ...prev, plan: data.plan }));
+                currentEventType = "";
+                continue;
+              }
+
+              if (currentEventType === "plan.approved") {
+                setAgentFlow((prev) => {
+                  if (!prev.plan) return prev;
+                  return { ...prev, plan: { ...prev.plan, approved: true } };
+                });
+                currentEventType = "";
+                continue;
+              }
+
+              if (currentEventType === "plan.node.status") {
+                setAgentFlow((prev) => {
+                  if (!prev.plan) return prev;
+                  const updatedNodes = prev.plan.nodes.map((n) =>
+                    n.id === data.nodeId ? { ...n, status: data.status as PlanNodeStatus } : n,
+                  );
+                  return { ...prev, plan: { ...prev.plan, nodes: updatedNodes } };
+                });
+                currentEventType = "";
+                continue;
+              }
+
+              if (currentEventType === "interaction.request") {
+                setAgentFlow((prev) => ({ ...prev, pendingInteraction: data.request ?? data }));
+                currentEventType = "";
+                continue;
+              }
+
+              if (currentEventType === "interaction.response") {
+                setAgentFlow((prev) => ({ ...prev, pendingInteraction: null }));
+                currentEventType = "";
+                continue;
+              }
+
+              if (currentEventType === "subtask.spawned" || currentEventType === "subtask.complete") {
+                // Handled by plan.node.status events — skip
+                currentEventType = "";
+                continue;
+              }
+
               if (data.content) {
                 if (pausedRef.current) {
                   bufferWhilePausedRef.current += data.content;
@@ -239,7 +311,8 @@ export function useSSEStream() {
     setActiveTools([]);
     setDoneData(null);
     setGeneratedTitle(null);
+    setAgentFlow({ tier: null, tierReasoning: null, plan: null, pendingInteraction: null });
   }, []);
 
-  return { tokens, status, activeTools, doneData, generatedTitle, startStream, stopStream, pauseStream, resumeStream, resetStream };
+  return { tokens, status, activeTools, doneData, generatedTitle, agentFlow, startStream, stopStream, pauseStream, resumeStream, resetStream };
 }

@@ -17,6 +17,7 @@ import { useClipboardPaste } from "../../hooks/useClipboardPaste";
 import { useTypingIndicator } from "../../hooks/useTypingIndicator";
 import { toast } from "../../components/ui/Toast";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
+import { ExecutionProgress } from "../../components/chat/ExecutionProgress";
 
 export const Route = createFileRoute("/_auth/conversations/$id")({
   component: () => (
@@ -32,7 +33,7 @@ function ConversationPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
-  const { tokens, status, activeTools, startStream, stopStream, pauseStream, resumeStream, resetStream } = useSSEStream();
+  const { tokens, status, activeTools, agentFlow, startStream, stopStream, pauseStream, resumeStream, resetStream } = useSSEStream();
   const { onKeystroke, stopTyping } = useTypingIndicator(id);
 
   const { data: conversation, isLoading: isConversationLoading } = useQuery(conversationDetailOptions(id));
@@ -387,6 +388,15 @@ function ConversationPage() {
             onNote={handleNote}
             onFork={handleFork}
           />
+
+          {/* Agent execution progress (tier badge, plan DAG, interactions) */}
+          {(status === "streaming" || status === "paused") && agentFlow.tier && (
+            <ExecutionProgress
+              agentFlow={agentFlow}
+              conversationId={id}
+              isStreaming={status === "streaming"}
+            />
+          )}
 
           {/* SSE error state */}
           {status === "error" && (
