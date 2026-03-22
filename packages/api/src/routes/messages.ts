@@ -770,10 +770,31 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
 
           // Try to get tool call records from Temporal workflow result
           let toolCallRecords: { toolName: string; input: Record<string, unknown>; output: unknown; error?: string; durationMs: number }[] = [];
+          let wfTier: string | undefined;
+          let wfPlanSummary: Record<string, unknown> | undefined;
           try {
             const handle = client.workflow.getHandle(workflowId);
             const wfResult = await handle.result();
             toolCallRecords = (wfResult as any)?.toolCallRecords ?? [];
+            wfTier = (wfResult as any)?.tier;
+            const wfPlan = (wfResult as any)?.plan;
+            if (wfPlan) {
+              wfPlanSummary = {
+                id: wfPlan.id,
+                tier: wfPlan.tier,
+                reasoning: wfPlan.reasoning,
+                approvalRequired: wfPlan.approvalRequired,
+                approved: wfPlan.approved,
+                nodes: (wfPlan.nodes ?? []).map((n: any) => ({
+                  id: n.id,
+                  description: n.description,
+                  tools: n.tools,
+                  dependencies: n.dependencies,
+                  status: n.status,
+                  result: n.result ? { durationMs: n.result.durationMs, tokensUsed: n.result.tokensUsed, toolCallCount: n.result.toolCallRecords?.length ?? 0 } : undefined,
+                })),
+              };
+            }
           } catch {
             // Workflow may still be running or failed — skip tool call persistence
           }
@@ -790,7 +811,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
             modelId: conversation.modelId ?? undefined,
             tokenCountPrompt: totalPromptTokens,
             tokenCountCompletion: totalCompletionTokens,
-            metadata: { latencyMs: Date.now() - startTime, model: body.model, smartRouted: true, toolSummary },
+            metadata: { latencyMs: Date.now() - startTime, model: body.model, smartRouted: true, toolSummary, tier: wfTier, plan: wfPlanSummary },
           });
 
           // Persist tool calls to DB

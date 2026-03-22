@@ -17,7 +17,7 @@ import { useClipboardPaste } from "../../hooks/useClipboardPaste";
 import { useTypingIndicator } from "../../hooks/useTypingIndicator";
 import { toast } from "../../components/ui/Toast";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
-import { ExecutionProgress } from "../../components/chat/ExecutionProgress";
+
 
 export const Route = createFileRoute("/_auth/conversations/$id")({
   component: () => (
@@ -379,6 +379,7 @@ function ConversationPage() {
             streamingContent={(status === "streaming" || status === "paused") ? tokens : undefined}
             isStreaming={status === "streaming" || status === "paused"}
             activeTools={activeTools}
+            agentFlow={(status === "streaming" || status === "paused") ? agentFlow : undefined}
             userName={user?.name}
             conversationId={id}
             onRate={handleRate}
@@ -388,15 +389,6 @@ function ConversationPage() {
             onNote={handleNote}
             onFork={handleFork}
           />
-
-          {/* Agent execution progress (tier badge, plan DAG, interactions) */}
-          {(status === "streaming" || status === "paused") && agentFlow.tier && (
-            <ExecutionProgress
-              agentFlow={agentFlow}
-              conversationId={id}
-              isStreaming={status === "streaming"}
-            />
-          )}
 
           {/* SSE error state */}
           {status === "error" && (

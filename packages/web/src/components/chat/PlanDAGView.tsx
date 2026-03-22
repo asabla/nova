@@ -14,6 +14,7 @@ import type { Plan, PlanNode, PlanNodeStatus } from "@nova/shared/types";
 interface PlanDAGViewProps {
   plan: Plan;
   isRunning?: boolean;
+  defaultCollapsed?: boolean;
 }
 
 const STATUS_CONFIG: Record<PlanNodeStatus, {
@@ -114,8 +115,8 @@ function PlanNodeRow({ node, depth = 0, allNodes }: { node: PlanNode; depth?: nu
   );
 }
 
-export function PlanDAGView({ plan, isRunning }: PlanDAGViewProps) {
-  const [collapsed, setCollapsed] = useState(false);
+export function PlanDAGView({ plan, isRunning, defaultCollapsed = false }: PlanDAGViewProps) {
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
   const completedCount = plan.nodes.filter((n) => n.status === "completed").length;
   const totalNodes = plan.nodes.length;

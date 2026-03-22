@@ -4,7 +4,7 @@ import { ArrowDown } from "lucide-react";
 import { MessageBubble } from "./MessageBubble";
 import { StreamingMessage } from "./StreamingMessage";
 import { TypingIndicator } from "./TypingIndicator";
-import type { ActiveTool } from "../../hooks/useSSE";
+import type { ActiveTool, AgentFlowState } from "../../hooks/useSSE";
 
 interface MessageListProps {
   messages: any[];
@@ -12,6 +12,7 @@ interface MessageListProps {
   streamingContent?: string;
   isStreaming?: boolean;
   activeTools?: ActiveTool[];
+  agentFlow?: AgentFlowState;
   userName?: string;
   conversationId?: string;
   onRate?: (messageId: string, rating: 1 | -1) => void;
@@ -22,7 +23,7 @@ interface MessageListProps {
   onFork?: (messageId: string) => void;
 }
 
-export function MessageList({ messages, artifactsByMessageId, streamingContent, isStreaming, activeTools, userName, conversationId, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork }: MessageListProps) {
+export function MessageList({ messages, artifactsByMessageId, streamingContent, isStreaming, activeTools, agentFlow, userName, conversationId, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork }: MessageListProps) {
   const { t } = useTranslation();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -130,7 +131,7 @@ export function MessageList({ messages, artifactsByMessageId, streamingContent, 
         ))}
 
         {isStreaming && streamingContent !== undefined && (
-          <StreamingMessage content={streamingContent} activeTools={activeTools} />
+          <StreamingMessage content={streamingContent} activeTools={activeTools} agentFlow={agentFlow} conversationId={conversationId} />
         )}
 
         {conversationId && (

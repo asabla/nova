@@ -8,8 +8,11 @@ import { ArtifactRenderer } from "./ArtifactRenderer";
 import { DynamicWidget } from "./DynamicWidget";
 import { ToolSummaryCompact } from "./InlineToolStatus";
 import { ThinkingIndicator } from "./ThinkingIndicator";
+import { TierBadge } from "./TierBadge";
+import { PlanDAGView } from "./PlanDAGView";
 import { AttachmentPreview } from "../common/AttachmentPreview";
 import { parseThinkBlocksComplete } from "../../lib/think-parser";
+import type { ExecutionTier, Plan } from "@nova/shared/types";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/Badge";
 import { Input } from "../ui/Input";
@@ -287,6 +290,16 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
                   resultSummary: t.error ? `Error: ${t.error.slice(0, 40)}` : undefined,
                 }))}
               />
+            )}
+
+            {/* Plan summary - persisted from execution */}
+            {isAssistant && message.metadata?.plan && (
+              <div className="my-1">
+                {message.metadata.tier && (
+                  <TierBadge tier={message.metadata.tier as ExecutionTier} reasoning={null} />
+                )}
+                <PlanDAGView plan={message.metadata.plan as Plan} isRunning={false} defaultCollapsed={true} />
+              </div>
             )}
 
             <div

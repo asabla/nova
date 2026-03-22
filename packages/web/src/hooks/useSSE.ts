@@ -311,7 +311,8 @@ export function useSSEStream() {
     setActiveTools([]);
     setDoneData(null);
     setGeneratedTitle(null);
-    setAgentFlow({ tier: null, tierReasoning: null, plan: null, pendingInteraction: null });
+    // Note: agentFlow is NOT cleared here — it persists until the next startStream()
+    // so the plan remains visible between stream end and query refetch
   }, []);
 
   return { tokens, status, activeTools, doneData, generatedTitle, agentFlow, startStream, stopStream, pauseStream, resumeStream, resetStream };

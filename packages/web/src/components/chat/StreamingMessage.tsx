@@ -3,15 +3,20 @@ import { Sparkles } from "lucide-react";
 import { MarkdownRenderer } from "../markdown/MarkdownRenderer";
 import { InlineToolStatusList } from "./InlineToolStatus";
 import { ThinkingIndicator } from "./ThinkingIndicator";
+import { TierBadge } from "./TierBadge";
+import { PlanDAGView } from "./PlanDAGView";
+import { InteractionPanel } from "./InteractionPanel";
 import { useThinkingParser } from "../../hooks/useThinkingParser";
-import type { ActiveTool } from "../../hooks/useSSE";
+import type { ActiveTool, AgentFlowState } from "../../hooks/useSSE";
 
 interface StreamingMessageProps {
   content: string;
   activeTools?: ActiveTool[];
+  agentFlow?: AgentFlowState;
+  conversationId?: string;
 }
 
-export function StreamingMessage({ content, activeTools }: StreamingMessageProps) {
+export function StreamingMessage({ content, activeTools, agentFlow, conversationId }: StreamingMessageProps) {
   const timestamp = useMemo(
     () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }),
     [],
@@ -37,6 +42,23 @@ export function StreamingMessage({ content, activeTools }: StreamingMessageProps
 
         {activeTools && activeTools.length > 0 && (
           <InlineToolStatusList tools={activeTools} />
+        )}
+
+        {agentFlow?.tier && (
+          <div className="my-1">
+            <TierBadge tier={agentFlow.tier} reasoning={agentFlow.tierReasoning} />
+          </div>
+        )}
+
+        {agentFlow?.plan && (agentFlow.tier === "sequential" || agentFlow.tier === "orchestrated") && (
+          <PlanDAGView plan={agentFlow.plan} isRunning={true} />
+        )}
+
+        {agentFlow?.pendingInteraction && conversationId && (
+          <InteractionPanel
+            request={agentFlow.pendingInteraction}
+            conversationId={conversationId}
+          />
         )}
 
         {hasThinkingContent && (
