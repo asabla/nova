@@ -3,7 +3,7 @@ import { clsx } from "clsx";
 import { Check, Square, CheckSquare, Download } from "lucide-react";
 
 export function ChecklistWidget({ params }: { params?: Record<string, string> }) {
-  const items = (params?.items ?? "Item 1,Item 2,Item 3").split(",").map((s) => s.trim());
+  const items = String(params?.items ?? "Item 1,Item 2,Item 3").split(",").map((s) => s.trim());
   const [checked, setChecked] = useState<Set<number>>(() => {
     if (!params?.checked) return new Set();
     return new Set(

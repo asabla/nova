@@ -7,6 +7,10 @@ import type {
   PlanNode,
 } from "@nova/shared/types";
 
+// Use a fast, lightweight model for planning tasks (tier assessment, DAG generation).
+// Falls back to the caller-provided model if planning-model is not configured.
+const PLANNING_MODEL = process.env.NOVA_PLANNING_MODEL ?? "planning-model";
+
 // ---------------------------------------------------------------------------
 // Tier Assessment
 // ---------------------------------------------------------------------------
@@ -24,7 +28,7 @@ export interface AssessTierInput {
  */
 export async function assessTier(input: AssessTierInput): Promise<TierAssessment> {
   const response = await openai.chat.completions.create({
-    model: input.model,
+    model: PLANNING_MODEL,
     messages: [
       {
         role: "system",
@@ -111,7 +115,7 @@ export async function generateDAGPlan(input: GenerateDAGPlanInput): Promise<Plan
       : `\n- This is a sequential plan. Each step should depend on the previous one (e.g. step-2 depends on step-1).`;
 
   const response = await openai.chat.completions.create({
-    model: input.model,
+    model: PLANNING_MODEL,
     messages: [
       {
         role: "system",

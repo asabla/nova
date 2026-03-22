@@ -2,7 +2,7 @@ import { Check, X, Circle } from "lucide-react";
 import { clsx } from "clsx";
 
 export function ProgressWidget({ params }: { params?: Record<string, string> }) {
-  const steps = (params?.steps ?? "Step 1,Step 2,Step 3").split(",").map((s) => s.trim());
+  const steps = String(params?.steps ?? "Step 1,Step 2,Step 3").split(",").map((s) => s.trim());
   const current = Math.max(0, Math.min(steps.length - 1, parseInt(params?.current ?? "0", 10) || 0));
   const status = (params?.status ?? "in-progress") as "in-progress" | "completed" | "failed";
 

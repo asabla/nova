@@ -4,11 +4,11 @@ import { CHART_COLORS } from "@/constants/chart-colors";
 export function ChartWidget({ params }: { params?: Record<string, string> }) {
   const chartType = (params?.chartType ?? "bar") as "bar" | "line" | "pie";
   const dataValues = useMemo(
-    () => (params?.data ?? "").split(",").map((s) => parseFloat(s.trim())).filter((n) => !isNaN(n)),
+    () => String(params?.data ?? "").split(",").map((s) => parseFloat(s.trim())).filter((n) => !isNaN(n)),
     [params?.data],
   );
   const labels = useMemo(
-    () => (params?.labels ?? "").split(",").map((s) => s.trim()).filter(Boolean),
+    () => String(params?.labels ?? "").split(",").map((s) => s.trim()).filter(Boolean),
     [params?.labels],
   );
 

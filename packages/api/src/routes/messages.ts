@@ -615,56 +615,40 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
     try {
       const startTime = Date.now();
 
-      // ── Tier assessment: decide execution strategy before LLM call ──
-      // For complex requests, skip the initial LLM call and hand off
-      // directly to the Temporal workflow for planned execution.
+      // ── Tier assessment: fast heuristic router (no LLM call) ──
+      // Classifies request complexity in <1ms instead of making a separate LLM call.
       let assessedTier: "direct" | "sequential" | "orchestrated" = "direct";
       if (body.enableTools) {
-        try {
-          const userMsg = enrichedMessages.filter((m: any) => m.role === "user").pop()?.content ?? "";
-          const priorTurns = enrichedMessages.filter((m: any) => m.role === "user" || m.role === "assistant");
-          const contextSummary = priorTurns.length > 1
-            ? priorTurns.slice(-6).map((m: any) => `${m.role}: ${(m.content ?? "").slice(0, 200)}`).join("\n")
-            : undefined;
+        const userMsg = enrichedMessages.filter((m: any) => m.role === "user").pop()?.content ?? "";
+        const priorTurns = enrichedMessages.filter((m: any) => m.role === "user" || m.role === "assistant");
+        const hasPriorContext = priorTurns.length > 1;
+        const msgLen = userMsg.length;
+        const msgLower = userMsg.toLowerCase();
 
-          const tierResult = await chatCompletion({
-            model: resolvedModel,
-            messages: [
-              {
-                role: "system",
-                content: `You are a task complexity router. Classify the user's request into one of three execution tiers.
-
-Tiers:
-- "direct": Simple Q&A, greetings, factual answers, single-step tasks, follow-ups to prior answers, reformatting data already in context. Most messages are direct.
-- "sequential": Needs 2-4 ordered steps. Single web search + synthesis, document lookup + analysis, one tool call with follow-up reasoning.
-- "orchestrated": Needs 4+ steps, multiple tools, parallel work, or multi-source research. Cross-referencing multiple sources, complex analysis requiring code execution + web research, tasks with independent sub-problems.
-
-${contextSummary ? "IMPORTANT: Consider conversation context. Follow-ups building on existing content are almost always direct." : ""}
-
-Respond with ONLY valid JSON: {"tier": "direct"|"sequential"|"orchestrated", "reasoning": "one sentence"}`,
-              },
-              ...(contextSummary ? [{ role: "system" as const, content: `Conversation context:\n${contextSummary}` }] : []),
-              { role: "user" as const, content: userMsg },
-            ],
-            temperature: 0,
-            max_tokens: 150,
-          } as any);
-
-          const tierContent = tierResult.choices?.[0]?.message?.content ?? "";
-          try {
-            const parsed = JSON.parse(tierContent);
-            if (parsed.tier === "sequential" || parsed.tier === "orchestrated") {
-              assessedTier = parsed.tier;
-            }
-          } catch { /* default to direct */ }
-          console.log(`[stream] tier assessment: ${assessedTier} (raw: ${tierContent.slice(0, 100)})`);
-        } catch (err) {
-          console.warn("[stream] tier assessment failed, defaulting to direct:", err);
+        // Follow-ups with existing context are almost always direct
+        if (hasPriorContext && (msgLen < 150 || /^(now |also |can you |what about |summarize|explain|show |list |tell me |thanks|ok |yes |no |sure|great|how about|why |could you |please )/i.test(userMsg))) {
+          assessedTier = "direct";
         }
+        // Explicit multi-step / multi-source language → orchestrated
+        else if (/\b(research\b.{5,}\band\b.{5,}\bthen\b|compare\b.{3,}\bacross\b|analyze\b.{5,}\bmultiple\b|from\s+(different|multiple|various)\s+(sources|perspectives|angles))/i.test(userMsg)) {
+          assessedTier = "orchestrated";
+        }
+        // Long messages with multiple instructions → sequential
+        else if (msgLen > 500 && (msgLower.includes(" then ") || msgLower.includes(" after that ") || msgLower.includes(" next ") || msgLower.includes(" step "))) {
+          assessedTier = "sequential";
+        }
+        // Short messages without prior context that imply a tool action → direct (let the agent loop decide)
+        else {
+          assessedTier = "direct";
+        }
+
+        console.log(`[stream] tier assessment (heuristic): ${assessedTier} msgLen=${msgLen} hasPrior=${hasPriorContext}`);
       }
 
-      // For sequential/orchestrated tiers, skip the initial LLM call and go straight to Temporal
-      if (assessedTier !== "direct" && body.enableTools) {
+      // When tools are enabled, always dispatch to Temporal workflow.
+      // This avoids the redundant LLM call pattern where the API makes a streaming call,
+      // detects tool_calls, discards the output, then Temporal makes the same call again.
+      if (body.enableTools) {
         await stream.writeSSE({
           event: "tier.assessed",
           data: JSON.stringify({ tier: assessedTier }),
@@ -711,9 +695,10 @@ Respond with ONLY valid JSON: {"tier": "direct"|"sequential"|"orchestrated", "re
           if (wfPlan) {
             wfPlanSummary = {
               id: wfPlan.id, tier: wfPlan.tier, reasoning: wfPlan.reasoning,
+              approvalRequired: wfPlan.approvalRequired, approved: wfPlan.approved,
               nodes: (wfPlan.nodes ?? []).map((n: any) => ({
                 id: n.id, description: n.description, tools: n.tools, dependencies: n.dependencies,
-                status: n.status, result: n.result ? { durationMs: n.result.durationMs, tokensUsed: n.result.tokensUsed } : undefined,
+                status: n.status, result: n.result ? { durationMs: n.result.durationMs, tokensUsed: n.result.tokensUsed, toolCallCount: n.result.toolCallRecords?.length ?? 0 } : undefined,
               })),
             };
           }
@@ -743,6 +728,66 @@ Respond with ONLY valid JSON: {"tier": "direct"|"sequential"|"orchestrated", "re
               })),
             );
           } catch (dbErr) { console.error("[planned-chat] Failed to persist tool calls:", dbErr); }
+
+          // Extract output files from code_execute results and attach to message
+          try {
+            const { env } = await import("../lib/env");
+            for (const r of toolCallRecords) {
+              if (r.toolName !== "code_execute") continue;
+              const output = r.output as { outputFiles?: { name: string; sizeBytes: number; storageKey: string }[] } | null;
+              if (!output?.outputFiles?.length) continue;
+
+              for (const of_ of output.outputFiles) {
+                const ext = of_.name.split(".").pop()?.toLowerCase() ?? "";
+
+                if (ext === "excalidraw") {
+                  try {
+                    const { getObjectBuffer } = await import("../lib/minio");
+                    const buf = await getObjectBuffer(of_.storageKey);
+                    const content = buf.toString("utf-8");
+                    const title = of_.name.replace(/\.excalidraw$/, "") || "Diagram";
+                    await artifactService.createArtifact(orgId, {
+                      messageId: assistantMessage.id,
+                      conversationId,
+                      type: "excalidraw",
+                      title,
+                      content,
+                      metadata: { sourceType: "sandbox" },
+                    });
+                  } catch (artifactErr) {
+                    console.error("[planned-chat] Failed to create excalidraw artifact:", artifactErr);
+                  }
+                  continue;
+                }
+
+                const mimeMap: Record<string, string> = {
+                  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", svg: "image/svg+xml", webp: "image/webp",
+                  pdf: "application/pdf", csv: "text/csv", json: "application/json", txt: "text/plain",
+                  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                  html: "text/html", xml: "application/xml", zip: "application/zip",
+                };
+                const contentType = mimeMap[ext] ?? "application/octet-stream";
+
+                const [fileRecord] = await db.insert(files).values({
+                  orgId, userId,
+                  filename: of_.name, contentType,
+                  sizeBytes: of_.sizeBytes,
+                  storagePath: of_.storageKey,
+                  storageBucket: env.MINIO_BUCKET,
+                  metadata: { source: "sandbox" },
+                }).returning();
+
+                await db.insert(messageAttachments).values({
+                  messageId: assistantMessage.id, orgId,
+                  fileId: fileRecord.id,
+                  attachmentType: "file",
+                });
+              }
+            }
+          } catch (fileErr) {
+            console.error("[planned-chat] Failed to persist output files:", fileErr);
+          }
         }
 
         // Auto-generate title for untitled conversations
@@ -784,349 +829,36 @@ Respond with ONLY valid JSON: {"tier": "direct"|"sequential"|"orchestrated", "re
         return;
       }
 
-      // ── Direct tier: standard LLM call with optional tool handoff ──
-      const completionParams: Record<string, unknown> = {
+      // ── No-tools path: direct streaming LLM call (no Temporal) ──
+      const llmStream = await streamChatCompletion({
         model: resolvedModel,
         messages: enrichedMessages,
         temperature: body.temperature,
         top_p: body.topP,
         max_tokens: body.maxTokens,
-      };
-
-      if (body.enableTools) {
-        completionParams.tools = DEFAULT_TOOLS;
-      }
-
-      const llmStream = await streamChatCompletion(completionParams as any);
+      } as any);
 
       let fullContent = "";
       let usageData: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null = null;
-      let toolCalls: { id: string; function: { name: string; arguments: string } }[] = [];
-      let finishReason = "stop";
-
-      // When tools are enabled, the model may output reasoning text ("I need to search...")
-      // before deciding to call tools. We buffer this initial content and only stream it
-      // if the response finishes without tool calls. If tool calls are detected, we discard
-      // the pre-tool reasoning and send a content_clear event to the frontend.
-      let hasToolCallDelta = false;
 
       for await (const chunk of llmStream) {
         const delta = chunk.choices?.[0]?.delta;
-        const choiceFinish = chunk.choices?.[0]?.finish_reason;
-
         const token = delta?.content;
         if (token) {
           fullContent += token;
-          // Only stream tokens if we haven't seen tool call deltas yet
-          if (!hasToolCallDelta) {
-            await stream.writeSSE({
-              event: "token",
-              data: JSON.stringify({ content: token }),
-            });
-          }
+          await stream.writeSSE({
+            event: "token",
+            data: JSON.stringify({ content: token }),
+          });
         }
-
-        // Accumulate tool calls from streaming deltas
-        if (delta?.tool_calls) {
-          if (!hasToolCallDelta) {
-            hasToolCallDelta = true;
-            // Tell the frontend to discard any pre-tool reasoning content it received
-            if (fullContent.trim()) {
-              await stream.writeSSE({
-                event: "content_clear",
-                data: JSON.stringify({ reason: "tool_calls_detected" }),
-              });
-            }
-          }
-          for (const tc of delta.tool_calls) {
-            const idx = tc.index ?? 0;
-            if (!toolCalls[idx]) {
-              toolCalls[idx] = { id: tc.id ?? "", function: { name: "", arguments: "" } };
-            }
-            if (tc.id) toolCalls[idx].id = tc.id;
-            if (tc.function?.name) toolCalls[idx].function.name += tc.function.name;
-            if (tc.function?.arguments) toolCalls[idx].function.arguments += tc.function.arguments;
-          }
-        }
-
-        if (choiceFinish) {
-          finishReason = choiceFinish;
-        }
-
-        if (chunk.usage) {
-          usageData = chunk.usage;
-        }
+        if (chunk.choices?.[0]?.finish_reason) { /* noop */ }
+        if (chunk.usage) usageData = chunk.usage;
       }
-
-      // Filter out any sparse entries from tool_calls accumulation
-      toolCalls = toolCalls.filter(Boolean);
 
       const latencyMs = Date.now() - startTime;
       const promptTokens = usageData?.prompt_tokens ?? Math.ceil(JSON.stringify(body.messages).length / 4);
       const completionTokens = usageData?.completion_tokens ?? Math.ceil(fullContent.length / 4);
 
-      // --- Smart routing: if tool calls detected, hand off to Temporal ---
-      console.log(`[stream] finishReason=${finishReason} toolCalls=${toolCalls.length} contentLen=${fullContent.length}`);
-      if (finishReason === "tool_calls" && toolCalls.length > 0) {
-        console.log(`[stream] tool calls:`, toolCalls.map(tc => `${tc.function.name}(${tc.function.arguments.slice(0, 50)})`));
-        // Send tool status events to the client (with parsed args)
-        for (const tc of toolCalls) {
-          let parsedArgs: Record<string, unknown> = {};
-          try { parsedArgs = JSON.parse(tc.function.arguments); } catch { /* ignore */ }
-          await stream.writeSSE({
-            event: "tool_status",
-            data: JSON.stringify({ tool: tc.function.name, status: "running", args: parsedArgs }),
-          });
-        }
-
-        const streamChannelId = `stream:${conversationId}:${crypto.randomUUID()}`;
-
-        try {
-          // Subscribe to Redis BEFORE starting workflow to avoid race condition
-          const { relayRedisToSSE } = await import("../lib/stream-relay");
-          const relayPromise = relayRedisToSSE(stream, streamChannelId, { timeoutMs: 600_000 });
-
-          const client = await getTemporalClient();
-          const workflowId = `agent-chat-${conversationId}-${Date.now()}`;
-
-          await client.workflow.start("agentWorkflow", {
-            taskQueue: TASK_QUEUES.AGENT,
-            workflowId,
-            args: [{
-              orgId,
-              userId: c.get("userId"),
-              conversationId,
-              streamChannelId,
-              messageHistory: enrichedMessages,
-              pendingToolCalls: toolCalls,
-              model: resolvedModel,
-              modelParams: { temperature: body.temperature, maxTokens: body.maxTokens },
-              tools: body.enableTools ? DEFAULT_TOOLS : undefined,
-              maxSteps: 12,
-              enableSearchAttributes: true,
-            }],
-          });
-
-          const relayResult = await relayPromise;
-
-          // When tool calls were triggered, the initial fullContent is the model's
-          // reasoning preamble ("I need to search for...", "Let me look up...") — not the real answer.
-          // The actual response comes from the workflow relay. Never fall back to pre-tool reasoning.
-          const relayContent = stripThinkBlocks(relayResult?.content ?? "");
-          const totalContent = relayContent;
-          const totalPromptTokens = promptTokens + (relayResult?.usage?.prompt_tokens ?? 0);
-          const totalCompletionTokens = completionTokens + (relayResult?.usage?.completion_tokens ?? 0);
-
-          // Try to get tool call records from Temporal workflow result
-          let toolCallRecords: { toolName: string; input: Record<string, unknown>; output: unknown; error?: string; durationMs: number }[] = [];
-          let wfTier: string | undefined;
-          let wfPlanSummary: Record<string, unknown> | undefined;
-          try {
-            const handle = client.workflow.getHandle(workflowId);
-            const wfResult = await handle.result();
-            toolCallRecords = (wfResult as any)?.toolCallRecords ?? [];
-            wfTier = (wfResult as any)?.tier;
-            const wfPlan = (wfResult as any)?.plan;
-            if (wfPlan) {
-              wfPlanSummary = {
-                id: wfPlan.id,
-                tier: wfPlan.tier,
-                reasoning: wfPlan.reasoning,
-                approvalRequired: wfPlan.approvalRequired,
-                approved: wfPlan.approved,
-                nodes: (wfPlan.nodes ?? []).map((n: any) => ({
-                  id: n.id,
-                  description: n.description,
-                  tools: n.tools,
-                  dependencies: n.dependencies,
-                  status: n.status,
-                  result: n.result ? { durationMs: n.result.durationMs, tokensUsed: n.result.tokensUsed, toolCallCount: n.result.toolCallRecords?.length ?? 0 } : undefined,
-                })),
-              };
-            }
-          } catch {
-            // Workflow may still be running or failed — skip tool call persistence
-          }
-
-          // Build tool call summary for metadata
-          const toolSummary = toolCallRecords.length > 0
-            ? toolCallRecords.map((r) => ({ name: r.toolName, durationMs: r.durationMs, error: r.error, args: r.input }))
-            : undefined;
-
-          const assistantMessage = await messageService.createMessage(orgId, {
-            conversationId,
-            senderType: "assistant",
-            content: totalContent,
-            modelId: conversation.modelId ?? undefined,
-            tokenCountPrompt: totalPromptTokens,
-            tokenCountCompletion: totalCompletionTokens,
-            metadata: { latencyMs: Date.now() - startTime, model: body.model, smartRouted: true, toolSummary, tier: wfTier, plan: wfPlanSummary },
-          });
-
-          // Persist tool calls to DB
-          if (toolCallRecords.length > 0) {
-            try {
-              await db.insert(toolCallsTable).values(
-                toolCallRecords.map((r) => ({
-                  messageId: assistantMessage.id,
-                  conversationId,
-                  orgId,
-                  toolName: r.toolName,
-                  input: r.input,
-                  output: r.output ?? null,
-                  status: r.error ? "error" : "completed",
-                  errorMessage: r.error ?? null,
-                  durationMs: r.durationMs,
-                })),
-              );
-            } catch (dbErr) {
-              console.error("[smart-chat] Failed to persist tool calls:", dbErr);
-            }
-
-            // Extract output files from code_execute results and attach to message
-            try {
-              const { env } = await import("../lib/env");
-              for (const r of toolCallRecords) {
-                if (r.toolName !== "code_execute") continue;
-                const output = r.output as { outputFiles?: { name: string; sizeBytes: number; storageKey: string }[] } | null;
-                if (!output?.outputFiles?.length) continue;
-
-                for (const of of output.outputFiles) {
-                  // Infer content type from extension
-                  const ext = of.name.split(".").pop()?.toLowerCase() ?? "";
-
-                  // Handle .excalidraw files as artifacts instead of attachments
-                  if (ext === "excalidraw") {
-                    try {
-                      const { getObjectBuffer } = await import("../lib/minio");
-                      const buf = await getObjectBuffer(of.storageKey);
-                      const content = buf.toString("utf-8");
-                      const title = of.name.replace(/\.excalidraw$/, "") || "Diagram";
-                      await artifactService.createArtifact(orgId, {
-                        messageId: assistantMessage.id,
-                        conversationId,
-                        type: "excalidraw",
-                        title,
-                        content,
-                        metadata: { sourceType: "sandbox" },
-                      });
-                    } catch (artifactErr) {
-                      console.error("[smart-chat] Failed to create excalidraw artifact:", artifactErr);
-                    }
-                    continue;
-                  }
-
-                  const mimeMap: Record<string, string> = {
-                    png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", svg: "image/svg+xml", webp: "image/webp",
-                    pdf: "application/pdf", csv: "text/csv", json: "application/json", txt: "text/plain",
-                    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    html: "text/html", xml: "application/xml", zip: "application/zip",
-                  };
-                  const contentType = mimeMap[ext] ?? "application/octet-stream";
-
-                  // Create file record
-                  const [fileRecord] = await db.insert(files).values({
-                    orgId,
-                    userId,
-                    filename: of.name,
-                    contentType,
-                    sizeBytes: of.sizeBytes,
-                    storagePath: of.storageKey,
-                    storageBucket: env.MINIO_BUCKET,
-                    metadata: { source: "sandbox" },
-                  }).returning();
-
-                  // Attach to assistant message
-                  await db.insert(messageAttachments).values({
-                    messageId: assistantMessage.id,
-                    orgId,
-                    fileId: fileRecord.id,
-                    attachmentType: "file",
-                  });
-                }
-              }
-            } catch (fileErr) {
-              console.error("[smart-chat] Failed to persist output files:", fileErr);
-            }
-          }
-
-          // Auto-generate title for untitled conversations
-          if (!conversation.title) {
-            const titleMsgs = [
-              ...body.messages.slice(0, 2).map((m) => ({ role: m.role, content: String(m.content).slice(0, 500) })),
-              { role: "assistant", content: totalContent.slice(0, 500) },
-            ];
-            try {
-              const title = await conversationService.generateConversationTitle(titleMsgs);
-              if (title && title !== "Untitled Conversation") {
-                await conversationService.updateConversation(orgId, conversationId, { title });
-                await stream.writeSSE({ event: "title_generated", data: JSON.stringify({ title }) });
-              }
-            } catch (e) {
-              console.error("[stream] title generation failed:", e);
-            }
-            try {
-              const tagNames = await conversationService.generateConversationTags(titleMsgs);
-              if (tagNames.length > 0) {
-                const tags = await conversationService.assignTagsToConversation(orgId, userId, conversationId, tagNames);
-                await stream.writeSSE({ event: "tags_generated", data: JSON.stringify({ tags }) });
-              }
-            } catch (e) {
-              console.error("[stream] tag generation failed:", e);
-            }
-          }
-
-          await stream.writeSSE({
-            event: "done",
-            data: JSON.stringify({
-              messageId: assistantMessage.id,
-              tokenCountPrompt: totalPromptTokens,
-              tokenCountCompletion: totalCompletionTokens,
-              latencyMs: Date.now() - startTime,
-            }),
-          });
-          console.log(`[stream] relay done, relayContent=${(relayResult?.content ?? "").length} chars`);
-        } catch (temporalErr) {
-          // Temporal unavailable — save partial response and return error
-          console.error("[smart-chat] Temporal workflow failed:", temporalErr);
-
-          if (fullContent) {
-            const partialMessage = await messageService.createMessage(orgId, {
-              conversationId,
-              senderType: "assistant",
-              content: fullContent,
-              modelId: conversation.modelId ?? undefined,
-              tokenCountPrompt: promptTokens,
-              tokenCountCompletion: completionTokens,
-              metadata: { latencyMs, model: body.model, partial: true },
-            });
-
-            await stream.writeSSE({
-              event: "done",
-              data: JSON.stringify({
-                messageId: partialMessage.id,
-                tokenCountPrompt: promptTokens,
-                tokenCountCompletion: completionTokens,
-                latencyMs,
-                partial: true,
-              }),
-            });
-          }
-
-          await stream.writeSSE({
-            event: "error",
-            data: JSON.stringify({
-              message: "Tool execution unavailable — showing partial response",
-              code: "temporal_unavailable",
-            }),
-          });
-        }
-
-        return;
-      }
-
-      // --- Normal path: no tool calls, save message as before ---
       fullContent = stripThinkBlocks(fullContent);
       const assistantMessage = await messageService.createMessage(orgId, {
         conversationId,

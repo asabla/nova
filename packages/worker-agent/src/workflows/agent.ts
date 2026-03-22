@@ -460,21 +460,24 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
     const maxSteps = input.maxSteps ?? agent?.maxSteps ?? 25;
     const timeoutSeconds = input.timeoutSeconds ?? agent?.timeoutSeconds ?? 300;
 
-    // Load agent memory
+    // Load memory and create conversation in parallel (both depend on agent config)
     let memory: Record<string, unknown> = {};
-    if (input.agentId && agent) {
-      memory = await loadAgentMemory(
-        input.agentId,
-        agent.memoryScope,
-        agent.memoryScope === "per-user" ? input.userId : undefined,
-      );
-    }
-
-    // Create or use conversation
     let conversationId = input.conversationId;
-    if (!conversationId && input.agentId && agent) {
-      const conv = await createAgentConversation(input.orgId, input.userId, input.agentId, `Agent: ${agent.name}`);
-      conversationId = conv.id;
+
+    if (input.agentId && agent) {
+      const needsConversation = !conversationId;
+      const [memoryResult, convResult] = await Promise.all([
+        loadAgentMemory(
+          input.agentId,
+          agent.memoryScope,
+          agent.memoryScope === "per-user" ? input.userId : undefined,
+        ),
+        needsConversation
+          ? createAgentConversation(input.orgId, input.userId, input.agentId, `Agent: ${agent.name}`)
+          : null,
+      ]);
+      memory = memoryResult;
+      if (convResult) conversationId = convResult.id;
     }
 
     // Build message history
@@ -485,7 +488,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
     if (Object.keys(memory).length > 0) {
       messageHistory.unshift({
         role: "system",
-        content: `Agent memory:\n${JSON.stringify(memory, null, 2)}`,
+        content: `Agent memory:\n${JSON.stringify(memory)}`,
       });
     }
 
@@ -630,9 +633,21 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
       }
     }
 
-    // Final synthesis: produce a clean user-facing response from all node results
+    // Final synthesis: produce a clean user-facing response from all node results.
+    // Skip the synthesis LLM call for single-node plans — use the node output directly.
     const completedWithContent = plan.nodes.filter((n) => n.status === "completed" && n.result?.content);
-    if (completedWithContent.length > 0) {
+    if (completedWithContent.length === 1) {
+      // Single node — use its output directly without an extra LLM call
+      finalContent = completedWithContent[0].result!.content;
+      if (ch) await publishTokenActivity(ch, finalContent);
+
+      if (conversationId && input.agentId) {
+        const msg = await saveAgentMessage(
+          input.orgId, conversationId, finalContent, input.agentId, agent?.modelId ?? null, 0, 0,
+        );
+        messageIds.push(msg.id);
+      }
+    } else if (completedWithContent.length > 1) {
       const nodeResults = completedWithContent
         .map((n) => `[${n.id}: ${n.description}]:\n${n.result!.content}`)
         .join("\n\n");
@@ -651,14 +666,9 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
       totalTokens += (synthesis.usage.prompt_tokens ?? 0) + (synthesis.usage.completion_tokens ?? 0);
 
       if (synthesis.content) {
-        // Use synthesis as the final content (not raw node concatenation)
         finalContent = synthesis.content;
-
-        // Stream the final synthesized response
         if (ch) await publishTokenActivity(ch, synthesis.content);
 
-        // Only save via saveAgentMessage when running as an agent (has agentId).
-        // For regular chat, the API message route saves the final message from the relay result.
         if (conversationId && input.agentId) {
           const msg = await saveAgentMessage(
             input.orgId, conversationId, synthesis.content, input.agentId, agent?.modelId ?? null,
