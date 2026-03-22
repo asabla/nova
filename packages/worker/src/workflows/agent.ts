@@ -6,6 +6,7 @@ import {
   condition,
   CancellationScope,
   executeChild,
+  upsertSearchAttributes,
 } from "@temporalio/workflow";
 import type * as agentActivities from "../activities/agent-execution.activities";
 import type * as agentStepActivities from "../activities/agent-step.activities";
@@ -244,6 +245,21 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
     }
   }
 
+  // Publish workflow metadata as search attributes for Temporal UI filtering.
+  // These attributes must be registered first via:
+  //   temporal operator search-attribute create --name NovaExecutionTier --type Keyword
+  //   temporal operator search-attribute create --name NovaAgentId --type Keyword
+  //   temporal operator search-attribute create --name NovaOrgId --type Keyword
+  // If not registered, upsertSearchAttributes will cause activation failures,
+  // so we guard with a flag passed from the workflow input.
+  if (input.enableSearchAttributes) {
+    upsertSearchAttributes({
+      NovaExecutionTier: [tier],
+      NovaAgentId: [input.agentId ?? "none"],
+      NovaOrgId: [input.orgId],
+    });
+  }
+
   // ------------------------------------------------------------------
   // Route by tier
   // ------------------------------------------------------------------
@@ -322,6 +338,10 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
     _cancelled: boolean,
     isCancelled: () => boolean,
   ): Promise<AgentWorkflowResult["status"]> {
+    // Load agent config for tool filtering
+    const agent = input.agentId ? await getAgentConfig(input.orgId, input.agentId) : null;
+    const allowedBuiltinTools = (agent as any)?.builtinTools ?? null;
+
     const messageHistory = [...(input.messageHistory ?? [])];
 
     // If we have pending tool calls, prepend them for the SDK
@@ -372,6 +392,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         maxTurns: input.maxSteps ?? 5,
         agentId: input.agentId,
         orgId: input.orgId,
+        allowedBuiltinTools,
       });
 
       totalTokens += agentResult.totalTokens;
@@ -586,7 +607,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         .join("\n\n");
 
       const synthesis = await executeAgentStepWithSDK({
-        systemPrompt: "You are a helpful assistant. Synthesize the gathered information into a clear, concise response. Do not mention steps, subtasks, plans, or the synthesis process. Just answer the user's question naturally. Be brief — avoid repeating information, unnecessary preamble, or filler. Short questions deserve short answers.",
+        systemPrompt: "You are a helpful assistant. Synthesize the gathered information into a clear, concise response. Do not mention steps, subtasks, plans, or the synthesis process. Just answer the user's question naturally. Be brief — avoid repeating information, unnecessary preamble, or filler. Short questions deserve short answers. Maximum 3 paragraphs unless the user explicitly asked for a long-form or detailed response.",
         modelId: input.model,
         modelParams: agent?.modelParams ?? {},
         messageHistory: [
@@ -648,6 +669,14 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
     updateNodeStatus(plan!, node.id, "running");
     if (ch) await publishPlanNodeStatusActivity(ch, { nodeId: node.id, status: "running" });
 
+    // Use a per-node activity proxy so each node shows as a separate activity in Temporal timeline
+    const { runAgentLoop: runNodeAgentLoop } = proxyActivities<typeof agentRunActivities>({
+      startToCloseTimeout: "3 minutes",
+      heartbeatTimeout: "30 seconds",
+      retry: { maximumAttempts: 2 },
+      activityId: `runAgentLoop-${node.id}`,
+    });
+
     const nodeStartTime = Date.now();
 
     try {
@@ -672,16 +701,18 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         : `You are executing step "${node.id}": ${node.description}\nBe focused and concise. Complete this specific step only.${continuationNote}`;
 
       // Run the agent loop with tools — this handles tool calls natively
-      const agentResult = await runAgentLoop({
+      const allowedBuiltinTools = (agent as any)?.builtinTools ?? null;
+      const agentResult = await runNodeAgentLoop({
         streamChannelId: nodeChannelId,
         model: node.assignedModel ?? input.model,
         systemPrompt,
         messageHistory: nodeMessages,
         temperature: input.modelParams?.temperature,
-        maxTokens: input.modelParams?.maxTokens,
+        maxTokens: Math.min(input.modelParams?.maxTokens ?? 2048, 2048),
         maxTurns: 5,
         agentId: input.agentId,
         orgId: input.orgId,
+        allowedBuiltinTools,
       });
 
       currentStep++;
