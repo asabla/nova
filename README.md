@@ -8,18 +8,23 @@ NOVA is a self-hosted-first, multi-tenant AI chat platform with custom agents, k
 
 ## Architecture
 
-Bun workspace monorepo with 4 packages:
+Bun workspace monorepo with 7 packages:
 
-- **@nova/shared** — Drizzle schemas (62 tables), types, constants, utils
+- **@nova/shared** — Drizzle schemas (65 tables), types, constants, utils, skills
 - **@nova/api** — Hono + Bun API server (REST, SSE, WebSocket)
 - **@nova/web** — React 19 + Vite + Tailwind v4 + TanStack Router + TanStack Query + Zustand
-- **@nova/worker** — Temporal workflows (runs on Node.js, not Bun)
+- **@nova/worker-shared** — Shared worker infrastructure (db, redis, litellm, stream-publisher, qdrant, minio, sandbox, tools)
+- **@nova/worker-agent** — Temporal agent workflows (task queue: `nova-agent`). Chat execution, tool use, DAG orchestration
+- **@nova/worker-ingestion** — Temporal ingestion workflows (task queue: `nova-ingestion`). Document/file/message embedding pipelines
+- **@nova/worker-background** — Temporal background workflows (task queue: `nova-background`). Research, summaries, cleanup, scheduling
+
+All worker packages run on **Node.js** (not Bun) — Temporal requires it.
 
 ## Prerequisites
 
 - [Bun](https://bun.sh/) >= 1.x
 - [Docker](https://www.docker.com/) + Docker Compose
-- Node.js 22+ (for worker package only — Temporal requires it)
+- Node.js 22+ (for worker packages only — Temporal requires it)
 - GNU Make (optional, but recommended)
 
 ## Quick Start
@@ -36,12 +41,12 @@ make dev                      # Start all dev servers
 This starts all packages concurrently:
 - **API** → http://localhost:3000
 - **Web** → http://localhost:5173
-- **Worker** → connects to Temporal at localhost:7233
+- **Workers** (agent, ingestion, background) → connect to Temporal at localhost:7233
 
 ### Manual setup (without Make)
 
 ```bash
-docker compose up -d postgres redis minio litellm temporal temporal-db temporal-ui searxng
+docker compose up -d postgres redis minio litellm temporal temporal-db temporal-ui qdrant searxng
 bun run db:migrate
 bun run --filter @nova/api db:seed
 bun run dev
@@ -50,9 +55,12 @@ bun run dev
 ### Individual packages
 
 ```bash
-bun run dev:api     # API only
-bun run dev:web     # Web only
-bun run dev:worker  # Worker only
+bun run dev:api              # API only
+bun run dev:web              # Web only
+bun run dev:workers          # All 3 workers
+bun run dev:worker:agent     # Agent worker only
+bun run dev:worker:ingestion # Ingestion worker only
+bun run dev:worker:background # Background worker only
 ```
 
 ## Make Targets
@@ -88,7 +96,7 @@ Build and deploy all services:
 ```bash
 make deploy
 # or manually:
-docker compose build api worker web
+docker compose build api web worker-agent worker-ingestion worker-background
 docker compose up -d
 ```
 
@@ -102,6 +110,7 @@ docker compose up -d
 | Redis | 6379 | Cache, pub/sub, rate limiting |
 | MinIO | 9000/9001 | S3-compatible file storage |
 | LiteLLM | 4000 | LLM proxy gateway |
+| Qdrant | 6333/6334 | Vector search engine |
 | Temporal | 7233 | Workflow orchestration |
 | Temporal UI | 8233 | Temporal dashboard |
 | SearxNG | 8888 | Web search |

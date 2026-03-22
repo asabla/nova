@@ -10,7 +10,7 @@ NOVA — self-hosted-first AI chat platform (multi-tenant SaaS). License: FSL-1.
 
 Bun workspace monorepo with 7 packages:
 
-- **@nova/shared** — Drizzle schemas (62 tables), types, constants, utils. Exports: `./schema`, `./schemas`, `./types`, `./constants`, `./utils`
+- **@nova/shared** — Drizzle schemas (65 tables), types, constants, utils, skills. Exports: `./schema`, `./schemas`, `./types`, `./constants`, `./utils`, `./content`, `./skills`
 - **@nova/api** — Hono REST API on Bun runtime. Routes in `src/routes/`, services in `src/services/`, middleware in `src/middleware/`
 - **@nova/web** — React 19 + Vite + TanStack Router + TanStack Query + Zustand + Tailwind v4. Path alias `@/*` → `src/*`
 - **@nova/worker-shared** — Shared worker infrastructure (db, redis, litellm, stream-publisher, qdrant, minio, sandbox, tools). Conditional exports like `@nova/worker-shared/db`
@@ -62,7 +62,7 @@ docker compose up -d api web worker-agent worker-ingestion worker-background
 
 ### API middleware chain (order matters)
 
-Error handler → Security headers → CORS → Request ID → Logger → **Public routes** (auth, health, webhooks) → Rate limit → **Auth** → Org scope → MFA guard → Content filter → Budget guard (LLM routes)
+Error handler → Security headers → CORS → Request ID → Logger → **Public routes** (auth, health, webhooks, SSO OAuth) → Rate limit → **Auth** → Org scope → Role resolver → MFA guard → Content filter → Budget guard (LLM routes)
 
 ### Key patterns
 
@@ -70,11 +70,13 @@ Error handler → Security headers → CORS → Request ID → Logger → **Publ
 - **Errors**: Use `AppError` from `@nova/shared/utils` — `AppError.notFound()`, `AppError.unauthorized()`, `AppError.badRequest()`
 - **Shared imports**: `import { conversations } from "@nova/shared/schema"`, `import type { User } from "@nova/shared/types"`
 - **Temporal workflows**: Orchestrate via `proxyActivities()`. Activities are side-effect functions (LLM calls, DB writes). Each worker registers its own workflows/activities. The unified `agentWorkflow` (`packages/worker-agent/src/workflows/agent.ts`) handles both chat and execution modes. It auto-summarizes conversation context when history exceeds ~25k tokens (100k chars) to stay within model limits — the middle portion is compressed to a "Previously: ..." summary while preserving system messages, the first user message, and the last 4 messages. Workflows are dispatched to specific task queues via `TASK_QUEUES` constants from `@nova/shared/constants`.
-- **Auth**: Better Auth v1.5.4. Session restored in `_auth.tsx` `beforeLoad` via `authClient.getSession()`. Cookie config uses `advanced.cookiePrefix` / `advanced.cookies.session_token.name` (NOT `session.cookieName` — silently ignored)
-- **Frontend state**: Zustand for client state (auth, UI), TanStack Query for server state
+- **Auth**: Better Auth ^1.2.7. Session restored in `_auth.tsx` `beforeLoad` via `authClient.getSession()`. Cookie config uses `advanced.cookiePrefix` / `advanced.cookies.session_token.name` (NOT `session.cookieName` — silently ignored)
+- **Frontend state**: Zustand for client state (`auth.store.ts`, `ui.store.ts`, `ws.store.ts`), TanStack Query for server state
 - **Route generation**: TanStack Router file-based routing, auto-generates `routeTree.gen.ts`
 - **Attachment previews**: `AttachmentPreview` component (`components/common/AttachmentPreview.tsx`) renders inline previews for images, HTML, PDF, video, audio, CSV, and text/code files. Uses `usePresignedUrl` hook with IntersectionObserver for lazy loading. Falls back to download button for unsupported types or on error.
-- **Agent skills**: 15 skills defined in `packages/shared/src/skills.ts` (xlsx, pdf, docx, pptx, algorithmic-art, brand-guidelines, canvas-design, claude-api, doc-coauthoring, frontend-design, internal-comms, mcp-builder, theme-factory, web-artifacts-builder, webapp-testing). Skills are triggered by file MIME types or keyword matching in user messages. Full SKILL.md instructions, scripts, and docs are baked into the sandbox Docker image at `/sandbox/skills/{name}/`. Compact instruction summaries are injected into the agent prompt. Skill content source: `packages/shared/skills/`.
+- **Agent skills**: 16 skills defined in `packages/shared/src/skills.ts` (xlsx, pdf, docx, pptx, algorithmic-art, brand-guidelines, canvas-design, claude-api, doc-coauthoring, excalidraw, frontend-design, internal-comms, mcp-builder, theme-factory, web-artifacts-builder, webapp-testing). Skills are triggered by file MIME types or keyword matching in user messages. Full SKILL.md instructions, scripts, and docs are baked into the sandbox Docker image at `/sandbox/skills/{name}/`. Compact instruction summaries are injected into the agent prompt. Skill content source: `packages/shared/skills/`.
+- **Widgets**: 22 dynamic widgets rendered inline in chat (weather, chart, map, poll, timer, countdown, kanban, etc.). Registry at `packages/web/src/components/chat/widgets/registry.ts`. `DynamicWidget` component supports iframe embeds, auto-refresh, and custom parameters.
+- **Stream relay**: SSE streaming via Redis pub/sub. Events are dual-published to both pub/sub channels and Redis lists (`stream-events:{channelId}`) for replay on reconnection. Stream relay logic in `packages/api/src/lib/stream-relay.ts`. Event types include `token`, `content_clear`, `tool_status`, `retry`, agent flow events (`tier.assessed`, `plan.generated`, `plan.node.status`), `done`, `error`.
 
 ### Infrastructure services
 
@@ -84,13 +86,14 @@ Error handler → Security headers → CORS → Request ID → Logger → **Publ
 | Redis | 6379 | Cache, pub/sub, rate limiting |
 | MinIO | 9000/9001 | S3-compatible file storage |
 | LiteLLM | 4000 | LLM proxy (needs OPENAI_API_KEY or ANTHROPIC_API_KEY) |
+| Qdrant | 6333/6334 | Vector search engine |
 | Temporal | 7233 | Workflow orchestration (separate DB) |
 | Temporal UI | 8233 | Workflow dashboard |
 | SearxNG | 8888 | Web search |
 
 ## Typecheck Architecture
 
-`bun run typecheck` first builds `@nova/shared` declarations (`tsc -b`), then typechecks all 4 packages in parallel. Shared uses **conditional exports** — `"types"` points to `dist/*.d.ts` (for tsc), `"default"` points to `src/*.ts` (for Bun/Vite runtime). Consumer tsconfigs use `incremental` for caching.
+`bun run typecheck` first builds `@nova/shared` declarations (`tsc -b`), then typechecks all packages in parallel. Shared uses **conditional exports** — `"types"` points to `dist/*.d.ts` (for tsc), `"default"` points to `src/*.ts` (for Bun/Vite runtime). Consumer tsconfigs use `incremental` for caching.
 
 ### Known OOM sources and mitigations
 
@@ -111,3 +114,4 @@ The API's typecheck script uses `NODE_OPTIONS='--max-old-space-size=6144'` (6GB 
 - **Env propagation**: `bun run --filter` doesn't propagate root `.env` — use `docker compose up` or set vars manually
 - **DB config**: Drizzle config is at `packages/api/drizzle.config.ts`, schemas are in `packages/shared/src/schemas/`
 - **No lint script**: `bun run lint` is defined but individual packages don't have lint scripts yet
+- **Makefile**: `make setup`, `make dev`, `make deploy`, `make infra`, etc. — run `make help` for all targets. Generally equivalent to the `bun run` commands but more convenient for common workflows
