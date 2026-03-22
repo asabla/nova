@@ -374,28 +374,28 @@ export function AttachmentPreview({ attachment }: AttachmentPreviewProps) {
 
   // --- PDF ---
   if (category === "pdf") {
+    const sizeLabel = formatSize(attachment.sizeBytes);
     return (
-      <div ref={ref} className="w-full max-w-2xl">
-        {urlLoading || !url ? (
-          <PreviewSkeleton className="h-[400px]" />
-        ) : (
-          <>
-            <div className="rounded-lg border border-border overflow-hidden">
-              <PreviewToolbar filename={filename} onExpand={() => setExpanded(true)} />
-              <iframe
-                src={url}
-                className="w-full h-[400px]"
-                title={filename}
-              />
-            </div>
-            <Dialog open={expanded} onClose={() => setExpanded(false)} title={filename} size="full">
-              <iframe
-                src={url}
-                className="w-full h-[70vh] rounded-lg border border-border"
-                title={filename}
-              />
-            </Dialog>
-          </>
+      <div ref={ref}>
+        <button
+          onClick={() => setExpanded(true)}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface border border-border hover:bg-surface-secondary transition-colors text-left max-w-[280px]"
+        >
+          <FileText className="h-4 w-4 text-text-tertiary shrink-0" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-text truncate">{filename}</p>
+            {sizeLabel && <p className="text-[10px] text-text-tertiary">{sizeLabel}</p>}
+          </div>
+          <Maximize2 className="h-3.5 w-3.5 text-text-tertiary shrink-0" aria-hidden="true" />
+        </button>
+        {url && (
+          <Dialog open={expanded} onClose={() => setExpanded(false)} title={filename} size="full">
+            <iframe
+              src={url}
+              className="w-full h-[80vh] rounded-lg border border-border"
+              title={filename}
+            />
+          </Dialog>
         )}
       </div>
     );
