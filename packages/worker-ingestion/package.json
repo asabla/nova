@@ -1,0 +1,34 @@
+{
+  "name": "@nova/worker-ingestion",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nova/shared": "workspace:*",
+    "@nova/worker-shared": "workspace:*",
+    "@temporalio/activity": "^1.11.7",
+    "@temporalio/client": "^1.11.7",
+    "@temporalio/worker": "^1.11.7",
+    "@temporalio/workflow": "^1.11.7",
+    "drizzle-orm": "^0.39.3",
+    "exif-reader": "^2.0.1",
+    "image-size": "^2.0.1",
+    "mupdf": "^1.27.0",
+    "openai": "^6.27.0",
+    "papaparse": "^5.5.2",
+    "tesseract.js": "^7.0.0",
+    "tsx": "^4.19.4",
+    "unpdf": "^1.4.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zod": "3.24.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "@types/node": "^22.15.2",
+    "@types/papaparse": "^5.3.15"
+  }
+}
