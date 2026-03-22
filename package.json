@@ -3,15 +3,21 @@
   "private": true,
   "workspaces": [
     "packages/shared",
+    "packages/worker-shared",
+    "packages/worker-agent",
+    "packages/worker-ingestion",
+    "packages/worker-background",
     "packages/api",
-    "packages/web",
-    "packages/worker"
+    "packages/web"
   ],
   "scripts": {
     "dev": "bun run --filter '*' dev",
     "dev:api": "bun run --filter @nova/api dev",
     "dev:web": "bun run --filter @nova/web dev",
-    "dev:worker": "bun run --filter @nova/worker dev",
+    "dev:worker:agent": "bun run --filter @nova/worker-agent dev",
+    "dev:worker:ingestion": "bun run --filter @nova/worker-ingestion dev",
+    "dev:worker:background": "bun run --filter @nova/worker-background dev",
+    "dev:workers": "bun run --filter '@nova/worker-*' dev",
     "build": "bun run --filter '*' build",
     "lint": "bun run --filter '*' lint",
     "typecheck": "tsc -b packages/shared/tsconfig.json && bun run --filter '*' typecheck",

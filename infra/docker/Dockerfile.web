@@ -8,7 +8,10 @@ COPY package.json bun.lock* ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/api/package.json packages/api/
 COPY packages/web/package.json packages/web/
-COPY packages/worker/package.json packages/worker/
+COPY packages/worker-shared/package.json packages/worker-shared/
+COPY packages/worker-agent/package.json packages/worker-agent/
+COPY packages/worker-ingestion/package.json packages/worker-ingestion/
+COPY packages/worker-background/package.json packages/worker-background/
 
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile

@@ -1,6 +1,7 @@
 import { db } from "../lib/db";
 import { files } from "@nova/shared/schema";
 import { eq, and, isNull, sql } from "drizzle-orm";
+import { TASK_QUEUES } from "@nova/shared/constants";
 import { getUploadUrl, getDownloadUrl, deleteObject } from "../lib/minio";
 import { parsePagination, buildPaginatedResponse, type PaginationInput } from "@nova/shared/utils";
 import { env } from "../lib/env";
@@ -136,7 +137,7 @@ function triggerFileIngestion(file: { id: string; orgId: string; contentType: st
   getTemporalClient()
     .then((client) =>
       client.workflow.start("fileIngestionWorkflow", {
-        taskQueue: "nova-main",
+        taskQueue: TASK_QUEUES.INGESTION,
         workflowId: `file-ingest-${file.id}`,
         args: [{ fileId: file.id, orgId: file.orgId }],
       }),

@@ -1,6 +1,7 @@
 import { db } from "../lib/db";
 import { messages, messageAttachments, messageRatings, messageNotes, conversations, files } from "@nova/shared/schemas";
 import { eq, and, isNull, asc, sql, inArray } from "drizzle-orm";
+import { TASK_QUEUES } from "@nova/shared/constants";
 import { parsePagination, buildPaginatedResponse, type PaginationInput } from "@nova/shared/utils";
 import { syncMessageUpsert, syncMessageDelete } from "../lib/qdrant-sync";
 import { getTemporalClient } from "../lib/temporal";
@@ -120,7 +121,7 @@ export async function createMessage(orgId: string, data: {
     getTemporalClient()
       .then((client) =>
         client.workflow.start("messageEmbeddingWorkflow", {
-          taskQueue: "nova-main",
+          taskQueue: TASK_QUEUES.INGESTION,
           workflowId: `msg-embed-${message.id}`,
           args: [{ messageId: message.id, orgId }],
         }),

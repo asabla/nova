@@ -7,7 +7,7 @@ import * as messageService from "../services/message.service";
 import * as conversationService from "../services/conversation.service";
 import { streamChatCompletion, chatCompletion } from "../lib/litellm";
 import { AppError } from "@nova/shared/utils";
-import { DEFAULTS } from "@nova/shared/constants";
+import { DEFAULTS, TASK_QUEUES } from "@nova/shared/constants";
 import { notificationService } from "../services/notification.service";
 import { getTemporalClient } from "../lib/temporal";
 import { db } from "../lib/db";
@@ -678,7 +678,7 @@ Respond with ONLY valid JSON: {"tier": "direct"|"sequential"|"orchestrated", "re
         const workflowId = `agent-chat-${conversationId}-${Date.now()}`;
 
         await client.workflow.start("agentWorkflow", {
-          taskQueue: "nova-main",
+          taskQueue: TASK_QUEUES.AGENT,
           workflowId,
           args: [{
             orgId,
@@ -864,7 +864,7 @@ Respond with ONLY valid JSON: {"tier": "direct"|"sequential"|"orchestrated", "re
           const workflowId = `agent-chat-${conversationId}-${Date.now()}`;
 
           await client.workflow.start("agentWorkflow", {
-            taskQueue: "nova-main",
+            taskQueue: TASK_QUEUES.AGENT,
             workflowId,
             args: [{
               orgId,

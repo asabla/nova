@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
 import { eq, and, desc } from "drizzle-orm";
+import { TASK_QUEUES } from "@nova/shared/constants";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
 import { researchReports, researchReportVersions } from "@nova/shared/schemas";
@@ -306,7 +307,7 @@ researchRoutes.post("/", async (c) => {
     const hasKnowledge = body.sources.knowledgeCollectionIds.length > 0;
     const hasFiles = body.sources.fileIds.length > 0;
     await client.workflow.start("researchAgentWorkflow", {
-      taskQueue: "nova-main",
+      taskQueue: TASK_QUEUES.BACKGROUND,
       workflowId: `research-${report.id}`,
       args: [{
         orgId,
@@ -484,7 +485,7 @@ researchRoutes.post("/:id/rerun", async (c) => {
     const rerunHasFiles = resolvedSources.fileIds.length > 0;
     const client = await getTemporalClient();
     await client.workflow.start("researchAgentWorkflow", {
-      taskQueue: "nova-main",
+      taskQueue: TASK_QUEUES.BACKGROUND,
       workflowId: `research-${newReport.id}`,
       args: [{
         orgId,
@@ -600,7 +601,7 @@ researchRoutes.post("/:id/refine", async (c) => {
     const streamChannelId = `research:${reportId}:v${newVersion}`;
 
     await client.workflow.start("researchRefinementWorkflow", {
-      taskQueue: "nova-main",
+      taskQueue: TASK_QUEUES.BACKGROUND,
       workflowId: `research-refine-${reportId}-v${newVersion}`,
       args: [{
         orgId,

@@ -8,12 +8,15 @@ NOVA — self-hosted-first AI chat platform (multi-tenant SaaS). License: FSL-1.
 
 ## Monorepo Structure
 
-Bun workspace monorepo with 4 packages:
+Bun workspace monorepo with 7 packages:
 
 - **@nova/shared** — Drizzle schemas (62 tables), types, constants, utils. Exports: `./schema`, `./schemas`, `./types`, `./constants`, `./utils`
 - **@nova/api** — Hono REST API on Bun runtime. Routes in `src/routes/`, services in `src/services/`, middleware in `src/middleware/`
 - **@nova/web** — React 19 + Vite + TanStack Router + TanStack Query + Zustand + Tailwind v4. Path alias `@/*` → `src/*`
-- **@nova/worker** — Temporal workflows on **Node.js** (not Bun — Temporal requires it). Uses `tsx` for dev
+- **@nova/worker-shared** — Shared worker infrastructure (db, redis, litellm, stream-publisher, qdrant, minio, sandbox, tools). Conditional exports like `@nova/worker-shared/db`
+- **@nova/worker-agent** — Temporal agent workflows on **Node.js** (task queue: `nova-agent`). Chat execution, tool use, DAG orchestration
+- **@nova/worker-ingestion** — Temporal ingestion workflows on **Node.js** (task queue: `nova-ingestion`). Document/file/message embedding pipelines
+- **@nova/worker-background** — Temporal background workflows on **Node.js** (task queue: `nova-background`). Research, summaries, cleanup, scheduling
 
 ## Commands
 
@@ -22,7 +25,10 @@ Bun workspace monorepo with 4 packages:
 bun run dev              # All packages
 bun run dev:api          # API only (localhost:3000)
 bun run dev:web          # Web only (localhost:5173)
-bun run dev:worker       # Worker only
+bun run dev:workers      # All 3 workers
+bun run dev:worker:agent      # Agent worker only
+bun run dev:worker:ingestion  # Ingestion worker only
+bun run dev:worker:background # Background worker only
 
 # Build & typecheck
 bun run build            # Build all packages
@@ -44,8 +50,8 @@ bun test packages/api/tests/lib/stream-relay.test.ts  # Single test file
 bun run storybook        # Dev server on port 6006
 
 # Docker
-docker compose build api web
-docker compose up -d api web
+docker compose build api web worker-agent worker-ingestion worker-background
+docker compose up -d api web worker-agent worker-ingestion worker-background
 ```
 
 **Unit tests** use `bun:test` (`describe`, `it`, `expect`). Test files live in `packages/*/tests/`.
@@ -63,7 +69,7 @@ Error handler → Security headers → CORS → Request ID → Logger → **Publ
 - **Services**: Named exports of async functions, no default exports. Located in `packages/api/src/services/`
 - **Errors**: Use `AppError` from `@nova/shared/utils` — `AppError.notFound()`, `AppError.unauthorized()`, `AppError.badRequest()`
 - **Shared imports**: `import { conversations } from "@nova/shared/schema"`, `import type { User } from "@nova/shared/types"`
-- **Temporal workflows**: Orchestrate via `proxyActivities()`. Activities are side-effect functions (LLM calls, DB writes). Worker registers both in `src/index.ts`. The unified `agentWorkflow` (`packages/worker/src/workflows/agent.ts`) handles both chat and execution modes. It auto-summarizes conversation context when history exceeds ~25k tokens (100k chars) to stay within model limits — the middle portion is compressed to a "Previously: ..." summary while preserving system messages, the first user message, and the last 4 messages.
+- **Temporal workflows**: Orchestrate via `proxyActivities()`. Activities are side-effect functions (LLM calls, DB writes). Each worker registers its own workflows/activities. The unified `agentWorkflow` (`packages/worker-agent/src/workflows/agent.ts`) handles both chat and execution modes. It auto-summarizes conversation context when history exceeds ~25k tokens (100k chars) to stay within model limits — the middle portion is compressed to a "Previously: ..." summary while preserving system messages, the first user message, and the last 4 messages. Workflows are dispatched to specific task queues via `TASK_QUEUES` constants from `@nova/shared/constants`.
 - **Auth**: Better Auth v1.5.4. Session restored in `_auth.tsx` `beforeLoad` via `authClient.getSession()`. Cookie config uses `advanced.cookiePrefix` / `advanced.cookies.session_token.name` (NOT `session.cookieName` — silently ignored)
 - **Frontend state**: Zustand for client state (auth, UI), TanStack Query for server state
 - **Route generation**: TanStack Router file-based routing, auto-generates `routeTree.gen.ts`
@@ -100,7 +106,7 @@ The API's typecheck script uses `NODE_OPTIONS='--max-old-space-size=6144'` (6GB 
 
 ## Gotchas
 
-- **Worker runtime**: Temporal requires Node.js — the worker package uses `tsx` (dev) and compiled JS (Docker), not Bun
+- **Worker runtime**: Temporal requires Node.js — all 3 worker packages use `tsx` (dev) and compiled JS (Docker), not Bun. Shared infra lives in `@nova/worker-shared`
 - **Hot reload limitation**: `bun --hot` doesn't reliably reload transitive dependency changes — rebuild Docker container
 - **Env propagation**: `bun run --filter` doesn't propagate root `.env` — use `docker compose up` or set vars manually
 - **DB config**: Drizzle config is at `packages/api/drizzle.config.ts`, schemas are in `packages/shared/src/schemas/`

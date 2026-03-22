@@ -1,13 +1,21 @@
 # syntax=docker/dockerfile:1
 
-# Bun for fast deps install + build, Node.js for Temporal runtime
-FROM oven/bun:1-alpine AS builder
+# Parameterized worker build — pass WORKER_PACKAGE to select which worker to build.
+# Usage: docker build --build-arg WORKER_PACKAGE=worker-agent -f infra/docker/Dockerfile.worker .
+ARG WORKER_PACKAGE=worker-agent
+
+# ── Stage 1: Shared base — deps install, patches, shared source build (cached across all workers) ──
+FROM oven/bun:1-alpine AS base
 
 WORKDIR /app
 
+# Copy all workspace package.json files for dependency resolution
 COPY package.json bun.lock* ./
 COPY packages/shared/package.json packages/shared/
-COPY packages/worker/package.json packages/worker/
+COPY packages/worker-shared/package.json packages/worker-shared/
+COPY packages/worker-agent/package.json packages/worker-agent/
+COPY packages/worker-ingestion/package.json packages/worker-ingestion/
+COPY packages/worker-background/package.json packages/worker-background/
 COPY packages/api/package.json packages/api/
 COPY packages/web/package.json packages/web/
 
@@ -21,7 +29,6 @@ RUN rm -rf node_modules/@openai/agents-core/src \
 
 # Patch: agents-core uses .superRefine() on ComputerUseCallItem which produces
 # ZodEffects — but zod v3 compat discriminatedUnion requires ZodObject with .shape.
-# Remove the .superRefine() call so the discriminated union can read the discriminator.
 RUN for f in node_modules/@openai/agents-core/dist/types/protocol.mjs \
              node_modules/@openai/agents-core/dist/types/protocol.js; do \
       bun -e " \
@@ -31,13 +38,25 @@ RUN for f in node_modules/@openai/agents-core/dist/types/protocol.mjs \
       "; \
     done
 
-# Copy source (only this invalidates on code changes)
+# Copy and build shared packages (same for all workers)
 COPY packages/shared/ packages/shared/
-COPY packages/worker/ packages/worker/
+COPY packages/worker-shared/ packages/worker-shared/
 
-# Clean stale build artifacts, then tsc -b builds shared + worker via project references
-RUN rm -rf packages/shared/dist packages/worker/dist packages/shared/*.tsbuildinfo packages/worker/*.tsbuildinfo && \
-    cd packages/worker && bunx tsc -b
+RUN rm -rf packages/shared/dist packages/worker-shared/dist \
+           packages/shared/*.tsbuildinfo packages/worker-shared/*.tsbuildinfo && \
+    cd packages/worker-shared && bunx tsc -b
+
+# ── Stage 2: Worker-specific build ──
+FROM base AS builder
+
+ARG WORKER_PACKAGE
+
+# Copy only the target worker's source (this layer varies per worker)
+COPY packages/${WORKER_PACKAGE}/ packages/${WORKER_PACKAGE}/
+
+# Build the worker (shared + worker-shared already built in base)
+RUN rm -rf packages/${WORKER_PACKAGE}/dist packages/${WORKER_PACKAGE}/*.tsbuildinfo && \
+    cd packages/${WORKER_PACKAGE} && bunx tsc -b
 
 # Production deps only
 RUN --mount=type=cache,target=/root/.bun/install/cache \
@@ -56,20 +75,23 @@ RUN for f in node_modules/@openai/agents-core/dist/types/protocol.mjs \
     done
 
 # Create zod/v4 shim — openai@6.27 imports 'zod/v4' but zod 3.x doesn't export it.
-# Re-export zod v3 under the v4 path so the import resolves.
 RUN mkdir -p node_modules/zod/v4 && \
     echo '// zod v4 shim — re-exports zod v3 for openai SDK compatibility' > node_modules/zod/v4/index.js && \
     echo 'module.exports = require("zod");' >> node_modules/zod/v4/index.js && \
     echo 'export * from "zod";' > node_modules/zod/v4/index.mjs
 
-# ── Runtime (Node.js — required by Temporal) ─────
+# ── Stage 3: Runtime (Node.js — required by Temporal) ──
 FROM node:22-slim
+
+ARG WORKER_PACKAGE
 
 WORKDIR /app
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/shared ./packages/shared
-COPY --from=builder /app/packages/worker ./packages/worker
+COPY --from=builder /app/packages/worker-shared ./packages/worker-shared
+COPY --from=builder /app/packages/${WORKER_PACKAGE} ./packages/${WORKER_PACKAGE}
 COPY --from=builder /app/package.json ./
 
-CMD ["npx", "tsx", "packages/worker/dist/index.js"]
+ENV WORKER_PACKAGE=${WORKER_PACKAGE}
+CMD npx tsx packages/${WORKER_PACKAGE}/dist/index.js

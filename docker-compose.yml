@@ -268,12 +268,80 @@ services:
       qdrant:
         condition: service_healthy
 
-  # ─── NOVA Worker ─────────────────────────────────
-  worker:
+  # ─── NOVA Workers ───────────────────────────────
+  worker-agent:
     build:
       context: .
       dockerfile: infra/docker/Dockerfile.worker
-    container_name: nova-worker
+      args:
+        WORKER_PACKAGE: worker-agent
+    container_name: nova-worker-agent
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://nova:nova@postgres:5432/nova
+      REDIS_URL: redis://redis:6379
+      TEMPORAL_ADDRESS: temporal:7233
+      LITELLM_URL: http://litellm:4000
+      SEARXNG_URL: http://searxng:8080
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_BUCKET: nova-files
+      SANDBOX_ENABLED: ${SANDBOX_ENABLED:-false}
+      WORKER_BUILD_ID: ${WORKER_BUILD_ID:-dev}
+      QDRANT_URL: http://qdrant:6333
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+      searxng:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+  worker-ingestion:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+      args:
+        WORKER_PACKAGE: worker-ingestion
+    container_name: nova-worker-ingestion
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://nova:nova@postgres:5432/nova
+      REDIS_URL: redis://redis:6379
+      TEMPORAL_ADDRESS: temporal:7233
+      LITELLM_URL: http://litellm:4000
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_BUCKET: nova-files
+      WORKER_BUILD_ID: ${WORKER_BUILD_ID:-dev}
+      QDRANT_URL: http://qdrant:6333
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
+  worker-background:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.worker
+      args:
+        WORKER_PACKAGE: worker-background
+    container_name: nova-worker-background
     restart: unless-stopped
     env_file: .env
     environment:

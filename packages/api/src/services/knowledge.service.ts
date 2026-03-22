@@ -1,4 +1,5 @@
 import { eq, and, desc, isNull, ilike, sql, inArray } from "drizzle-orm";
+import { TASK_QUEUES } from "@nova/shared/constants";
 import { db } from "../lib/db";
 import { knowledgeCollections, knowledgeDocuments, knowledgeChunks, knowledgeTags, knowledgeDocumentTagAssignments } from "@nova/shared/schemas";
 import { auditLogs } from "@nova/shared/schema";
@@ -524,7 +525,7 @@ export async function triggerDocumentIngestion(
   try {
     const client = await getTemporalClient();
     await client.workflow.start("documentIngestionWorkflow", {
-      taskQueue: "nova-main",
+      taskQueue: TASK_QUEUES.INGESTION,
       workflowId: `doc-ingest-${doc.id}`,
       args: [{
         orgId,
