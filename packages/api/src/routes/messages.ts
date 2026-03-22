@@ -883,11 +883,11 @@ Respond with ONLY valid JSON: {"tier": "direct"|"sequential"|"orchestrated", "re
 
           const relayResult = await relayPromise;
 
-          // When tool calls were triggered, the initial fullContent is typically the model's
+          // When tool calls were triggered, the initial fullContent is the model's
           // reasoning preamble ("I need to search for...", "Let me look up...") — not the real answer.
-          // The actual response comes from the workflow relay. Discard the initial content.
+          // The actual response comes from the workflow relay. Never fall back to pre-tool reasoning.
           const relayContent = stripThinkBlocks(relayResult?.content ?? "");
-          const totalContent = relayContent || stripThinkBlocks(fullContent);
+          const totalContent = relayContent;
           const totalPromptTokens = promptTokens + (relayResult?.usage?.prompt_tokens ?? 0);
           const totalCompletionTokens = completionTokens + (relayResult?.usage?.completion_tokens ?? 0);
 

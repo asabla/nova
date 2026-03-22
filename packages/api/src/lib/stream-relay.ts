@@ -52,6 +52,17 @@ export async function relayRedisToSSE(
             });
             break;
 
+          case "content_clear":
+            // Worker detected tool calls after streaming reasoning text — discard it
+            accumulatedContent = "";
+            stream.writeSSE({
+              event: "content_clear",
+              data: JSON.stringify({ reason: data.reason }),
+            }).catch(() => {
+              if (!settled) { settled = true; cleanup(); resolve({ content: accumulatedContent, usage: {} }); }
+            });
+            break;
+
           case "tool_status":
             stream.writeSSE({
               event: "tool_status",

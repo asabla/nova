@@ -10,6 +10,7 @@ import {
   publishError,
 } from "@nova/worker-shared/stream";
 import { getBuiltinTools, loadCustomTools } from "@nova/worker-shared/tools";
+import { redis } from "@nova/worker-shared/redis";
 
 export interface AgentRunInput {
   streamChannelId: string;
@@ -79,11 +80,22 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
 
   let eventCount = 0;
 
+  // Track whether the current turn has seen tool calls — if so, any pre-tool
+  // reasoning text was already streamed and needs to be cleared.
+  let currentTurnHasToolCall = false;
+  let preToolContentLength = 0;
+  // Track how many chars were actually streamed to the frontend (after think filtering)
+  let streamedContentLength = 0;
+
   // State machine for filtering <think> blocks from streamed tokens
   let insideThinkBlock = false;
   let thinkBuffer = "";
 
   async function streamWithThinkFilter(channelId: string, delta: string) {
+    const publish = async (text: string) => {
+      streamedContentLength += text.length;
+      await publishToken(channelId, text);
+    };
     if (insideThinkBlock) {
       thinkBuffer += delta;
       const closeIdx = thinkBuffer.indexOf("</think>");
@@ -91,7 +103,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
         const afterClose = thinkBuffer.slice(closeIdx + 8);
         thinkBuffer = "";
         insideThinkBlock = false;
-        if (afterClose) await publishToken(channelId, afterClose);
+        if (afterClose) await publish(afterClose);
       }
     } else {
       const combined = thinkBuffer + delta;
@@ -100,21 +112,21 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
         const before = combined.slice(0, openIdx);
         thinkBuffer = combined.slice(openIdx);
         insideThinkBlock = true;
-        if (before) await publishToken(channelId, before);
+        if (before) await publish(before);
         // Check if close tag is also in same chunk
         const closeIdx = thinkBuffer.indexOf("</think>");
         if (closeIdx !== -1) {
           const afterClose = thinkBuffer.slice(closeIdx + 8);
           thinkBuffer = "";
           insideThinkBlock = false;
-          if (afterClose) await publishToken(channelId, afterClose);
+          if (afterClose) await publish(afterClose);
         }
       } else if (combined.endsWith("<") || combined.endsWith("<t") || combined.endsWith("<th") || combined.endsWith("<thi") || combined.endsWith("<thin") || combined.endsWith("<think")) {
         // Partial tag — buffer it
         thinkBuffer = combined;
       } else {
         thinkBuffer = "";
-        await publishToken(channelId, delta);
+        await publish(delta);
       }
     }
   }
@@ -135,6 +147,11 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
 
       if (event.type === "raw_model_stream_event") {
         const data = event.data as any;
+        // New model response starting — reset pre-tool tracking for this turn
+        if (data?.type === "response_started") {
+          currentTurnHasToolCall = false;
+          preToolContentLength = 0;
+        }
         // Log first few events for debugging
         if (eventCount <= 3) {
           console.log(`[agent-run] event #${eventCount}: raw_model type=${data?.type} keys=${data ? Object.keys(data).join(",") : "null"}`);
@@ -142,8 +159,13 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
         // output_text_delta events contain streaming text tokens
         if (data?.type === "output_text_delta" && data.delta) {
           fullContent += data.delta;
-          // Filter <think> blocks from streaming output
-          await streamWithThinkFilter(input.streamChannelId, data.delta);
+          // Only stream tokens if no tool call has been detected in this turn.
+          // Pre-tool reasoning ("I need to search...") gets cleared when the
+          // first tool_called event arrives.
+          if (!currentTurnHasToolCall) {
+            preToolContentLength += data.delta.length;
+            await streamWithThinkFilter(input.streamChannelId, data.delta);
+          }
         }
       } else if (event.type === "run_item_stream_event") {
         const item = event.item as any;
@@ -168,6 +190,16 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
           const toolName = rawItem?.name ?? rawItem?.function?.name ?? "unknown";
 
           if (event.name === "tool_called") {
+            // First tool call in this turn — discard any pre-tool reasoning
+            // that was already streamed ("I need to search...", "Let me look up...")
+            if (!currentTurnHasToolCall && preToolContentLength > 0) {
+              await redis.publish(
+                input.streamChannelId,
+                JSON.stringify({ type: "content_clear", reason: "tool_calls_detected" }),
+              );
+            }
+            currentTurnHasToolCall = true;
+
             let parsedArgs: Record<string, unknown> = {};
             try {
               const argsStr = rawItem?.arguments ?? rawItem?.function?.arguments;
@@ -230,17 +262,15 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
       totalTokens = usage.totalTokens ?? (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0);
     }
 
-    // Use finalOutput if we didn't accumulate content from streaming
-    if (!fullContent) {
-      try {
-        if (stream.finalOutput) {
-          fullContent =
-            typeof stream.finalOutput === "string"
-              ? stream.finalOutput
-              : JSON.stringify(stream.finalOutput);
-        }
-      } catch {
-        // finalOutput may not be available if max turns exceeded
+    // Prefer finalOutput from the SDK — it contains the clean final answer
+    // without <think> blocks or pre-tool reasoning.
+    const finalOutput = stream.finalOutput;
+    if (finalOutput) {
+      const finalText = typeof finalOutput === "string"
+        ? finalOutput
+        : JSON.stringify(finalOutput);
+      if (finalText) {
+        fullContent = finalText;
       }
     }
   } catch (err) {
@@ -266,6 +296,12 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
 
   // Strip <think> reasoning blocks before returning
   fullContent = stripThinkBlocks(fullContent);
+
+  // If the streamed tokens were all inside <think> blocks (filtered out) but we have
+  // clean content from finalOutput, stream it now so the frontend receives it.
+  if (fullContent && streamedContentLength === 0) {
+    await publishToken(input.streamChannelId, fullContent);
+  }
 
   // Signal completion to the relay
   console.log(`[agent-run] done: ${eventCount} events, ${fullContent.length} chars content, channel=${input.streamChannelId}`);
