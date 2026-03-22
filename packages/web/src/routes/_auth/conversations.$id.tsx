@@ -33,7 +33,7 @@ function ConversationPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
-  const { tokens, status, activeTools, agentFlow, startStream, stopStream, pauseStream, resumeStream, resetStream } = useSSEStream();
+  const { tokens, status, activeTools, agentFlow, startStream, reconnectStream, stopStream, pauseStream, resumeStream, resetStream } = useSSEStream();
   const { onKeystroke, stopTyping } = useTypingIndicator(id);
 
   const { data: conversation, isLoading: isConversationLoading } = useQuery(conversationDetailOptions(id));
@@ -55,6 +55,22 @@ function ConversationPage() {
     return map;
   }, [allArtifacts]);
 
+  // Track which conversation we've attempted reconnection for
+  const reconnectAttemptedRef = React.useRef<string | null>(null);
+
+  // Reset stream state when switching conversations
+  const prevIdRef = React.useRef(id);
+  useEffect(() => {
+    if (prevIdRef.current !== id) {
+      prevIdRef.current = id;
+      reconnectAttemptedRef.current = null;
+      stopStream();
+      resetStream();
+    }
+    // Only depend on id — stopStream/resetStream are stable refs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
   useEffect(() => {
     if (status === "done" || status === "error") {
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
@@ -65,6 +81,31 @@ function ConversationPage() {
     }
   }, [status, id, queryClient, resetStream]);
 
+  // Auto-reconnect to an in-progress stream when navigating back to a conversation
+  useEffect(() => {
+    if (isMessagesLoading || !messages.length || status !== "idle") return;
+    // Only attempt once per conversation
+    if (reconnectAttemptedRef.current === id) return;
+
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg?.senderType === "assistant" && lastMsg?.status === "streaming") {
+      reconnectAttemptedRef.current = id;
+      const apiUrl = import.meta.env.VITE_API_URL ?? "";
+      api.get<{ active: boolean; channelId?: string }>(`/api/conversations/${id}/messages/stream/active`)
+        .then((res) => {
+          if (res.active && res.channelId) {
+            reconnectStream(`${apiUrl}/api/conversations/${id}/messages/stream/reconnect?channelId=${res.channelId}`);
+          } else {
+            // Stream ended but message wasn't updated (crash recovery) — refetch
+            queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
+          }
+        })
+        .catch(() => {
+          // If check fails, just refetch messages
+          queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
+        });
+    }
+  }, [isMessagesLoading, messages, status, id, reconnectStream, queryClient]);
 
   // --- Slash command handlers ---
   const handleClearConversation = useCallback(async () => {

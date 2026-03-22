@@ -8,8 +8,45 @@ import type {
 } from "@nova/shared/types";
 import { redis } from "./redis";
 
+const STREAM_BUFFER_TTL = 1800; // 30 minutes
+
+/** Extract conversationId from channelId format: stream:{conversationId}:{uuid} */
+function conversationIdFromChannel(channelId: string): string | null {
+  const parts = channelId.split(":");
+  return parts.length >= 3 ? parts[1] : null;
+}
+
+/** Initialize Redis buffer keys for a new stream. Call before starting the workflow. */
+export async function initStreamBuffer(channelId: string, conversationId: string) {
+  await Promise.all([
+    redis.set(`active-stream:${conversationId}`, channelId, "EX", STREAM_BUFFER_TTL),
+    // Use a list to buffer the full event stream for replay
+    redis.del(`stream-events:${channelId}`),
+  ]);
+  await redis.expire(`stream-events:${channelId}`, STREAM_BUFFER_TTL);
+}
+
+/** Clean up Redis buffer keys after stream completes or errors. */
+export async function cleanupStreamBuffer(channelId: string) {
+  const conversationId = conversationIdFromChannel(channelId);
+  const keys = [`stream-events:${channelId}`];
+  if (conversationId) keys.push(`active-stream:${conversationId}`);
+  await redis.del(...keys);
+}
+
+/**
+ * Publish an event to both pub/sub and the replay buffer.
+ * Every event goes through here so reconnecting clients get a perfect replay.
+ */
+async function publishAndBuffer(channelId: string, event: string) {
+  await Promise.all([
+    redis.publish(channelId, event),
+    redis.rpush(`stream-events:${channelId}`, event),
+  ]);
+}
+
 export async function publishToken(channelId: string, token: string) {
-  await redis.publish(channelId, JSON.stringify({ type: "token", content: token }));
+  await publishAndBuffer(channelId, JSON.stringify({ type: "token", content: token }));
 }
 
 export async function publishToolStatus(
@@ -18,7 +55,11 @@ export async function publishToolStatus(
   status: ToolCallStatus,
   extra?: { args?: Record<string, unknown>; resultSummary?: string },
 ) {
-  await redis.publish(channelId, JSON.stringify({ type: "tool_status", tool, status, ...extra }));
+  await publishAndBuffer(channelId, JSON.stringify({ type: "tool_status", tool, status, ...extra }));
+}
+
+export async function publishContentClear(channelId: string, reason?: string) {
+  await publishAndBuffer(channelId, JSON.stringify({ type: "content_clear", reason }));
 }
 
 export async function publishDone(
@@ -26,10 +67,12 @@ export async function publishDone(
   result: { content: string; usage: { prompt_tokens?: number; completion_tokens?: number } },
 ) {
   await redis.publish(channelId, JSON.stringify({ type: "done", ...result }));
+  await cleanupStreamBuffer(channelId);
 }
 
 export async function publishError(channelId: string, message: string) {
   await redis.publish(channelId, JSON.stringify({ type: "error", message }));
+  await cleanupStreamBuffer(channelId);
 }
 
 // --- Research progress publishers ---

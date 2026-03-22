@@ -6,11 +6,12 @@ import { toAgentInput } from "@nova/worker-shared/message-convert";
 import {
   publishToken,
   publishToolStatus,
+  publishContentClear,
   publishDone,
   publishError,
 } from "@nova/worker-shared/stream";
 import { getBuiltinTools, loadCustomTools } from "@nova/worker-shared/tools";
-import { redis } from "@nova/worker-shared/redis";
+
 
 export interface AgentRunInput {
   streamChannelId: string;
@@ -193,10 +194,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
             // First tool call in this turn — discard any pre-tool reasoning
             // that was already streamed ("I need to search...", "Let me look up...")
             if (!currentTurnHasToolCall && preToolContentLength > 0) {
-              await redis.publish(
-                input.streamChannelId,
-                JSON.stringify({ type: "content_clear", reason: "tool_calls_detected" }),
-              );
+              await publishContentClear(input.streamChannelId, "tool_calls_detected");
             }
             currentTurnHasToolCall = true;
 

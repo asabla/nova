@@ -281,6 +281,197 @@ export function useSSEStream() {
     }
   }, []);
 
+  /** Reconnect to an in-progress stream: receives buffered content via catchup event, then live tokens */
+  const reconnectStream = useCallback(async (url: string) => {
+    setTokens("");
+    setStatus("streaming");
+    setActiveTools([]);
+    setDoneData(null);
+    setAgentFlow({ tier: null, tierReasoning: null, plan: null, pendingInteraction: null });
+    pausedRef.current = false;
+    bufferWhilePausedRef.current = "";
+    abortRef.current = new AbortController();
+
+    try {
+      const headers: Record<string, string> = {};
+      const orgId = getActiveOrgId();
+      if (orgId) headers["x-org-id"] = orgId;
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers,
+        signal: abortRef.current.signal,
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          window.location.href = "/login";
+          return;
+        }
+        setStatus("error");
+        return;
+      }
+
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let currentEventType = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop()!;
+
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            currentEventType = line.slice(7).trim();
+            continue;
+          }
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (currentEventType === "done") {
+                if (rafIdRef.current !== null) {
+                  cancelAnimationFrame(rafIdRef.current);
+                  rafIdRef.current = null;
+                }
+                const allPending = pendingTokensRef.current + bufferWhilePausedRef.current;
+                pendingTokensRef.current = "";
+                bufferWhilePausedRef.current = "";
+                if (allPending) {
+                  setTokens((prev) => prev + allPending);
+                }
+                setDoneData({
+                  messageId: data.messageId,
+                  tokenCountPrompt: data.tokenCountPrompt,
+                  tokenCountCompletion: data.tokenCountCompletion,
+                  latencyMs: data.latencyMs,
+                });
+                setStatus("done");
+                currentEventType = "";
+                return;
+              }
+
+              if (currentEventType === "error") {
+                setStatus("error");
+                currentEventType = "";
+                return;
+              }
+
+              if (currentEventType === "tool_status" && data.tool) {
+                setActiveTools((prev) => {
+                  const existing = prev.findIndex((t) => t.name === data.tool);
+                  if (existing >= 0) {
+                    const updated = [...prev];
+                    updated[existing] = {
+                      ...updated[existing],
+                      status: data.status,
+                      ...(data.args ? { args: data.args } : {}),
+                      ...(data.resultSummary ? { resultSummary: data.resultSummary } : {}),
+                    };
+                    return updated;
+                  }
+                  return [...prev, {
+                    name: data.tool,
+                    status: data.status,
+                    ...(data.args ? { args: data.args } : {}),
+                    ...(data.resultSummary ? { resultSummary: data.resultSummary } : {}),
+                  }];
+                });
+                currentEventType = "";
+                continue;
+              }
+
+              if (currentEventType === "tier.assessed") {
+                setAgentFlow((prev) => ({ ...prev, tier: data.tier, tierReasoning: data.reasoning }));
+                currentEventType = "";
+                continue;
+              }
+
+              if (currentEventType === "plan.generated") {
+                setAgentFlow((prev) => ({ ...prev, plan: data.plan }));
+                currentEventType = "";
+                continue;
+              }
+
+              if (currentEventType === "plan.approved") {
+                setAgentFlow((prev) => {
+                  if (!prev.plan) return prev;
+                  return { ...prev, plan: { ...prev.plan, approved: true } };
+                });
+                currentEventType = "";
+                continue;
+              }
+
+              if (currentEventType === "plan.node.status") {
+                setAgentFlow((prev) => {
+                  if (!prev.plan) return prev;
+                  const updatedNodes = prev.plan.nodes.map((n) =>
+                    n.id === data.nodeId ? { ...n, status: data.status as PlanNodeStatus } : n,
+                  );
+                  return { ...prev, plan: { ...prev.plan, nodes: updatedNodes } };
+                });
+                currentEventType = "";
+                continue;
+              }
+
+              if (currentEventType === "interaction.request") {
+                setAgentFlow((prev) => ({ ...prev, pendingInteraction: data.request ?? data }));
+                currentEventType = "";
+                continue;
+              }
+
+              if (currentEventType === "interaction.response") {
+                setAgentFlow((prev) => ({ ...prev, pendingInteraction: null }));
+                currentEventType = "";
+                continue;
+              }
+
+              if (currentEventType === "content_clear") {
+                if (rafIdRef.current !== null) {
+                  cancelAnimationFrame(rafIdRef.current);
+                  rafIdRef.current = null;
+                }
+                pendingTokensRef.current = "";
+                bufferWhilePausedRef.current = "";
+                setTokens("");
+                currentEventType = "";
+                continue;
+              }
+
+              if (data.content) {
+                if (pausedRef.current) {
+                  bufferWhilePausedRef.current += data.content;
+                } else {
+                  pendingTokensRef.current += data.content;
+                  scheduleTokenFlush();
+                }
+              }
+            } catch {
+              // Skip malformed data
+            }
+            currentEventType = "";
+          }
+        }
+      }
+
+      if (bufferWhilePausedRef.current) {
+        setTokens((prev) => prev + bufferWhilePausedRef.current);
+        bufferWhilePausedRef.current = "";
+      }
+      setStatus("done");
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        setStatus("error");
+      }
+    }
+  }, []);
+
   const stopStream = useCallback(() => {
     abortRef.current?.abort();
     // Cancel pending rAF and flush all buffered content
@@ -328,5 +519,5 @@ export function useSSEStream() {
     // so the plan remains visible between stream end and query refetch
   }, []);
 
-  return { tokens, status, activeTools, doneData, generatedTitle, agentFlow, startStream, stopStream, pauseStream, resumeStream, resetStream };
+  return { tokens, status, activeTools, doneData, generatedTitle, agentFlow, startStream, reconnectStream, stopStream, pauseStream, resumeStream, resetStream };
 }

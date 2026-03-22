@@ -655,6 +655,24 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         });
 
         const streamChannelId = `stream:${conversationId}:${crypto.randomUUID()}`;
+
+        // Create placeholder assistant message with status "streaming" so it's visible if the client reconnects
+        const assistantMessage = await messageService.createMessage(orgId, {
+          conversationId,
+          senderType: "assistant",
+          content: "",
+          status: "streaming",
+          modelId: conversation.modelId ?? undefined,
+        });
+
+        // Initialize Redis keys for stream reconnection
+        const { redis: redisClient } = await import("../lib/redis");
+        await Promise.all([
+          redisClient.set(`active-stream:${conversationId}`, streamChannelId, "EX", 1800),
+          redisClient.del(`stream-events:${streamChannelId}`),
+        ]);
+        await redisClient.expire(`stream-events:${streamChannelId}`, 1800);
+
         const { relayRedisToSSE } = await import("../lib/stream-relay");
         const relayPromise = relayRedisToSSE(stream, streamChannelId, { timeoutMs: 600_000 });
 
@@ -680,7 +698,14 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
           }],
         });
 
-        const relayResult = await relayPromise;
+        // Wait for relay — resolves on stream done, error, timeout, or client disconnect.
+        // Must always complete the message regardless of client connection state.
+        let relayResult: Awaited<ReturnType<typeof relayRedisToSSE>> = null;
+        try {
+          relayResult = await relayPromise;
+        } catch (relayErr) {
+          console.error("[stream] relay error:", relayErr);
+        }
         const totalContent = stripThinkBlocks(relayResult?.content ?? "");
 
         let toolCallRecords: any[] = [];
@@ -708,15 +733,17 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
           ? toolCallRecords.map((r: any) => ({ name: r.toolName, durationMs: r.durationMs, error: r.error, args: r.input }))
           : undefined;
 
-        const assistantMessage = await messageService.createMessage(orgId, {
-          conversationId,
-          senderType: "assistant",
-          content: totalContent,
-          modelId: conversation.modelId ?? undefined,
-          tokenCountPrompt: relayResult?.usage?.prompt_tokens ?? 0,
-          tokenCountCompletion: relayResult?.usage?.completion_tokens ?? 0,
-          metadata: { latencyMs: Date.now() - startTime, model: body.model, smartRouted: true, toolSummary, tier: wfTier ?? assessedTier, plan: wfPlanSummary },
-        });
+        // Complete the message — this must succeed even if the client disconnected
+        try {
+          await messageService.completeStreamingMessage(orgId, assistantMessage.id, {
+            content: totalContent,
+            tokenCountPrompt: relayResult?.usage?.prompt_tokens ?? 0,
+            tokenCountCompletion: relayResult?.usage?.completion_tokens ?? 0,
+            metadata: { latencyMs: Date.now() - startTime, model: body.model, smartRouted: true, toolSummary, tier: wfTier ?? assessedTier, plan: wfPlanSummary },
+          });
+        } catch (completeErr) {
+          console.error("[stream] Failed to complete streaming message:", completeErr);
+        }
 
         if (toolCallRecords.length > 0) {
           try {
@@ -1092,6 +1119,53 @@ messagesRouter.post("/:conversationId/stop", async (c) => {
   }
 
   return c.json({ ok: true, message: "No active agent run found" });
+});
+
+// --- Stream reconnection endpoints ---
+
+/** Check if there's an active stream for a conversation */
+messagesRouter.get("/:conversationId/messages/stream/active", async (c) => {
+  const orgId = c.get("orgId");
+  const conversationId = c.req.param("conversationId");
+
+  const conversation = await conversationService.getConversation(orgId, conversationId);
+  if (!conversation) throw AppError.notFound("Conversation");
+
+  const { redis } = await import("../lib/redis");
+  const channelId = await redis.get(`active-stream:${conversationId}`);
+  if (!channelId) return c.json({ active: false });
+
+  return c.json({ active: true, channelId });
+});
+
+/** Reconnect to an in-progress stream: sends buffered content then resumes live relay */
+messagesRouter.get("/:conversationId/messages/stream/reconnect", async (c) => {
+  const orgId = c.get("orgId");
+  const conversationId = c.req.param("conversationId");
+  const channelId = c.req.query("channelId");
+
+  if (!channelId) throw AppError.badRequest("Missing channelId query parameter");
+
+  const conversation = await conversationService.getConversation(orgId, conversationId);
+  if (!conversation) throw AppError.notFound("Conversation");
+
+  // Verify the channelId belongs to this conversation
+  if (!channelId.startsWith(`stream:${conversationId}:`)) {
+    throw AppError.badRequest("Channel ID does not match conversation");
+  }
+
+  return streamSSE(c, async (stream) => {
+    const { relayRedisToSSEWithCatchup } = await import("../lib/stream-relay");
+    try {
+      await relayRedisToSSEWithCatchup(stream, channelId, { timeoutMs: 600_000 });
+    } catch (err) {
+      console.error("[reconnect] relay error:", err);
+      await stream.writeSSE({
+        event: "error",
+        data: JSON.stringify({ message: "Reconnect failed", code: "reconnect_error" }),
+      });
+    }
+  });
 });
 
 export { messagesRouter as messageRoutes };

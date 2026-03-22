@@ -81,6 +81,7 @@ export async function createMessage(orgId: string, data: {
   modelId?: string;
   contentType?: string;
   metadata?: unknown;
+  status?: "streaming" | "completed" | "failed" | "cancelled";
   tokenCountPrompt?: number;
   tokenCountCompletion?: number;
   costCents?: number;
@@ -95,6 +96,7 @@ export async function createMessage(orgId: string, data: {
     modelId: data.modelId,
     contentType: data.contentType ?? "text",
     metadata: data.metadata,
+    status: data.status ?? "completed",
     tokenCountPrompt: data.tokenCountPrompt,
     tokenCountCompletion: data.tokenCountCompletion,
     costCents: data.costCents,
@@ -117,6 +119,61 @@ export async function createMessage(orgId: string, data: {
   syncMessageUpsert(message as any);
 
   // Trigger async embedding workflow for non-empty user/assistant messages
+  if (message.content && (message.senderType === "user" || message.senderType === "assistant")) {
+    getTemporalClient()
+      .then((client) =>
+        client.workflow.start("messageEmbeddingWorkflow", {
+          taskQueue: TASK_QUEUES.INGESTION,
+          workflowId: `msg-embed-${message.id}`,
+          args: [{ messageId: message.id, orgId }],
+        }),
+      )
+      .catch((err) => console.error("[message] Failed to start embedding workflow:", err));
+  }
+
+  return message;
+}
+
+export async function completeStreamingMessage(orgId: string, messageId: string, data: {
+  content: string;
+  metadata?: unknown;
+  tokenCountPrompt?: number;
+  tokenCountCompletion?: number;
+  costCents?: number;
+}) {
+  const result = await db
+    .update(messages)
+    .set({
+      content: data.content,
+      status: "completed",
+      metadata: data.metadata,
+      tokenCountPrompt: data.tokenCountPrompt,
+      tokenCountCompletion: data.tokenCountCompletion,
+      costCents: data.costCents,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(messages.id, messageId), eq(messages.orgId, orgId)))
+    .returning();
+
+  const message = result[0];
+  if (!message) return null;
+
+  // Update conversation token totals
+  if (data.tokenCountPrompt || data.tokenCountCompletion) {
+    const totalNew = (data.tokenCountPrompt ?? 0) + (data.tokenCountCompletion ?? 0);
+    await db
+      .update(conversations)
+      .set({
+        totalTokens: sql`${conversations.totalTokens} + ${totalNew}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(conversations.id, message.conversationId));
+  }
+
+  // Sync to Qdrant
+  syncMessageUpsert(message as any);
+
+  // Trigger async embedding workflow
   if (message.content && (message.senderType === "user" || message.senderType === "assistant")) {
     getTemporalClient()
       .then((client) =>

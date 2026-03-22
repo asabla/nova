@@ -115,7 +115,9 @@ export function MessageList({ messages, artifactsByMessageId, streamingContent, 
           </div>
         )}
 
-        {messages.map((msg: any) => (
+        {messages
+          .filter((msg: any) => msg.status !== "streaming")
+          .map((msg: any) => (
           <MessageBubble
             key={msg.id}
             message={msg}
