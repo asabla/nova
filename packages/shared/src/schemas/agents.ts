@@ -24,6 +24,7 @@ export const agents = pgTable("agents", {
   webhookUrl: text("webhook_url"),
   cronSchedule: text("cron_schedule"),
   isEnabled: boolean("is_enabled").notNull().default(true),
+  builtinTools: jsonb("builtin_tools").$type<string[]>(),
   clonedFromAgentId: uuid("cloned_from_agent_id"),
   currentVersion: integer("current_version").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -33,6 +34,7 @@ export const agents = pgTable("agents", {
   index("idx_agents_org_id").on(table.orgId),
   index("idx_agents_owner_id").on(table.ownerId),
   index("idx_agents_org_active").on(table.orgId),
+  uniqueIndex("idx_agents_org_name").on(table.orgId, table.name),
 ]);
 
 export const agentVersions = pgTable("agent_versions", {

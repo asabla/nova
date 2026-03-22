@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, boolean, integer, jsonb, numeric, index } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, boolean, integer, jsonb, numeric, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { organisations } from "./organisations";
@@ -28,6 +28,7 @@ export const promptTemplates = pgTable("prompt_templates", {
 }, (table) => [
   index("idx_prompt_templates_org_id").on(table.orgId),
   index("idx_prompt_templates_owner_id").on(table.ownerId),
+  uniqueIndex("idx_prompt_templates_org_name").on(table.orgId, table.name),
 ]);
 
 export const promptTemplateVersions = pgTable("prompt_template_versions", {

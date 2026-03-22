@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "./db";
 import { organisations, orgSettings, users, userProfiles, modelProviders, models, agents, promptTemplates } from "@nova/shared/schemas";
 import { hashPassword } from "better-auth/crypto";
@@ -114,10 +114,13 @@ async function seed() {
       type: "custom",
       apiBaseUrl: "http://localhost:4000",
     })
-    .onConflictDoNothing()
+    .onConflictDoUpdate({
+      target: [modelProviders.orgId, modelProviders.name],
+      set: { apiBaseUrl: "http://localhost:4000", updatedAt: new Date() },
+    })
     .returning();
 
-  const providerId = provider?.id ?? (await db.select().from(modelProviders).where(eq(modelProviders.orgId, orgId)).then((r) => r[0]!.id));
+  const providerId = provider?.id ?? (await db.select().from(modelProviders).where(and(eq(modelProviders.orgId, orgId), eq(modelProviders.name, "LiteLLM Proxy"))).then((r) => r[0]!.id));
 
   const modelDefs = [
     { name: "Default Model", modelIdExternal: "default-model", capabilities: ["chat", "vision"], contextWindow: 32000, isDefault: true },
@@ -136,7 +139,10 @@ async function seed() {
         contextWindow: m.contextWindow,
         isDefault: m.isDefault ?? false,
       })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: [models.orgId, models.modelIdExternal],
+        set: { name: m.name, capabilities: m.capabilities, contextWindow: m.contextWindow, isDefault: m.isDefault ?? false, updatedAt: new Date() },
+      });
   }
   console.log(`  Models: ${modelDefs.length} registered`);
 
@@ -199,9 +205,12 @@ async function seed() {
         visibility: "org",
         isApproved: true,
       })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: [promptTemplates.orgId, promptTemplates.name],
+        set: { content: p.content, description: p.description, variables: p.variables, systemPrompt: p.systemPrompt, updatedAt: new Date() },
+      });
   }
-  console.log(`  Prompt templates: ${prompts.length} created`);
+  console.log(`  Prompt templates: ${prompts.length} upserted`);
 
   // ─── 5. Agents ────────────────────────────────────
   const agentDefs = [
@@ -222,6 +231,7 @@ Be thorough but concise. Prioritize accuracy over speed.`,
       toolApprovalMode: "auto",
       maxSteps: 10,
       timeoutSeconds: 120,
+      builtinTools: ["web_search", "fetch_url", "search_workspace", "read_file"],
     },
     {
       name: "Code Assistant",
@@ -244,6 +254,7 @@ Guidelines:
       toolApprovalMode: "auto",
       maxSteps: 5,
       timeoutSeconds: 60,
+      builtinTools: ["code_execute", "read_file", "search_workspace"],
     },
     {
       name: "Writing Editor",
@@ -265,6 +276,7 @@ When editing:
       toolApprovalMode: "auto",
       maxSteps: 3,
       timeoutSeconds: 60,
+      builtinTools: ["read_file", "search_workspace"],
     },
     {
       name: "Data Analyst",
@@ -287,6 +299,7 @@ Guidelines:
       toolApprovalMode: "auto",
       maxSteps: 8,
       timeoutSeconds: 120,
+      builtinTools: ["code_execute", "search_workspace", "read_file", "web_search"],
     },
   ];
 
@@ -303,12 +316,23 @@ Guidelines:
         toolApprovalMode: a.toolApprovalMode,
         maxSteps: a.maxSteps,
         timeoutSeconds: a.timeoutSeconds,
+        builtinTools: a.builtinTools,
         isEnabled: true,
         isPublished: true,
       })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: [agents.orgId, agents.name],
+        set: {
+          description: a.description,
+          systemPrompt: a.systemPrompt,
+          maxSteps: a.maxSteps,
+          timeoutSeconds: a.timeoutSeconds,
+          builtinTools: a.builtinTools,
+          updatedAt: new Date(),
+        },
+      });
   }
-  console.log(`  Agents: ${agentDefs.length} created`);
+  console.log(`  Agents: ${agentDefs.length} upserted`);
 
   // ─── Done ─────────────────────────────────────────
   console.log("\n  Seed complete!");

@@ -17,6 +17,7 @@ export const modelProviders = pgTable("model_providers", {
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 }, (table) => [
   index("idx_model_providers_org_id").on(table.orgId),
+  uniqueIndex("idx_model_providers_org_name").on(table.orgId, table.name),
 ]);
 
 export const models = pgTable("models", {
