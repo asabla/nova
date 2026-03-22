@@ -1,0 +1,78 @@
+{
+  "name": "@nova/worker-shared",
+  "version": "0.0.1",
+  "type": "module",
+  "exports": {
+    "./db": {
+      "types": "./dist/db.d.ts",
+      "default": "./src/db.ts"
+    },
+    "./redis": {
+      "types": "./dist/redis.d.ts",
+      "default": "./src/redis.ts"
+    },
+    "./env": {
+      "types": "./dist/env.d.ts",
+      "default": "./src/env.ts"
+    },
+    "./litellm": {
+      "types": "./dist/litellm.d.ts",
+      "default": "./src/litellm.ts"
+    },
+    "./models": {
+      "types": "./dist/models.d.ts",
+      "default": "./src/models.ts"
+    },
+    "./stream": {
+      "types": "./dist/stream-publisher.d.ts",
+      "default": "./src/stream-publisher.ts"
+    },
+    "./qdrant": {
+      "types": "./dist/qdrant.d.ts",
+      "default": "./src/qdrant.ts"
+    },
+    "./minio": {
+      "types": "./dist/minio.d.ts",
+      "default": "./src/minio.ts"
+    },
+    "./sandbox": {
+      "types": "./dist/docker-sandbox.d.ts",
+      "default": "./src/docker-sandbox.ts"
+    },
+    "./tar": {
+      "types": "./dist/tar.d.ts",
+      "default": "./src/tar.ts"
+    },
+    "./agent-sdk-model": {
+      "types": "./dist/agent-sdk-model.d.ts",
+      "default": "./src/agent-sdk-model.ts"
+    },
+    "./message-convert": {
+      "types": "./dist/message-convert.d.ts",
+      "default": "./src/message-convert.ts"
+    },
+    "./tools": {
+      "types": "./dist/tools/index.d.ts",
+      "default": "./src/tools/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nova/shared": "workspace:*",
+    "@openai/agents": "^0.7.0",
+    "@qdrant/js-client-rest": "1.13.0",
+    "drizzle-orm": "^0.39.3",
+    "ioredis": "^5.4.2",
+    "minio": "^8.0.4",
+    "openai": "^6.27.0",
+    "postgres": "^3.4.5",
+    "zod": "3.24.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "@types/node": "^22.15.2"
+  }
+}
