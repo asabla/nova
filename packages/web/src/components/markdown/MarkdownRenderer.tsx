@@ -236,6 +236,10 @@ const MD_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>["components"] = 
     );
   },
   a({ href, children }) {
+    // sandbox: URIs are internal file references — render as plain text
+    if (href?.startsWith("sandbox:")) {
+      return <span className="text-accent font-medium">{children}</span>;
+    }
     return (
       <a
         href={href}

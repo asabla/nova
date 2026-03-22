@@ -62,7 +62,7 @@ export async function getFile(orgId: string, fileId: string) {
 export async function getFileDownloadUrl(orgId: string, fileId: string) {
   const file = await getFile(orgId, fileId);
   if (!file) return null;
-  const url = await getDownloadUrl(file.storagePath);
+  const url = await getDownloadUrl(file.storagePath, file.contentType);
   return { url, file };
 }
 

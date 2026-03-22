@@ -33,8 +33,13 @@ export async function getUploadUrl(orgId: string, filename: string): Promise<{ u
   return { url: toProxyUrl(url), key };
 }
 
-export async function getDownloadUrl(key: string): Promise<string> {
-  const url = await minio.presignedGetObject(BUCKET, key, 60 * 60);
+export async function getDownloadUrl(key: string, contentType?: string): Promise<string> {
+  const respHeaders: Record<string, string> = {};
+  if (contentType) {
+    respHeaders["response-content-type"] = contentType;
+    respHeaders["response-content-disposition"] = "inline";
+  }
+  const url = await minio.presignedGetObject(BUCKET, key, 60 * 60, respHeaders);
   return toProxyUrl(url);
 }
 
