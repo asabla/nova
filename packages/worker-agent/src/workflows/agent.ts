@@ -67,6 +67,31 @@ function isPlanComplete(plan: Plan): boolean {
   );
 }
 
+/**
+ * After a node fails, mark all transitive dependents as "skipped" since they
+ * can never become ready. Returns the IDs of newly-skipped nodes.
+ */
+function skipUnreachableNodes(plan: Plan): string[] {
+  const skipped: string[] = [];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const node of plan.nodes) {
+      if (node.status !== "pending" && node.status !== "ready") continue;
+      const hasFailedDep = node.dependencies.some((depId) => {
+        const dep = plan.nodes.find((d) => d.id === depId);
+        return dep?.status === "failed" || dep?.status === "skipped";
+      });
+      if (hasFailedDep) {
+        node.status = "skipped";
+        skipped.push(node.id);
+        changed = true;
+      }
+    }
+  }
+  return skipped;
+}
+
 // ---------------------------------------------------------------------------
 // Proxied activities
 // ---------------------------------------------------------------------------
@@ -742,6 +767,11 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
     } catch (err: any) {
       updateNodeStatus(plan!, node.id, "failed");
       if (ch) await publishPlanNodeStatusActivity(ch, { nodeId: node.id, status: "failed", detail: err.message });
+      // Mark all transitive dependents as skipped
+      const skippedIds = skipUnreachableNodes(plan!);
+      for (const id of skippedIds) {
+        if (ch) await publishPlanNodeStatusActivity(ch, { nodeId: id, status: "skipped", detail: "Upstream dependency failed" });
+      }
     }
 
     currentNodeId = undefined;
@@ -805,6 +835,12 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
 
       updateNodeStatus(plan!, node.id, resultStatus as any);
       if (ch) await publishPlanNodeStatusActivity(ch, { nodeId: node.id, status: resultStatus as any });
+    }
+
+    // After processing all parallel nodes, skip any dependents of failed nodes
+    const skippedIds = skipUnreachableNodes(plan!);
+    for (const id of skippedIds) {
+      if (ch) await publishPlanNodeStatusActivity(ch, { nodeId: id, status: "skipped", detail: "Upstream dependency failed" });
     }
   }
 }
