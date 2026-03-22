@@ -32,12 +32,13 @@ const DEFAULT_CARDS: KanbanCard[] = [
   { id: "card-2", title: "Draft wireframes", columnId: "todo" },
 ];
 
-function parseJSON<T>(raw: string | undefined, fallback: T): { data: T; error?: string } {
+function parseJSON<T>(raw: string | undefined | T, fallback: T): { data: T; error?: string } {
   if (!raw) return { data: fallback };
+  if (typeof raw !== "string") return { data: raw as T };
   try {
     return { data: JSON.parse(raw) };
   } catch {
-    return { data: fallback, error: `Invalid JSON: ${raw.slice(0, 80)}…` };
+    return { data: fallback, error: `Invalid JSON: ${String(raw).slice(0, 80)}…` };
   }
 }
 

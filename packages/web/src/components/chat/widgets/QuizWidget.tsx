@@ -184,6 +184,7 @@ function generateQuizHtml(title: string, questions: Question[]): string {
 export function QuizWidget({ params }: { params?: Record<string, string> }) {
   const questions = useMemo<Question[]>(() => {
     if (!params?.questions) return DEFAULT_QUESTIONS;
+    if (typeof params.questions !== "string") return params.questions as unknown as Question[];
     try {
       return JSON.parse(params.questions);
     } catch {

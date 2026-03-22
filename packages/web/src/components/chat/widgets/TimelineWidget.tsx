@@ -27,7 +27,8 @@ export function TimelineWidget({ params }: { params?: Record<string, string> }) 
 
   if (params?.events) {
     try {
-      const parsed = JSON.parse(params.events);
+      const raw = params.events;
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
       if (Array.isArray(parsed) && parsed.length > 0) {
         events = parsed;
       }

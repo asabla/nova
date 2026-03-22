@@ -36,6 +36,7 @@ export function CalendarWidget({ params }: { params?: Record<string, string> }) 
 
   const labels = useMemo<Record<string, string>>(() => {
     if (!params?.labels) return {};
+    if (typeof params.labels !== "string") return params.labels as unknown as Record<string, string>;
     try {
       return JSON.parse(params.labels);
     } catch {

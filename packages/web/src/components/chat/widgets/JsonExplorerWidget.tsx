@@ -118,15 +118,19 @@ export function JsonExplorerWidget({ params }: { params?: Record<string, string>
   }
 
   let parsed: JsonValue;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (e) {
-    return (
-      <div className="rounded-lg border border-border bg-surface-secondary p-4 font-mono text-xs">
-        <p className="text-red-400 mb-2">Invalid JSON</p>
-        <pre className="text-text-tertiary whitespace-pre-wrap break-all">{raw}</pre>
-      </div>
-    );
+  if (typeof raw !== "string") {
+    parsed = raw as JsonValue;
+  } else {
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      return (
+        <div className="rounded-lg border border-border bg-surface-secondary p-4 font-mono text-xs">
+          <p className="text-red-400 mb-2">Invalid JSON</p>
+          <pre className="text-text-tertiary whitespace-pre-wrap break-all">{raw}</pre>
+        </div>
+      );
+    }
   }
 
   return (
