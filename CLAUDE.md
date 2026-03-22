@@ -82,7 +82,7 @@ Error handler → Security headers → CORS → Request ID → Logger → **Publ
 
 | Service | Port | Purpose |
 |---------|------|---------|
-| PostgreSQL | 5432 | Main database (pgvector + pg_trgm) |
+| PostgreSQL | 5432 | Main database (pg_trgm) |
 | Redis | 6379 | Cache, pub/sub, rate limiting |
 | MinIO | 9000/9001 | S3-compatible file storage |
 | LiteLLM | 4000 | LLM proxy (needs OPENAI_API_KEY or ANTHROPIC_API_KEY) |

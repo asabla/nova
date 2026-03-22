@@ -106,7 +106,7 @@ docker compose up -d
 |---------|------|-------------|
 | Web | 5173 | Frontend (nginx) |
 | API | 3000 | Backend API |
-| PostgreSQL | 5432 | Database (pgvector + pg_trgm) |
+| PostgreSQL | 5432 | Database (pg_trgm) |
 | Redis | 6379 | Cache, pub/sub, rate limiting |
 | MinIO | 9000/9001 | S3-compatible file storage |
 | LiteLLM | 4000 | LLM proxy gateway |
