@@ -669,7 +669,8 @@ const readFileTool = tool({
         try {
           const { createRequire } = await import("node:module");
           const req = createRequire(import.meta.url);
-          const pdfParse = req("pdf-parse/lib/pdf-parse.js");
+          const resolved = req("pdf-parse/lib/pdf-parse.js");
+          const pdfParse = typeof resolved === "function" ? resolved : (resolved?.default ?? resolved);
           const result = await pdfParse(buffer);
           text = result.text;
         } catch {

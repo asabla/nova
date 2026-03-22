@@ -12,14 +12,14 @@ async function getPdfParser(): Promise<(buf: Buffer) => Promise<{ text: string }
   const { createRequire } = await import("node:module");
   try {
     const req = createRequire(import.meta.url);
-    _pdfParse = req("pdf-parse/lib/pdf-parse.js");
+    const resolved = req("pdf-parse/lib/pdf-parse.js");
+    _pdfParse = typeof resolved === "function" ? resolved : (resolved?.default ?? resolved);
   } catch {
-    // Fallback: try absolute path
     try {
       const req = createRequire("/app/package.json");
-      _pdfParse = req("pdf-parse/lib/pdf-parse.js");
+      const resolved = req("pdf-parse/lib/pdf-parse.js");
+      _pdfParse = typeof resolved === "function" ? resolved : (resolved?.default ?? resolved);
     } catch {
-      // Last resort: dynamic import of the main module (may fail with test file read)
       const mod: any = await import("pdf-parse");
       _pdfParse = (mod.default ?? mod) as any;
     }

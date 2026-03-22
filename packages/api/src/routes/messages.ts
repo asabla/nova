@@ -399,14 +399,25 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
     }
 
     const fileSections: string[] = [];
+    // Types where the ingestion pipeline extracts content into RAG (Qdrant) —
+    // don't dump full text into context; let the agent use search_workspace or read_file.
+    const RAG_INDEXED_TYPES = new Set([
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ]);
     for (const a of atts) {
       const file = a.fileId ? fileRecords[a.fileId] : null;
       if (file) {
-        const text = await extractFileContent(file.storagePath, file.contentType, file.filename ?? undefined);
-        if (text) {
-          fileSections.push(`--- File: ${a.filename ?? "attachment"} ---\n${text}\n--- End of file ---`);
+        if (RAG_INDEXED_TYPES.has(file.contentType)) {
+          const sizeStr = `${((file.sizeBytes ?? 0) / 1024).toFixed(0)} KB`;
+          fileSections.push(`[Attached file: ${a.filename ?? "unknown"} (${file.contentType}, ${sizeStr}) — content indexed for search. Use search_workspace to find relevant sections, or read_file / code_execute for full content.]`);
         } else {
-          fileSections.push(`[Attached file: ${a.filename ?? "unknown"} (${file.contentType}) — content could not be extracted]`);
+          const text = await extractFileContent(file.storagePath, file.contentType, file.filename ?? undefined);
+          if (text) {
+            fileSections.push(`--- File: ${a.filename ?? "attachment"} ---\n${text}\n--- End of file ---`);
+          } else {
+            fileSections.push(`[Attached file: ${a.filename ?? "unknown"} (${file.contentType}) — content could not be extracted]`);
+          }
         }
       }
     }
