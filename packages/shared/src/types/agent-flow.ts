@@ -184,6 +184,8 @@ export interface AgentWorkflowInput {
   tools?: unknown[];
   maxSteps?: number;
   timeoutSeconds?: number;
+  /** Set to true when Temporal custom search attributes are registered */
+  enableSearchAttributes?: boolean;
 }
 
 export interface AgentWorkflowResult {

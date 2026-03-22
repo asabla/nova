@@ -717,11 +717,16 @@ export const builtinTools = [webSearchTool, fetchUrlTool, invokeAgentTool, codeE
 /**
  * All built-in tools for a given org context.
  * Includes org-scoped tools like search_workspace.
+ * When allowedTools is provided, only returns tools whose names are in the list.
+ * When allowedTools is null/undefined, returns all tools (backward compatible).
  */
-export function getBuiltinTools(orgId?: string): FunctionTool<any, any>[] {
-  const tools: FunctionTool<any, any>[] = [...builtinTools];
+export function getBuiltinTools(orgId?: string, allowedTools?: string[] | null): FunctionTool<any, any>[] {
+  let tools: FunctionTool<any, any>[] = [...builtinTools];
   if (orgId) {
     tools.push(createSearchWorkspaceTool(orgId));
+  }
+  if (allowedTools && allowedTools.length > 0) {
+    tools = tools.filter((t) => allowedTools.includes(t.name));
   }
   return tools;
 }
