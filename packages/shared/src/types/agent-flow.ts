@@ -186,6 +186,8 @@ export interface AgentWorkflowInput {
   timeoutSeconds?: number;
   /** Set to true when Temporal custom search attributes are registered */
   enableSearchAttributes?: boolean;
+  /** Pre-assessed tier from the API — skips the workflow's own tier assessment */
+  preAssessedTier?: "direct" | "sequential" | "orchestrated";
 }
 
 export interface AgentWorkflowResult {

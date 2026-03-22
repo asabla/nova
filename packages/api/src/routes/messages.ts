@@ -614,6 +614,151 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
 
     try {
       const startTime = Date.now();
+
+      // ── Tier assessment: decide execution strategy before LLM call ──
+      // For complex requests, skip the initial LLM call and hand off
+      // directly to the Temporal workflow for planned execution.
+      let assessedTier: "direct" | "sequential" | "orchestrated" = "direct";
+      if (body.enableTools) {
+        try {
+          const userMsg = enrichedMessages.filter((m: any) => m.role === "user").pop()?.content ?? "";
+          const priorTurns = enrichedMessages.filter((m: any) => m.role === "user" || m.role === "assistant");
+          const contextSummary = priorTurns.length > 1
+            ? priorTurns.slice(-6).map((m: any) => `${m.role}: ${(m.content ?? "").slice(0, 200)}`).join("\n")
+            : undefined;
+
+          const tierResult = await chatCompletion({
+            model: resolvedModel,
+            messages: [
+              {
+                role: "system",
+                content: `You are a task complexity router. Classify the user's request into one of three execution tiers.
+
+Tiers:
+- "direct": Simple Q&A, greetings, factual answers, single-step tasks, follow-ups to prior answers, reformatting data already in context. Most messages are direct.
+- "sequential": Needs 2-4 ordered steps. Single web search + synthesis, document lookup + analysis, one tool call with follow-up reasoning.
+- "orchestrated": Needs 4+ steps, multiple tools, parallel work, or multi-source research. Cross-referencing multiple sources, complex analysis requiring code execution + web research, tasks with independent sub-problems.
+
+${contextSummary ? "IMPORTANT: Consider conversation context. Follow-ups building on existing content are almost always direct." : ""}
+
+Respond with ONLY valid JSON: {"tier": "direct"|"sequential"|"orchestrated", "reasoning": "one sentence"}`,
+              },
+              ...(contextSummary ? [{ role: "system" as const, content: `Conversation context:\n${contextSummary}` }] : []),
+              { role: "user" as const, content: userMsg },
+            ],
+            temperature: 0,
+            max_tokens: 150,
+          } as any);
+
+          const tierContent = tierResult.choices?.[0]?.message?.content ?? "";
+          try {
+            const parsed = JSON.parse(tierContent);
+            if (parsed.tier === "sequential" || parsed.tier === "orchestrated") {
+              assessedTier = parsed.tier;
+            }
+          } catch { /* default to direct */ }
+          console.log(`[stream] tier assessment: ${assessedTier} (raw: ${tierContent.slice(0, 100)})`);
+        } catch (err) {
+          console.warn("[stream] tier assessment failed, defaulting to direct:", err);
+        }
+      }
+
+      // For sequential/orchestrated tiers, skip the initial LLM call and go straight to Temporal
+      if (assessedTier !== "direct" && body.enableTools) {
+        await stream.writeSSE({
+          event: "tier.assessed",
+          data: JSON.stringify({ tier: assessedTier }),
+        });
+
+        const streamChannelId = `stream:${conversationId}:${crypto.randomUUID()}`;
+        const { relayRedisToSSE } = await import("../lib/stream-relay");
+        const relayPromise = relayRedisToSSE(stream, streamChannelId, { timeoutMs: 600_000 });
+
+        const client = await getTemporalClient();
+        const workflowId = `agent-chat-${conversationId}-${Date.now()}`;
+
+        await client.workflow.start("agentWorkflow", {
+          taskQueue: "nova-main",
+          workflowId,
+          args: [{
+            orgId,
+            userId: c.get("userId"),
+            conversationId,
+            streamChannelId,
+            userMessage: enrichedMessages.filter((m: any) => m.role === "user").pop()?.content,
+            messageHistory: enrichedMessages,
+            model: resolvedModel,
+            modelParams: { temperature: body.temperature, maxTokens: body.maxTokens },
+            tools: DEFAULT_TOOLS,
+            maxSteps: 25,
+            enableSearchAttributes: true,
+            preAssessedTier: assessedTier,
+          }],
+        });
+
+        const relayResult = await relayPromise;
+        const totalContent = stripThinkBlocks(relayResult?.content ?? "");
+
+        let toolCallRecords: any[] = [];
+        let wfTier: string | undefined;
+        let wfPlanSummary: Record<string, unknown> | undefined;
+        try {
+          const handle = client.workflow.getHandle(workflowId);
+          const wfResult = await handle.result();
+          toolCallRecords = (wfResult as any)?.toolCallRecords ?? [];
+          wfTier = (wfResult as any)?.tier;
+          const wfPlan = (wfResult as any)?.plan;
+          if (wfPlan) {
+            wfPlanSummary = {
+              id: wfPlan.id, tier: wfPlan.tier, reasoning: wfPlan.reasoning,
+              nodes: (wfPlan.nodes ?? []).map((n: any) => ({
+                id: n.id, description: n.description, tools: n.tools, dependencies: n.dependencies,
+                status: n.status, result: n.result ? { durationMs: n.result.durationMs, tokensUsed: n.result.tokensUsed } : undefined,
+              })),
+            };
+          }
+        } catch { /* workflow may still be running */ }
+
+        const toolSummary = toolCallRecords.length > 0
+          ? toolCallRecords.map((r: any) => ({ name: r.toolName, durationMs: r.durationMs, error: r.error, args: r.input }))
+          : undefined;
+
+        const assistantMessage = await messageService.createMessage(orgId, {
+          conversationId,
+          senderType: "assistant",
+          content: totalContent,
+          modelId: conversation.modelId ?? undefined,
+          tokenCountPrompt: relayResult?.usage?.prompt_tokens ?? 0,
+          tokenCountCompletion: relayResult?.usage?.completion_tokens ?? 0,
+          metadata: { latencyMs: Date.now() - startTime, model: body.model, smartRouted: true, toolSummary, tier: wfTier ?? assessedTier, plan: wfPlanSummary },
+        });
+
+        if (toolCallRecords.length > 0) {
+          try {
+            await db.insert(toolCallsTable).values(
+              toolCallRecords.map((r: any) => ({
+                messageId: assistantMessage.id, conversationId, orgId,
+                toolName: r.toolName, input: r.input, output: r.output ?? null,
+                status: r.error ? "error" : "completed", errorMessage: r.error ?? null, durationMs: r.durationMs,
+              })),
+            );
+          } catch (dbErr) { console.error("[planned-chat] Failed to persist tool calls:", dbErr); }
+        }
+
+        await stream.writeSSE({
+          event: "done",
+          data: JSON.stringify({
+            messageId: assistantMessage.id,
+            tokenCountPrompt: relayResult?.usage?.prompt_tokens ?? 0,
+            tokenCountCompletion: relayResult?.usage?.completion_tokens ?? 0,
+            latencyMs: Date.now() - startTime,
+          }),
+        });
+
+        return;
+      }
+
+      // ── Direct tier: standard LLM call with optional tool handoff ──
       const completionParams: Record<string, unknown> = {
         model: resolvedModel,
         messages: enrichedMessages,

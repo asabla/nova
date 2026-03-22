@@ -209,7 +209,13 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
   // the LLM already decided what tools to call — skip planning and run direct.
   const hasPendingToolCalls = input.pendingToolCalls && input.pendingToolCalls.length > 0;
 
-  if (hasPendingToolCalls) {
+  if (input.preAssessedTier) {
+    // Tier was already assessed by the API — use it directly
+    tier = input.preAssessedTier;
+    if (ch) {
+      await publishTierAssessedActivity(ch, { tier, reasoning: "Pre-assessed by API" });
+    }
+  } else if (hasPendingToolCalls) {
     tier = "direct";
     if (ch) {
       await publishTierAssessedActivity(ch, { tier, reasoning: "Tool calls already requested by LLM" });
