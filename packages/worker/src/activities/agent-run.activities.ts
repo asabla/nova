@@ -24,6 +24,8 @@ export interface AgentRunInput {
   agentId?: string;
   /** Org ID for org-scoped tools like search_workspace */
   orgId?: string;
+  /** When set, only these builtin tools are available. Null/undefined = all tools. */
+  allowedBuiltinTools?: string[] | null;
 }
 
 export interface AgentRunResult {
@@ -47,8 +49,8 @@ export interface AgentRunResult {
  * (call LLM -> detect tool_calls -> execute -> repeat).
  */
 export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult> {
-  // Build tools list: built-in (with org-scoped tools) + any custom tools from DB
-  const tools: FunctionTool<any, any>[] = getBuiltinTools(input.orgId);
+  // Build tools list: built-in (filtered by agent config) + any custom tools from DB
+  const tools: FunctionTool<any, any>[] = getBuiltinTools(input.orgId, input.allowedBuiltinTools);
   if (input.agentId) {
     const custom = await loadCustomTools(input.agentId);
     tools.push(...custom);
@@ -61,7 +63,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
     tools,
     modelSettings: {
       temperature: input.temperature ?? 0.7,
-      maxTokens: input.maxTokens ?? 16384,
+      maxTokens: input.maxTokens ?? 4096,
     },
   });
 
@@ -78,6 +80,46 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
 
   let eventCount = 0;
 
+  // State machine for filtering <think> blocks from streamed tokens
+  let insideThinkBlock = false;
+  let thinkBuffer = "";
+
+  async function streamWithThinkFilter(channelId: string, delta: string) {
+    if (insideThinkBlock) {
+      thinkBuffer += delta;
+      const closeIdx = thinkBuffer.indexOf("</think>");
+      if (closeIdx !== -1) {
+        const afterClose = thinkBuffer.slice(closeIdx + 8);
+        thinkBuffer = "";
+        insideThinkBlock = false;
+        if (afterClose) await publishToken(channelId, afterClose);
+      }
+    } else {
+      const combined = thinkBuffer + delta;
+      const openIdx = combined.indexOf("<think>");
+      if (openIdx !== -1) {
+        const before = combined.slice(0, openIdx);
+        thinkBuffer = combined.slice(openIdx);
+        insideThinkBlock = true;
+        if (before) await publishToken(channelId, before);
+        // Check if close tag is also in same chunk
+        const closeIdx = thinkBuffer.indexOf("</think>");
+        if (closeIdx !== -1) {
+          const afterClose = thinkBuffer.slice(closeIdx + 8);
+          thinkBuffer = "";
+          insideThinkBlock = false;
+          if (afterClose) await publishToken(channelId, afterClose);
+        }
+      } else if (combined.endsWith("<") || combined.endsWith("<t") || combined.endsWith("<th") || combined.endsWith("<thi") || combined.endsWith("<thin") || combined.endsWith("<think")) {
+        // Partial tag — buffer it
+        thinkBuffer = combined;
+      } else {
+        thinkBuffer = "";
+        await publishToken(channelId, delta);
+      }
+    }
+  }
+
   try {
     const stream = await run(agent, sdkInput, {
       stream: true,
@@ -85,7 +127,11 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
     });
     for await (const event of stream as AsyncIterable<RunStreamEvent>) {
       // Heartbeat to Temporal so the activity doesn't time out during long streams
-      heartbeat();
+      heartbeat({
+        eventCount,
+        contentLength: fullContent.length,
+        toolCallsCompleted: toolCallRecords.length,
+      });
       eventCount++;
 
       if (event.type === "raw_model_stream_event") {
@@ -97,7 +143,8 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
         // output_text_delta events contain streaming text tokens
         if (data?.type === "output_text_delta" && data.delta) {
           fullContent += data.delta;
-          await publishToken(input.streamChannelId, data.delta);
+          // Filter <think> blocks from streaming output
+          await streamWithThinkFilter(input.streamChannelId, data.delta);
         }
       } else if (event.type === "run_item_stream_event") {
         const item = event.item as any;
@@ -241,9 +288,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
  * These are chain-of-thought traces that should not be shown to the user.
  */
 function stripThinkBlocks(text: string): string {
-  const stripped = text.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<think>[\s\S]*$/g, "").trim();
-  // If stripping removed all content, return the original with tags removed but text preserved
-  return stripped || text.replace(/<\/?think>/g, "").trim();
+  return text.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/<think>[\s\S]*$/g, "").trim();
 }
 
 function buildResultSummary(toolName: string, result: unknown): string {
