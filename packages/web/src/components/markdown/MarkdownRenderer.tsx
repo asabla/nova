@@ -240,6 +240,24 @@ const MD_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>["components"] = 
     if (href?.startsWith("sandbox:")) {
       return <span className="text-accent font-medium">{children}</span>;
     }
+    // Internal app links (e.g. /conversations/uuid) — use client-side navigation
+    const isInternal = href && /^\/(?:conversations|folders|search)(\/|$)/.test(href);
+    if (isInternal) {
+      return (
+        <a
+          href={href}
+          onClick={(e) => {
+            e.preventDefault();
+            // TanStack Router listens for popstate events on the history
+            window.history.pushState({}, "", href);
+            window.dispatchEvent(new PopStateEvent("popstate"));
+          }}
+          className="text-accent font-medium no-underline hover:underline hover:decoration-accent/40 transition-colors break-words"
+        >
+          {children}
+        </a>
+      );
+    }
     return (
       <a
         href={href}

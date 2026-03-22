@@ -333,7 +333,8 @@ export function createSearchWorkspaceTool(orgId: string) {
       "Use this when the user wants to find something from earlier conversations, stored knowledge, or uploaded files. " +
       "IMPORTANT: Always use type 'all' unless the user specifically asks to search only one type. " +
       "For temporal queries like 'yesterday' or 'last week', use dateFrom/dateTo to filter by time range. " +
-      "You can combine date filters with a broad query (e.g. query='' with dateFrom to list recent activity).",
+      "You can combine date filters with a broad query (e.g. query='' with dateFrom to list recent activity). " +
+      "When referencing conversations in your response, use the 'url' field from the results to create markdown links, e.g. [Title](url). These are relative URLs that the app handles internally.",
     parameters: {
       type: "object" as const,
       properties: {
@@ -429,6 +430,7 @@ export function createSearchWorkspaceTool(orgId: string) {
           results.conversations = convs.map((p) => ({
             id: p.id,
             title: p.payload.title,
+            url: `/conversations/${p.id}`,
             createdAt: p.payload.createdAt,
           }));
         } catch (err) {
@@ -448,6 +450,7 @@ export function createSearchWorkspaceTool(orgId: string) {
             results.messages = msgs.map((r) => ({
               id: r.id,
               conversationId: r.payload.conversationId,
+              conversationUrl: `/conversations/${r.payload.conversationId}`,
               senderType: r.payload.senderType,
               content: truncate(r.payload.content as string, 300),
               createdAt: r.payload.createdAt,
@@ -461,6 +464,7 @@ export function createSearchWorkspaceTool(orgId: string) {
             results.messages = msgs.map((p) => ({
               id: p.id,
               conversationId: p.payload.conversationId,
+              conversationUrl: `/conversations/${p.payload.conversationId}`,
               senderType: p.payload.senderType,
               content: truncate(p.payload.content as string, 300),
               createdAt: p.payload.createdAt,
@@ -471,6 +475,7 @@ export function createSearchWorkspaceTool(orgId: string) {
             results.messages = msgs.map((p) => ({
               id: p.id,
               conversationId: p.payload.conversationId,
+              conversationUrl: `/conversations/${p.payload.conversationId}`,
               senderType: p.payload.senderType,
               content: truncate(p.payload.content as string, 300),
               createdAt: p.payload.createdAt,
