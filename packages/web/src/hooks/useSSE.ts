@@ -239,6 +239,19 @@ export function useSSEStream() {
                 continue;
               }
 
+              if (currentEventType === "content_clear") {
+                // Discard pre-tool reasoning content when the model decides to use tools
+                if (rafIdRef.current !== null) {
+                  cancelAnimationFrame(rafIdRef.current);
+                  rafIdRef.current = null;
+                }
+                pendingTokensRef.current = "";
+                bufferWhilePausedRef.current = "";
+                setTokens("");
+                currentEventType = "";
+                continue;
+              }
+
               if (data.content) {
                 if (pausedRef.current) {
                   bufferWhilePausedRef.current += data.content;

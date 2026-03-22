@@ -633,6 +633,12 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
       let toolCalls: { id: string; function: { name: string; arguments: string } }[] = [];
       let finishReason = "stop";
 
+      // When tools are enabled, the model may output reasoning text ("I need to search...")
+      // before deciding to call tools. We buffer this initial content and only stream it
+      // if the response finishes without tool calls. If tool calls are detected, we discard
+      // the pre-tool reasoning and send a content_clear event to the frontend.
+      let hasToolCallDelta = false;
+
       for await (const chunk of llmStream) {
         const delta = chunk.choices?.[0]?.delta;
         const choiceFinish = chunk.choices?.[0]?.finish_reason;
@@ -640,14 +646,27 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         const token = delta?.content;
         if (token) {
           fullContent += token;
-          await stream.writeSSE({
-            event: "token",
-            data: JSON.stringify({ content: token }),
-          });
+          // Only stream tokens if we haven't seen tool call deltas yet
+          if (!hasToolCallDelta) {
+            await stream.writeSSE({
+              event: "token",
+              data: JSON.stringify({ content: token }),
+            });
+          }
         }
 
         // Accumulate tool calls from streaming deltas
         if (delta?.tool_calls) {
+          if (!hasToolCallDelta) {
+            hasToolCallDelta = true;
+            // Tell the frontend to discard any pre-tool reasoning content it received
+            if (fullContent.trim()) {
+              await stream.writeSSE({
+                event: "content_clear",
+                data: JSON.stringify({ reason: "tool_calls_detected" }),
+              });
+            }
+          }
           for (const tc of delta.tool_calls) {
             const idx = tc.index ?? 0;
             if (!toolCalls[idx]) {
@@ -719,9 +738,11 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
 
           const relayResult = await relayPromise;
 
-          // Combine initial content + relay content for the final message, stripping reasoning traces
-          // Strip each part separately to avoid unclosed <think> in fullContent eating relay content
-          const totalContent = stripThinkBlocks(fullContent) + stripThinkBlocks(relayResult?.content ?? "");
+          // When tool calls were triggered, the initial fullContent is typically the model's
+          // reasoning preamble ("I need to search for...", "Let me look up...") — not the real answer.
+          // The actual response comes from the workflow relay. Discard the initial content.
+          const relayContent = stripThinkBlocks(relayResult?.content ?? "");
+          const totalContent = relayContent || stripThinkBlocks(fullContent);
           const totalPromptTokens = promptTokens + (relayResult?.usage?.prompt_tokens ?? 0);
           const totalCompletionTokens = completionTokens + (relayResult?.usage?.completion_tokens ?? 0);
 
