@@ -242,10 +242,12 @@ export function NewResearchForm({
     [t],
   );
 
+  const tabContentHeight = compact ? "h-[180px]" : "";
+
   const renderTabContent = (activeTab: string) => {
     if (activeTab === "web") {
       return (
-        <div className="space-y-3">
+        <div className={clsx("space-y-3", tabContentHeight)}>
           <Switch
             checked={sources.webSearch}
             onChange={(checked) =>
@@ -264,7 +266,7 @@ export function NewResearchForm({
 
     if (activeTab === "knowledge") {
       return (
-        <div className="space-y-2">
+        <div className={clsx("space-y-2", tabContentHeight)}>
           <Input
             placeholder={t("research.searchCollections", "Search collections...")}
             value={knowledgeSearch}
@@ -282,7 +284,7 @@ export function NewResearchForm({
                 : t("research.noCollectionsMatch", "No collections match your search")}
             </p>
           ) : (
-            <div className="max-h-48 overflow-y-auto -mx-1 px-1 space-y-1">
+            <div className="overflow-y-auto -mx-1 px-1 space-y-1" style={{ maxHeight: compact ? 130 : 192 }}>
               {filteredCollections.map((col) => (
                 <button
                   key={col.id}
@@ -324,7 +326,7 @@ export function NewResearchForm({
 
     if (activeTab === "files") {
       return (
-        <div className="space-y-2">
+        <div className={clsx("space-y-2", tabContentHeight)}>
           <Input
             placeholder={t("research.searchFiles", "Search files...")}
             value={filesSearch}
@@ -342,7 +344,7 @@ export function NewResearchForm({
                 : t("research.noFilesMatch", "No files match your search")}
             </p>
           ) : (
-            <div className="max-h-48 overflow-y-auto -mx-1 px-1 space-y-1">
+            <div className="overflow-y-auto -mx-1 px-1 space-y-1" style={{ maxHeight: compact ? 130 : 192 }}>
               {filteredFiles.map((file) => (
                 <button
                   key={file.id}
@@ -384,7 +386,7 @@ export function NewResearchForm({
 
   if (compact) {
     return (
-      <form onSubmit={handleSubmit} className="flex flex-col mt-2" style={{ minHeight: 420 }}>
+      <form onSubmit={handleSubmit} className="flex flex-col mt-2">
         <div className="space-y-2.5 flex-1">
           <Textarea
             ref={textareaRef}
@@ -394,8 +396,8 @@ export function NewResearchForm({
               "research.queryPlaceholder",
               "What would you like to research in depth?",
             )}
-            rows={3}
-            className="text-sm resize-none"
+            rows={5}
+            className="text-sm resize-vertical"
             error={
               query.length > 0 && query.trim().length < 3
                 ? t("research.queryMinLength", "Query must be at least 3 characters")
