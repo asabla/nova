@@ -1,6 +1,8 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Send, Square, Paperclip, Pause, Play } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Send, Square, Paperclip, Pause, Play, Microscope, X, Sparkles } from "lucide-react";
 import { clsx } from "clsx";
 import { VoiceInput } from "./VoiceInput";
 import { AttachmentBar } from "./AttachmentBar";
@@ -8,6 +10,10 @@ import { MentionPopup, useMentionTrigger, type MentionCandidate } from "./Mentio
 import { SlashCommand, getSlashCommand } from "./SlashCommand";
 import { useSlashCommandTrigger } from "./useSlashCommandTrigger";
 import { HelpDialog } from "./HelpDialog";
+import { Dialog } from "../ui/Dialog";
+import { NewResearchForm, type NewResearchFormSubmitData } from "../research/NewResearchForm";
+import { api } from "../../lib/api";
+import { toast } from "../ui/Toast";
 
 interface MessageInputProps {
   onSend: (content: string, files?: File[]) => void;
@@ -25,18 +31,80 @@ interface MessageInputProps {
   onExportConversation?: () => void;
 }
 
+// ---------------------------------------------------------------------------
+// Research intent detection (high threshold)
+// ---------------------------------------------------------------------------
+
+const RESEARCH_START_PATTERNS = [
+  /^research\b/i,
+  /^deep\s*dive\s+(into|on)\b/i,
+  /^investigate\b/i,
+  /^find\s+sources?\s+(about|on|for)\b/i,
+  /^comprehensive\s+(analysis|review|overview|report)\s+(of|on|about)\b/i,
+  /^thorough(ly)?\s+(research|investigate|analyze|review)\b/i,
+  /^in-depth\s+(research|analysis|review|report)\b/i,
+];
+
+const RESEARCH_KEYWORD_PATTERNS = [
+  /\bwith\s+(sources|citations|references)\b/i,
+  /\bcite\s+sources\b/i,
+  /\bresearch\s+report\b/i,
+  /\bliterature\s+review\b/i,
+];
+
+function detectResearchIntent(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed.length < 15) return false;
+  if (RESEARCH_START_PATTERNS.some((p) => p.test(trimmed))) return true;
+  if (RESEARCH_KEYWORD_PATTERNS.some((p) => p.test(trimmed))) return true;
+  return false;
+}
+
 export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, isPaused, disabled, onFileUpload, onTyping, conversationId, onSlashCommand, onClearConversation, onExportConversation }: MessageInputProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [researchModalOpen, setResearchModalOpen] = useState(false);
+  const [researchDismissed, setResearchDismissed] = useState(false);
 
   // Auto-save draft on disconnect / page unload (story #202)
   const draftKey = conversationId ? `nova:message-draft:${conversationId}` : "nova:message-draft";
   const [content, setContent] = useState(() => {
     try { return localStorage.getItem(draftKey) ?? ""; } catch { return ""; }
   });
+
+  // Research mutation
+  const startResearch = useMutation({
+    mutationFn: (data: NewResearchFormSubmitData) =>
+      api.post<any>("/api/research", { ...data, conversationId }),
+    onSuccess: (data: any) => {
+      toast(t("research.started", "Research started"), "success");
+      queryClient.invalidateQueries({ queryKey: ["research-reports"] });
+      setResearchModalOpen(false);
+      navigate({ to: "/research", search: { report: data.id } });
+    },
+    onError: (err: any) =>
+      toast(err.message ?? t("research.startFailed", "Failed to start research"), "error"),
+  });
+
+  // Smart research detection
+  const showResearchSuggestion = useMemo(
+    () => !researchDismissed && !isStreaming && detectResearchIntent(content),
+    [content, researchDismissed, isStreaming],
+  );
+
+  // Reset dismissed state when content changes significantly
+  const prevContentRef = useRef(content);
+  useEffect(() => {
+    if (researchDismissed && content.trim() !== prevContentRef.current.trim()) {
+      setResearchDismissed(false);
+    }
+    prevContentRef.current = content;
+  }, [content, researchDismissed]);
 
   // Save draft to localStorage on change
   const saveDraftTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -191,6 +259,32 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
     <div className="border-t border-border bg-surface px-4 py-3">
       <div className="max-w-3xl mx-auto">
         <AttachmentBar files={pendingFiles} onRemove={removeFile} />
+
+        {/* Research intent suggestion bar */}
+        {showResearchSuggestion && (
+          <div className="flex items-center gap-2 mb-2 px-3 py-2 rounded-xl bg-primary/5 border border-primary/20 text-sm">
+            <Sparkles className="h-4 w-4 text-primary shrink-0" aria-hidden="true" />
+            <span className="text-text-secondary flex-1">
+              {t("research.suggestion", { defaultValue: "This looks like a research task." })}
+            </span>
+            <button
+              onClick={() => {
+                setResearchModalOpen(true);
+              }}
+              className="px-2.5 py-1 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary-dark transition-colors"
+            >
+              {t("research.deepResearch", { defaultValue: "Deep Research" })}
+            </button>
+            <button
+              onClick={() => setResearchDismissed(true)}
+              className="text-text-tertiary hover:text-text-secondary transition-colors p-0.5"
+              aria-label={t("common.dismiss", { defaultValue: "Dismiss" })}
+            >
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          </div>
+        )}
+
         <div
           className="relative flex items-end gap-2 rounded-2xl border border-border bg-surface-secondary px-3 py-2 input-glow transition-colors"
           onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
@@ -288,19 +382,29 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
               </button>
             </div>
           ) : (
-            <button
-              onClick={handleSubmit}
-              disabled={(!content.trim() && pendingFiles.length === 0) || disabled}
-              aria-label={t("messages.send")}
-              className={clsx(
-                "p-2 rounded-xl transition-colors shrink-0 mb-0.5",
-                (content.trim() || pendingFiles.length > 0) && !disabled
-                  ? "bg-primary text-primary-foreground hover:bg-primary-dark"
-                  : "bg-surface-tertiary text-text-tertiary",
-              )}
-            >
-              <Send className="h-4 w-4" aria-hidden="true" />
-            </button>
+            <div className="flex items-center gap-1.5 shrink-0 mb-0.5">
+              <button
+                onClick={() => setResearchModalOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium text-text-secondary hover:text-primary hover:bg-primary/10 border border-border hover:border-primary/30 transition-colors"
+                aria-label={t("research.deepResearch", { defaultValue: "Deep Research" })}
+              >
+                <Microscope className="h-3.5 w-3.5" aria-hidden="true" />
+                {t("research.research", { defaultValue: "Research" })}
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={(!content.trim() && pendingFiles.length === 0) || disabled}
+                aria-label={t("messages.send")}
+                className={clsx(
+                  "p-2 rounded-xl transition-colors",
+                  (content.trim() || pendingFiles.length > 0) && !disabled
+                    ? "bg-primary text-primary-foreground hover:bg-primary-dark"
+                    : "bg-surface-tertiary text-text-tertiary",
+                )}
+              >
+                <Send className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
           )}
         </div>
         <div className="flex items-center justify-between mt-2 text-[10px] text-text-tertiary">
@@ -318,6 +422,21 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
       </div>
 
       <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
+
+      {/* Deep Research modal */}
+      <Dialog
+        open={researchModalOpen}
+        onClose={() => setResearchModalOpen(false)}
+        title={t("research.deepResearch", { defaultValue: "Deep Research" })}
+        size="md"
+      >
+        <NewResearchForm
+          compact
+          isPending={startResearch.isPending}
+          defaultValues={content.trim() ? { query: content.trim() } : undefined}
+          onSubmit={(data) => startResearch.mutate(data)}
+        />
+      </Dialog>
     </div>
   );
 }

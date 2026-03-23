@@ -208,9 +208,9 @@ export function NewResearchForm({
     if (query.trim().length < 3) return;
     onSubmit({
       query: query.trim(),
-      maxSources,
-      maxIterations,
-      outputFormat,
+      maxSources: compact ? 10 : maxSources,
+      maxIterations: compact ? 5 : maxIterations,
+      outputFormat: compact ? "structured" : outputFormat,
       sources,
     });
   };
@@ -384,71 +384,27 @@ export function NewResearchForm({
 
   if (compact) {
     return (
-      <form onSubmit={handleSubmit} className="space-y-2.5 mt-2">
-        <Textarea
-          ref={textareaRef}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t(
-            "research.queryPlaceholder",
-            "What would you like to research in depth?",
-          )}
-          rows={3}
-          className="text-sm resize-none"
-          error={
-            query.length > 0 && query.trim().length < 3
-              ? t("research.queryMinLength", "Query must be at least 3 characters")
-              : undefined
-          }
-        />
-
-        {/* Source chips */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {sources.webSearch && (
-            <SourceChip
-              icon={<Globe className="h-2.5 w-2.5" />}
-              label={t("research.webSearch", "Web")}
-              onRemove={() =>
-                setSources((prev) => ({ ...prev, webSearch: false }))
-              }
-            />
-          )}
-          {selectedCollectionNames.map((name, i) => (
-            <SourceChip
-              key={sources.knowledgeCollectionIds[i]}
-              icon={<Database className="h-2.5 w-2.5" />}
-              label={name}
-              onRemove={() =>
-                toggleCollection(sources.knowledgeCollectionIds[i])
-              }
-            />
-          ))}
-          {selectedFileNames.map((name, i) => (
-            <SourceChip
-              key={sources.fileIds[i]}
-              icon={<FileIcon className="h-2.5 w-2.5" />}
-              label={name}
-              onRemove={() => toggleFile(sources.fileIds[i])}
-            />
-          ))}
-          <button
-            type="button"
-            onClick={() => setSourcePickerOpen((v) => !v)}
-            className={clsx(
-              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-colors",
-              sourcePickerOpen
-                ? "bg-primary/10 text-primary"
-                : "bg-surface-tertiary text-text-secondary hover:text-text hover:bg-surface-secondary",
+      <form onSubmit={handleSubmit} className="flex flex-col mt-2" style={{ minHeight: 420 }}>
+        <div className="space-y-2.5 flex-1">
+          <Textarea
+            ref={textareaRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t(
+              "research.queryPlaceholder",
+              "What would you like to research in depth?",
             )}
-          >
-            <Plus className="h-2.5 w-2.5" />
-            {t("research.addSource", "Source")}
-          </button>
-        </div>
+            rows={3}
+            className="text-sm resize-none"
+            error={
+              query.length > 0 && query.trim().length < 3
+                ? t("research.queryMinLength", "Query must be at least 3 characters")
+                : undefined
+            }
+          />
 
-        {/* Compact source picker dropdown */}
-        {sourcePickerOpen && (
-          <div className="rounded-lg border border-border bg-surface p-3 shadow-lg">
+          {/* Source picker — always visible */}
+          <div className="rounded-lg border border-border bg-surface p-3">
             <Tabs
               tabs={sourceTabs}
               onTabChange={handleTabChange}
@@ -456,70 +412,13 @@ export function NewResearchForm({
               {renderTabContent}
             </Tabs>
           </div>
-        )}
-
-        {/* Advanced settings toggle */}
-        <button
-          type="button"
-          onClick={() => setShowAdvanced((v) => !v)}
-          className="flex items-center gap-1 text-xs text-text-secondary hover:text-text transition-colors"
-        >
-          <Settings2 className="h-3 w-3" aria-hidden="true" />
-          {t("research.advancedSettings", "Advanced settings")}
-          {showAdvanced ? (
-            <ChevronDown className="h-3 w-3" />
-          ) : (
-            <ChevronRight className="h-3 w-3" />
-          )}
-        </button>
-
-        {showAdvanced && (
-          <div className="space-y-3 p-3 rounded-lg bg-surface-secondary border border-border">
-            <div className="grid grid-cols-2 gap-3">
-              <Slider
-                label={t("research.maxSources", "Max Sources")}
-                value={maxSources}
-                onChange={setMaxSources}
-                min={1}
-                max={50}
-                step={1}
-              />
-              <Slider
-                label={t("research.maxIterations", "Max Iterations")}
-                value={maxIterations}
-                onChange={setMaxIterations}
-                min={1}
-                max={10}
-                step={1}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs text-text-tertiary mb-1 flex items-center gap-1">
-                <LayoutList className="h-3 w-3" aria-hidden="true" />
-                {t("research.outputFormat", "Output Format")}
-              </label>
-              <div className="flex gap-2">
-                <FormatButton
-                  active={outputFormat === "structured"}
-                  onClick={() => setOutputFormat("structured")}
-                  label={t("research.formatStructured", "Structured")}
-                />
-                <FormatButton
-                  active={outputFormat === "markdown"}
-                  onClick={() => setOutputFormat("markdown")}
-                  label={t("research.formatMarkdown", "Markdown")}
-                />
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
 
         <Button
           type="submit"
           variant="primary"
           size="sm"
-          className="w-full"
+          className="w-full mt-3"
           disabled={query.trim().length < 3 || isPending}
           loading={isPending}
         >

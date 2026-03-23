@@ -178,7 +178,7 @@ function SearchPage() {
         navigate({ to: `/knowledge/${result.id}` });
         break;
       case "research":
-        navigate({ to: "/research" });
+        navigate({ to: "/research", search: { report: undefined } });
         break;
     }
   };

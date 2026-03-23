@@ -49,6 +49,9 @@ import { MarkdownRenderer } from "../../components/markdown/MarkdownRenderer";
 // ---------------------------------------------------------------------------
 
 export const Route = createFileRoute("/_auth/research")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    report: typeof search.report === "string" ? (search.report as string) : (undefined as string | undefined),
+  }),
   component: () => (
     <ErrorBoundary>
       <ResearchPage />
@@ -113,8 +116,16 @@ interface ResearchReport {
 function ResearchPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [selectedReport, setSelectedReport] = useState<string | null>(null);
+  const { report: reportFromUrl } = Route.useSearch();
+  const [selectedReport, setSelectedReport] = useState<string | null>(reportFromUrl ?? null);
   const [rerunDialogReport, setRerunDialogReport] = useState<ResearchReport | null>(null);
+
+  // Sync URL search param to selected report
+  useEffect(() => {
+    if (reportFromUrl && reportFromUrl !== selectedReport) {
+      setSelectedReport(reportFromUrl);
+    }
+  }, [reportFromUrl]);
 
   // ---- Data fetching ----
 
@@ -196,9 +207,12 @@ function ResearchPage() {
   return (
     <div className="flex flex-col md:flex-row h-full">
       {/* ------------------------------------------------------------------ */}
-      {/* Left panel - History & new research form                            */}
+      {/* Left panel - History & new research form (hidden when report selected via URL) */}
       {/* ------------------------------------------------------------------ */}
-      <div className="w-full md:w-80 max-h-[40vh] md:max-h-none border-b md:border-b-0 md:border-r border-border flex flex-col bg-surface">
+      <div className={clsx(
+        "w-full md:w-80 max-h-[40vh] md:max-h-none border-b md:border-b-0 md:border-r border-border flex flex-col bg-surface",
+        selectedReport && "hidden md:hidden",
+      )}>
         {/* Gradient accent strip */}
         <div className="h-[3px] bg-gradient-to-r from-primary via-primary/70 to-primary/40 shrink-0" />
 

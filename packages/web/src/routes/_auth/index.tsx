@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUp, Lightbulb, Code2, Palette, BarChart3,
-  ArrowRight, RefreshCw, MessageSquare, Paperclip, X, FileText,
+  ArrowRight, RefreshCw, MessageSquare, Paperclip, X, FileText, Microscope,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { CardSkeleton } from "../../components/ui/Skeleton";
@@ -17,6 +17,9 @@ import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { MentionPopup, useMentionTrigger, type MentionCandidate } from "../../components/chat/MentionPopup";
 import { SlashCommand } from "../../components/chat/SlashCommand";
 import { useSlashCommandTrigger } from "../../components/chat/useSlashCommandTrigger";
+import { Dialog } from "../../components/ui/Dialog";
+import { NewResearchForm, type NewResearchFormSubmitData } from "../../components/research/NewResearchForm";
+import { toast } from "../../components/ui/Toast";
 
 export const Route = createFileRoute("/_auth/")({
   component: () => (
@@ -36,11 +39,26 @@ function getGreeting(t: (key: string, fallback: string) => string): string {
 function HomePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const [message, setMessage] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [researchModalOpen, setResearchModalOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const startResearch = useMutation({
+    mutationFn: (data: NewResearchFormSubmitData) =>
+      api.post<any>("/api/research", data),
+    onSuccess: (data: any) => {
+      toast(t("research.started", "Research started"), "success");
+      queryClient.invalidateQueries({ queryKey: ["research-reports"] });
+      setResearchModalOpen(false);
+      navigate({ to: "/research", search: { report: data.id } });
+    },
+    onError: (err: any) =>
+      toast(err.message ?? t("research.startFailed", "Failed to start research"), "error"),
+  });
 
   const greeting = getGreeting(t);
   const firstName = user?.name?.split(" ")[0] || "";
@@ -228,21 +246,31 @@ function HomePage() {
                   <Paperclip className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
-              <button
-                onClick={handleSend}
-                disabled={!message.trim() && pendingFiles.length === 0}
-                className="h-9 w-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground disabled:opacity-25 disabled:cursor-not-allowed hover:bg-primary-dark active:scale-95 transition-all duration-150"
-                aria-label={t("home.send", "Send message")}
-              >
-                <ArrowUp className="h-4 w-4" aria-hidden="true" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setResearchModalOpen(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium text-text-secondary hover:text-primary hover:bg-primary/10 border border-border hover:border-primary/30 transition-colors"
+                  aria-label={t("research.deepResearch", { defaultValue: "Deep Research" })}
+                >
+                  <Microscope className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t("research.research", { defaultValue: "Research" })}
+                </button>
+                <button
+                  onClick={handleSend}
+                  disabled={!message.trim() && pendingFiles.length === 0}
+                  className="h-9 w-9 flex items-center justify-center rounded-xl bg-primary text-primary-foreground disabled:opacity-25 disabled:cursor-not-allowed hover:bg-primary-dark active:scale-95 transition-all duration-150"
+                  aria-label={t("home.send", "Send message")}
+                >
+                  <ArrowUp className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Quick Starters */}
         <div className="mb-12 stagger-children">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
             {quickStarters.map((starter) => {
               const Icon = starter.icon;
               return (
@@ -260,6 +288,17 @@ function HomePage() {
                 </button>
               );
             })}
+            <button
+              onClick={() => setResearchModalOpen(true)}
+              className="flex flex-col items-center gap-2.5 p-4 rounded-2xl bg-surface-secondary border border-border hover:border-primary/30 transition-all text-center group hover-lift"
+            >
+              <div className="h-10 w-10 rounded-xl bg-primary/8 flex items-center justify-center">
+                <Microscope className="h-5 w-5 text-primary" aria-hidden="true" />
+              </div>
+              <span className="text-xs font-medium text-text-secondary group-hover:text-text transition-colors leading-tight">
+                {t("home.starterResearch", "Deep Research")}
+              </span>
+            </button>
           </div>
         </div>
 
@@ -320,6 +359,21 @@ function HomePage() {
           )}
         </div>
       </div>
+
+      {/* Deep Research modal */}
+      <Dialog
+        open={researchModalOpen}
+        onClose={() => setResearchModalOpen(false)}
+        title={t("research.deepResearch", { defaultValue: "Deep Research" })}
+        size="md"
+      >
+        <NewResearchForm
+          compact
+          isPending={startResearch.isPending}
+          defaultValues={message.trim() ? { query: message.trim() } : undefined}
+          onSubmit={(data) => startResearch.mutate(data)}
+        />
+      </Dialog>
     </div>
   );
 }
