@@ -76,7 +76,7 @@ function AgentBuilderPage() {
       // Attach selected knowledge collections
       if (newId && selectedCollectionIds.length > 0) {
         const knowledgeResults = await Promise.allSettled(
-          selectedCollectionIds.map((collectionId) => api.post(`/api/agents/${newId}/knowledge`, { collectionId })),
+          selectedCollectionIds.map((collectionId) => api.post(`/api/agents/${newId}/knowledge`, { knowledgeCollectionId: collectionId })),
         );
         const failed = knowledgeResults.filter((r) => r.status === "rejected").length;
         if (failed > 0) {
@@ -559,75 +559,96 @@ function KnowledgeSelector({
   const selected = allCollections.filter((c) => selectedCollectionIds.includes(c.id));
   const available = allCollections.filter((c) => !selectedCollectionIds.includes(c.id));
 
+  const statusColor = (status: string) => {
+    if (status === "ready" || status === "indexed") return "text-success";
+    if (status === "indexing" || status === "pending") return "text-warning";
+    return "text-text-tertiary";
+  };
+
   if (isLoading) {
     return (
-      <div className="max-w-2xl space-y-3">
+      <div className="max-w-3xl space-y-3">
         {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-14 w-full rounded-lg" />
+          <Skeleton key={i} className="h-16 w-full rounded-xl" />
         ))}
       </div>
     );
   }
 
-  if (allCollections.length === 0) {
-    return (
-      <div className="max-w-2xl text-center py-12">
-        <BookOpen className="h-12 w-12 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
-        <h3 className="text-lg font-medium text-text mb-1">{t("agents.noCollectionsAvailable", { defaultValue: "No knowledge collections" })}</h3>
-        <p className="text-sm text-text-secondary">
-          {t("agents.noCollectionsAvailableDesc", { defaultValue: "Create a knowledge collection first, then attach it here." })}
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-2xl space-y-6">
-      {selected.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-text mb-3">
-            {t("agents.selectedCollections", { defaultValue: "Selected Collections" })} ({selected.length})
-          </h3>
+    <div className="max-w-3xl space-y-8">
+      {/* Selected */}
+      <div>
+        <h3 className="text-sm font-semibold text-text mb-3">
+          {t("agents.selectedCollections", { defaultValue: "Selected" })}
+          <span className="ml-1.5 text-text-tertiary font-normal">({selected.length})</span>
+        </h3>
+        {selected.length === 0 ? (
+          <div className="flex flex-col items-center py-8 rounded-xl border border-dashed border-border">
+            <BookOpen className="h-8 w-8 text-text-tertiary mb-2" aria-hidden="true" />
+            <p className="text-sm text-text-secondary">{t("agents.noKnowledgeSelected", { defaultValue: "No collections selected" })}</p>
+            <p className="text-xs text-text-tertiary">{t("agents.knowledgeHint", { defaultValue: "Connect collections below to give this agent access to your documents." })}</p>
+          </div>
+        ) : (
           <div className="space-y-2">
             {selected.map((c) => (
-              <div key={c.id} className="flex items-center justify-between p-3 rounded-lg bg-surface-secondary border border-border">
-                <div className="flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-green-400" aria-hidden="true" />
-                  <div>
-                    <span className="text-sm text-text font-medium">{c.name}</span>
-                    {c.description && <p className="text-xs text-text-tertiary">{c.description}</p>}
+              <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl bg-surface-secondary border border-border group">
+                <div className="h-9 w-9 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
+                  <BookOpen className="h-4 w-4 text-emerald-400" aria-hidden="true" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text truncate">{c.name}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {c.status && <span className={`text-[10px] font-medium ${statusColor(c.status)}`}>{c.status}</span>}
+                    {c.description && <span className="text-[10px] text-text-tertiary truncate">{c.description}</span>}
                   </div>
                 </div>
-                <button onClick={() => onToggle(c.id)} className="text-xs text-danger hover:underline">
-                  {t("agents.disconnect", { defaultValue: "Disconnect" })}
+                <button
+                  onClick={() => onToggle(c.id)}
+                  className="px-2 py-1 rounded-lg text-xs text-text-tertiary hover:text-danger hover:bg-danger/10 transition-colors opacity-0 group-hover:opacity-100"
+                >
+                  {t("common.remove", { defaultValue: "Remove" })}
                 </button>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {available.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-text mb-3">
-            {t("agents.availableCollections", { defaultValue: "Available Collections" })}
-          </h3>
+      {/* Available */}
+      <div>
+        <h3 className="text-sm font-semibold text-text mb-3">
+          {t("agents.availableCollections", { defaultValue: "Available" })}
+          <span className="ml-1.5 text-text-tertiary font-normal">({available.length})</span>
+        </h3>
+        {available.length === 0 && allCollections.length === 0 ? (
+          <div className="flex flex-col items-center py-8 rounded-xl border border-dashed border-border">
+            <p className="text-sm text-text-tertiary">{t("agents.noCollections", { defaultValue: "No knowledge collections exist yet." })}</p>
+          </div>
+        ) : available.length === 0 ? (
+          <p className="text-xs text-text-tertiary py-2">{t("agents.allSelected", { defaultValue: "All collections are already selected." })}</p>
+        ) : (
           <div className="space-y-2">
             {available.map((c) => (
-              <div key={c.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
-                <div>
-                  <span className="text-sm text-text font-medium">{c.name}</span>
-                  {c.description && <p className="text-xs text-text-tertiary">{c.description}</p>}
+              <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl border border-border hover:border-border-strong transition-colors group">
+                <div className="h-9 w-9 rounded-lg bg-surface-tertiary flex items-center justify-center shrink-0">
+                  <BookOpen className="h-4 w-4 text-text-tertiary" aria-hidden="true" />
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => onToggle(c.id)}>
-                  <Plus className="h-3 w-3 mr-1" aria-hidden="true" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text truncate">{c.name}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {c.status && <span className={`text-[10px] font-medium ${statusColor(c.status)}`}>{c.status}</span>}
+                    {c.description && <span className="text-[10px] text-text-tertiary truncate">{c.description}</span>}
+                  </div>
+                </div>
+                <Button variant="secondary" size="sm" onClick={() => onToggle(c.id)}>
                   {t("agents.connect", { defaultValue: "Connect" })}
                 </Button>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

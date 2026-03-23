@@ -628,7 +628,9 @@ function AgentToolsTab({ agentId }: { agentId: string }) {
 
 function AgentKnowledgeTab({ agentId }: { agentId: string }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
+
   const { data: collections } = useQuery({
     queryKey: ["knowledge"],
     queryFn: () => api.get<any>("/api/knowledge"),
@@ -641,7 +643,7 @@ function AgentKnowledgeTab({ agentId }: { agentId: string }) {
 
   const attachKnowledge = useMutation({
     mutationFn: (collectionId: string) =>
-      api.post(`/api/agents/${agentId}/knowledge`, { collectionId }),
+      api.post(`/api/agents/${agentId}/knowledge`, { knowledgeCollectionId: collectionId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agents", agentId, "knowledge"] });
       toast.success(t("agents.knowledgeConnected", { defaultValue: "Knowledge collection connected" }));
@@ -659,17 +661,32 @@ function AgentKnowledgeTab({ agentId }: { agentId: string }) {
     onError: (err: any) => toast.error(err.message ?? t("agents.knowledgeDisconnectFailed", { defaultValue: "Failed to disconnect knowledge" })),
   });
 
-  const attached = (agentKnowledge as any)?.data ?? [];
-  const allCollections = (collections as any)?.data ?? [];
-  const available = allCollections.filter(
-    (c: any) => !attached.some((ac: any) => ac.collectionId === c.id),
-  );
+  const allCollections: any[] = (collections as any)?.data ?? [];
+  const attachedLinks: any[] = (agentKnowledge as any)?.data ?? [];
+
+  // Build a lookup map so we can resolve names for attached collections
+  const collectionMap = new Map(allCollections.map((c: any) => [c.id, c]));
+
+  // Resolve attached links to full collection objects
+  const attachedIds = new Set(attachedLinks.map((link: any) => link.knowledgeCollectionId ?? link.collectionId));
+  const attached = attachedLinks.map((link: any) => {
+    const cId = link.knowledgeCollectionId ?? link.collectionId;
+    const full = collectionMap.get(cId);
+    return { ...link, _collection: full, _id: cId };
+  });
+  const available = allCollections.filter((c: any) => !attachedIds.has(c.id));
+
+  const statusColor = (status: string) => {
+    if (status === "ready" || status === "indexed") return "text-success";
+    if (status === "indexing" || status === "pending") return "text-warning";
+    return "text-text-tertiary";
+  };
 
   if (knowledgeLoading) {
     return (
-      <div className="max-w-2xl space-y-3">
+      <div className="max-w-3xl space-y-3">
         {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-14 w-full rounded-lg" />
+          <Skeleton key={i} className="h-16 w-full rounded-xl" />
         ))}
       </div>
     );
@@ -688,49 +705,114 @@ function AgentKnowledgeTab({ agentId }: { agentId: string }) {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-3xl space-y-8">
+      {/* Connected section */}
       <div>
-        <h3 className="text-sm font-semibold text-text mb-3">{t("agents.connectedCollections", { defaultValue: "Connected Collections" })} ({attached.length})</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-text">
+            {t("agents.connectedCollections", { defaultValue: "Connected" })}
+            <span className="ml-1.5 text-text-tertiary font-normal">({attached.length})</span>
+          </h3>
+        </div>
+
         {attached.length === 0 ? (
-          <p className="text-sm text-text-tertiary py-4">{t("agents.noKnowledge", { defaultValue: "No knowledge collections connected." })}</p>
+          <div className="flex flex-col items-center py-8 rounded-xl border border-dashed border-border">
+            <BookOpen className="h-8 w-8 text-text-tertiary mb-2" aria-hidden="true" />
+            <p className="text-sm text-text-secondary mb-1">{t("agents.noKnowledge", { defaultValue: "No knowledge collections connected" })}</p>
+            <p className="text-xs text-text-tertiary">{t("agents.knowledgeHint", { defaultValue: "Connect collections below to give this agent access to your documents." })}</p>
+          </div>
         ) : (
           <div className="space-y-2">
-            {attached.map((c: any) => (
-              <div key={c.id} className="flex items-center justify-between p-3 rounded-lg bg-surface-secondary border border-border">
-                <div className="flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-green-400" aria-hidden="true" />
-                  <span className="text-sm text-text font-medium">{c.name ?? c.collectionId}</span>
+            {attached.map((link: any) => {
+              const c = link._collection;
+              return (
+                <div key={link.id} className="flex items-center gap-3 p-3 rounded-xl bg-surface-secondary border border-border group">
+                  <div className="h-9 w-9 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
+                    <BookOpen className="h-4 w-4 text-emerald-400" aria-hidden="true" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-text truncate">{c?.name ?? link._id}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {c?.status && (
+                        <span className={`text-[10px] font-medium ${statusColor(c.status)}`}>{c.status}</span>
+                      )}
+                      {c?.description && (
+                        <span className="text-[10px] text-text-tertiary truncate">{c.description}</span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => detachKnowledge.mutate(link._id)}
+                    className="px-2 py-1 rounded-lg text-xs text-text-tertiary hover:text-danger hover:bg-danger/10 transition-colors opacity-0 group-hover:opacity-100"
+                  >
+                    {t("agents.disconnect", { defaultValue: "Disconnect" })}
+                  </button>
                 </div>
-                <button
-                  onClick={() => detachKnowledge.mutate(c.collectionId ?? c.id)}
-                  className="text-xs text-danger hover:underline cursor-pointer"
-                >
-                  {t("agents.disconnect", { defaultValue: "Disconnect" })}
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
-      {available.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-text mb-3">{t("agents.availableCollections", { defaultValue: "Available Collections" })}</h3>
+      {/* Available section */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-text">
+            {t("agents.availableCollections", { defaultValue: "Available" })}
+            <span className="ml-1.5 text-text-tertiary font-normal">({available.length})</span>
+          </h3>
+          <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/knowledge" })}>
+            {t("agents.manageCollections", { defaultValue: "Manage collections" })}
+          </Button>
+        </div>
+
+        {available.length === 0 ? (
+          <div className="flex flex-col items-center py-8 rounded-xl border border-dashed border-border">
+            <p className="text-sm text-text-tertiary mb-3">
+              {allCollections.length === 0
+                ? t("agents.noCollections", { defaultValue: "No knowledge collections exist yet." })
+                : t("agents.allConnected", { defaultValue: "All collections are already connected." })}
+            </p>
+            {allCollections.length === 0 && (
+              <Button variant="secondary" size="sm" onClick={() => navigate({ to: "/knowledge" })}>
+                {t("agents.createCollection", { defaultValue: "Create a collection" })}
+              </Button>
+            )}
+          </div>
+        ) : (
           <div className="space-y-2">
             {available.map((c: any) => (
-              <div key={c.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
-                <div>
-                  <span className="text-sm text-text font-medium">{c.name}</span>
-                  {c.description && <p className="text-xs text-text-tertiary">{c.description}</p>}
+              <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl border border-border hover:border-border-strong transition-colors group">
+                <div className="h-9 w-9 rounded-lg bg-surface-tertiary flex items-center justify-center shrink-0">
+                  <BookOpen className="h-4 w-4 text-text-tertiary" aria-hidden="true" />
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => attachKnowledge.mutate(c.id)}>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text truncate">{c.name}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {c.status && (
+                      <span className={`text-[10px] font-medium ${statusColor(c.status)}`}>{c.status}</span>
+                    )}
+                    {c.description && (
+                      <span className="text-[10px] text-text-tertiary truncate">{c.description}</span>
+                    )}
+                    {c.visibility && c.visibility !== "private" && (
+                      <span className="text-[10px] text-text-tertiary">{c.visibility}</span>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => attachKnowledge.mutate(c.id)}
+                  disabled={attachKnowledge.isPending}
+                >
                   {t("agents.connect", { defaultValue: "Connect" })}
                 </Button>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
