@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { clsx } from "clsx";
 import {
-  Archive, Pin, Trash2, PanelLeft, PanelLeftClose, BookOpen,
+  Archive, Pin, Trash2, PanelLeft, PanelLeftClose, BookOpen, Bot,
   Settings, ShieldCheck,
   HelpCircle, Filter, Search, Microscope, Compass,
   CheckSquare, Square, FolderOpen, MessageSquare, Zap, HardDrive, Plus,
@@ -307,10 +307,11 @@ export function Sidebar() {
             icon={Library}
             label={t("nav.library", { defaultValue: "Library" })}
             collapsed={!sidebarOpen}
-            routes={["/knowledge", "/files"]}
+            routes={["/knowledge", "/files", "/agents"]}
           >
             <SidebarLink icon={BookOpen} label={t("nav.knowledge", { defaultValue: "Knowledge" })} to="/knowledge" indent />
             <SidebarLink icon={HardDrive} label={t("nav.files", { defaultValue: "Files" })} to="/files" indent />
+            <SidebarLink icon={Bot} label={t("nav.agents", { defaultValue: "Agents" })} to="/agents" indent />
           </SidebarCollapsible>
         </div>
 

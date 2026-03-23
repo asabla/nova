@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import {
   Compass,
   MessageSquare,
@@ -11,8 +12,12 @@ import {
   BarChart3,
   ArrowRight,
   Sparkles,
+  Bot,
+  Star,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
+import { Badge } from "../../components/ui/Badge";
+import { api } from "../../lib/api";
 
 export const Route = createFileRoute("/_auth/explore")({
   component: ExplorePage,
@@ -22,13 +27,13 @@ export const Route = createFileRoute("/_auth/explore")({
 // Data
 // ---------------------------------------------------------------------------
 
-type Category = "all" | "general" | "code" | "research" | "creative" | "analysis";
+type Category = "all" | "agents" | "general" | "code" | "research" | "creative" | "analysis";
 
 interface SampleConversation {
   id: string;
   title: string;
   description: string;
-  category: Exclude<Category, "all">;
+  category: Exclude<Category, "all" | "agents">;
   tags: string[];
   starterMessage: string;
   icon: React.ElementType;
@@ -38,6 +43,7 @@ interface SampleConversation {
 
 const categories: { id: Category; label: string; icon: React.ElementType }[] = [
   { id: "all", label: "All", icon: Compass },
+  { id: "agents", label: "Agents", icon: Bot },
   { id: "general", label: "General", icon: MessageSquare },
   { id: "code", label: "Code", icon: Code2 },
   { id: "research", label: "Research", icon: Search },
@@ -217,6 +223,55 @@ const sampleConversations: SampleConversation[] = [
 // Components
 // ---------------------------------------------------------------------------
 
+function AgentCard({
+  agent,
+  onChat,
+  onView,
+}: {
+  agent: any;
+  onChat: (agent: any) => void;
+  onView: (agent: any) => void;
+}) {
+  return (
+    <div className="flex flex-col p-4 rounded-xl bg-surface-secondary border border-border hover:border-border-strong transition-colors group">
+      <div className="flex items-start gap-3 mb-3">
+        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+          <Bot className="h-5 w-5 text-primary" aria-hidden="true" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-semibold text-text truncate">{agent.name}</h3>
+          {agent.visibility && (
+            <Badge variant={agent.visibility === "public" ? "primary" : "default"} className="mt-0.5">
+              {agent.visibility}
+            </Badge>
+          )}
+        </div>
+      </div>
+      {agent.description && (
+        <p className="text-xs text-text-tertiary line-clamp-2 mb-3 flex-1">{agent.description}</p>
+      )}
+      <div className="flex items-center gap-2 mt-auto">
+        {typeof agent.usageCount === "number" && (
+          <div className="flex items-center gap-1 mr-auto">
+            <Star className="h-3 w-3 text-text-tertiary" aria-hidden="true" />
+            <span className="text-[10px] text-text-tertiary">{agent.usageCount}</span>
+          </div>
+        )}
+        <button
+          onClick={() => onView(agent)}
+          className="text-xs text-text-tertiary hover:text-text transition-colors"
+        >
+          View
+        </button>
+        <Button variant="ghost" size="sm" onClick={() => onChat(agent)}>
+          <MessageSquare className="h-3 w-3 mr-1" aria-hidden="true" />
+          Chat
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function ConversationCard({
   conversation,
   onStart,
@@ -275,10 +330,19 @@ function ExplorePage() {
   const [activeCategory, setActiveCategory] = useState<Category>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Fetch published agents
+  const { data: agentsData } = useQuery({
+    queryKey: ["agents-marketplace", "explore"],
+    queryFn: () => api.get<any>("/api/agents/marketplace/browse"),
+    staleTime: 60_000,
+  });
+
+  const publishedAgents: any[] = (agentsData as any)?.data ?? [];
+
   const filteredConversations = useMemo(() => {
     let result = sampleConversations;
 
-    if (activeCategory !== "all") {
+    if (activeCategory !== "all" && activeCategory !== "agents") {
       result = result.filter((c) => c.category === activeCategory);
     }
 
@@ -295,14 +359,37 @@ function ExplorePage() {
     return result;
   }, [activeCategory, searchQuery]);
 
+  const filteredAgents = useMemo(() => {
+    if (activeCategory !== "all" && activeCategory !== "agents") return [];
+    if (!searchQuery) return publishedAgents.slice(0, 6);
+    const q = searchQuery.toLowerCase();
+    return publishedAgents
+      .filter(
+        (a) =>
+          a.name?.toLowerCase().includes(q) ||
+          a.description?.toLowerCase().includes(q),
+      )
+      .slice(0, 6);
+  }, [publishedAgents, activeCategory, searchQuery]);
+
+  const showAgents = activeCategory === "all" || activeCategory === "agents";
+  const showConversations = activeCategory !== "agents";
+
   const handleStartConversation = (starterMessage: string) => {
-    // Store the starter message so the new conversation page can pick it up
     try {
       sessionStorage.setItem("nova:starter-message", starterMessage);
     } catch {
       // sessionStorage unavailable
     }
     navigate({ to: "/conversations/new" });
+  };
+
+  const handleChatWithAgent = (agent: any) => {
+    navigate({ to: "/conversations/new", search: { agentId: agent.id } });
+  };
+
+  const handleViewAgent = (agent: any) => {
+    navigate({ to: `/agents/${agent.id}` });
   };
 
   return (
@@ -317,7 +404,7 @@ function ExplorePage() {
           </div>
           <h1 className="text-2xl font-bold text-text mb-2">{t("explore.title", "Explore")}</h1>
           <p className="text-sm text-text-secondary max-w-md mx-auto">
-            {t("explore.subtitle", "Discover what NOVA can do. Browse sample conversations and start one with a single click.")}
+            {t("explore.subtitle", "Discover agents and sample conversations to get started with NOVA.")}
           </p>
         </div>
 
@@ -328,7 +415,7 @@ function ExplorePage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t("explore.searchPlaceholder", "Search conversations...")}
+            placeholder={t("explore.searchPlaceholder", "Search agents and conversations...")}
             className="w-full h-10 pl-10 pr-4 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary transition-colors"
           />
         </div>
@@ -355,32 +442,82 @@ function ExplorePage() {
           })}
         </div>
 
-        {/* Grid */}
-        {filteredConversations.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredConversations.map((conv) => (
-              <ConversationCard
-                key={conv.id}
-                conversation={conv}
-                onStart={handleStartConversation}
-              />
-            ))}
+        {/* Featured Agents */}
+        {showAgents && filteredAgents.length > 0 && (
+          <div className="mb-10">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-text">
+                {t("explore.featuredAgents", "Agents")}
+              </h2>
+              <button
+                onClick={() => navigate({ to: "/agents/marketplace" })}
+                className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-dark transition-colors"
+              >
+                {t("explore.viewAllAgents", "View all")}
+                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredAgents.map((agent: any) => (
+                <AgentCard
+                  key={agent.id}
+                  agent={agent}
+                  onChat={handleChatWithAgent}
+                  onView={handleViewAgent}
+                />
+              ))}
+            </div>
           </div>
-        ) : (
+        )}
+
+        {/* Sample Conversations */}
+        {showConversations && (
+          <>
+            {showAgents && filteredAgents.length > 0 && (
+              <h2 className="text-lg font-semibold text-text mb-4">
+                {t("explore.sampleConversations", "Get Started")}
+              </h2>
+            )}
+
+            {filteredConversations.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredConversations.map((conv) => (
+                  <ConversationCard
+                    key={conv.id}
+                    conversation={conv}
+                    onStart={handleStartConversation}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16">
+                <Search className="h-8 w-8 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
+                <p className="text-sm text-text-secondary">
+                  {t("explore.noResults", "No results matching your search")}
+                </p>
+                <button
+                  onClick={() => {
+                    setSearchQuery("");
+                    setActiveCategory("all");
+                  }}
+                  className="text-xs text-primary hover:text-primary-dark mt-2 underline"
+                >
+                  {t("explore.clearFilters", "Clear filters")}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Empty state for agents-only filter with no agents */}
+        {activeCategory === "agents" && filteredAgents.length === 0 && (
           <div className="text-center py-16">
-            <Search className="h-8 w-8 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
+            <Bot className="h-8 w-8 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
             <p className="text-sm text-text-secondary">
-              {t("explore.noResults", "No conversations matching your search")}
+              {searchQuery
+                ? t("explore.noAgentsSearch", "No agents matching your search")
+                : t("explore.noAgentsPublished", "No published agents yet")}
             </p>
-            <button
-              onClick={() => {
-                setSearchQuery("");
-                setActiveCategory("all");
-              }}
-              className="text-xs text-primary hover:text-primary-dark mt-2 underline"
-            >
-              {t("explore.clearFilters", "Clear filters")}
-            </button>
           </div>
         )}
 
@@ -389,13 +526,22 @@ function ExplorePage() {
           <p className="text-sm text-text-tertiary mb-3">
             {t("explore.ctaText", "Don't see what you're looking for?")}
           </p>
-          <Button
-            variant="primary"
-            onClick={() => navigate({ to: "/conversations/new" })}
-          >
-            <MessageSquare className="h-4 w-4" aria-hidden="true" />
-            {t("explore.startBlank", "Start a blank conversation")}
-          </Button>
+          <div className="flex items-center justify-center gap-3">
+            <Button
+              variant="primary"
+              onClick={() => navigate({ to: "/conversations/new" })}
+            >
+              <MessageSquare className="h-4 w-4" aria-hidden="true" />
+              {t("explore.startBlank", "Start a blank conversation")}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => navigate({ to: "/agents/new" })}
+            >
+              <Bot className="h-4 w-4" aria-hidden="true" />
+              {t("explore.createAgent", "Create an agent")}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

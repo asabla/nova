@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Bot, ArrowLeft, Save, Trash2, Copy, Share2, History, TestTube, Settings2, Wrench, BookOpen, Brain, RefreshCw } from "lucide-react";
+import { Bot, ArrowLeft, Save, Trash2, Copy, Share2, History, TestTube, Settings2, Wrench, BookOpen, Brain, RefreshCw, MessageSquare } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
@@ -11,6 +11,7 @@ import { Dialog } from "../../components/ui/Dialog";
 import { toast } from "../../components/ui/Toast";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { api } from "../../lib/api";
+import { queryKeys } from "../../lib/query-keys";
 import { formatDateTime } from "../../lib/format";
 
 export const Route = createFileRoute("/_auth/agents/$id")({
@@ -34,10 +35,19 @@ function AgentDetailPage() {
     name: "",
     description: "",
     systemPrompt: "",
+    modelId: "",
     visibility: "private",
     toolApprovalMode: "always-ask",
     memoryScope: "per-user",
   });
+
+  const { data: modelsData } = useQuery({
+    queryKey: queryKeys.models.all,
+    queryFn: () => api.get<any>("/api/models"),
+    staleTime: 60_000,
+  });
+
+  const models = (modelsData as any)?.data ?? [];
 
   useEffect(() => {
     if (agent) {
@@ -45,6 +55,7 @@ function AgentDetailPage() {
         name: agent.name ?? "",
         description: agent.description ?? "",
         systemPrompt: agent.systemPrompt ?? "",
+        modelId: agent.modelId ?? "",
         visibility: agent.visibility ?? "private",
         toolApprovalMode: agent.toolApprovalMode ?? "always-ask",
         memoryScope: agent.memoryScope ?? "per-user",
@@ -189,6 +200,9 @@ function AgentDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={() => navigate({ to: "/conversations/new", search: { agentId: id } })}>
+            <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" /> {t("agents.chat", { defaultValue: "Chat" })}
+          </Button>
           <Button variant="ghost" size="sm" onClick={() => cloneMutation.mutate()}>
             <Copy className="h-3.5 w-3.5" aria-hidden="true" /> {t("agents.clone", { defaultValue: "Clone" })}
           </Button>
@@ -242,6 +256,15 @@ function AgentDetailPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <Select
+                label={t("agents.model", { defaultValue: "Model" })}
+                value={form.modelId}
+                onChange={(value) => setForm({ ...form, modelId: value })}
+                options={[
+                  { value: "", label: t("agents.defaultModel", { defaultValue: "Default" }) },
+                  ...models.map((m: any) => ({ value: m.modelIdExternal ?? m.id, label: m.name })),
+                ]}
+              />
+              <Select
                 label={t("agents.visibility", { defaultValue: "Visibility" })}
                 value={form.visibility}
                 onChange={(value) => setForm({ ...form, visibility: value })}
@@ -252,6 +275,9 @@ function AgentDetailPage() {
                   { value: "public", label: t("agents.visibilityPublic", { defaultValue: "Public" }) },
                 ]}
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <Select
                 label={t("agents.toolApproval", { defaultValue: "Tool Approval" })}
                 value={form.toolApprovalMode}
@@ -262,18 +288,17 @@ function AgentDetailPage() {
                   { value: "never", label: t("agents.toolNever", { defaultValue: "Never allow" }) },
                 ]}
               />
+              <Select
+                label={t("agents.memoryScope", { defaultValue: "Memory Scope" })}
+                value={form.memoryScope}
+                onChange={(value) => setForm({ ...form, memoryScope: value })}
+                options={[
+                  { value: "per-user", label: t("agents.memoryPerUser", { defaultValue: "Per user" }) },
+                  { value: "per-conversation", label: t("agents.memoryPerConversation", { defaultValue: "Per conversation" }) },
+                  { value: "global", label: t("agents.memoryGlobal", { defaultValue: "Global" }) },
+                ]}
+              />
             </div>
-
-            <Select
-              label={t("agents.memoryScope", { defaultValue: "Memory Scope" })}
-              value={form.memoryScope}
-              onChange={(value) => setForm({ ...form, memoryScope: value })}
-              options={[
-                { value: "per-user", label: t("agents.memoryPerUser", { defaultValue: "Per user" }) },
-                { value: "per-conversation", label: t("agents.memoryPerConversation", { defaultValue: "Per conversation" }) },
-                { value: "global", label: t("agents.memoryGlobal", { defaultValue: "Global" }) },
-              ]}
-            />
 
             {agent && (
               <div className="pt-4 border-t border-border text-xs text-text-tertiary space-y-1">

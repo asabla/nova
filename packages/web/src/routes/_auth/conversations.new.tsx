@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Sparkles, FileText, Loader2 } from "lucide-react";
+import { Sparkles, FileText, Loader2, Bot } from "lucide-react";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { MessageInput } from "../../components/chat/MessageInput";
@@ -20,7 +20,21 @@ function NewConversationPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedModel, setSelectedModel] = useState("");
+
+  // Read agentId from URL search params (e.g. /conversations/new?agentId=xxx)
+  const agentId = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("agentId") ?? undefined
+    : undefined;
   const [isCreating, setIsCreating] = useState(false);
+
+  const { data: agentData } = useQuery({
+    queryKey: ["agents", agentId],
+    queryFn: () => api.get<any>(`/api/agents/${agentId}`),
+    enabled: !!agentId,
+    staleTime: 60_000,
+  });
+
+  const agent = agentId ? (agentData as any) : null;
 
   const { data: modelsData } = useQuery({
     queryKey: queryKeys.models.all,
@@ -59,7 +73,10 @@ function NewConversationPage() {
     try {
       const payload: any = {};
       if (selectedModel) payload.modelId = selectedModel;
+      else if (agent?.modelId) payload.modelId = agent.modelId;
       if (systemPrompt) payload.systemPrompt = systemPrompt;
+      else if (agent?.systemPrompt) payload.systemPrompt = agent.systemPrompt;
+      if (agentId) payload.agentId = agentId;
 
       const conversation = await api.post<{ id: string }>("/api/conversations", payload);
 
@@ -87,7 +104,7 @@ function NewConversationPage() {
       toast(t("conversations.createFailed", "Failed to create conversation"), "error");
       setIsCreating(false);
     }
-  }, [navigate, queryClient, selectedModel, isCreating, t, uploadSingleFile]);
+  }, [navigate, queryClient, selectedModel, isCreating, t, uploadSingleFile, agent, agentId]);
 
   // Check for starter message from explore page or session storage
   useEffect(() => {
@@ -119,11 +136,15 @@ function NewConversationPage() {
         <div className="text-center max-w-lg">
           <div className="flex justify-center mb-4">
             <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center">
-              <Sparkles className="h-6 w-6 text-primary" />
+              {agent ? <Bot className="h-6 w-6 text-primary" /> : <Sparkles className="h-6 w-6 text-primary" />}
             </div>
           </div>
-          <h2 className="text-xl font-semibold text-text mb-2">{t("conversations.newTitle", "New Conversation")}</h2>
-          <p className="text-sm text-text-secondary mb-4">{t("conversations.newDescription", "Start a conversation with an AI assistant")}</p>
+          <h2 className="text-xl font-semibold text-text mb-2">
+            {agent ? agent.name : t("conversations.newTitle", "New Conversation")}
+          </h2>
+          <p className="text-sm text-text-secondary mb-4">
+            {agent?.description ?? t("conversations.newDescription", "Start a conversation with an AI assistant")}
+          </p>
 
           {/* Model selector */}
           <div className="flex flex-col items-center gap-2 mb-6">

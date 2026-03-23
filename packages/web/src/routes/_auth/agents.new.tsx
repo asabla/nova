@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Bot, ArrowLeft, Save, TestTube, Copy, Settings2, Wrench, BookOpen, Brain } from "lucide-react";
+import { Bot, ArrowLeft, Save, TestTube, Settings2, Wrench, BookOpen, Brain, Plus, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Textarea } from "../../components/ui/Textarea";
 import { Select } from "../../components/ui/Select";
+import { Skeleton } from "../../components/ui/Skeleton";
 import { toast } from "../../components/ui/Toast";
 import { api } from "../../lib/api";
+import { queryKeys } from "../../lib/query-keys";
 
 export const Route = createFileRoute("/_auth/agents/new")({
   component: AgentBuilderPage,
@@ -29,9 +32,19 @@ function AgentBuilderPage() {
     maxSteps: 10,
     timeoutSeconds: 300,
   });
+  const [selectedToolIds, setSelectedToolIds] = useState<string[]>([]);
+  const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>([]);
   const [testPrompt, setTestPrompt] = useState("");
   const [testResult, setTestResult] = useState("");
   const [testing, setTesting] = useState(false);
+
+  const { data: modelsData } = useQuery({
+    queryKey: queryKeys.models.all,
+    queryFn: () => api.get<any>("/api/models"),
+    staleTime: 60_000,
+  });
+
+  const models = (modelsData as any)?.data ?? [];
 
   const handleSave = async () => {
     if (!agent.name.trim()) {
@@ -41,9 +54,33 @@ function AgentBuilderPage() {
 
     setSaving(true);
     try {
-      const result = await api.post("/api/agents", agent);
+      const result = await api.post<any>("/api/agents", agent);
+      const newId = result.id ?? result.data?.id;
+
+      // Attach selected tools
+      if (newId && selectedToolIds.length > 0) {
+        const toolResults = await Promise.allSettled(
+          selectedToolIds.map((toolId) => api.post(`/api/agents/${newId}/tools`, { toolId })),
+        );
+        const failed = toolResults.filter((r) => r.status === "rejected").length;
+        if (failed > 0) {
+          toast.warning(t("agents.someToolsFailed", { defaultValue: `${failed} tool(s) failed to attach`, count: failed }));
+        }
+      }
+
+      // Attach selected knowledge collections
+      if (newId && selectedCollectionIds.length > 0) {
+        const knowledgeResults = await Promise.allSettled(
+          selectedCollectionIds.map((collectionId) => api.post(`/api/agents/${newId}/knowledge`, { collectionId })),
+        );
+        const failed = knowledgeResults.filter((r) => r.status === "rejected").length;
+        if (failed > 0) {
+          toast.warning(t("agents.someKnowledgeFailed", { defaultValue: `${failed} collection(s) failed to attach`, count: failed }));
+        }
+      }
+
       toast.success(t("agents.created", { defaultValue: "Agent created successfully" }));
-      navigate({ to: "/agents" });
+      navigate({ to: newId ? `/agents/${newId}` : "/agents" });
     } catch (err: any) {
       toast.error(err.message ?? t("agents.createFailed", { defaultValue: "Failed to create agent" }));
     } finally {
@@ -73,8 +110,8 @@ function AgentBuilderPage() {
 
   const tabs = [
     { id: "config" as const, label: t("agents.tabs.config", { defaultValue: "Configuration" }), icon: Settings2 },
-    { id: "tools" as const, label: t("agents.tabs.tools", { defaultValue: "Tools" }), icon: Wrench },
-    { id: "knowledge" as const, label: t("agents.tabs.knowledge", { defaultValue: "Knowledge" }), icon: BookOpen },
+    { id: "tools" as const, label: t("agents.tabs.tools", { defaultValue: "Tools" }), icon: Wrench, count: selectedToolIds.length },
+    { id: "knowledge" as const, label: t("agents.tabs.knowledge", { defaultValue: "Knowledge" }), icon: BookOpen, count: selectedCollectionIds.length },
     { id: "memory" as const, label: t("agents.tabs.memory", { defaultValue: "Memory" }), icon: Brain },
     { id: "test" as const, label: t("agents.tabs.test", { defaultValue: "Test" }), icon: TestTube },
   ];
@@ -132,6 +169,11 @@ function AgentBuilderPage() {
           >
             <tab.icon className="h-3.5 w-3.5" aria-hidden="true" />
             {tab.label}
+            {"count" in tab && tab.count != null && tab.count > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary">
+                {tab.count}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -152,6 +194,15 @@ function AgentBuilderPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <Select
+                label={t("agents.model", { defaultValue: "Model" })}
+                value={agent.modelId}
+                onChange={(value) => setAgent({ ...agent, modelId: value })}
+                options={[
+                  { value: "", label: t("agents.defaultModel", { defaultValue: "Default" }) },
+                  ...models.map((m: any) => ({ value: m.modelIdExternal ?? m.id, label: m.name })),
+                ]}
+              />
+              <Select
                 label={t("agents.visibility", { defaultValue: "Visibility" })}
                 value={agent.visibility}
                 onChange={(value) => setAgent({ ...agent, visibility: value as any })}
@@ -162,6 +213,9 @@ function AgentBuilderPage() {
                   { value: "public", label: t("agents.visibilityPublic", { defaultValue: "Public" }) },
                 ]}
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <Select
                 label={t("agents.toolApproval", { defaultValue: "Tool Approval" })}
                 value={agent.toolApprovalMode}
@@ -172,9 +226,6 @@ function AgentBuilderPage() {
                   { value: "never", label: t("agents.toolNever", { defaultValue: "Never allow" }) },
                 ]}
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
               <Select
                 label={t("agents.memoryScope", { defaultValue: "Memory Scope" })}
                 value={agent.memoryScope}
@@ -185,6 +236,9 @@ function AgentBuilderPage() {
                   { value: "global", label: t("agents.memoryGlobal", { defaultValue: "Global" }) },
                 ]}
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <Input
                 label={t("agents.maxSteps", { defaultValue: "Max Steps" })}
                 type="number"
@@ -193,34 +247,38 @@ function AgentBuilderPage() {
                 min={1}
                 max={100}
               />
+              <Input
+                label={t("agents.timeout", { defaultValue: "Timeout (seconds)" })}
+                type="number"
+                value={agent.timeoutSeconds}
+                onChange={(e) => setAgent({ ...agent, timeoutSeconds: parseInt(e.target.value) || 300 })}
+                min={10}
+                max={3600}
+              />
             </div>
           </div>
         )}
 
         {activeTab === "tools" && (
-          <div className="max-w-2xl">
-            <div className="text-center py-12">
-              <Wrench className="h-12 w-12 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
-              <h3 className="text-lg font-medium text-text mb-1">{t("agents.attachTools", { defaultValue: "Attach Tools" })}</h3>
-              <p className="text-sm text-text-secondary mb-4">
-                {t("agents.attachToolsDesc", { defaultValue: "Enable tools from the marketplace or connect custom tools via OpenAPI specs." })}
-              </p>
-              <Button variant="primary" onClick={() => navigate({ to: "/tools" })}>{t("agents.browseTools", { defaultValue: "Browse Tools" })}</Button>
-            </div>
-          </div>
+          <ToolsSelector
+            selectedToolIds={selectedToolIds}
+            onToggle={(toolId) =>
+              setSelectedToolIds((prev) =>
+                prev.includes(toolId) ? prev.filter((id) => id !== toolId) : [...prev, toolId],
+              )
+            }
+          />
         )}
 
         {activeTab === "knowledge" && (
-          <div className="max-w-2xl">
-            <div className="text-center py-12">
-              <BookOpen className="h-12 w-12 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
-              <h3 className="text-lg font-medium text-text mb-1">{t("agents.connectKnowledge", { defaultValue: "Connect Knowledge" })}</h3>
-              <p className="text-sm text-text-secondary mb-4">
-                {t("agents.connectKnowledgeDesc", { defaultValue: "Attach knowledge collections so this agent can search and reference your documents." })}
-              </p>
-              <Button variant="primary" onClick={() => navigate({ to: "/knowledge" })}>{t("agents.browseCollections", { defaultValue: "Browse Collections" })}</Button>
-            </div>
-          </div>
+          <KnowledgeSelector
+            selectedCollectionIds={selectedCollectionIds}
+            onToggle={(collectionId) =>
+              setSelectedCollectionIds((prev) =>
+                prev.includes(collectionId) ? prev.filter((id) => id !== collectionId) : [...prev, collectionId],
+              )
+            }
+          />
         )}
 
         {activeTab === "memory" && (
@@ -229,7 +287,7 @@ function AgentBuilderPage() {
               <Brain className="h-12 w-12 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
               <h3 className="text-lg font-medium text-text mb-1">{t("agents.agentMemory", { defaultValue: "Agent Memory" })}</h3>
               <p className="text-sm text-text-secondary mb-4">
-                {t("agents.agentMemoryDesc", { defaultValue: "Memory entries will appear here once the agent starts storing information." })}
+                {t("agents.memoryCreateHint", { defaultValue: "Memory entries will be generated as users interact with this agent." })}
               </p>
               <p className="text-xs text-text-tertiary">
                 {t("agents.memoryScopeLabel", { defaultValue: "Memory scope" })}: <span className="font-medium">{agent.memoryScope}</span>
@@ -268,6 +326,198 @@ function AgentBuilderPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tools selector for the create page
+// ---------------------------------------------------------------------------
+
+function ToolsSelector({
+  selectedToolIds,
+  onToggle,
+}: {
+  selectedToolIds: string[];
+  onToggle: (toolId: string) => void;
+}) {
+  const { t } = useTranslation();
+
+  const { data: allToolsData, isLoading } = useQuery({
+    queryKey: ["tools"],
+    queryFn: () => api.get<any>("/api/tools"),
+    staleTime: 60_000,
+  });
+
+  const allTools: any[] = (allToolsData as any)?.data ?? [];
+  const selected = allTools.filter((tool) => selectedToolIds.includes(tool.id));
+  const available = allTools.filter((tool) => !selectedToolIds.includes(tool.id));
+
+  if (isLoading) {
+    return (
+      <div className="max-w-2xl space-y-3">
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-14 w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  if (allTools.length === 0) {
+    return (
+      <div className="max-w-2xl text-center py-12">
+        <Wrench className="h-12 w-12 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
+        <h3 className="text-lg font-medium text-text mb-1">{t("agents.noToolsAvailable", { defaultValue: "No tools available" })}</h3>
+        <p className="text-sm text-text-secondary">
+          {t("agents.noToolsAvailableDesc", { defaultValue: "Create tools first, then come back to attach them." })}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      {selected.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-text mb-3">
+            {t("agents.selectedTools", { defaultValue: "Selected Tools" })} ({selected.length})
+          </h3>
+          <div className="space-y-2">
+            {selected.map((tool) => (
+              <div key={tool.id} className="flex items-center justify-between p-3 rounded-lg bg-surface-secondary border border-border">
+                <div className="flex items-center gap-2">
+                  <Wrench className="h-4 w-4 text-primary" aria-hidden="true" />
+                  <div>
+                    <span className="text-sm text-text font-medium">{tool.name}</span>
+                    {tool.description && <p className="text-xs text-text-tertiary">{tool.description}</p>}
+                  </div>
+                </div>
+                <button onClick={() => onToggle(tool.id)} className="text-xs text-danger hover:underline">
+                  {t("common.remove", { defaultValue: "Remove" })}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {available.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-text mb-3">
+            {t("agents.availableTools", { defaultValue: "Available Tools" })}
+          </h3>
+          <div className="space-y-2">
+            {available.map((tool) => (
+              <div key={tool.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
+                <div>
+                  <span className="text-sm text-text font-medium">{tool.name}</span>
+                  {tool.description && <p className="text-xs text-text-tertiary">{tool.description}</p>}
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => onToggle(tool.id)}>
+                  <Plus className="h-3 w-3 mr-1" aria-hidden="true" />
+                  {t("agents.attach", { defaultValue: "Attach" })}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Knowledge selector for the create page
+// ---------------------------------------------------------------------------
+
+function KnowledgeSelector({
+  selectedCollectionIds,
+  onToggle,
+}: {
+  selectedCollectionIds: string[];
+  onToggle: (collectionId: string) => void;
+}) {
+  const { t } = useTranslation();
+
+  const { data: collectionsData, isLoading } = useQuery({
+    queryKey: ["knowledge"],
+    queryFn: () => api.get<any>("/api/knowledge"),
+    staleTime: 60_000,
+  });
+
+  const allCollections: any[] = (collectionsData as any)?.data ?? [];
+  const selected = allCollections.filter((c) => selectedCollectionIds.includes(c.id));
+  const available = allCollections.filter((c) => !selectedCollectionIds.includes(c.id));
+
+  if (isLoading) {
+    return (
+      <div className="max-w-2xl space-y-3">
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-14 w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  if (allCollections.length === 0) {
+    return (
+      <div className="max-w-2xl text-center py-12">
+        <BookOpen className="h-12 w-12 text-text-tertiary mx-auto mb-3" aria-hidden="true" />
+        <h3 className="text-lg font-medium text-text mb-1">{t("agents.noCollectionsAvailable", { defaultValue: "No knowledge collections" })}</h3>
+        <p className="text-sm text-text-secondary">
+          {t("agents.noCollectionsAvailableDesc", { defaultValue: "Create a knowledge collection first, then attach it here." })}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      {selected.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-text mb-3">
+            {t("agents.selectedCollections", { defaultValue: "Selected Collections" })} ({selected.length})
+          </h3>
+          <div className="space-y-2">
+            {selected.map((c) => (
+              <div key={c.id} className="flex items-center justify-between p-3 rounded-lg bg-surface-secondary border border-border">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-green-400" aria-hidden="true" />
+                  <div>
+                    <span className="text-sm text-text font-medium">{c.name}</span>
+                    {c.description && <p className="text-xs text-text-tertiary">{c.description}</p>}
+                  </div>
+                </div>
+                <button onClick={() => onToggle(c.id)} className="text-xs text-danger hover:underline">
+                  {t("agents.disconnect", { defaultValue: "Disconnect" })}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {available.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-text mb-3">
+            {t("agents.availableCollections", { defaultValue: "Available Collections" })}
+          </h3>
+          <div className="space-y-2">
+            {available.map((c) => (
+              <div key={c.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
+                <div>
+                  <span className="text-sm text-text font-medium">{c.name}</span>
+                  {c.description && <p className="text-xs text-text-tertiary">{c.description}</p>}
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => onToggle(c.id)}>
+                  <Plus className="h-3 w-3 mr-1" aria-hidden="true" />
+                  {t("agents.connect", { defaultValue: "Connect" })}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
