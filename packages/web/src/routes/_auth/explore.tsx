@@ -17,7 +17,9 @@ import {
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
+import { TemplateInputDialog } from "../../components/explore/TemplateInputDialog";
 import { api } from "../../lib/api";
+import { setPendingFiles } from "../../lib/pending-files";
 import { getAgentColor, getAgentBgStyle, getAgentIconStyle } from "../../lib/agent-appearance";
 
 export const Route = createFileRoute("/_auth/explore")({
@@ -30,7 +32,18 @@ export const Route = createFileRoute("/_auth/explore")({
 
 type Category = "all" | "agents" | "general" | "code" | "research" | "creative" | "analysis";
 
-interface SampleConversation {
+type TemplateInputType = "text" | "textarea" | "file";
+
+export interface TemplateInput {
+  id: string;
+  type: TemplateInputType;
+  label: string;
+  placeholder: string;
+  required: boolean;
+  accept?: string;
+}
+
+export interface SampleConversation {
   id: string;
   title: string;
   description: string;
@@ -40,6 +53,7 @@ interface SampleConversation {
   icon: React.ElementType;
   color: string;
   bgColor: string;
+  inputs?: TemplateInput[];
 }
 
 const categories: { id: Category; label: string; icon: React.ElementType }[] = [
@@ -88,10 +102,27 @@ const sampleConversations: SampleConversation[] = [
     category: "general",
     tags: ["summary", "writing"],
     starterMessage:
-      "Summarize the key arguments and findings from the following text, highlighting any actionable insights:\n\n[Paste your content here]",
+      "Summarize the key arguments and findings from the following text, highlighting any actionable insights:\n\n{{content}}",
     icon: MessageSquare,
     color: "text-success",
     bgColor: "bg-success/10",
+    inputs: [
+      {
+        id: "content",
+        type: "textarea",
+        label: "Content to summarize",
+        placeholder: "Paste your article, paper, or meeting notes here...",
+        required: true,
+      },
+      {
+        id: "content_file",
+        type: "file",
+        label: "Or upload a document",
+        placeholder: "PDF, DOCX, TXT, Markdown...",
+        required: false,
+        accept: ".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown",
+      },
+    ],
   },
 
   // Code
@@ -103,10 +134,27 @@ const sampleConversations: SampleConversation[] = [
     category: "code",
     tags: ["review", "quality"],
     starterMessage:
-      "Review this TypeScript function for bugs, performance issues, and best practices. Suggest improvements:\n\n```typescript\n// Paste your code here\n```",
+      "Review this TypeScript function for bugs, performance issues, and best practices. Suggest improvements:\n\n```typescript\n{{code}}\n```",
     icon: Code2,
     color: "text-success",
     bgColor: "bg-success/10",
+    inputs: [
+      {
+        id: "code",
+        type: "textarea",
+        label: "Code to review",
+        placeholder: "Paste your code here...",
+        required: true,
+      },
+      {
+        id: "code_file",
+        type: "file",
+        label: "Or upload a source file",
+        placeholder: ".ts, .tsx, .js, .py, ...",
+        required: false,
+        accept: "text/*,application/json,.ts,.tsx,.js,.jsx,.py,.go,.rs,.java,.rb,.php,.swift,.kt",
+      },
+    ],
   },
   {
     id: "debug-help",
@@ -116,10 +164,27 @@ const sampleConversations: SampleConversation[] = [
     category: "code",
     tags: ["debug", "troubleshoot"],
     starterMessage:
-      "I'm getting an unexpected error in my React app. The component re-renders infinitely when I add a useEffect hook. Here's the code:\n\n```tsx\n// Paste your component here\n```",
+      "I'm getting an unexpected error in my React app. The component re-renders infinitely when I add a useEffect hook. Here's the code:\n\n```tsx\n{{component}}\n```",
     icon: Code2,
     color: "text-danger",
     bgColor: "bg-danger/10",
+    inputs: [
+      {
+        id: "component",
+        type: "textarea",
+        label: "Component code",
+        placeholder: "Paste your React component here...",
+        required: true,
+      },
+      {
+        id: "component_file",
+        type: "file",
+        label: "Or upload the file",
+        placeholder: ".tsx, .jsx, ...",
+        required: false,
+        accept: "text/*,.ts,.tsx,.js,.jsx",
+      },
+    ],
   },
   {
     id: "api-design",
@@ -200,10 +265,27 @@ const sampleConversations: SampleConversation[] = [
     category: "analysis",
     tags: ["data", "insights"],
     starterMessage:
-      "I have the following CSV data showing monthly user signups and churn for the past year. Identify trends, seasonality, and suggest what might be causing the churn spikes:\n\n```csv\nmonth,signups,churned\n// Paste your data here\n```",
+      "I have the following CSV data showing monthly user signups and churn for the past year. Identify trends, seasonality, and suggest what might be causing the churn spikes:\n\n```csv\n{{data}}\n```",
     icon: BarChart3,
     color: "text-success",
     bgColor: "bg-success/10",
+    inputs: [
+      {
+        id: "data",
+        type: "textarea",
+        label: "CSV data",
+        placeholder: "month,signups,churned\n2025-01,120,15\n2025-02,135,22\n...",
+        required: true,
+      },
+      {
+        id: "data_file",
+        type: "file",
+        label: "Or upload a file",
+        placeholder: ".csv, .xlsx, .json, ...",
+        required: false,
+        accept: ".csv,.xlsx,.xls,.json,.tsv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/json",
+      },
+    ],
   },
   {
     id: "business-analysis",
@@ -278,7 +360,7 @@ function ConversationCard({
   onStart,
 }: {
   conversation: SampleConversation;
-  onStart: (starterMessage: string) => void;
+  onStart: (conversation: SampleConversation) => void;
 }) {
   const { t } = useTranslation();
   const Icon = conversation.icon;
@@ -311,7 +393,7 @@ function ConversationCard({
       </p>
 
       <button
-        onClick={() => onStart(conversation.starterMessage)}
+        onClick={() => onStart(conversation)}
         className="flex items-center gap-2 text-xs font-medium text-primary hover:text-primary-dark transition-colors group-hover:gap-3"
       >
         {t("explore.tryConversation", "Try this conversation")}
@@ -330,6 +412,7 @@ function ExplorePage() {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState<Category>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState<SampleConversation | null>(null);
 
   // Fetch published agents
   const { data: agentsData } = useQuery({
@@ -379,12 +462,29 @@ function ExplorePage() {
   const showAgents = filteredAgents.length > 0;
   const showConversations = activeCategory !== "agents";
 
-  const handleStartConversation = (starterMessage: string) => {
+  const handleStartConversation = (conversation: SampleConversation) => {
+    if (conversation.inputs?.length) {
+      setSelectedTemplate(conversation);
+      return;
+    }
     try {
-      sessionStorage.setItem("nova:starter-message", starterMessage);
+      sessionStorage.setItem("nova:starter-message", conversation.starterMessage);
     } catch {
       // sessionStorage unavailable
     }
+    navigate({ to: "/conversations/new" });
+  };
+
+  const handleTemplateSubmit = (resolvedMessage: string, files?: File[]) => {
+    if (files?.length) {
+      setPendingFiles(files);
+    }
+    try {
+      sessionStorage.setItem("nova:starter-message", resolvedMessage);
+    } catch {
+      // sessionStorage unavailable
+    }
+    setSelectedTemplate(null);
     navigate({ to: "/conversations/new" });
   };
 
@@ -548,6 +648,13 @@ function ExplorePage() {
           </div>
         </div>
       </div>
+
+      <TemplateInputDialog
+        open={!!selectedTemplate}
+        onClose={() => setSelectedTemplate(null)}
+        conversation={selectedTemplate}
+        onSubmit={handleTemplateSubmit}
+      />
     </div>
   );
 }
