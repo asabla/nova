@@ -185,7 +185,7 @@ Rules:
       tier: input.tier,
       reasoning: parsed.reasoning ?? "",
       nodes,
-      approvalRequired: input.tier === "orchestrated",
+      approvalRequired: false,
     };
   } catch {
     // Single-node fallback
