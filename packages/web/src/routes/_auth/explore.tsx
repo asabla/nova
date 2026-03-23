@@ -14,6 +14,12 @@ import {
   Sparkles,
   Bot,
   Star,
+  FileText,
+  BookOpen,
+  Mail,
+  PenTool,
+  Database,
+  Terminal,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
@@ -70,59 +76,59 @@ const sampleConversations: SampleConversation[] = [
   // General
   {
     id: "explain-concept",
-    title: "Explain a Complex Topic",
+    title: "Explain a Technical Concept",
     description:
-      "Get a clear, layered explanation of any topic -- from quantum mechanics to economics.",
+      "Get a layered explanation that builds from fundamentals to advanced details, with real-world analogies.",
     category: "general",
     tags: ["learning", "explanation"],
     starterMessage:
-      "Explain how neural networks learn, starting from the basics and building up to backpropagation. Use analogies to make it intuitive.",
+      "Explain how TLS/SSL encryption works when I visit a website. Start with the high-level handshake, then go deeper into certificates, key exchange, and cipher suites. Use real-world analogies where they help.",
     icon: Lightbulb,
     color: "text-warning",
     bgColor: "bg-warning/10",
   },
   {
-    id: "brainstorm-ideas",
-    title: "Brainstorm Ideas",
+    id: "meeting-summary",
+    title: "Extract Action Items from Notes",
     description:
-      "Generate creative ideas for projects, products, or solutions to problems.",
+      "Turn messy meeting notes or a brain dump into structured decisions, action items, and next steps.",
     category: "general",
-    tags: ["brainstorm", "ideas"],
+    tags: ["productivity", "summary"],
     starterMessage:
-      "I'm building a productivity app for remote teams. Brainstorm 10 unique features that would differentiate it from Slack and Notion.",
-    icon: Sparkles,
-    color: "text-primary",
-    bgColor: "bg-primary/10",
-  },
-  {
-    id: "summarize-text",
-    title: "Summarize Long Content",
-    description:
-      "Condense articles, papers, or meeting notes into key takeaways.",
-    category: "general",
-    tags: ["summary", "writing"],
-    starterMessage:
-      "Summarize the key arguments and findings from the following text, highlighting any actionable insights:\n\n{{content}}",
-    icon: MessageSquare,
+      "Extract decisions, action items (with owners if mentioned), and open questions from these meeting notes. Flag anything that seems unresolved or contradictory.\n\n{{notes}}",
+    icon: FileText,
     color: "text-success",
     bgColor: "bg-success/10",
     inputs: [
       {
-        id: "content",
+        id: "notes",
         type: "textarea",
-        label: "Content to summarize",
-        placeholder: "Paste your article, paper, or meeting notes here...",
+        label: "Meeting notes or transcript",
+        placeholder: "Paste your raw meeting notes, transcript, or brain dump here...",
         required: true,
       },
       {
-        id: "content_file",
+        id: "notes_file",
         type: "file",
         label: "Or upload a document",
-        placeholder: "PDF, DOCX, TXT, Markdown...",
+        placeholder: "TXT, MD, DOCX, PDF...",
         required: false,
-        accept: ".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown",
+        accept: ".txt,.md,.docx,.pdf,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf",
       },
     ],
+  },
+  {
+    id: "brainstorm-solutions",
+    title: "Brainstorm Solutions",
+    description:
+      "Generate diverse ideas for a specific problem, with trade-offs for each approach.",
+    category: "general",
+    tags: ["brainstorm", "ideas"],
+    starterMessage:
+      "I need to reduce our CI/CD pipeline time from 45 minutes to under 15 minutes. The pipeline runs: lint, unit tests, integration tests, Docker build, and deploy to staging. Give me 8 concrete approaches ranked by impact-to-effort ratio, with trade-offs for each.",
+    icon: Sparkles,
+    color: "text-primary",
+    bgColor: "bg-primary/10",
   },
 
   // Code
@@ -130,11 +136,11 @@ const sampleConversations: SampleConversation[] = [
     id: "code-review",
     title: "Code Review",
     description:
-      "Get feedback on code quality, potential bugs, and improvement suggestions.",
+      "Get a thorough review covering bugs, security, performance, and maintainability.",
     category: "code",
     tags: ["review", "quality"],
     starterMessage:
-      "Review this TypeScript function for bugs, performance issues, and best practices. Suggest improvements:\n\n```typescript\n{{code}}\n```",
+      "Review this code for bugs, security issues, performance problems, and readability. Prioritize findings by severity and provide a corrected version for anything critical.\n\n```\n{{code}}\n```",
     icon: Code2,
     color: "text-success",
     bgColor: "bg-success/10",
@@ -150,122 +156,134 @@ const sampleConversations: SampleConversation[] = [
         id: "code_file",
         type: "file",
         label: "Or upload a source file",
-        placeholder: ".ts, .tsx, .js, .py, ...",
+        placeholder: ".ts, .py, .go, .rs, .java, ...",
         required: false,
         accept: "text/*,application/json,.ts,.tsx,.js,.jsx,.py,.go,.rs,.java,.rb,.php,.swift,.kt",
       },
     ],
   },
   {
-    id: "debug-help",
-    title: "Debug an Issue",
+    id: "debug-error",
+    title: "Debug an Error",
     description:
-      "Describe a bug and get step-by-step debugging guidance and potential fixes.",
+      "Paste an error message or describe unexpected behavior and get a root cause analysis with fix.",
     category: "code",
     tags: ["debug", "troubleshoot"],
     starterMessage:
-      "I'm getting an unexpected error in my React app. The component re-renders infinitely when I add a useEffect hook. Here's the code:\n\n```tsx\n{{component}}\n```",
-    icon: Code2,
+      "I'm getting this error and I can't figure out the root cause. Walk me through what's happening, why it's failing, and how to fix it.\n\nError:\n```\n{{error}}\n```\n\nRelevant code (if applicable):\n```\n{{context_code}}\n```",
+    icon: Terminal,
     color: "text-danger",
     bgColor: "bg-danger/10",
     inputs: [
       {
-        id: "component",
+        id: "error",
         type: "textarea",
-        label: "Component code",
-        placeholder: "Paste your React component here...",
+        label: "Error message or stack trace",
+        placeholder: "Paste the full error message or stack trace...",
         required: true,
       },
       {
-        id: "component_file",
-        type: "file",
-        label: "Or upload the file",
-        placeholder: ".tsx, .jsx, ...",
+        id: "context_code",
+        type: "textarea",
+        label: "Relevant code (optional)",
+        placeholder: "Paste the code that's causing the error...",
         required: false,
-        accept: "text/*,.ts,.tsx,.js,.jsx",
       },
     ],
   },
   {
-    id: "api-design",
-    title: "Design a REST API",
+    id: "system-design",
+    title: "System Design",
     description:
-      "Get help designing API endpoints, schemas, and authentication flows.",
+      "Get a technical architecture with component diagrams, data flow, and technology choices.",
     category: "code",
-    tags: ["api", "architecture"],
+    tags: ["architecture", "design"],
     starterMessage:
-      "Help me design a REST API for a task management system. I need endpoints for projects, tasks, users, and comments. Include authentication, pagination, and error handling patterns.",
-    icon: Code2,
+      "Design a real-time notification system for a SaaS app with 100k daily active users. Requirements: push notifications, in-app notifications, email digests, user preferences, and read/unread state. Cover the architecture, data model, technology choices, and how it scales.",
+    icon: Database,
     color: "text-primary",
     bgColor: "bg-primary/10",
+  },
+  {
+    id: "write-script",
+    title: "Write a Script",
+    description:
+      "Describe what you need automated and get a working, well-documented script.",
+    category: "code",
+    tags: ["automation", "script"],
+    starterMessage:
+      "Write a Python script that monitors a directory for new CSV files, validates their schema (must have columns: date, amount, category, description), cleans the data (handle missing values, normalize dates to ISO format), and loads them into a SQLite database. Include logging, error handling, and a dry-run mode.",
+    icon: Terminal,
+    color: "text-warning",
+    bgColor: "bg-warning/10",
   },
 
   // Research
   {
-    id: "literature-review",
-    title: "Literature Review",
+    id: "compare-options",
+    title: "Compare Technologies",
     description:
-      "Explore research topics and get structured overviews of existing work.",
+      "Get a structured side-by-side comparison of tools, frameworks, or approaches to make a decision.",
     category: "research",
-    tags: ["academic", "review"],
+    tags: ["comparison", "decision"],
     starterMessage:
-      "Give me a structured overview of the current state of research on Retrieval-Augmented Generation (RAG). Cover key papers, approaches, limitations, and open problems.",
+      "Compare these three approaches for building a mobile app: React Native, Flutter, and native (Swift + Kotlin). Our team has strong TypeScript skills, moderate Dart experience, and no native mobile experience. We need offline support, push notifications, and camera access. Evaluate: development speed, performance, maintenance cost, hiring pool, and ecosystem maturity. Recommend one with clear reasoning.",
     icon: Search,
     color: "text-primary",
     bgColor: "bg-primary/10",
   },
   {
-    id: "compare-options",
-    title: "Compare Technologies",
+    id: "research-topic",
+    title: "Research a Topic",
     description:
-      "Get a balanced comparison of tools, frameworks, or approaches for decision-making.",
+      "Get a structured overview of a subject with key concepts, current state, and open questions.",
     category: "research",
-    tags: ["comparison", "decision"],
+    tags: ["learning", "overview"],
     starterMessage:
-      "Compare PostgreSQL vs. MongoDB for a multi-tenant SaaS application. Consider scalability, schema flexibility, query performance, operational complexity, and cost. Present as a structured comparison.",
-    icon: Search,
+      "Give me a structured overview of WebAssembly (Wasm) for backend/server-side use. Cover: what it is and how it works, current state of WASI, major runtimes (Wasmtime, Wasmer, WasmEdge), real-world production use cases, limitations and gotchas, and where the ecosystem is headed in the next 2 years.",
+    icon: BookOpen,
     color: "text-warning",
     bgColor: "bg-warning/10",
   },
 
   // Creative
   {
-    id: "write-story",
-    title: "Write a Short Story",
+    id: "draft-email",
+    title: "Draft a Professional Email",
     description:
-      "Collaborate on creative writing with AI as your co-author.",
+      "Get a polished, ready-to-send email for any professional situation.",
     category: "creative",
-    tags: ["writing", "fiction"],
+    tags: ["email", "writing"],
     starterMessage:
-      "Write the opening scene of a sci-fi short story set in 2150 where AI and humans coexist. The main character discovers something unexpected about their AI companion. Make it atmospheric and character-driven.",
-    icon: Palette,
-    color: "text-warning",
-    bgColor: "bg-warning/10",
-  },
-  {
-    id: "marketing-copy",
-    title: "Draft Marketing Copy",
-    description:
-      "Create compelling copy for landing pages, emails, or social media.",
-    category: "creative",
-    tags: ["marketing", "copywriting"],
-    starterMessage:
-      "Write landing page copy for NOVA -- a self-hosted AI platform for teams. Highlight: multi-model support, privacy, custom agents, and knowledge bases. Tone: professional but approachable. Include a headline, subheading, 3 feature sections, and a CTA.",
-    icon: Palette,
+      "Draft an email to our engineering team announcing that we're migrating from REST to GraphQL for our public API. Tone: direct but encouraging. Cover: why we're doing it (type safety, reduced over-fetching, better DX for integrators), timeline (Q2 planning, Q3 migration, Q4 deprecation of REST), what changes for them (training sessions, new tooling), and a clear ask (review the RFC by Friday). Keep it under 300 words.",
+    icon: Mail,
     color: "text-primary",
     bgColor: "bg-primary/10",
+  },
+  {
+    id: "write-proposal",
+    title: "Write a Proposal or Brief",
+    description:
+      "Create a structured document that argues for a specific project, initiative, or approach.",
+    category: "creative",
+    tags: ["writing", "business"],
+    starterMessage:
+      "Write a one-page proposal for adopting a design system at our 40-person startup. We currently have 3 frontend apps with inconsistent UI. Cover: the problem (inconsistency, duplicated work, slow iterations), the proposed solution (component library + design tokens + Storybook), estimated effort (team of 2, 6-week foundation), expected ROI (faster feature development, better brand consistency, easier onboarding), and recommended next steps.",
+    icon: PenTool,
+    color: "text-warning",
+    bgColor: "bg-warning/10",
   },
 
   // Analysis
   {
-    id: "data-analysis",
-    title: "Analyze Data Patterns",
+    id: "analyze-data",
+    title: "Analyze a Dataset",
     description:
-      "Upload data and get insights, trends, and visualization suggestions.",
+      "Upload data and get a full analysis with insights, trends, and visualizations.",
     category: "analysis",
     tags: ["data", "insights"],
     starterMessage:
-      "I have the following CSV data showing monthly user signups and churn for the past year. Identify trends, seasonality, and suggest what might be causing the churn spikes:\n\n```csv\n{{data}}\n```",
+      "Analyze this dataset. Start with a data quality assessment, then identify the most important patterns and trends. Create visualizations for the key findings. End with 3 actionable recommendations.\n\n```\n{{data}}\n```",
     icon: BarChart3,
     color: "text-success",
     bgColor: "bg-success/10",
@@ -273,29 +291,42 @@ const sampleConversations: SampleConversation[] = [
       {
         id: "data",
         type: "textarea",
-        label: "CSV data",
-        placeholder: "month,signups,churned\n2025-01,120,15\n2025-02,135,22\n...",
+        label: "Paste your data (CSV, JSON, or table)",
+        placeholder: "date,revenue,customers,churn_rate\n2025-01,120000,450,3.2\n2025-02,135000,480,2.8\n...",
         required: true,
       },
       {
         id: "data_file",
         type: "file",
-        label: "Or upload a file",
-        placeholder: ".csv, .xlsx, .json, ...",
+        label: "Or upload a data file",
+        placeholder: ".csv, .xlsx, .json, .tsv",
         required: false,
         accept: ".csv,.xlsx,.xls,.json,.tsv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/json",
       },
     ],
   },
   {
-    id: "business-analysis",
-    title: "SWOT Analysis",
+    id: "sql-query",
+    title: "Write a SQL Query",
     description:
-      "Get a structured strengths, weaknesses, opportunities, threats analysis.",
+      "Describe what you need in plain English and get a performant, well-commented SQL query.",
+    category: "analysis",
+    tags: ["sql", "database"],
+    starterMessage:
+      "Write a PostgreSQL query that finds all customers who made at least 3 purchases in the last 90 days but haven't logged in during the last 14 days. Include their total spend, last purchase date, and last login date. Tables: customers(id, email, name, created_at), orders(id, customer_id, total, created_at), sessions(id, customer_id, started_at). Optimize for a table with 2M+ customers.",
+    icon: Database,
+    color: "text-primary",
+    bgColor: "bg-primary/10",
+  },
+  {
+    id: "strategic-analysis",
+    title: "Strategic Analysis",
+    description:
+      "Get a structured competitive analysis, SWOT, or market assessment for a business question.",
     category: "analysis",
     tags: ["business", "strategy"],
     starterMessage:
-      "Perform a SWOT analysis for a startup entering the self-hosted AI tools market in 2026. Consider the competitive landscape (OpenAI, Anthropic, open-source alternatives), market trends, and enterprise needs.",
+      "Perform a competitive analysis of the self-hosted AI platform market in 2026. Compare: open-source options (Ollama + Open WebUI, LocalAI, LibreChat), commercial self-hosted (NOVA, AnythingLLM, TypingMind), and cloud-managed (OpenAI Teams, Anthropic Teams, Google Gemini for Workspace). Evaluate on: deployment complexity, model flexibility, data privacy, cost at 50-person team scale, and feature completeness. Present as a comparison matrix with a summary.",
     icon: BarChart3,
     color: "text-warning",
     bgColor: "bg-warning/10",

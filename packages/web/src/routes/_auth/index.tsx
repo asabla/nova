@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowUp, Lightbulb, Code2, Palette, BarChart3,
+  ArrowUp, Lightbulb, Code2, PenTool,
   ArrowRight, RefreshCw, MessageSquare, Paperclip, X, FileText, Microscope,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
@@ -87,32 +87,25 @@ function HomePage() {
 
   const quickStarters = [
     {
-      icon: Lightbulb,
-      color: "text-amber-500",
-      bg: "bg-amber-500/8",
-      label: t("home.starterExplain", "Explain a concept"),
-      message: t("home.starterExplainMessage", "Explain how neural networks learn, starting from the basics and building up to backpropagation."),
-    },
-    {
       icon: Code2,
       color: "text-emerald-500",
       bg: "bg-emerald-500/8",
-      label: t("home.starterReview", "Review my code"),
-      message: t("home.starterReviewMessage", "Review this code for bugs, performance issues, and best practices. Suggest improvements:\n\n```\n// Paste your code here\n```"),
+      label: t("home.starterCode", "Explain a codebase pattern"),
+      message: t("home.starterCodeMessage", "Explain the repository pattern in backend development. When should I use it versus just calling the ORM directly? Show examples in TypeScript with a real use case like a user service."),
     },
     {
-      icon: Palette,
+      icon: PenTool,
       color: "text-primary",
       bg: "bg-primary/8",
-      label: t("home.starterWrite", "Help me write"),
-      message: t("home.starterWriteMessage", "Help me draft a clear, engaging piece of writing on the following topic:\n\n[Describe your topic here]"),
+      label: t("home.starterDraft", "Draft a document"),
+      message: t("home.starterDraftMessage", "Write a concise RFC template I can use for proposing technical changes at my company. Include sections for: problem statement, proposed solution, alternatives considered, migration plan, and open questions. Fill in a realistic example about migrating from monolith to microservices."),
     },
     {
-      icon: BarChart3,
-      color: "text-rose-500",
-      bg: "bg-rose-500/8",
-      label: t("home.starterAnalyze", "Analyze data"),
-      message: t("home.starterAnalyzeMessage", "Analyze the following data and identify key trends, patterns, and actionable insights:\n\n[Paste your data here]"),
+      icon: Lightbulb,
+      color: "text-amber-500",
+      bg: "bg-amber-500/8",
+      label: t("home.starterProblem", "Break down a problem"),
+      message: t("home.starterProblemMessage", "I need to improve the onboarding experience for our B2B SaaS product. Currently 40% of trial users drop off before completing setup. Break this down: what are the most common reasons for onboarding drop-off, what metrics should I track, and give me a prioritized list of 5 quick wins I can implement this sprint."),
     },
   ];
 
@@ -270,7 +263,7 @@ function HomePage() {
 
         {/* Quick Starters */}
         <div className="mb-12 stagger-children">
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {quickStarters.map((starter) => {
               const Icon = starter.icon;
               return (
