@@ -134,10 +134,19 @@ const sampleConversations: SampleConversation[] = [
     category: "general",
     tags: ["brainstorm", "ideas"],
     starterMessage:
-      "I need to reduce our CI/CD pipeline time from 45 minutes to under 15 minutes. The pipeline runs: lint, unit tests, integration tests, Docker build, and deploy to staging. Give me 8 concrete approaches ranked by impact-to-effort ratio, with trade-offs for each.",
+      "I need help brainstorming solutions for the following problem:\n\n{{problem}}\n\nGive me 8 concrete approaches ranked by impact-to-effort ratio, with trade-offs for each.",
     icon: Sparkles,
     color: "text-primary",
     bgColor: "bg-primary/10",
+    inputs: [
+      {
+        id: "problem",
+        type: "textarea",
+        label: "What problem do you need solutions for?",
+        placeholder: "e.g. Our CI/CD pipeline takes 45 minutes and we need it under 15, our onboarding flow has a 60% drop-off rate, we're running out of database storage...",
+        required: true,
+      },
+    ],
   },
 
   // Code
@@ -208,10 +217,19 @@ const sampleConversations: SampleConversation[] = [
     category: "code",
     tags: ["architecture", "design"],
     starterMessage:
-      "Design a real-time notification system for a SaaS app with 100k daily active users. Requirements: push notifications, in-app notifications, email digests, user preferences, and read/unread state. Cover the architecture, data model, technology choices, and how it scales.",
+      "Design a system for the following:\n\n{{system}}\n\nCover the architecture, data model, technology choices, and how it scales.",
     icon: Database,
     color: "text-primary",
     bgColor: "bg-primary/10",
+    inputs: [
+      {
+        id: "system",
+        type: "textarea",
+        label: "What system do you want designed?",
+        placeholder: "e.g. A real-time notification system for a SaaS app with 100k daily active users, supporting push notifications, in-app, and email digests...",
+        required: true,
+      },
+    ],
   },
   {
     id: "write-script",
@@ -221,10 +239,19 @@ const sampleConversations: SampleConversation[] = [
     category: "code",
     tags: ["automation", "script"],
     starterMessage:
-      "Write a Python script that monitors a directory for new CSV files, validates their schema (must have columns: date, amount, category, description), cleans the data (handle missing values, normalize dates to ISO format), and loads them into a SQLite database. Include logging, error handling, and a dry-run mode.",
+      "Write a script for the following:\n\n{{task}}\n\nInclude logging, error handling, and clear comments. Make it production-ready.",
     icon: Terminal,
     color: "text-warning",
     bgColor: "bg-warning/10",
+    inputs: [
+      {
+        id: "task",
+        type: "textarea",
+        label: "What do you need the script to do?",
+        placeholder: "e.g. Monitor a directory for new CSV files, validate their schema, clean the data, and load them into a SQLite database...",
+        required: true,
+      },
+    ],
   },
 
   // Research
@@ -236,10 +263,19 @@ const sampleConversations: SampleConversation[] = [
     category: "research",
     tags: ["comparison", "decision"],
     starterMessage:
-      "Compare these three approaches for building a mobile app: React Native, Flutter, and native (Swift + Kotlin). Our team has strong TypeScript skills, moderate Dart experience, and no native mobile experience. We need offline support, push notifications, and camera access. Evaluate: development speed, performance, maintenance cost, hiring pool, and ecosystem maturity. Recommend one with clear reasoning.",
+      "Help me compare the following:\n\n{{comparison}}\n\nEvaluate key dimensions like performance, developer experience, ecosystem maturity, cost, and long-term maintainability. Present as a comparison matrix and recommend one with clear reasoning.",
     icon: Search,
     color: "text-primary",
     bgColor: "bg-primary/10",
+    inputs: [
+      {
+        id: "comparison",
+        type: "textarea",
+        label: "What do you want to compare?",
+        placeholder: "e.g. React Native vs Flutter vs native Swift/Kotlin for a mobile app. Our team knows TypeScript well. We need offline support and push notifications...",
+        required: true,
+      },
+    ],
   },
   {
     id: "research-topic",
@@ -273,10 +309,19 @@ const sampleConversations: SampleConversation[] = [
     category: "creative",
     tags: ["email", "writing"],
     starterMessage:
-      "Draft an email to our engineering team announcing that we're migrating from REST to GraphQL for our public API. Tone: direct but encouraging. Cover: why we're doing it (type safety, reduced over-fetching, better DX for integrators), timeline (Q2 planning, Q3 migration, Q4 deprecation of REST), what changes for them (training sessions, new tooling), and a clear ask (review the RFC by Friday). Keep it under 300 words.",
+      "Draft a professional email based on the following:\n\n{{context}}\n\nMake it clear, concise, and professional. Keep it under 300 words.",
     icon: Mail,
     color: "text-primary",
     bgColor: "bg-primary/10",
+    inputs: [
+      {
+        id: "context",
+        type: "textarea",
+        label: "What's the email about?",
+        placeholder: "e.g. Announce to the engineering team that we're migrating from REST to GraphQL. Tone: direct but encouraging. Include timeline and a clear ask to review the RFC by Friday...",
+        required: true,
+      },
+    ],
   },
   {
     id: "write-proposal",
@@ -286,10 +331,19 @@ const sampleConversations: SampleConversation[] = [
     category: "creative",
     tags: ["writing", "business"],
     starterMessage:
-      "Write a one-page proposal for adopting a design system at our 40-person startup. We currently have 3 frontend apps with inconsistent UI. Cover: the problem (inconsistency, duplicated work, slow iterations), the proposed solution (component library + design tokens + Storybook), estimated effort (team of 2, 6-week foundation), expected ROI (faster feature development, better brand consistency, easier onboarding), and recommended next steps.",
+      "Write a one-page proposal for the following:\n\n{{proposal}}\n\nCover the problem, proposed solution, estimated effort, expected ROI, and recommended next steps.",
     icon: PenTool,
     color: "text-warning",
     bgColor: "bg-warning/10",
+    inputs: [
+      {
+        id: "proposal",
+        type: "textarea",
+        label: "What should the proposal argue for?",
+        placeholder: "e.g. Adopting a design system at our 40-person startup. We have 3 frontend apps with inconsistent UI. We want to propose a component library + design tokens + Storybook...",
+        required: true,
+      },
+    ],
   },
 
   // Analysis
@@ -360,10 +414,19 @@ const sampleConversations: SampleConversation[] = [
     category: "analysis",
     tags: ["business", "strategy"],
     starterMessage:
-      "Perform a competitive analysis of the self-hosted AI platform market in 2026. Compare: open-source options (Ollama + Open WebUI, LocalAI, LibreChat), commercial self-hosted (NOVA, AnythingLLM, TypingMind), and cloud-managed (OpenAI Teams, Anthropic Teams, Google Gemini for Workspace). Evaluate on: deployment complexity, model flexibility, data privacy, cost at 50-person team scale, and feature completeness. Present as a comparison matrix with a summary.",
+      "Perform a strategic analysis for the following:\n\n{{question}}\n\nInclude a comparison matrix, key insights, and actionable recommendations.",
     icon: BarChart3,
     color: "text-warning",
     bgColor: "bg-warning/10",
+    inputs: [
+      {
+        id: "question",
+        type: "textarea",
+        label: "What business question or market do you want analyzed?",
+        placeholder: "e.g. Competitive analysis of the self-hosted AI platform market — compare open-source, commercial self-hosted, and cloud-managed options for a 50-person team...",
+        required: true,
+      },
+    ],
   },
 ];
 

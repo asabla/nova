@@ -20,6 +20,8 @@ import { useSlashCommandTrigger } from "../../components/chat/useSlashCommandTri
 import { Dialog } from "../../components/ui/Dialog";
 import { NewResearchForm, type NewResearchFormSubmitData } from "../../components/research/NewResearchForm";
 import { toast } from "../../components/ui/Toast";
+import { TemplateInputDialog } from "../../components/explore/TemplateInputDialog";
+import type { SampleConversation } from "./explore";
 
 export const Route = createFileRoute("/_auth/")({
   component: () => (
@@ -44,6 +46,7 @@ function HomePage() {
   const [message, setMessage] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [researchModalOpen, setResearchModalOpen] = useState(false);
+  const [selectedStarter, setSelectedStarter] = useState<SampleConversation | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -85,27 +88,66 @@ function HomePage() {
     [slash.handleSelect],
   );
 
-  const quickStarters = [
+  const quickStarters: SampleConversation[] = [
     {
+      id: "home-explain-pattern",
+      title: t("home.starterCode", "Explain a codebase pattern"),
+      description: "Get a clear explanation of a codebase pattern or concept with real-world examples.",
+      category: "code",
+      tags: ["learning", "code"],
       icon: Code2,
       color: "text-emerald-500",
-      bg: "bg-emerald-500/8",
-      label: t("home.starterCode", "Explain a codebase pattern"),
-      message: t("home.starterCodeMessage", "Explain the repository pattern in backend development. When should I use it versus just calling the ORM directly? Show examples in TypeScript with a real use case like a user service."),
+      bgColor: "bg-emerald-500/8",
+      starterMessage: "Explain {{topic}} in backend/software development. When should I use it and when should I avoid it? Show examples in a real use case.",
+      inputs: [
+        {
+          id: "topic",
+          type: "text",
+          label: "What pattern or concept do you want explained?",
+          placeholder: "e.g. the repository pattern, dependency injection, event sourcing, CQRS...",
+          required: true,
+        },
+      ],
     },
     {
+      id: "home-draft-document",
+      title: t("home.starterDraft", "Draft a document"),
+      description: "Get a well-structured document for any professional purpose.",
+      category: "creative",
+      tags: ["writing", "document"],
       icon: PenTool,
       color: "text-primary",
-      bg: "bg-primary/8",
-      label: t("home.starterDraft", "Draft a document"),
-      message: t("home.starterDraftMessage", "Write a concise RFC template I can use for proposing technical changes at my company. Include sections for: problem statement, proposed solution, alternatives considered, migration plan, and open questions. Fill in a realistic example about migrating from monolith to microservices."),
+      bgColor: "bg-primary/8",
+      starterMessage: "Draft the following document:\n\n{{request}}",
+      inputs: [
+        {
+          id: "request",
+          type: "textarea",
+          label: "What document do you need?",
+          placeholder: "e.g. An RFC template for proposing technical changes, a post-mortem template, a project kickoff brief...",
+          required: true,
+        },
+      ],
     },
     {
+      id: "home-break-down-problem",
+      title: t("home.starterProblem", "Break down a problem"),
+      description: "Get a structured breakdown of a problem with root causes, metrics, and actionable next steps.",
+      category: "general",
+      tags: ["problem-solving", "analysis"],
       icon: Lightbulb,
       color: "text-amber-500",
-      bg: "bg-amber-500/8",
-      label: t("home.starterProblem", "Break down a problem"),
-      message: t("home.starterProblemMessage", "I need to improve the onboarding experience for our B2B SaaS product. Currently 40% of trial users drop off before completing setup. Break this down: what are the most common reasons for onboarding drop-off, what metrics should I track, and give me a prioritized list of 5 quick wins I can implement this sprint."),
+      bgColor: "bg-amber-500/8",
+      starterMessage: "Break down this problem for me:\n\n{{problem}}\n\nIdentify root causes, what metrics I should track, and give me a prioritized list of actionable next steps.",
+      inputs: [
+        {
+          id: "problem",
+          type: "textarea",
+          label: "What problem do you need broken down?",
+          placeholder: "e.g. 40% of trial users drop off before completing onboarding in our B2B SaaS product...",
+          required: true,
+        },
+      ],
     },
   ];
 
@@ -268,15 +310,15 @@ function HomePage() {
               const Icon = starter.icon;
               return (
                 <button
-                  key={starter.label}
-                  onClick={() => handleStartConversation(starter.message)}
+                  key={starter.id}
+                  onClick={() => setSelectedStarter(starter)}
                   className="flex flex-col items-center gap-2.5 p-4 rounded-2xl bg-surface-secondary border border-border hover:border-border-strong transition-all text-center group hover-lift"
                 >
-                  <div className={`h-10 w-10 rounded-xl ${starter.bg} flex items-center justify-center`}>
+                  <div className={`h-10 w-10 rounded-xl ${starter.bgColor} flex items-center justify-center`}>
                     <Icon className={`h-5 w-5 ${starter.color}`} aria-hidden="true" />
                   </div>
                   <span className="text-xs font-medium text-text-secondary group-hover:text-text transition-colors leading-tight">
-                    {starter.label}
+                    {starter.title}
                   </span>
                 </button>
               );
@@ -367,6 +409,20 @@ function HomePage() {
           onSubmit={(data) => startResearch.mutate(data)}
         />
       </Dialog>
+
+      {/* Starter input dialog */}
+      <TemplateInputDialog
+        open={!!selectedStarter}
+        onClose={() => setSelectedStarter(null)}
+        conversation={selectedStarter}
+        onSubmit={(resolvedMessage, files) => {
+          if (files?.length) {
+            storePendingFiles(files);
+          }
+          setSelectedStarter(null);
+          handleStartConversation(resolvedMessage);
+        }}
+      />
     </div>
   );
 }
