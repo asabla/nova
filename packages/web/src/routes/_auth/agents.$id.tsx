@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Bot, ArrowLeft, Save, Trash2, Copy, Share2, History, TestTube, Settings2, Wrench, BookOpen, Brain, RefreshCw, MessageSquare, Send, Loader2, User, Sparkles, RotateCcw } from "lucide-react";
+import { Bot, ArrowLeft, Save, Trash2, Copy, Share2, History, TestTube, Settings2, Wrench, BookOpen, Brain, RefreshCw, MessageSquare, Send, Loader2, User, Sparkles, RotateCcw, Globe, Code2, Link2, FileText, Search, Users } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
@@ -520,6 +520,15 @@ function AgentDetailPage() {
   );
 }
 
+const BUILTIN_TOOLS = [
+  { name: "web_search", label: "Web Search", description: "Search the web for current information via SearxNG", icon: Globe, color: "#3b82f6" },
+  { name: "fetch_url", label: "Fetch URL", description: "Retrieve and extract content from any web page", icon: Link2, color: "#06b6d4" },
+  { name: "code_execute", label: "Code Execution", description: "Run Python, JavaScript, and other code in a sandboxed environment", icon: Code2, color: "#22c55e" },
+  { name: "read_file", label: "Read File", description: "Read files from the workspace storage", icon: FileText, color: "#f97316" },
+  { name: "search_workspace", label: "Search Workspace", description: "Search across conversations and knowledge in the organization", icon: Search, color: "#a855f7" },
+  { name: "invoke_agent", label: "Invoke Agent", description: "Delegate tasks to other specialized agents", icon: Users, color: "#ec4899" },
+];
+
 function AgentToolsTab({ agentId }: { agentId: string }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -551,16 +560,17 @@ function AgentToolsTab({ agentId }: { agentId: string }) {
     onError: (err: any) => toast.error(err.message ?? t("agents.toolRemoveFailed", { defaultValue: "Failed to remove tool" })),
   });
 
-  const attached = (agentTools as any)?.data ?? [];
-  const available = ((allTools as any)?.data ?? []).filter(
-    (tool: any) => !attached.some((at: any) => at.toolId === tool.id),
+  const customAttached = (agentTools as any)?.data ?? [];
+  const allCustomTools: any[] = ((allTools as any)?.data ?? []);
+  const customAvailable = allCustomTools.filter(
+    (tool: any) => !customAttached.some((at: any) => at.toolId === tool.id),
   );
 
   if (toolsLoading) {
     return (
-      <div className="max-w-2xl space-y-3">
+      <div className="max-w-3xl space-y-3">
         {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-14 w-full rounded-lg" />
+          <Skeleton key={i} className="h-16 w-full rounded-xl" />
         ))}
       </div>
     );
@@ -579,22 +589,67 @@ function AgentToolsTab({ agentId }: { agentId: string }) {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-3xl space-y-8">
+      {/* Built-in tools */}
       <div>
-        <h3 className="text-sm font-semibold text-text mb-3">{t("agents.attachedTools", { defaultValue: "Attached Tools" })} ({attached.length})</h3>
-        {attached.length === 0 ? (
-          <p className="text-sm text-text-tertiary py-4">{t("agents.noToolsAttached", { defaultValue: "No tools attached yet." })}</p>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-text">
+            {t("agents.builtinTools", { defaultValue: "Built-in Tools" })}
+            <span className="ml-1.5 text-text-tertiary font-normal">({BUILTIN_TOOLS.length})</span>
+          </h3>
+          <span className="text-[10px] text-text-tertiary px-2 py-0.5 rounded-full bg-surface-secondary border border-border">
+            {t("agents.alwaysAvailable", { defaultValue: "Always available" })}
+          </span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {BUILTIN_TOOLS.map((bt) => {
+            const Icon = bt.icon;
+            return (
+              <div key={bt.name} className="flex items-center gap-3 p-3 rounded-xl bg-surface-secondary border border-border">
+                <div
+                  className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: `${bt.color}15` }}
+                >
+                  <Icon className="h-4 w-4" style={{ color: bt.color }} aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-text">{bt.label}</p>
+                  <p className="text-[10px] text-text-tertiary truncate">{bt.description}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Custom tools — connected */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-text">
+            {t("agents.customTools", { defaultValue: "Custom Tools" })}
+            <span className="ml-1.5 text-text-tertiary font-normal">({customAttached.length})</span>
+          </h3>
+        </div>
+        {customAttached.length === 0 ? (
+          <div className="flex flex-col items-center py-8 rounded-xl border border-dashed border-border">
+            <Wrench className="h-8 w-8 text-text-tertiary mb-2" aria-hidden="true" />
+            <p className="text-sm text-text-secondary mb-1">{t("agents.noCustomTools", { defaultValue: "No custom tools attached" })}</p>
+            <p className="text-xs text-text-tertiary">{t("agents.customToolsHint", { defaultValue: "Attach custom tools from your organization's tool library below." })}</p>
+          </div>
         ) : (
           <div className="space-y-2">
-            {attached.map((tool: any) => (
-              <div key={tool.id} className="flex items-center justify-between p-3 rounded-lg bg-surface-secondary border border-border">
-                <div className="flex items-center gap-2">
+            {customAttached.map((tool: any) => (
+              <div key={tool.id} className="flex items-center gap-3 p-3 rounded-xl bg-surface-secondary border border-border group">
+                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                   <Wrench className="h-4 w-4 text-primary" aria-hidden="true" />
-                  <span className="text-sm text-text font-medium">{tool.name ?? tool.toolId}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text truncate">{tool.name ?? tool.toolId}</p>
+                  {tool.description && <p className="text-[10px] text-text-tertiary truncate mt-0.5">{tool.description}</p>}
                 </div>
                 <button
                   onClick={() => detachTool.mutate(tool.toolId ?? tool.id)}
-                  className="text-xs text-danger hover:underline cursor-pointer"
+                  className="px-2 py-1 rounded-lg text-xs text-text-tertiary hover:text-danger hover:bg-danger/10 transition-colors opacity-0 group-hover:opacity-100"
                 >
                   {t("common.remove", { defaultValue: "Remove" })}
                 </button>
@@ -604,17 +659,24 @@ function AgentToolsTab({ agentId }: { agentId: string }) {
         )}
       </div>
 
-      {available.length > 0 && (
+      {/* Custom tools — available to attach */}
+      {customAvailable.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-text mb-3">{t("agents.availableTools", { defaultValue: "Available Tools" })}</h3>
+          <h3 className="text-sm font-semibold text-text mb-3">
+            {t("agents.availableTools", { defaultValue: "Available" })}
+            <span className="ml-1.5 text-text-tertiary font-normal">({customAvailable.length})</span>
+          </h3>
           <div className="space-y-2">
-            {available.map((tool: any) => (
-              <div key={tool.id} className="flex items-center justify-between p-3 rounded-lg border border-border">
-                <div>
-                  <span className="text-sm text-text font-medium">{tool.name}</span>
-                  {tool.description && <p className="text-xs text-text-tertiary">{tool.description}</p>}
+            {customAvailable.map((tool: any) => (
+              <div key={tool.id} className="flex items-center gap-3 p-3 rounded-xl border border-border hover:border-border-strong transition-colors group">
+                <div className="h-9 w-9 rounded-lg bg-surface-tertiary flex items-center justify-center shrink-0">
+                  <Wrench className="h-4 w-4 text-text-tertiary" aria-hidden="true" />
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => attachTool.mutate(tool.id)}>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text truncate">{tool.name}</p>
+                  {tool.description && <p className="text-[10px] text-text-tertiary truncate mt-0.5">{tool.description}</p>}
+                </div>
+                <Button variant="secondary" size="sm" onClick={() => attachTool.mutate(tool.id)} disabled={attachTool.isPending}>
                   {t("agents.attach", { defaultValue: "Attach" })}
                 </Button>
               </div>
