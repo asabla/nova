@@ -93,7 +93,7 @@ function AgentBuilderPage() {
     setTesting(true);
     setTestResult("");
     try {
-      const result = await api.post<any>("/api/v1/chat/completions", {
+      const result = await api.post<any>("/v1/chat/completions", {
         model: agent.modelId || "gpt-4o",
         messages: [
           ...(agent.systemPrompt ? [{ role: "system", content: agent.systemPrompt }] : []),

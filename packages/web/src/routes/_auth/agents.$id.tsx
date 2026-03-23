@@ -125,7 +125,7 @@ function AgentDetailPage() {
         ...(form.systemPrompt ? [{ role: "system", content: form.systemPrompt }] : []),
         ...updatedMessages.filter((m) => m.role !== "error").map((m) => ({ role: m.role, content: m.content })),
       ];
-      const result = await api.post<any>("/api/v1/chat/completions", {
+      const result = await api.post<any>("/v1/chat/completions", {
         model: form.modelId || "gpt-4o",
         messages: apiMessages,
       });
