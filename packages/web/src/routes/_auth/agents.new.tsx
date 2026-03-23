@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Bot, ArrowLeft, Save, TestTube, Settings2, Wrench, BookOpen, Brain, Plus, X } from "lucide-react";
+import { Bot, ArrowLeft, Save, TestTube, Settings2, Wrench, BookOpen, Brain, Plus, X, Send, Loader2, User, Sparkles, RotateCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "../../components/ui/Button";
@@ -34,9 +34,10 @@ function AgentBuilderPage() {
   });
   const [selectedToolIds, setSelectedToolIds] = useState<string[]>([]);
   const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>([]);
-  const [testPrompt, setTestPrompt] = useState("");
-  const [testResult, setTestResult] = useState("");
+  const [testMessages, setTestMessages] = useState<{ role: "user" | "assistant" | "error"; content: string }[]>([]);
+  const [testInput, setTestInput] = useState("");
   const [testing, setTesting] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: modelsData } = useQuery({
     queryKey: queryKeys.models.all,
@@ -45,6 +46,10 @@ function AgentBuilderPage() {
   });
 
   const models = (modelsData as any)?.data ?? [];
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [testMessages]);
 
   const handleSave = async () => {
     if (!agent.name.trim()) {
@@ -89,21 +94,28 @@ function AgentBuilderPage() {
   };
 
   const handleTest = async () => {
-    if (!testPrompt.trim()) return;
+    if (!testInput.trim() || testing) return;
+    const userMsg = testInput.trim();
+    setTestInput("");
+
+    const updatedMessages = [...testMessages, { role: "user" as const, content: userMsg }];
+    setTestMessages(updatedMessages);
     setTesting(true);
-    setTestResult("");
+
     try {
+      const apiMessages = [
+        ...(agent.systemPrompt ? [{ role: "system", content: agent.systemPrompt }] : []),
+        ...updatedMessages.filter((m) => m.role !== "error").map((m) => ({ role: m.role, content: m.content })),
+      ];
       const defaultModel = models[0]?.modelIdExternal ?? models[0]?.id ?? "gpt-4o";
       const result = await api.post<any>("/v1/chat/completions", {
         model: agent.modelId || defaultModel,
-        messages: [
-          ...(agent.systemPrompt ? [{ role: "system", content: agent.systemPrompt }] : []),
-          { role: "user", content: testPrompt },
-        ],
+        messages: apiMessages,
       });
-      setTestResult(result.choices?.[0]?.message?.content ?? t("agents.noResponse", { defaultValue: "No response" }));
+      const content = result.choices?.[0]?.message?.content ?? t("agents.noResponse", { defaultValue: "No response" });
+      setTestMessages((prev) => [...prev, { role: "assistant", content }]);
     } catch (err: any) {
-      setTestResult(`${t("common.error", { defaultValue: "Error" })}: ${err.message ?? t("agents.testFailed", { defaultValue: "Test failed" })}`);
+      setTestMessages((prev) => [...prev, { role: "error", content: err.message ?? t("agents.testFailed", { defaultValue: "Test failed" }) }]);
     } finally {
       setTesting(false);
     }
@@ -298,32 +310,129 @@ function AgentBuilderPage() {
         )}
 
         {activeTab === "test" && (
-          <div className="max-w-2xl space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-text mb-1.5">{t("agents.testPrompt", { defaultValue: "Test Prompt" })}</label>
-              <div className="flex gap-2">
-                <Textarea
-                  value={testPrompt}
-                  onChange={(e) => setTestPrompt(e.target.value)}
-                  placeholder={t("agents.testPlaceholder", { defaultValue: "Enter a test message..." })}
-                  rows={3}
-                  className="flex-1"
-                />
-                <Button variant="primary" onClick={handleTest} disabled={testing || !testPrompt.trim()}>
-                  <TestTube className="h-4 w-4" aria-hidden="true" />
-                  {testing ? t("agents.running", { defaultValue: "Running..." }) : t("agents.test", { defaultValue: "Test" })}
-                </Button>
-              </div>
+          <div className="flex flex-col h-full max-w-3xl mx-auto -mt-6 -mb-6 py-0" style={{ height: "calc(100vh - 180px)" }}>
+            {/* Chat messages area */}
+            <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+              {testMessages.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+                    <TestTube className="h-7 w-7 text-primary" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-base font-semibold text-text mb-1">{t("agents.testPlayground", { defaultValue: "Test Playground" })}</h3>
+                  <p className="text-sm text-text-tertiary max-w-sm mb-6">
+                    {t("agents.testPlaygroundDesc", { defaultValue: "Send messages to test your agent's behavior. The conversation uses the current system prompt and model." })}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 max-w-md">
+                    {[
+                      t("agents.testSample1", { defaultValue: "Introduce yourself" }),
+                      t("agents.testSample2", { defaultValue: "What can you help me with?" }),
+                      t("agents.testSample3", { defaultValue: "Give me an example of your work" }),
+                      t("agents.testSample4", { defaultValue: "What are your limitations?" }),
+                    ].map((sample) => (
+                      <button
+                        key={sample}
+                        onClick={() => setTestInput(sample)}
+                        className="text-left text-xs p-3 rounded-xl bg-surface-secondary border border-border text-text-secondary hover:bg-surface-tertiary hover:text-text transition-colors"
+                      >
+                        {sample}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {testMessages.map((msg, i) => (
+                <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : ""}`}>
+                  {msg.role !== "user" && (
+                    <div
+                      className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                        msg.role === "error" ? "bg-danger/15" : "bg-primary/10"
+                      }`}
+                    >
+                      {msg.role === "error" ? (
+                        <Sparkles className="h-3.5 w-3.5 text-danger" aria-hidden="true" />
+                      ) : (
+                        <Bot className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                      )}
+                    </div>
+                  )}
+                  <div
+                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+                      msg.role === "user"
+                        ? "bg-primary text-primary-foreground rounded-br-md"
+                        : msg.role === "error"
+                          ? "bg-danger/10 text-danger border border-danger/20 rounded-bl-md"
+                          : "bg-surface-secondary border border-border text-text rounded-bl-md"
+                    }`}
+                  >
+                    {msg.content}
+                  </div>
+                  {msg.role === "user" && (
+                    <div className="h-7 w-7 rounded-lg bg-surface-tertiary flex items-center justify-center shrink-0 mt-0.5">
+                      <User className="h-3.5 w-3.5 text-text-tertiary" aria-hidden="true" />
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {testing && (
+                <div className="flex gap-3">
+                  <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Bot className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                  </div>
+                  <div className="bg-surface-secondary border border-border rounded-2xl rounded-bl-md px-4 py-3">
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: "0.2s" }} />
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: "0.4s" }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
             </div>
 
-            {testResult && (
-              <div>
-                <label className="block text-sm font-medium text-text mb-1.5">{t("agents.response", { defaultValue: "Response" })}</label>
-                <div className="px-3 py-2 rounded-lg border border-border bg-surface-secondary text-sm text-text whitespace-pre-wrap">
-                  {testResult}
+            {/* Input area */}
+            <div className="border-t border-border px-4 py-3">
+              <div className="flex items-center gap-2">
+                {testMessages.length > 0 && (
+                  <button
+                    onClick={() => setTestMessages([])}
+                    className="p-2 rounded-lg hover:bg-surface-secondary text-text-tertiary hover:text-text transition-colors shrink-0"
+                    title={t("agents.clearChat", { defaultValue: "Clear chat" })}
+                    aria-label={t("agents.clearChat", { defaultValue: "Clear chat" })}
+                  >
+                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                )}
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={testInput}
+                    onChange={(e) => setTestInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleTest(); } }}
+                    placeholder={t("agents.testInputPlaceholder", { defaultValue: "Type a message to test..." })}
+                    disabled={testing}
+                    className="w-full h-10 pl-4 pr-12 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary focus:border-primary/50 transition-colors"
+                  />
+                  <button
+                    onClick={handleTest}
+                    disabled={testing || !testInput.trim()}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-text-tertiary transition-colors disabled:opacity-30 hover:bg-primary/10 hover:text-primary"
+                  >
+                    {testing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Send className="h-4 w-4" aria-hidden="true" />
+                    )}
+                  </button>
                 </div>
               </div>
-            )}
+              <p className="text-[10px] text-text-tertiary mt-1.5 text-center">
+                {t("agents.testDisclaimer", { defaultValue: "Test responses use the current system prompt and selected model. Changes are not saved automatically." })}
+              </p>
+            </div>
           </div>
         )}
       </div>
