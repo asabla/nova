@@ -125,8 +125,9 @@ function AgentDetailPage() {
         ...(form.systemPrompt ? [{ role: "system", content: form.systemPrompt }] : []),
         ...updatedMessages.filter((m) => m.role !== "error").map((m) => ({ role: m.role, content: m.content })),
       ];
+      const defaultModel = models[0]?.modelIdExternal ?? models[0]?.id ?? "gpt-4o";
       const result = await api.post<any>("/v1/chat/completions", {
-        model: form.modelId || "gpt-4o",
+        model: form.modelId || defaultModel,
         messages: apiMessages,
       });
       const content = result.choices?.[0]?.message?.content ?? t("agents.noResponse", { defaultValue: "No response" });
