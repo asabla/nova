@@ -6,8 +6,6 @@ import { Sparkles, FileText, Loader2, Bot } from "lucide-react";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { MessageInput } from "../../components/chat/MessageInput";
-import { ModelCapabilityBadges } from "../../components/ui/ModelCapabilityBadges";
-import { Select } from "../../components/ui/Select";
 import { toast } from "../../components/ui/Toast";
 import { consumePendingFiles } from "../../lib/pending-files";
 
@@ -19,7 +17,6 @@ function NewConversationPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [selectedModel, setSelectedModel] = useState("");
 
   // Read agentId from URL search params (e.g. /conversations/new?agentId=xxx)
   const agentId = typeof window !== "undefined"
@@ -36,12 +33,6 @@ function NewConversationPage() {
 
   const agent = agentId ? (agentData as any) : null;
 
-  const { data: modelsData } = useQuery({
-    queryKey: queryKeys.models.all,
-    queryFn: () => api.get<any>("/api/models"),
-    staleTime: 60_000,
-  });
-
   // Load conversation starters from prompt templates (story #182)
   const { data: starterTemplates } = useQuery({
     queryKey: queryKeys.prompts.starters(),
@@ -49,7 +40,6 @@ function NewConversationPage() {
     staleTime: 60_000,
   });
 
-  const models = (modelsData as any)?.data ?? [];
   const starters = (starterTemplates as any)?.data ?? [];
 
   const uploadSingleFile = useCallback(async (file: File) => {
@@ -72,8 +62,7 @@ function NewConversationPage() {
 
     try {
       const payload: any = {};
-      if (selectedModel) payload.modelId = selectedModel;
-      else if (agent?.modelId) payload.modelId = agent.modelId;
+      if (agent?.modelId) payload.modelId = agent.modelId;
       if (systemPrompt) payload.systemPrompt = systemPrompt;
       else if (agent?.systemPrompt) payload.systemPrompt = agent.systemPrompt;
       if (agentId) payload.agentId = agentId;
@@ -104,7 +93,7 @@ function NewConversationPage() {
       toast(t("conversations.createFailed", "Failed to create conversation"), "error");
       setIsCreating(false);
     }
-  }, [navigate, queryClient, selectedModel, isCreating, t, uploadSingleFile, agent, agentId]);
+  }, [navigate, queryClient, isCreating, t, uploadSingleFile, agent, agentId]);
 
   // Check for starter message from explore page or session storage
   useEffect(() => {
@@ -120,6 +109,14 @@ function NewConversationPage() {
     }
   }, [createAndSend]);
 
+  // Agent-specific starters (same as the test tab in agent edit)
+  const agentStarters = [
+    t("agents.testSample1", { defaultValue: "Introduce yourself" }),
+    t("agents.testSample2", { defaultValue: "What can you help me with?" }),
+    t("agents.testSample3", { defaultValue: "Give me an example of your work" }),
+    t("agents.testSample4", { defaultValue: "What are your limitations?" }),
+  ];
+
   // Default starters if no templates exist
   const defaultStarters = [
     t("home.starterPrompt1", "Explain quantum computing in simple terms"),
@@ -128,7 +125,7 @@ function NewConversationPage() {
     t("home.starterPrompt4", "Summarize the latest AI research"),
   ];
 
-  const hasTemplateStarters = starters.length > 0;
+  const hasTemplateStarters = !agent && starters.length > 0;
 
   return (
     <div className="flex flex-col flex-1">
@@ -142,35 +139,9 @@ function NewConversationPage() {
           <h2 className="text-xl font-semibold text-text mb-2">
             {agent ? agent.name : t("conversations.newTitle", "New Conversation")}
           </h2>
-          <p className="text-sm text-text-secondary mb-4">
+          <p className="text-sm text-text-secondary mb-6">
             {agent?.description ?? t("conversations.newDescription", "Start a conversation with an AI assistant")}
           </p>
-
-          {/* Model selector */}
-          <div className="flex flex-col items-center gap-2 mb-6">
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Select
-                options={[
-                  { value: "", label: t("conversations.autoModel", "Auto (default model)") },
-                  ...models.map((m: any) => ({ value: m.modelIdExternal, label: m.name })),
-                ]}
-                value={selectedModel}
-                onChange={(val) => setSelectedModel(val)}
-                disabled={isCreating}
-                size="sm"
-              />
-
-            </div>
-
-            {/* Show capability badges for selected model */}
-            {(() => {
-              const selected = models.find((m: any) => m.modelIdExternal === selectedModel);
-              const caps: string[] = selected?.capabilities ?? [];
-              return caps.length > 0 ? (
-                <ModelCapabilityBadges capabilities={caps} compact className="justify-center" />
-              ) : null;
-            })()}
-          </div>
 
           {/* Loading overlay */}
           {isCreating && (
@@ -183,7 +154,19 @@ function NewConversationPage() {
           {/* Conversation Starters */}
           {!isCreating && (
             <>
-              {hasTemplateStarters ? (
+              {agent ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {agentStarters.map((prompt) => (
+                    <button
+                      key={prompt}
+                      onClick={() => createAndSend(prompt)}
+                      className="text-left text-xs p-3 rounded-xl bg-surface-secondary border border-border text-text-secondary hover:bg-surface-tertiary hover:text-text transition-colors"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              ) : hasTemplateStarters ? (
                 <div className="space-y-3">
                   <p className="text-xs text-text-tertiary">
                     <FileText className="h-3 w-3 inline mr-1" aria-hidden="true" />

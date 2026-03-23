@@ -82,10 +82,19 @@ const sampleConversations: SampleConversation[] = [
     category: "general",
     tags: ["learning", "explanation"],
     starterMessage:
-      "Explain how TLS/SSL encryption works when I visit a website. Start with the high-level handshake, then go deeper into certificates, key exchange, and cipher suites. Use real-world analogies where they help.",
+      "Explain {{topic}} in a layered way. Start with the high-level intuition, then go deeper into how it actually works under the hood. Use real-world analogies where they help.",
     icon: Lightbulb,
     color: "text-warning",
     bgColor: "bg-warning/10",
+    inputs: [
+      {
+        id: "topic",
+        type: "text",
+        label: "What topic do you want explained?",
+        placeholder: "e.g. how TLS/SSL encryption works, how garbage collection works, how DNS resolution works...",
+        required: true,
+      },
+    ],
   },
   {
     id: "meeting-summary",
@@ -240,10 +249,19 @@ const sampleConversations: SampleConversation[] = [
     category: "research",
     tags: ["learning", "overview"],
     starterMessage:
-      "Give me a structured overview of WebAssembly (Wasm) for backend/server-side use. Cover: what it is and how it works, current state of WASI, major runtimes (Wasmtime, Wasmer, WasmEdge), real-world production use cases, limitations and gotchas, and where the ecosystem is headed in the next 2 years.",
+      "Give me a structured overview of {{topic}}. Cover: what it is and how it works, the current state of the art, major tools or projects in the space, real-world production use cases, limitations and gotchas, and where things are headed in the next 1-2 years.",
     icon: BookOpen,
     color: "text-warning",
     bgColor: "bg-warning/10",
+    inputs: [
+      {
+        id: "topic",
+        type: "text",
+        label: "What topic do you want researched?",
+        placeholder: "e.g. WebAssembly for server-side use, edge computing architectures, vector databases...",
+        required: true,
+      },
+    ],
   },
 
   // Creative
@@ -313,10 +331,26 @@ const sampleConversations: SampleConversation[] = [
     category: "analysis",
     tags: ["sql", "database"],
     starterMessage:
-      "Write a PostgreSQL query that finds all customers who made at least 3 purchases in the last 90 days but haven't logged in during the last 14 days. Include their total spend, last purchase date, and last login date. Tables: customers(id, email, name, created_at), orders(id, customer_id, total, created_at), sessions(id, customer_id, started_at). Optimize for a table with 2M+ customers.",
+      "Write a PostgreSQL query for the following:\n\n{{request}}\n\nDatabase schema:\n```sql\n{{schema}}\n```\n\nUse CTEs for readability, add comments explaining the logic, and note any performance considerations.",
     icon: Database,
     color: "text-primary",
     bgColor: "bg-primary/10",
+    inputs: [
+      {
+        id: "request",
+        type: "textarea",
+        label: "What should the query do?",
+        placeholder: "e.g. Find all customers who made at least 3 purchases in the last 90 days but haven't logged in during the last 14 days...",
+        required: true,
+      },
+      {
+        id: "schema",
+        type: "textarea",
+        label: "Database schema (table definitions)",
+        placeholder: "customers(id, email, name, created_at)\norders(id, customer_id, total, created_at)\nsessions(id, customer_id, started_at)",
+        required: true,
+      },
+    ],
   },
   {
     id: "strategic-analysis",

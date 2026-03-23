@@ -128,18 +128,33 @@ export function TemplateInputDialog({ open, onClose, conversation, onSubmit }: T
             <label htmlFor={textInput.id} className="block text-sm font-medium text-text mb-1.5">
               {textInput.label}
             </label>
-            <textarea
-              id={textInput.id}
-              value={textValues[textInput.id] ?? ""}
-              onChange={(e) => handleTextChange(textInput.id, e.target.value)}
-              placeholder={textInput.placeholder}
-              rows={6}
-              className={`w-full px-3 py-2.5 rounded-lg border text-sm text-text bg-surface placeholder:text-text-tertiary resize-y min-h-[120px] max-h-[320px] font-mono transition-colors ${
-                errors[textInput.id]
-                  ? "border-danger focus:ring-danger/30"
-                  : "border-border focus:border-primary focus:ring-primary/20"
-              } focus:outline-none focus:ring-2`}
-            />
+            {textInput.type === "text" ? (
+              <input
+                type="text"
+                id={textInput.id}
+                value={textValues[textInput.id] ?? ""}
+                onChange={(e) => handleTextChange(textInput.id, e.target.value)}
+                placeholder={textInput.placeholder}
+                className={`w-full px-3 py-2.5 rounded-lg border text-sm text-text bg-surface placeholder:text-text-tertiary transition-colors ${
+                  errors[textInput.id]
+                    ? "border-danger focus:ring-danger/30"
+                    : "border-border focus:border-primary focus:ring-primary/20"
+                } focus:outline-none focus:ring-2`}
+              />
+            ) : (
+              <textarea
+                id={textInput.id}
+                value={textValues[textInput.id] ?? ""}
+                onChange={(e) => handleTextChange(textInput.id, e.target.value)}
+                placeholder={textInput.placeholder}
+                rows={6}
+                className={`w-full px-3 py-2.5 rounded-lg border text-sm text-text bg-surface placeholder:text-text-tertiary resize-y min-h-[120px] max-h-[320px] font-mono transition-colors ${
+                  errors[textInput.id]
+                    ? "border-danger focus:ring-danger/30"
+                    : "border-border focus:border-primary focus:ring-primary/20"
+                } focus:outline-none focus:ring-2`}
+              />
+            )}
             {errors[textInput.id] && (
               <p className="mt-1 text-xs text-danger">
                 {t("explore.inputRequired", "Please provide content or upload a file")}
