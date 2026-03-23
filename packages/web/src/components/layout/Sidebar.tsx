@@ -6,9 +6,9 @@ import { clsx } from "clsx";
 import {
   Archive, Pin, Trash2, PanelLeft, PanelLeftClose, BookOpen,
   Settings, ShieldCheck,
-  Microscope, Compass, HelpCircle, Filter, Search,
+  HelpCircle, Filter, Search, Microscope, Compass,
   CheckSquare, Square, FolderOpen, MessageSquare, Zap, HardDrive, Plus,
-  X, Loader2, ChevronRight, ChevronDown,
+  X, Loader2, ChevronRight, ChevronDown, Library,
 } from "lucide-react";
 import { isToday, isYesterday, isThisWeek } from "date-fns";
 import { api } from "../../lib/api";
@@ -38,13 +38,14 @@ export function Sidebar() {
   const [showFilters, setShowFilters] = useState(false);
   const [filterDateRange, setFilterDateRange] = useState<DateRange>("all");
   const [filterFolderId, setFilterFolderId] = useState<string | null>(null);
+  const [filterType, setFilterType] = useState<"all" | "chats" | "research">("all");
   const [bulkMode, setBulkMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [foldersOpen, setFoldersOpen] = useState(false);
+  const [foldersOpen, setFoldersOpen] = useState(true);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const matchRoute = useMatchRoute();
   const activeMatch = matchRoute({ to: "/conversations/$id", fuzzy: false });
@@ -57,11 +58,17 @@ export function Sidebar() {
     staleTime: 30_000,
   });
 
+  const { data: researchData } = useQuery({
+    queryKey: ["research-reports"],
+    queryFn: () => api.get<any>("/api/research"),
+    staleTime: 30_000,
+  });
+
   const { data: foldersData } = useQuery({
     queryKey: queryKeys.folders.list(),
     queryFn: () => api.get<any>("/api/conversations/folders"),
     staleTime: 0,
-    enabled: foldersOpen || !!filterFolderId,
+    enabled: true,
   });
 
   const { data: folderDetailData } = useQuery({
@@ -107,8 +114,36 @@ export function Sidebar() {
   });
 
   // ── Derived data ─────────────────────────────────────────────────────
-  const conversations = conversationsData?.data ?? [];
+  const rawConversations = conversationsData?.data ?? [];
+  const researchReports: any[] = (researchData as any)?.data ?? [];
   const folders: any[] = (foldersData as any)?.data ?? [];
+
+  // Merge research reports into the conversation list with a visual marker
+  const conversations = useMemo(() => {
+    const convs = [...rawConversations];
+    for (const report of researchReports) {
+      // Skip if already linked to a conversation that's in the list
+      if (report.conversationId && convs.some((c: any) => c.id === report.conversationId)) continue;
+      convs.push({
+        id: `research-${report.id}`,
+        _researchId: report.id,
+        _isResearch: true,
+        title: report.title || report.query,
+        createdAt: report.createdAt,
+        updatedAt: report.updatedAt ?? report.createdAt,
+        isPinned: false,
+        isArchived: false,
+        tags: [],
+        _researchStatus: report.status,
+      });
+    }
+    convs.sort((a: any, b: any) => {
+      const dateA = new Date(a.updatedAt ?? a.createdAt).getTime();
+      const dateB = new Date(b.updatedAt ?? b.createdAt).getTime();
+      return dateB - dateA;
+    });
+    return convs;
+  }, [rawConversations, researchReports]);
 
   // ── Debounced server search ──────────────────────────────────────────
   useEffect(() => {
@@ -142,13 +177,16 @@ export function Sidebar() {
   const clearAllFilters = useCallback(() => {
     setFilterDateRange("all");
     setFilterFolderId(null);
+    setFilterType("all");
   }, []);
 
   // ── Filtering (local for non-search, date range, tags, model) ──────
   const isSearchActive = searchQuery.trim().length >= 2;
 
   const filteredConversations = conversations.filter((c: any) => {
-    if (folderConversationIds && !folderConversationIds.has(c.id)) return false;
+    if (filterType === "research" && !c._isResearch) return false;
+    if (filterType === "chats" && c._isResearch) return false;
+    if (folderConversationIds && !c._isResearch && !folderConversationIds.has(c.id)) return false;
     if (filterDateRange !== "all") {
       const date = new Date(c.updatedAt ?? c.createdAt);
       const now = new Date();
@@ -256,15 +294,25 @@ export function Sidebar() {
           )}
         </div>
 
-        {/* Primary Navigation */}
-        <nav className={clsx("pt-2 pb-1 space-y-0.5", sidebarOpen ? "px-2" : "px-1.5")} aria-label={t("nav.main", { defaultValue: "Main navigation" })}>
-          <SidebarLink icon={MessageSquare} label={t("nav.conversations", { defaultValue: "Conversations" })} to="/" exact collapsed={!sidebarOpen} />
-          <SidebarLink icon={Microscope} label={t("nav.research", { defaultValue: "Research" })} to="/research" collapsed={!sidebarOpen} />
-          <SidebarLink icon={BookOpen} label={t("nav.knowledge", { defaultValue: "Knowledge" })} to="/knowledge" collapsed={!sidebarOpen} />
+        {/* New Chat + Library Navigation */}
+        <div className={clsx("pt-2 pb-1 space-y-0.5", sidebarOpen ? "px-2" : "px-1.5")}>
+          {/* + New Chat */}
+          <SidebarLink icon={Plus} label={t("conversations.new", { defaultValue: "New conversation" })} to="/" exact collapsed={!sidebarOpen} />
+
+          {/* Explore */}
           <SidebarLink icon={Compass} label={t("nav.explore", { defaultValue: "Explore" })} to="/explore" collapsed={!sidebarOpen} />
-          <SidebarLink icon={HardDrive} label={t("nav.files", { defaultValue: "Files" })} to="/files" collapsed={!sidebarOpen} />
-          <SidebarLink icon={FolderOpen} label={t("nav.folders", { defaultValue: "Folders" })} to="/folders" collapsed={!sidebarOpen} />
-        </nav>
+
+          {/* Library collapsible group */}
+          <SidebarCollapsible
+            icon={Library}
+            label={t("nav.library", { defaultValue: "Library" })}
+            collapsed={!sidebarOpen}
+            routes={["/knowledge", "/files"]}
+          >
+            <SidebarLink icon={BookOpen} label={t("nav.knowledge", { defaultValue: "Knowledge" })} to="/knowledge" indent />
+            <SidebarLink icon={HardDrive} label={t("nav.files", { defaultValue: "Files" })} to="/files" indent />
+          </SidebarCollapsible>
+        </div>
 
         {sidebarOpen && (
           <>
@@ -386,6 +434,28 @@ export function Sidebar() {
               )}
             </div>
 
+            {/* Quick type filter chips — always visible */}
+            <div className="px-3 pt-1.5 flex gap-1">
+              {(["all", "chats", "research"] as const).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setFilterType(type)}
+                  className={clsx(
+                    "flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-full transition-colors",
+                    filterType === type
+                      ? "bg-primary/10 text-primary"
+                      : "bg-surface-tertiary/50 text-text-tertiary hover:bg-surface-tertiary hover:text-text-secondary",
+                  )}
+                >
+                  {type === "research" && <Microscope className="h-2.5 w-2.5" aria-hidden="true" />}
+                  {type === "chats" && <MessageSquare className="h-2.5 w-2.5" aria-hidden="true" />}
+                  {type === "all" && t("search.filter.all", { defaultValue: "All" })}
+                  {type === "chats" && t("search.filter.chats", { defaultValue: "Chats" })}
+                  {type === "research" && t("search.filter.research", { defaultValue: "Research" })}
+                </button>
+              ))}
+            </div>
+
             {/* Expanded Filters */}
             {showFilters && (
               <div className="px-3 pt-1 space-y-1.5">
@@ -471,7 +541,13 @@ export function Sidebar() {
                               key={conv.id}
                               conv={conv}
                               active={activeConversationId === conv.id}
-                              onClick={() => navigate({ to: `/conversations/${conv.id}` })}
+                              onClick={() => {
+                                if (conv._isResearch) {
+                                  navigate({ to: "/research", search: { report: conv._researchId } });
+                                } else {
+                                  navigate({ to: `/conversations/${conv.id}` });
+                                }
+                              }}
                             />
                           ))}
                         </>
@@ -549,6 +625,8 @@ export function Sidebar() {
                         onClick={() => {
                           if (bulkMode) {
                             toggleSelect(conv.id);
+                          } else if (conv._isResearch) {
+                            navigate({ to: "/research", search: { report: conv._researchId } });
                           } else {
                             navigate({ to: `/conversations/${conv.id}` });
                           }
@@ -644,10 +722,21 @@ function ConversationItem({
           ? <CheckSquare className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" aria-hidden="true" />
           : <Square className="h-3.5 w-3.5 text-text-tertiary shrink-0 mt-0.5" aria-hidden="true" />
       )}
-      {!bulkMode && conv.isPinned && <Pin className="h-3 w-3 text-primary shrink-0 mt-1" aria-hidden="true" />}
+      {!bulkMode && conv._isResearch && <span title="Deep Research"><Microscope className="h-3 w-3 text-primary shrink-0 mt-1" aria-hidden="true" /></span>}
+      {!bulkMode && !conv._isResearch && conv.isPinned && <Pin className="h-3 w-3 text-primary shrink-0 mt-1" aria-hidden="true" />}
       <div className="flex-1 min-w-0">
         <span className="block truncate text-xs">{conv.title ?? "Untitled"}</span>
         <span className="flex items-center gap-1.5 mt-0.5 text-[10px] text-text-tertiary">
+          {conv._isResearch && (
+            <>
+              <span className={clsx(
+                "inline-block h-1.5 w-1.5 rounded-full shrink-0",
+                conv._researchStatus === "completed" ? "bg-success" :
+                conv._researchStatus === "failed" ? "bg-danger" :
+                "bg-warning animate-pulse",
+              )} />
+            </>
+          )}
           {relTime && <span>{relTime}</span>}
           {convTags.length > 0 && (
             <>
@@ -672,7 +761,7 @@ function ConversationItem({
 // SidebarLink
 // ---------------------------------------------------------------------------
 
-function SidebarLink({ icon: Icon, label, to, exact, collapsed }: { icon: any; label: string; to: string; exact?: boolean; collapsed?: boolean }) {
+function SidebarLink({ icon: Icon, label, to, exact, collapsed, indent }: { icon: any; label: string; to: string; exact?: boolean; collapsed?: boolean; indent?: boolean }) {
   const matchRoute = useMatchRoute();
   const isActive = exact
     ? matchRoute({ to, fuzzy: false }) || (to === "/" && matchRoute({ to: "/", fuzzy: false }))
@@ -701,7 +790,8 @@ function SidebarLink({ icon: Icon, label, to, exact, collapsed }: { icon: any; l
       to={to}
       aria-current={isActive ? "page" : undefined}
       className={clsx(
-        "w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-150 relative no-underline",
+        "w-full flex items-center gap-2.5 py-1.5 rounded-lg text-sm transition-all duration-150 relative no-underline",
+        indent ? "pl-8 pr-3" : "px-3",
         isActive
           ? "bg-primary/10 text-primary font-medium nav-active"
           : "text-text-secondary hover:bg-surface-tertiary hover:text-text hover:translate-x-0.5",
@@ -710,5 +800,65 @@ function SidebarLink({ icon: Icon, label, to, exact, collapsed }: { icon: any; l
       <Icon className="h-4 w-4" aria-hidden="true" />
       {label}
     </Link>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SidebarCollapsible — collapsible nav group
+// ---------------------------------------------------------------------------
+
+function SidebarCollapsible({
+  icon: Icon,
+  label,
+  collapsed,
+  children,
+  routes,
+}: {
+  icon: any;
+  label: string;
+  collapsed?: boolean;
+  children: React.ReactNode;
+  routes: string[];
+}) {
+  const [open, setOpen] = useState(true);
+  const matchRoute = useMatchRoute();
+  const isChildActive = routes.some((r) => matchRoute({ to: r, fuzzy: true }));
+
+  if (collapsed) {
+    return (
+      <div
+        title={label}
+        className={clsx(
+          "flex items-center justify-center h-9 w-9 mx-auto rounded-lg transition-all duration-150 relative",
+          isChildActive
+            ? "bg-primary/10 text-primary"
+            : "text-text-secondary hover:bg-surface-tertiary hover:text-text",
+        )}
+      >
+        <Icon className="h-4 w-4" aria-hidden="true" />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(!open)}
+        className={clsx(
+          "w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-150",
+          isChildActive
+            ? "text-primary font-medium"
+            : "text-text-secondary hover:bg-surface-tertiary hover:text-text",
+        )}
+      >
+        <Icon className="h-4 w-4" aria-hidden="true" />
+        {label}
+        <ChevronDown
+          className={clsx("h-3 w-3 ml-auto transition-transform", !open && "-rotate-90")}
+          aria-hidden="true"
+        />
+      </button>
+      {open && <div className="space-y-0.5">{children}</div>}
+    </div>
   );
 }

@@ -268,7 +268,7 @@ export function OmniBar() {
         label: t("nav.research", { defaultValue: "Research" }),
         icon: <Microscope className="h-4 w-4" aria-hidden="true" />,
         section: "navigation" as ResultSection,
-        action: runAndClose(() => navigate({ to: "/research" })),
+        action: runAndClose(() => navigate({ to: "/research", search: { report: undefined } })),
       },
       {
         id: "nav-explore",
@@ -438,7 +438,7 @@ export function OmniBar() {
           description: r.status,
           icon: <FlaskConical className="h-4 w-4" aria-hidden="true" />,
           section: "research",
-          action: runAndClose(() => navigate({ to: "/research" })),
+          action: runAndClose(() => navigate({ to: "/research", search: { report: undefined } })),
         });
       }
     }
