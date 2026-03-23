@@ -29,6 +29,11 @@ const envSchema = z.object({
     .transform((v) => v === "true" || v === "1"),
   SANDBOX_DOCKER_HOST: z.string().optional(),
 
+  VISION_VERIFY_ENABLED: z
+    .enum(["true", "false", "1", "0"])
+    .default("true")
+    .transform((v) => v === "true" || v === "1"),
+
   MINIO_ENDPOINT: z.string().default("http://minio:9000"),
   MINIO_ROOT_USER: z.string().default("minioadmin"),
   MINIO_ROOT_PASSWORD: z.string().default("minioadmin"),

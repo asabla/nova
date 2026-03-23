@@ -309,6 +309,20 @@ export const codeExecuteTool = tool({
       );
     }
 
+    // Vision verification for visual outputs
+    let visualVerification: { name: string; description: string }[] = [];
+    if (result.outputFiles.length > 0) {
+      try {
+        const { isVisualFile, verifyVisualOutputs } = await import("../vision-verify");
+        const visualFiles = result.outputFiles.filter((f) => isVisualFile(f.name));
+        if (visualFiles.length > 0) {
+          visualVerification = await verifyVisualOutputs(visualFiles, { maxFiles: 3 });
+        }
+      } catch (err) {
+        console.warn("[code_execute] Vision verification failed:", err);
+      }
+    }
+
     return {
       stdout: result.run.stdout.slice(0, 100_000),
       stderr: result.run.stderr.slice(0, 10_000),
@@ -316,6 +330,7 @@ export const codeExecuteTool = tool({
       language: result.language,
       version: result.version,
       ...(outputFileInfo.length > 0 ? { outputFiles: outputFileInfo } : {}),
+      ...(visualVerification.length > 0 ? { visualVerification } : {}),
     };
   },
 });
