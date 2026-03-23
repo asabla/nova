@@ -119,29 +119,29 @@ function AgentBuilderPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate({ to: "/agents" })} className="p-1 hover:bg-surface-secondary rounded" aria-label={t("common.goBack", { defaultValue: "Go back" })}>
-            <ArrowLeft className="h-5 w-5 text-text-secondary" aria-hidden="true" />
+      <div className="flex items-center justify-between px-6 py-3 border-b border-border gap-4">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <button onClick={() => navigate({ to: "/agents" })} className="p-1.5 hover:bg-surface-secondary rounded-lg shrink-0" aria-label={t("common.goBack", { defaultValue: "Go back" })}>
+            <ArrowLeft className="h-4 w-4 text-text-secondary" aria-hidden="true" />
           </button>
-          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
             <Bot className="h-5 w-5 text-primary" aria-hidden="true" />
           </div>
-          <div>
-            <Input
+          <div className="min-w-0 flex-1">
+            <input
               type="text"
               value={agent.name}
               onChange={(e) => setAgent({ ...agent, name: e.target.value })}
               placeholder={t("agents.namePlaceholder", { defaultValue: "Agent name..." })}
-              className="text-lg font-semibold text-text bg-transparent border-none outline-none placeholder:text-text-tertiary"
+              className="text-base font-semibold text-text bg-transparent border-none outline-none w-full placeholder:text-text-tertiary"
               aria-label={t("agents.nameLabel", { defaultValue: "Agent name" })}
             />
-            <Input
+            <input
               type="text"
               value={agent.description}
               onChange={(e) => setAgent({ ...agent, description: e.target.value })}
               placeholder={t("agents.descriptionPlaceholder", { defaultValue: "Description..." })}
-              className="text-sm text-text-secondary bg-transparent border-none outline-none block placeholder:text-text-tertiary"
+              className="text-xs text-text-secondary bg-transparent border-none outline-none w-full placeholder:text-text-tertiary"
               aria-label={t("agents.descriptionLabel", { defaultValue: "Agent description" })}
             />
           </div>

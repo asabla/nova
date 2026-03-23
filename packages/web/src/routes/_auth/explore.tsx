@@ -18,6 +18,7 @@ import {
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { api } from "../../lib/api";
+import { getAgentColor, getAgentBgStyle, getAgentIconStyle } from "../../lib/agent-appearance";
 
 export const Route = createFileRoute("/_auth/explore")({
   component: ExplorePage,
@@ -235,8 +236,8 @@ function AgentCard({
   return (
     <div className="flex flex-col p-4 rounded-xl bg-surface-secondary border border-border hover:border-border-strong transition-colors group">
       <div className="flex items-start gap-3 mb-3">
-        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-          <Bot className="h-5 w-5 text-primary" aria-hidden="true" />
+        <div className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0" style={getAgentBgStyle(getAgentColor(agent))}>
+          <Bot className="h-5 w-5" style={getAgentIconStyle(getAgentColor(agent))} aria-hidden="true" />
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-semibold text-text truncate">{agent.name}</h3>
@@ -360,19 +361,22 @@ function ExplorePage() {
   }, [activeCategory, searchQuery]);
 
   const filteredAgents = useMemo(() => {
-    if (activeCategory !== "all" && activeCategory !== "agents") return [];
-    if (!searchQuery) return publishedAgents.slice(0, 6);
-    const q = searchQuery.toLowerCase();
-    return publishedAgents
-      .filter(
+    let result = publishedAgents;
+
+    // Apply search filter
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
         (a) =>
           a.name?.toLowerCase().includes(q) ||
           a.description?.toLowerCase().includes(q),
-      )
-      .slice(0, 6);
+      );
+    }
+
+    return result.slice(0, activeCategory === "agents" ? 12 : 6);
   }, [publishedAgents, activeCategory, searchQuery]);
 
-  const showAgents = activeCategory === "all" || activeCategory === "agents";
+  const showAgents = filteredAgents.length > 0;
   const showConversations = activeCategory !== "agents";
 
   const handleStartConversation = (starterMessage: string) => {

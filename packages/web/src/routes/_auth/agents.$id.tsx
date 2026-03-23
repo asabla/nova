@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Bot, ArrowLeft, Save, Trash2, Copy, Share2, History, TestTube, Settings2, Wrench, BookOpen, Brain, RefreshCw, MessageSquare } from "lucide-react";
+import { Bot, ArrowLeft, Save, Trash2, Copy, Share2, History, TestTube, Settings2, Wrench, BookOpen, Brain, RefreshCw, MessageSquare, Send, Loader2, User, Sparkles, RotateCcw } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "../../components/ui/Button";
-import { Input } from "../../components/ui/Input";
 import { Textarea } from "../../components/ui/Textarea";
 import { Select } from "../../components/ui/Select";
 import { Dialog } from "../../components/ui/Dialog";
@@ -13,6 +12,7 @@ import { Skeleton } from "../../components/ui/Skeleton";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { formatDateTime } from "../../lib/format";
+import { getAgentColor, getAgentBgStyle, getAgentIconStyle, AGENT_COLORS } from "../../lib/agent-appearance";
 
 export const Route = createFileRoute("/_auth/agents/$id")({
   component: AgentDetailPage,
@@ -48,6 +48,7 @@ function AgentDetailPage() {
   });
 
   const models = (modelsData as any)?.data ?? [];
+  const agentColor = getAgentColor({ id, name: form.name, avatarUrl: agent?.avatarUrl });
 
   useEffect(() => {
     if (agent) {
@@ -97,25 +98,41 @@ function AgentDetailPage() {
     onError: (err: any) => toast.error(err.message ?? t("agents.cloneFailed", { defaultValue: "Clone failed" })),
   });
 
-  const [testPrompt, setTestPrompt] = useState("");
-  const [testResult, setTestResult] = useState("");
+  const [testMessages, setTestMessages] = useState<{ role: "user" | "assistant" | "error"; content: string }[]>([]);
+  const [testInput, setTestInput] = useState("");
   const [testing, setTesting] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [testMessages]);
 
   const handleTest = async () => {
-    if (!testPrompt.trim()) return;
+    if (!testInput.trim() || testing) return;
+    const userMsg = testInput.trim();
+    setTestInput("");
+
+    const updatedMessages = [...testMessages, { role: "user" as const, content: userMsg }];
+    setTestMessages(updatedMessages);
     setTesting(true);
-    setTestResult("");
+
     try {
+      const apiMessages = [
+        ...(form.systemPrompt ? [{ role: "system", content: form.systemPrompt }] : []),
+        ...updatedMessages.filter((m) => m.role !== "error").map((m) => ({ role: m.role, content: m.content })),
+      ];
       const result = await api.post<any>("/api/v1/chat/completions", {
-        model: "gpt-4o",
-        messages: [
-          ...(form.systemPrompt ? [{ role: "system", content: form.systemPrompt }] : []),
-          { role: "user", content: testPrompt },
-        ],
+        model: form.modelId || "gpt-4o",
+        messages: apiMessages,
       });
-      setTestResult(result.choices?.[0]?.message?.content ?? t("agents.noResponse", { defaultValue: "No response" }));
+      const content = result.choices?.[0]?.message?.content ?? t("agents.noResponse", { defaultValue: "No response" });
+      setTestMessages((prev) => [...prev, { role: "assistant", content }]);
     } catch (err: any) {
-      setTestResult(`${t("common.error", { defaultValue: "Error" })}: ${err.message ?? t("agents.testFailed", { defaultValue: "Test failed" })}`);
+      setTestMessages((prev) => [...prev, { role: "error", content: err.message ?? t("agents.testFailed", { defaultValue: "Test failed" }) }]);
     } finally {
       setTesting(false);
     }
@@ -173,28 +190,31 @@ function AgentDetailPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate({ to: "/agents" })} className="p-1 hover:bg-surface-secondary rounded" aria-label={t("common.goBack", { defaultValue: "Go back" })}>
-            <ArrowLeft className="h-5 w-5 text-text-secondary" aria-hidden="true" />
+      <div className="flex items-center justify-between px-6 py-3 border-b border-border gap-4">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <button onClick={() => navigate({ to: "/agents" })} className="p-1.5 hover:bg-surface-secondary rounded-lg shrink-0" aria-label={t("common.goBack", { defaultValue: "Go back" })}>
+            <ArrowLeft className="h-4 w-4 text-text-secondary" aria-hidden="true" />
           </button>
-          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Bot className="h-5 w-5 text-primary" aria-hidden="true" />
+          <div
+            className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0"
+            style={getAgentBgStyle(agentColor)}
+          >
+            <Bot className="h-5 w-5" style={getAgentIconStyle(agentColor)} aria-hidden="true" />
           </div>
-          <div>
-            <Input
+          <div className="min-w-0 flex-1">
+            <input
               type="text"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="text-lg font-semibold text-text bg-transparent border-none outline-none"
+              className="text-base font-semibold text-text bg-transparent border-none outline-none w-full"
               aria-label={t("agents.nameLabel", { defaultValue: "Agent name" })}
             />
-            <Input
+            <input
               type="text"
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               placeholder={t("agents.descriptionPlaceholder", { defaultValue: "Description..." })}
-              className="text-sm text-text-secondary bg-transparent border-none outline-none block placeholder:text-text-tertiary"
+              className="text-xs text-text-secondary bg-transparent border-none outline-none w-full placeholder:text-text-tertiary"
               aria-label={t("agents.descriptionLabel", { defaultValue: "Agent description" })}
             />
           </div>
@@ -300,6 +320,37 @@ function AgentDetailPage() {
               />
             </div>
 
+            {/* Agent color */}
+            <div>
+              <label className="block text-sm font-medium text-text mb-2">{t("agents.agentColor", { defaultValue: "Agent Color" })}</label>
+              <div className="flex items-center gap-2">
+                {AGENT_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => {
+                      // Store color in avatarUrl field with convention
+                      updateMutation.mutate({ ...form, avatarUrl: `color:${c}` } as any);
+                    }}
+                    className={`h-7 w-7 rounded-full border-2 transition-transform hover:scale-110 ${
+                      agentColor === c ? "border-text scale-110" : "border-transparent"
+                    }`}
+                    style={{ backgroundColor: c }}
+                    aria-label={`Select color ${c}`}
+                  />
+                ))}
+                <button
+                  onClick={() => {
+                    updateMutation.mutate({ ...form, avatarUrl: "" } as any);
+                  }}
+                  className={`h-7 px-2 rounded-full text-[10px] font-medium border transition-colors ${
+                    !agent?.avatarUrl?.startsWith("color:") ? "border-text text-text" : "border-border text-text-tertiary hover:text-text"
+                  }`}
+                >
+                  Auto
+                </button>
+              </div>
+            </div>
+
             {agent && (
               <div className="pt-4 border-t border-border text-xs text-text-tertiary space-y-1">
                 <p>{t("agents.version", { defaultValue: "Version" })}: {agent.currentVersion}</p>
@@ -311,28 +362,129 @@ function AgentDetailPage() {
         )}
 
         {activeTab === "test" && (
-          <div className="max-w-2xl space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-text mb-1.5">{t("agents.testPrompt", { defaultValue: "Test Prompt" })}</label>
-              <div className="flex gap-2">
-                <Textarea
-                  value={testPrompt}
-                  onChange={(e) => setTestPrompt(e.target.value)}
-                  placeholder={t("agents.testPlaceholder", { defaultValue: "Enter a test message..." })}
-                  rows={3}
-                  className="flex-1"
-                />
-                <Button variant="primary" onClick={handleTest} disabled={testing || !testPrompt.trim()}>
-                  <TestTube className="h-4 w-4" aria-hidden="true" />
-                  {testing ? t("agents.running", { defaultValue: "Running..." }) : t("agents.test", { defaultValue: "Test" })}
-                </Button>
-              </div>
+          <div className="flex flex-col h-full max-w-3xl mx-auto -mt-6 -mb-6 py-0" style={{ height: "calc(100vh - 180px)" }}>
+            {/* Chat messages area */}
+            <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+              {testMessages.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <div className="h-14 w-14 rounded-2xl flex items-center justify-center mb-4" style={getAgentBgStyle(agentColor)}>
+                    <TestTube className="h-7 w-7" style={getAgentIconStyle(agentColor)} aria-hidden="true" />
+                  </div>
+                  <h3 className="text-base font-semibold text-text mb-1">{t("agents.testPlayground", { defaultValue: "Test Playground" })}</h3>
+                  <p className="text-sm text-text-tertiary max-w-sm mb-6">
+                    {t("agents.testPlaygroundDesc", { defaultValue: "Send messages to test your agent's behavior. The conversation uses the current system prompt and model." })}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 max-w-md">
+                    {[
+                      t("agents.testSample1", { defaultValue: "Introduce yourself" }),
+                      t("agents.testSample2", { defaultValue: "What can you help me with?" }),
+                      t("agents.testSample3", { defaultValue: "Give me an example of your work" }),
+                      t("agents.testSample4", { defaultValue: "What are your limitations?" }),
+                    ].map((sample) => (
+                      <button
+                        key={sample}
+                        onClick={() => { setTestInput(sample); }}
+                        className="text-left text-xs p-3 rounded-xl bg-surface-secondary border border-border text-text-secondary hover:bg-surface-tertiary hover:text-text transition-colors"
+                      >
+                        {sample}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {testMessages.map((msg, i) => (
+                <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : ""}`}>
+                  {msg.role !== "user" && (
+                    <div
+                      className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
+                      style={msg.role === "error" ? { backgroundColor: "rgba(239,68,68,0.15)" } : getAgentBgStyle(agentColor)}
+                    >
+                      {msg.role === "error" ? (
+                        <Sparkles className="h-3.5 w-3.5 text-danger" aria-hidden="true" />
+                      ) : (
+                        <Bot className="h-3.5 w-3.5" style={getAgentIconStyle(agentColor)} aria-hidden="true" />
+                      )}
+                    </div>
+                  )}
+                  <div
+                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+                      msg.role === "user"
+                        ? "bg-primary text-primary-foreground rounded-br-md"
+                        : msg.role === "error"
+                          ? "bg-danger/10 text-danger border border-danger/20 rounded-bl-md"
+                          : "bg-surface-secondary border border-border text-text rounded-bl-md"
+                    }`}
+                  >
+                    {msg.content}
+                  </div>
+                  {msg.role === "user" && (
+                    <div className="h-7 w-7 rounded-lg bg-surface-tertiary flex items-center justify-center shrink-0 mt-0.5">
+                      <User className="h-3.5 w-3.5 text-text-tertiary" aria-hidden="true" />
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {testing && (
+                <div className="flex gap-3">
+                  <div className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0" style={getAgentBgStyle(agentColor)}>
+                    <Bot className="h-3.5 w-3.5" style={getAgentIconStyle(agentColor)} aria-hidden="true" />
+                  </div>
+                  <div className="bg-surface-secondary border border-border rounded-2xl rounded-bl-md px-4 py-3">
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: agentColor }} />
+                      <div className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: agentColor, animationDelay: "0.2s" }} />
+                      <div className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: agentColor, animationDelay: "0.4s" }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
             </div>
-            {testResult && (
-              <div className="px-3 py-2 rounded-lg border border-border bg-surface-secondary text-sm text-text whitespace-pre-wrap">
-                {testResult}
+
+            {/* Input area */}
+            <div className="border-t border-border px-4 py-3">
+              <div className="flex items-center gap-2">
+                {testMessages.length > 0 && (
+                  <button
+                    onClick={() => setTestMessages([])}
+                    className="p-2 rounded-lg hover:bg-surface-secondary text-text-tertiary hover:text-text transition-colors shrink-0"
+                    title={t("agents.clearChat", { defaultValue: "Clear chat" })}
+                    aria-label={t("agents.clearChat", { defaultValue: "Clear chat" })}
+                  >
+                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                )}
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={testInput}
+                    onChange={(e) => setTestInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleTest(); } }}
+                    placeholder={t("agents.testInputPlaceholder", { defaultValue: "Type a message to test..." })}
+                    disabled={testing}
+                    className="w-full h-10 pl-4 pr-12 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary focus:border-primary/50 transition-colors"
+                  />
+                  <button
+                    onClick={handleTest}
+                    disabled={testing || !testInput.trim()}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-colors disabled:opacity-30"
+                    style={!testing && testInput.trim() ? { backgroundColor: `${agentColor}20`, color: agentColor } : undefined}
+                  >
+                    {testing ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-text-tertiary" aria-hidden="true" />
+                    ) : (
+                      <Send className="h-4 w-4" aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
               </div>
-            )}
+              <p className="text-[10px] text-text-tertiary mt-1.5 text-center">
+                {t("agents.testDisclaimer", { defaultValue: "Test responses use the current system prompt and selected model. Changes are not saved automatically." })}
+              </p>
+            </div>
           </div>
         )}
 

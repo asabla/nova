@@ -9,6 +9,7 @@ import { queryKeys } from "../../lib/query-keys";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { CardSkeleton } from "../../components/ui/Skeleton";
+import { getAgentColor, getAgentBgStyle, getAgentIconStyle } from "../../lib/agent-appearance";
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -185,14 +186,15 @@ function AgentsListPage() {
 function AgentCard({ agent, onChat }: { agent: any; onChat: (agent: any, e: React.MouseEvent) => void }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const color = getAgentColor(agent);
   return (
     <button
       onClick={() => navigate({ to: `/agents/${agent.id}` })}
       className="flex flex-col p-4 rounded-xl bg-surface-secondary border border-border hover:border-border-strong transition-colors cursor-pointer group text-left"
     >
       <div className="flex items-start justify-between mb-3 w-full">
-        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-          <Bot className="h-5 w-5 text-primary" aria-hidden="true" />
+        <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={getAgentBgStyle(color)}>
+          <Bot className="h-5 w-5" style={getAgentIconStyle(color)} aria-hidden="true" />
         </div>
         <div className="flex items-center gap-1.5">
           <Badge variant={agent.visibility === "public" ? "primary" : "default"}>
