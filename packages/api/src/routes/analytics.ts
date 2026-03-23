@@ -173,4 +173,13 @@ analyticsRoutes.get("/budget-status", async (c) => {
   return c.json({ data: status });
 });
 
+// GET /api/analytics/traces - Agent execution traces
+analyticsRoutes.get("/traces", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  const range = parseDateRange(c);
+  const limit = parseInt(c.req.query("limit") ?? "50");
+  const traces = await analyticsService.getAgentTraces(orgId, range, limit);
+  return c.json({ data: traces });
+});
+
 export { analyticsRoutes };

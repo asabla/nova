@@ -195,6 +195,8 @@ export interface AgentWorkflowResult {
   content: string;
   messageIds: string[];
   totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
   steps: number;
   status:
     | "completed"

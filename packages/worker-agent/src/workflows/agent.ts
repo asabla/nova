@@ -185,6 +185,8 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
   let pendingToolApprovals: string[] = [];
   let currentStep = 0;
   let totalTokens = 0;
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
   let currentStatus = "running";
   let finalContent = "";
   const messageIds: string[] = [];
@@ -332,7 +334,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
   if (ch && tier !== "direct") {
     await publishDoneActivity(ch, {
       content: finalContent,
-      usage: { prompt_tokens: 0, completion_tokens: totalTokens },
+      usage: { prompt_tokens: totalInputTokens, completion_tokens: totalOutputTokens },
     });
   }
 
@@ -353,6 +355,8 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
     content: finalContent,
     messageIds,
     totalTokens,
+    inputTokens: totalInputTokens,
+    outputTokens: totalOutputTokens,
     steps: currentStep,
     status: finalStatus,
     toolCallRecords,
@@ -427,6 +431,8 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
       });
 
       totalTokens += agentResult.totalTokens;
+      totalInputTokens += agentResult.inputTokens;
+      totalOutputTokens += agentResult.outputTokens;
       currentStep = agentResult.steps;
       toolCallRecords.push(...agentResult.toolCallRecords);
     };
@@ -438,7 +444,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
     } catch (err: any) {
       if (err.name === "CancelledFailure" || err.message?.includes("timed out")) {
         const isTimeout = err.message?.includes("timed out") && !isCancelled();
-        await publishDone(input.streamChannelId!, { content: "", usage: { prompt_tokens: 0, completion_tokens: 0 } });
+        await publishDone(input.streamChannelId!, { content: "", usage: { prompt_tokens: totalInputTokens, completion_tokens: totalOutputTokens } });
         return isTimeout ? "timeout" : "cancelled";
       }
       throw err;
@@ -663,6 +669,8 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         singleTurn: true,
       });
 
+      totalInputTokens += synthesis.usage.prompt_tokens ?? 0;
+      totalOutputTokens += synthesis.usage.completion_tokens ?? 0;
       totalTokens += (synthesis.usage.prompt_tokens ?? 0) + (synthesis.usage.completion_tokens ?? 0);
 
       if (synthesis.content) {
@@ -758,6 +766,8 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
 
       currentStep++;
       totalTokens += agentResult.totalTokens;
+      totalInputTokens += agentResult.inputTokens;
+      totalOutputTokens += agentResult.outputTokens;
       toolCallRecords.push(...agentResult.toolCallRecords);
 
       // Add the result to conversation history for downstream nodes
@@ -834,6 +844,8 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
       const resultStatus = childResult.status === "completed" ? "completed" : "failed";
 
       totalTokens += childResult.totalTokens ?? 0;
+      totalInputTokens += childResult.inputTokens ?? 0;
+      totalOutputTokens += childResult.outputTokens ?? 0;
       toolCallRecords.push(...(childResult.toolCallRecords ?? []));
 
       plan!.nodes.find((n) => n.id === node.id)!.result = {

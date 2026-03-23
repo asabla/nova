@@ -57,6 +57,13 @@
       "when": 1774121428431,
       "tag": "0007_material_mindworm",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1774292870378,
+      "tag": "0008_lucky_tarot",
+      "breakpoints": true
     }
   ]
 }

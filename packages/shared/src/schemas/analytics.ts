@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, bigint, integer, index } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, bigint, integer, index, unique } from "drizzle-orm/pg-core";
 import { createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { organisations } from "./organisations";
@@ -27,6 +27,7 @@ export const usageStats = pgTable("usage_stats", {
 }, (table) => [
   index("idx_usage_stats_org_period").on(table.orgId, table.period, table.periodStart),
   index("idx_usage_stats_user_period").on(table.userId, table.period),
+  unique("uq_usage_stats_daily").on(table.orgId, table.userId, table.groupId, table.modelId, table.period, table.periodStart).nullsNotDistinct(),
 ]);
 
 export const selectUsageStatsSchema = createSelectSchema(usageStats);

@@ -11,11 +11,12 @@ import { DEFAULTS, TASK_QUEUES } from "@nova/shared/constants";
 import { notificationService } from "../services/notification.service";
 import { getTemporalClient } from "../lib/temporal";
 import { db } from "../lib/db";
-import { userProfiles, users, agents, orgSettings, files, toolCalls as toolCallsTable, messageAttachments, messages as messagesTable } from "@nova/shared/schemas";
+import { userProfiles, users, agents, orgSettings, files, toolCalls as toolCallsTable, messageAttachments, messages as messagesTable, models } from "@nova/shared/schemas";
 import { eq, and, isNull, inArray } from "drizzle-orm";
 import { extractFileContent } from "../lib/file-extract";
 import { SKILLS, SANDBOX_PACKAGES_NOTE } from "@nova/shared/skills";
 import * as artifactService from "../services/artifact.service";
+import { analyticsService, calculateCostCents } from "../services/analytics.service";
 
 /** Strip <think>...</think> reasoning blocks from model output */
 function stripThinkBlocks(text: string): string {
@@ -360,6 +361,13 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
     resolvedModel = setting?.value ?? body.model;
   }
 
+  // Resolve model UUID from external ID for analytics tracking
+  let resolvedModelId: string | null = conversation.modelId;
+  if (!resolvedModelId && resolvedModel) {
+    const [m] = await db.select({ id: models.id }).from(models).where(eq(models.modelIdExternal, resolvedModel)).limit(1);
+    resolvedModelId = m?.id ?? null;
+  }
+
   const lastUserContent = [...body.messages].reverse().find((m) => m.role === "user")?.content;
 
   // Enrich messages with file content so the LLM can read uploaded files
@@ -662,7 +670,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
           senderType: "assistant",
           content: "",
           status: "streaming",
-          modelId: conversation.modelId ?? undefined,
+          modelId: resolvedModelId ?? undefined,
         });
 
         // Initialize Redis keys for stream reconnection
@@ -733,16 +741,38 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
           ? toolCallRecords.map((r: any) => ({ name: r.toolName, durationMs: r.durationMs, error: r.error, args: r.input }))
           : undefined;
 
+        // Compute usage metrics
+        const usagePromptTokens = relayResult?.usage?.prompt_tokens ?? 0;
+        const usageCompletionTokens = relayResult?.usage?.completion_tokens ?? 0;
+        const latencyMs = Date.now() - startTime;
+        let costCents = 0;
+        try { costCents = await calculateCostCents(resolvedModelId, usagePromptTokens, usageCompletionTokens); } catch {}
+
         // Complete the message — this must succeed even if the client disconnected
         try {
           await messageService.completeStreamingMessage(orgId, assistantMessage.id, {
             content: totalContent,
-            tokenCountPrompt: relayResult?.usage?.prompt_tokens ?? 0,
-            tokenCountCompletion: relayResult?.usage?.completion_tokens ?? 0,
-            metadata: { latencyMs: Date.now() - startTime, model: body.model, smartRouted: true, toolSummary, tier: wfTier ?? assessedTier, plan: wfPlanSummary },
+            tokenCountPrompt: usagePromptTokens,
+            tokenCountCompletion: usageCompletionTokens,
+            costCents,
+            metadata: { latencyMs, model: body.model, smartRouted: true, toolSummary, tier: wfTier ?? assessedTier, plan: wfPlanSummary },
           });
         } catch (completeErr) {
           console.error("[stream] Failed to complete streaming message:", completeErr);
+        }
+
+        // Record usage analytics
+        try {
+          await analyticsService.recordUsage(orgId, {
+            userId,
+            modelId: resolvedModelId ?? undefined,
+            promptTokens: usagePromptTokens,
+            completionTokens: usageCompletionTokens,
+            costCents,
+            latencyMs,
+          });
+        } catch (analyticsErr) {
+          console.error("[stream] Failed to record usage analytics:", analyticsErr);
         }
 
         if (toolCallRecords.length > 0) {
@@ -887,15 +917,33 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
       const completionTokens = usageData?.completion_tokens ?? Math.ceil(fullContent.length / 4);
 
       fullContent = stripThinkBlocks(fullContent);
+      let costCents = 0;
+      try { costCents = await calculateCostCents(resolvedModelId, promptTokens, completionTokens); } catch {}
+
       const assistantMessage = await messageService.createMessage(orgId, {
         conversationId,
         senderType: "assistant",
         content: fullContent,
-        modelId: conversation.modelId ?? undefined,
+        modelId: resolvedModelId ?? undefined,
         tokenCountPrompt: promptTokens,
         tokenCountCompletion: completionTokens,
+        costCents,
         metadata: { latencyMs, model: body.model },
       });
+
+      // Record usage analytics
+      try {
+        await analyticsService.recordUsage(orgId, {
+          userId,
+          modelId: resolvedModelId ?? undefined,
+          promptTokens,
+          completionTokens,
+          costCents,
+          latencyMs,
+        });
+      } catch (analyticsErr) {
+        console.error("[stream] Failed to record usage analytics:", analyticsErr);
+      }
 
       // Auto-generate title for untitled conversations
       if (!conversation.title) {
@@ -1079,6 +1127,10 @@ messagesRouter.post("/:conversationId/messages/:messageId/replay", zValidator("j
 
   const data = result as any;
   const content = data.choices?.[0]?.message?.content ?? "";
+  const replayPromptTokens = data.usage?.prompt_tokens ?? 0;
+  const replayCompletionTokens = data.usage?.completion_tokens ?? 0;
+  let replayCostCents = 0;
+  try { replayCostCents = await calculateCostCents(replayConversation.modelId, replayPromptTokens, replayCompletionTokens); } catch {}
 
   // Save as a new assistant message
   const replayMessage = await messageService.createMessage(orgId, {
@@ -1086,10 +1138,24 @@ messagesRouter.post("/:conversationId/messages/:messageId/replay", zValidator("j
     senderType: "assistant",
     content,
     modelId: model,
-    tokenCountPrompt: data.usage?.prompt_tokens,
-    tokenCountCompletion: data.usage?.completion_tokens,
+    tokenCountPrompt: replayPromptTokens,
+    tokenCountCompletion: replayCompletionTokens,
+    costCents: replayCostCents,
     metadata: { replayOf: messageId, model },
   });
+
+  // Record usage analytics
+  try {
+    await analyticsService.recordUsage(orgId, {
+      userId,
+      modelId: replayConversation.modelId ?? undefined,
+      promptTokens: replayPromptTokens,
+      completionTokens: replayCompletionTokens,
+      costCents: replayCostCents,
+    });
+  } catch (analyticsErr) {
+    console.error("[replay] Failed to record usage analytics:", analyticsErr);
+  }
 
   return c.json(replayMessage, 201);
 });

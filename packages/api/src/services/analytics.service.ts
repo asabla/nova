@@ -9,11 +9,38 @@ import {
   models,
   groups,
   groupMemberships,
+  workflows,
+  toolCalls,
+  agents,
 } from "@nova/shared/schemas";
 
 interface DateRange {
   from?: Date;
   to?: Date;
+}
+
+/**
+ * Calculate cost in cents for a given model and token counts.
+ * Uses the per-token pricing from the models table.
+ */
+export async function calculateCostCents(
+  modelId: string | null | undefined,
+  promptTokens: number,
+  completionTokens: number,
+): Promise<number> {
+  if (!modelId) return 0;
+  const [model] = await db
+    .select({
+      costPerPromptTokenCents: models.costPerPromptTokenCents,
+      costPerCompletionTokenCents: models.costPerCompletionTokenCents,
+    })
+    .from(models)
+    .where(eq(models.id, modelId))
+    .limit(1);
+  if (!model) return 0;
+  const promptCost = promptTokens * parseFloat(model.costPerPromptTokenCents ?? "0");
+  const completionCost = completionTokens * parseFloat(model.costPerCompletionTokenCents ?? "0");
+  return Math.round(promptCost + completionCost);
 }
 
 export const analyticsService = {
@@ -372,7 +399,7 @@ export const analyticsService = {
         avgLatencyMs: data.latencyMs ?? null,
       })
       .onConflictDoUpdate({
-        target: [usageStats.id],
+        target: [usageStats.orgId, usageStats.userId, usageStats.groupId, usageStats.modelId, usageStats.period, usageStats.periodStart],
         set: {
           promptTokens: sql`${usageStats.promptTokens} + ${data.promptTokens}`,
           completionTokens: sql`${usageStats.completionTokens} + ${data.completionTokens}`,
@@ -746,5 +773,126 @@ export const analyticsService = {
     }
 
     return results;
+  },
+
+  // ── Agent Traces ──────────────────────────────────────────────────
+  async getAgentTraces(orgId: string, range?: DateRange, limit = 50) {
+    const conditions: any[] = [
+      eq(workflows.orgId, orgId),
+      isNull(workflows.deletedAt),
+    ];
+    if (range?.from) conditions.push(gte(workflows.startedAt, range.from));
+    if (range?.to) conditions.push(lte(workflows.startedAt, range.to));
+
+    const wfRows = await db
+      .select({
+        id: workflows.id,
+        status: workflows.status,
+        conversationId: workflows.conversationId,
+        agentId: workflows.agentId,
+        initiatedById: workflows.initiatedById,
+        output: workflows.output,
+        errorMessage: workflows.errorMessage,
+        startedAt: workflows.startedAt,
+        completedAt: workflows.completedAt,
+      })
+      .from(workflows)
+      .where(and(...conditions))
+      .orderBy(desc(workflows.startedAt))
+      .limit(limit);
+
+    if (wfRows.length === 0) return [];
+
+    // Batch-fetch user names and agent names
+    const userIds = [...new Set(wfRows.map((w) => w.initiatedById))];
+    const agentIds = [...new Set(wfRows.map((w) => w.agentId).filter(Boolean))] as string[];
+
+    const [userRows, agentRows] = await Promise.all([
+      userIds.length > 0
+        ? db.select({ userId: userProfiles.userId, displayName: userProfiles.displayName })
+            .from(userProfiles)
+            .where(sql`${userProfiles.userId} = ANY(ARRAY[${sql.join(userIds.map((id) => sql`${id}::uuid`), sql`, `)}])`)
+        : [],
+      agentIds.length > 0
+        ? db.select({ id: agents.id, name: agents.name })
+            .from(agents)
+            .where(sql`${agents.id} = ANY(ARRAY[${sql.join(agentIds.map((id) => sql`${id}::uuid`), sql`, `)}])`)
+        : [],
+    ]);
+
+    const userNameMap = new Map(userRows.map((u) => [u.userId, u.displayName]));
+    const agentNameMap = new Map(agentRows.map((a) => [a.id, a.name]));
+
+    // Fetch tool calls for all workflows via their messageIds
+    const allMessageIds: string[] = [];
+    for (const wf of wfRows) {
+      const output = wf.output as any;
+      if (output?.messageIds) allMessageIds.push(...output.messageIds);
+    }
+
+    const toolCallMap = new Map<string, any[]>();
+    if (allMessageIds.length > 0) {
+      const tcRows = await db
+        .select({
+          messageId: toolCalls.messageId,
+          toolName: toolCalls.toolName,
+          input: toolCalls.input,
+          output: toolCalls.output,
+          status: toolCalls.status,
+          durationMs: toolCalls.durationMs,
+          errorMessage: toolCalls.errorMessage,
+        })
+        .from(toolCalls)
+        .where(sql`${toolCalls.messageId} = ANY(ARRAY[${sql.join(allMessageIds.map((id) => sql`${id}::uuid`), sql`, `)}])`);
+
+      for (const tc of tcRows) {
+        const existing = toolCallMap.get(tc.messageId) ?? [];
+        existing.push({
+          name: tc.toolName,
+          durationMs: tc.durationMs ?? 0,
+          status: tc.status === "error" ? "error" : "success",
+          input: typeof tc.input === "object" ? JSON.stringify(tc.input).slice(0, 500) : String(tc.input ?? "").slice(0, 500),
+          output: typeof tc.output === "object" ? JSON.stringify(tc.output).slice(0, 500) : String(tc.output ?? "").slice(0, 500),
+        });
+        toolCallMap.set(tc.messageId, existing);
+      }
+    }
+
+    // Map workflow status to frontend-expected status
+    function mapStatus(s: string): "success" | "error" | "timeout" | "running" {
+      if (s === "completed") return "success";
+      if (s === "error") return "error";
+      if (s === "timeout") return "timeout";
+      if (s === "running") return "running";
+      return "success";
+    }
+
+    return wfRows.map((wf) => {
+      const output = wf.output as any;
+      const messageIds: string[] = output?.messageIds ?? [];
+      const wfToolCalls = messageIds.flatMap((mid) => toolCallMap.get(mid) ?? []);
+      const durationMs = wf.completedAt && wf.startedAt
+        ? new Date(wf.completedAt).getTime() - new Date(wf.startedAt).getTime()
+        : 0;
+
+      // Try to get model from output or use a default
+      const modelName = output?.model ?? "unknown";
+
+      return {
+        id: wf.id,
+        agentName: wf.agentId ? (agentNameMap.get(wf.agentId) ?? "Agent") : "Chat",
+        conversationId: wf.conversationId ?? "",
+        userId: wf.initiatedById,
+        userName: userNameMap.get(wf.initiatedById) ?? "Unknown",
+        modelName,
+        status: mapStatus(wf.status),
+        startedAt: wf.startedAt?.toISOString() ?? "",
+        durationMs,
+        totalTokens: output?.totalTokens ?? 0,
+        costCents: 0,
+        toolCalls: wfToolCalls,
+        errorMessage: wf.errorMessage ?? undefined,
+      };
+    });
   },
 };

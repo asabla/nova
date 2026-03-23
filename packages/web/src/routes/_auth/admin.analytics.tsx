@@ -10,7 +10,7 @@ import { api, apiHeaders } from "../../lib/api";
 
 import type {
   Summary, DailyRow, ModelRow, UserRow, GroupRow, Trends,
-  CostData, BudgetAlert, BudgetStatus, AgentRun, ToolCall,
+  CostData, BudgetAlert, BudgetStatus, AgentRun,
   CostBreakdownTab, MainTab, DatePreset,
 } from "../../components/admin/analytics/types";
 import { getDateRange, defaultDateRange } from "../../components/admin/analytics/types";
@@ -97,6 +97,12 @@ function AdminAnalyticsPage() {
     staleTime: 60_000,
   });
 
+  const { data: traces, isLoading: tracesLoading } = useQuery({
+    queryKey: ["analytics-traces", dateRange],
+    queryFn: () => api.get<{ data: AgentRun[] }>(`/api/analytics/traces${queryParams}&limit=50`),
+    staleTime: 60_000,
+  });
+
   // ── Extracted data ──────────────────────────────────────────────
 
   const s = (summary as any)?.data as Summary | undefined;
@@ -108,27 +114,7 @@ function AdminAnalyticsPage() {
   const costData = (costs as any)?.data as CostData | undefined;
   const alertsData = (((budgetAlerts as any)?.data) ?? []) as BudgetAlert[];
   const statusData = (((budgetStatus as any)?.data) ?? []) as BudgetStatus[];
-
-  // ── Mock agent traces ─────────────────────────────────────────
-
-  const agentTraces: AgentRun[] = modelData.slice(0, 5).map((m, i) => ({
-    id: `trace-${i}`,
-    agentName: `Agent ${i + 1}`,
-    conversationId: `conv-${i}`,
-    userId: `user-${i}`,
-    userName: userData[i]?.displayName ?? `User ${i + 1}`,
-    modelName: m.modelName,
-    status: (i === 2 ? "error" : i === 4 ? "running" : "success") as AgentRun["status"],
-    startedAt: new Date(Date.now() - (i + 1) * 3600_000).toISOString(),
-    durationMs: Math.round(m.avgLatencyMs * (1 + Math.random() * 3)),
-    totalTokens: Math.round(m.totalTokens / Math.max(m.requestCount, 1)),
-    costCents: Math.round(m.costCents / Math.max(m.requestCount, 1)),
-    toolCalls: [
-      { name: "web_search", durationMs: Math.round(200 + Math.random() * 800), status: "success" as const, input: '{"query": "example search"}', output: '{"results": [...]}' },
-      { name: "code_interpreter", durationMs: Math.round(500 + Math.random() * 2000), status: (i === 2 ? "error" : "success") as ToolCall["status"], input: '{"code": "print(42)"}', output: i === 2 ? "Error: timeout" : '{"result": "42"}' },
-    ],
-    errorMessage: i === 2 ? "Tool execution timed out after 30s" : undefined,
-  }));
+  const agentTraces = (((traces as any)?.data) ?? []) as AgentRun[];
 
   // ── Export handler ──────────────────────────────────────────────
 
@@ -348,7 +334,7 @@ function AdminAnalyticsPage() {
       {mainTab === "traces" && (
         <AgentTracesTab
           traces={agentTraces}
-          loading={modelLoading}
+          loading={tracesLoading}
           expandedTraceId={expandedTraceId}
           onToggleTrace={(id) => setExpandedTraceId(expandedTraceId === id ? null : id)}
         />

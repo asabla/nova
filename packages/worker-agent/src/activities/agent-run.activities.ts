@@ -32,6 +32,8 @@ export interface AgentRunInput {
 export interface AgentRunResult {
   content: string;
   totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
   steps: number;
   toolCallRecords: {
     toolName: string;
@@ -73,6 +75,8 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
 
   let fullContent = "";
   let totalTokens = 0;
+  let inputTokens = 0;
+  let outputTokens = 0;
   let steps = 0;
   const toolCallRecords: AgentRunResult["toolCallRecords"] = [];
 
@@ -257,7 +261,9 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
 
     const usage = (stream as any).state?.usage;
     if (usage) {
-      totalTokens = usage.totalTokens ?? (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0);
+      inputTokens = usage.inputTokens ?? 0;
+      outputTokens = usage.outputTokens ?? 0;
+      totalTokens = usage.totalTokens ?? inputTokens + outputTokens;
     }
 
     // Prefer finalOutput from the SDK — it contains the clean final answer
@@ -305,12 +311,14 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
   console.log(`[agent-run] done: ${eventCount} events, ${fullContent.length} chars content, channel=${input.streamChannelId}`);
   await publishDone(input.streamChannelId, {
     content: fullContent,
-    usage: { prompt_tokens: 0, completion_tokens: 0 },
+    usage: { prompt_tokens: inputTokens, completion_tokens: outputTokens },
   });
 
   return {
     content: fullContent,
     totalTokens,
+    inputTokens,
+    outputTokens,
     steps,
     toolCallRecords,
   };
