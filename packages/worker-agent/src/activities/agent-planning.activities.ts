@@ -7,9 +7,11 @@ import type {
   PlanNode,
 } from "@nova/shared/types";
 
-// Use a fast, lightweight model for planning tasks (tier assessment, DAG generation).
-// Falls back to the caller-provided model if planning-model is not configured.
-const PLANNING_MODEL = process.env.NOVA_PLANNING_MODEL ?? "planning-model";
+// Planning tasks (tier assessment, DAG generation) use the conversation's own model
+// with lightweight overrides (low temperature, small token budget).
+// An explicit env var or LiteLLM "planning-model" alias can still override this
+// for deployments that want a dedicated cheaper/faster model.
+const PLANNING_MODEL_OVERRIDE = process.env.NOVA_PLANNING_MODEL;
 
 // ---------------------------------------------------------------------------
 // Tier Assessment
@@ -28,7 +30,7 @@ export interface AssessTierInput {
  */
 export async function assessTier(input: AssessTierInput): Promise<TierAssessment> {
   const response = await openai.chat.completions.create({
-    model: PLANNING_MODEL,
+    model: PLANNING_MODEL_OVERRIDE ?? input.model,
     messages: [
       {
         role: "system",
@@ -55,7 +57,6 @@ Respond with ONLY valid JSON:
       { role: "user" as const, content: input.userMessage },
     ],
     temperature: 0,
-    max_tokens: 200,
   } as any);
 
   const content = (response as any).choices?.[0]?.message?.content ?? "";
@@ -115,7 +116,7 @@ export async function generateDAGPlan(input: GenerateDAGPlanInput): Promise<Plan
       : `\n- This is a sequential plan. Each step should depend on the previous one (e.g. step-2 depends on step-1).`;
 
   const response = await openai.chat.completions.create({
-    model: PLANNING_MODEL,
+    model: PLANNING_MODEL_OVERRIDE ?? input.model,
     messages: [
       {
         role: "system",

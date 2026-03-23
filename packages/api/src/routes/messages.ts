@@ -623,44 +623,45 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
     try {
       const startTime = Date.now();
 
-      // ── Tier assessment: fast heuristic router (no LLM call) ──
-      // Classifies request complexity in <1ms instead of making a separate LLM call.
-      let assessedTier: "direct" | "sequential" | "orchestrated" = "direct";
+      // ── Tier pre-assessment: fast-path obvious follow-ups to "direct" ──
+      // Only set preAssessedTier when confident the request is simple.
+      // For ambiguous or first messages, leave undefined so the workflow's
+      // LLM-based assessTier() activity handles classification.
+      let assessedTier: "direct" | "sequential" | "orchestrated" | undefined = undefined;
       if (body.enableTools) {
         const userMsg = enrichedMessages.filter((m: any) => m.role === "user").pop()?.content ?? "";
         const priorTurns = enrichedMessages.filter((m: any) => m.role === "user" || m.role === "assistant");
         const hasPriorContext = priorTurns.length > 1;
         const msgLen = userMsg.length;
-        const msgLower = userMsg.toLowerCase();
 
-        // Follow-ups with existing context are almost always direct
-        if (hasPriorContext && (msgLen < 150 || /^(now |also |can you |what about |summarize|explain|show |list |tell me |thanks|ok |yes |no |sure|great|how about|why |could you |please )/i.test(userMsg))) {
+        // Follow-ups in existing conversations with short or conversational messages → direct
+        if (hasPriorContext && (
+          msgLen < 150 ||
+          /^(now |also |can you |what about |summarize|explain|show |list |tell me |thanks|ok |yes |no |sure|great|how about|why |could you |please |yeah|got it|perfect|nice|do that|go ahead|sounds good)/i.test(userMsg)
+        )) {
           assessedTier = "direct";
         }
-        // Explicit multi-step / multi-source language → orchestrated
-        else if (/\b(research\b.{5,}\band\b.{5,}\bthen\b|compare\b.{3,}\bacross\b|analyze\b.{5,}\bmultiple\b|from\s+(different|multiple|various)\s+(sources|perspectives|angles))/i.test(userMsg)) {
-          assessedTier = "orchestrated";
-        }
-        // Long messages with multiple instructions → sequential
-        else if (msgLen > 500 && (msgLower.includes(" then ") || msgLower.includes(" after that ") || msgLower.includes(" next ") || msgLower.includes(" step "))) {
-          assessedTier = "sequential";
-        }
-        // Short messages without prior context that imply a tool action → direct (let the agent loop decide)
-        else {
+        // Very short first messages (greetings, simple questions) without conjunctions → direct
+        else if (!hasPriorContext && msgLen < 80 && !/\b(and|then|also|plus|additionally|furthermore|moreover|as well as)\b/i.test(userMsg)) {
           assessedTier = "direct";
         }
+        // Everything else → undefined (deferred to workflow LLM assessor)
 
-        console.log(`[stream] tier assessment (heuristic): ${assessedTier} msgLen=${msgLen} hasPrior=${hasPriorContext}`);
+        console.log(`[stream] tier pre-assessment: ${assessedTier ?? "deferred-to-llm"} msgLen=${msgLen} hasPrior=${hasPriorContext}`);
       }
 
       // When tools are enabled, always dispatch to Temporal workflow.
       // This avoids the redundant LLM call pattern where the API makes a streaming call,
       // detects tool_calls, discards the output, then Temporal makes the same call again.
       if (body.enableTools) {
-        await stream.writeSSE({
-          event: "tier.assessed",
-          data: JSON.stringify({ tier: assessedTier }),
-        });
+        // Only send early tier.assessed for fast-pathed direct; otherwise the
+        // workflow will emit the event after LLM assessment completes.
+        if (assessedTier) {
+          await stream.writeSSE({
+            event: "tier.assessed",
+            data: JSON.stringify({ tier: assessedTier }),
+          });
+        }
 
         const streamChannelId = `stream:${conversationId}:${crypto.randomUUID()}`;
 
