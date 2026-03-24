@@ -14,8 +14,7 @@ import type {
   UserInteractionResponse,
 } from "@nova/shared/types";
 const { executeAgentStepWithSDK } = proxyActivities<typeof agentStepActivities>({
-  startToCloseTimeout: "2 minutes",
-  heartbeatTimeout: "30 seconds",
+  startToCloseTimeout: "3 minutes",
   retry: { maximumAttempts: 3 },
 });
 
@@ -148,7 +147,7 @@ export async function agentSubtaskWorkflow(input: SubtaskInput): Promise<Subtask
   };
 
   try {
-    await CancellationScope.withTimeout(120_000, subtaskLoop);
+    await CancellationScope.withTimeout(300_000, subtaskLoop);
   } catch (err: any) {
     if (err.name === "CancelledFailure" || err.message?.includes("timed out")) {
       finalStatus = cancelled ? "failed" : "timeout";

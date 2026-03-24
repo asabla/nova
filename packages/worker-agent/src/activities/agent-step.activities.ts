@@ -2,8 +2,11 @@ import { Agent, run } from "@openai/agents";
 import type { FunctionTool } from "@openai/agents";
 import { heartbeat } from "@temporalio/activity";
 import { createLiteLLMModel } from "@nova/worker-shared/agent-sdk-model";
+import { openai } from "@nova/worker-shared/litellm";
 import { toAgentInput } from "@nova/worker-shared/message-convert";
 import { getBuiltinTools, loadCustomTools } from "@nova/worker-shared/tools";
+import { getModelParams } from "@nova/worker-shared/models";
+import { createReasoningModel } from "@nova/worker-shared/reasoning-model";
 
 export interface AgentStepInput {
   systemPrompt: string | null;
@@ -51,17 +54,27 @@ export async function executeAgentStepWithSDK(
     tools.push(...custom);
   }
 
+  // Check model-specific params (e.g. reasoning models that don't support temperature/max_tokens)
+  const dbModelParams = await getModelParams(input.modelId);
+  const dropParams = dbModelParams?.dropParams ?? [];
+  const dropSet = new Set(dropParams);
+
+  const model = dropParams.length > 0
+    ? await createReasoningModel(openai, input.modelId, dropParams)
+    : createLiteLLMModel(input.modelId);
+
+  const modelSettings: Record<string, unknown> = {};
+  if (!dropSet.has("temperature")) modelSettings.temperature = (input.modelParams as any)?.temperature ?? 0.7;
+  if (!dropSet.has("max_tokens")) modelSettings.maxTokens = (input.modelParams as any)?.maxTokens ?? 16384;
+
   const agent = new Agent({
     name: "nova-agent",
     instructions: input.systemPrompt ?? "You are a helpful assistant.",
-    model: createLiteLLMModel(input.modelId),
+    model,
     // In single-turn mode, don't pass tools so the model can still request them
     // but the SDK won't auto-execute -- the workflow handles tool execution with approval flow
     tools: input.singleTurn ? [] : tools,
-    modelSettings: {
-      temperature: (input.modelParams as any)?.temperature ?? 0.7,
-      maxTokens: (input.modelParams as any)?.maxTokens ?? 16384,
-    },
+    modelSettings,
   });
 
   const sdkInput = toAgentInput(input.messageHistory);
