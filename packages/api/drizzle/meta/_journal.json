@@ -64,6 +64,13 @@
       "when": 1774292870378,
       "tag": "0008_lucky_tarot",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1774372310772,
+      "tag": "0009_nebulous_juggernaut",
+      "breakpoints": true
     }
   ]
 }

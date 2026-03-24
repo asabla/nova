@@ -16,6 +16,7 @@ const compareSchema = z.object({
 });
 
 modelCompareRoutes.post("/", zValidator("json", compareSchema), async (c) => {
+  const orgId = c.get("orgId");
   const body = c.req.valid("json");
 
   return streamSSE(c, async (stream) => {
@@ -38,6 +39,7 @@ modelCompareRoutes.post("/", zValidator("json", compareSchema), async (c) => {
             messages: [{ role: "user", content: body.prompt }],
             temperature: body.temperature,
             max_tokens: body.maxTokens,
+            orgId,
           });
 
           for await (const chunk of llmStream) {

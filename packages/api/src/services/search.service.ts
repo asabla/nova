@@ -56,7 +56,7 @@ export const searchService = {
     // Generate embedding for semantic mode
     let queryEmbedding: number[] | null = null;
     if (isSemantic) {
-      queryEmbedding = await generateEmbedding(query);
+      queryEmbedding = await generateEmbedding(query, undefined, orgId);
     }
 
     const orgFilter = { key: "orgId", match: { value: orgId } };

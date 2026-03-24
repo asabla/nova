@@ -52,6 +52,7 @@ webhookRoutes.post("/agents/:webhookId", async (c) => {
       messages,
       temperature: modelParams.temperature as number | undefined,
       max_tokens: modelParams.maxTokens as number | undefined,
+      orgId: agent.orgId,
     });
 
     await writeAuditLog({
@@ -110,6 +111,7 @@ webhookRoutes.post("/email/inbound", async (c) => {
     const result = await chatCompletion({
       model: agent.modelId ?? "default",
       messages,
+      orgId: agent.orgId,
     });
 
     await writeAuditLog({

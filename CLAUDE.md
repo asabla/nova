@@ -13,7 +13,7 @@ Bun workspace monorepo with 7 packages:
 - **@nova/shared** — Drizzle schemas (65 tables), types, constants, utils, skills. Exports: `./schema`, `./schemas`, `./types`, `./constants`, `./utils`, `./content`, `./skills`
 - **@nova/api** — Hono REST API on Bun runtime. Routes in `src/routes/`, services in `src/services/`, middleware in `src/middleware/`
 - **@nova/web** — React 19 + Vite + TanStack Router + TanStack Query + Zustand + Tailwind v4. Path alias `@/*` → `src/*`
-- **@nova/worker-shared** — Shared worker infrastructure (db, redis, litellm, stream-publisher, qdrant, minio, sandbox, tools). Conditional exports like `@nova/worker-shared/db`
+- **@nova/worker-shared** — Shared worker infrastructure (db, redis, model-client, stream-publisher, qdrant, minio, sandbox, tools). Conditional exports like `@nova/worker-shared/db`
 - **@nova/worker-agent** — Temporal agent workflows on **Node.js** (task queue: `nova-agent`). Chat execution, tool use, DAG orchestration
 - **@nova/worker-ingestion** — Temporal ingestion workflows on **Node.js** (task queue: `nova-ingestion`). Document/file/message embedding pipelines
 - **@nova/worker-background** — Temporal background workflows on **Node.js** (task queue: `nova-background`). Research, summaries, cleanup, scheduling
@@ -85,7 +85,7 @@ Error handler → Security headers → CORS → Request ID → Logger → **Publ
 | PostgreSQL | 5432 | Main database (pg_trgm) |
 | Redis | 6379 | Cache, pub/sub, rate limiting |
 | MinIO | 9000/9001 | S3-compatible file storage |
-| LiteLLM | 4000 | LLM proxy (needs OPENAI_API_KEY or ANTHROPIC_API_KEY) |
+| *(removed)* | *(4000)* | LLM calls go directly to providers (OpenAI, Anthropic, etc.) |
 | Qdrant | 6333/6334 | Vector search engine |
 | Temporal | 7233 | Workflow orchestration (separate DB) |
 | Temporal UI | 8233 | Workflow dashboard |

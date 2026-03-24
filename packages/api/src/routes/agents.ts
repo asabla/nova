@@ -197,6 +197,7 @@ agentRoutes.post("/:id/test", async (c) => {
       model: agent.modelId ?? "default",
       messages,
       ...(agent.modelParams as Record<string, unknown> ?? {}),
+      orgId,
     });
     return c.json({
       content: result.choices?.[0]?.message?.content ?? "",

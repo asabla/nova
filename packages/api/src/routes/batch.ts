@@ -34,6 +34,7 @@ batchRoutes.post("/", zValidator("json", batchRequestSchema), async (c) => {
         messages: req.messages,
         temperature: req.temperature,
         max_tokens: req.maxTokens,
+        orgId,
       });
 
       return {

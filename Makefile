@@ -10,7 +10,7 @@
 # Defaults
 # ──────────────────────────────────────────────
 COMPOSE := docker compose
-INFRA   := postgres redis minio litellm temporal temporal-db temporal-ui searxng
+INFRA   := postgres redis minio temporal temporal-db temporal-ui searxng
 APPS    := api web worker
 
 help: ## Show this help
@@ -55,7 +55,7 @@ endif
 # ──────────────────────────────────────────────
 # Infrastructure only
 # ──────────────────────────────────────────────
-infra: ## Start infrastructure services only (postgres, redis, minio, litellm, temporal, searxng)
+infra: ## Start infrastructure services only (postgres, redis, minio, temporal, searxng)
 	$(COMPOSE) up -d $(INFRA)
 
 infra-down: ## Stop infrastructure services only

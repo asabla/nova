@@ -855,7 +855,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
             { role: "assistant", content: totalContent.slice(0, 500) },
           ];
           try {
-            const title = await conversationService.generateConversationTitle(titleMsgs);
+            const title = await conversationService.generateConversationTitle(titleMsgs, orgId);
             if (title && title !== "Untitled Conversation") {
               await conversationService.updateConversation(orgId, conversationId, { title });
               await stream.writeSSE({ event: "title_generated", data: JSON.stringify({ title }) });
@@ -864,7 +864,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
             console.error("[stream] title generation failed:", e);
           }
           try {
-            const tagNames = await conversationService.generateConversationTags(titleMsgs);
+            const tagNames = await conversationService.generateConversationTags(titleMsgs, orgId);
             if (tagNames.length > 0) {
               const tags = await conversationService.assignTagsToConversation(orgId, userId, conversationId, tagNames);
               await stream.writeSSE({ event: "tags_generated", data: JSON.stringify({ tags }) });
@@ -894,6 +894,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         temperature: body.temperature,
         top_p: body.topP,
         max_tokens: body.maxTokens,
+        orgId,
       } as any);
 
       let fullContent = "";
@@ -953,7 +954,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
           { role: "assistant", content: fullContent.slice(0, 500) },
         ];
         try {
-          const title = await conversationService.generateConversationTitle(titleMsgs);
+          const title = await conversationService.generateConversationTitle(titleMsgs, orgId);
           if (title && title !== "Untitled Conversation") {
             await conversationService.updateConversation(orgId, conversationId, { title });
             await stream.writeSSE({ event: "title_generated", data: JSON.stringify({ title }) });
@@ -962,7 +963,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
           console.error("[stream] title generation failed:", e);
         }
         try {
-          const tagNames = await conversationService.generateConversationTags(titleMsgs);
+          const tagNames = await conversationService.generateConversationTags(titleMsgs, orgId);
           if (tagNames.length > 0) {
             const tags = await conversationService.assignTagsToConversation(orgId, userId, conversationId, tagNames);
             await stream.writeSSE({ event: "tags_generated", data: JSON.stringify({ tags }) });
@@ -1124,6 +1125,7 @@ messagesRouter.post("/:conversationId/messages/:messageId/replay", zValidator("j
     temperature,
     top_p: topP,
     max_tokens: maxTokens,
+    orgId,
   });
 
   const data = result as any;

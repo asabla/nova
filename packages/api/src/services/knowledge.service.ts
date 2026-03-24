@@ -246,7 +246,7 @@ export const knowledgeService = {
     let queryEmbedding: number[] | null = null;
     try {
       const { generateEmbedding } = await import("../lib/litellm");
-      queryEmbedding = await generateEmbedding(query, collection.embeddingModel ?? undefined);
+      queryEmbedding = await generateEmbedding(query, collection.embeddingModel ?? undefined, orgId);
     } catch {
       // Fallback to text similarity if embedding API is unavailable
     }

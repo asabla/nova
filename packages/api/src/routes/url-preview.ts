@@ -295,6 +295,7 @@ urlPreviewRoutes.post(
           { role: "user", content: prompt },
         ],
         max_tokens: 1000,
+        orgId,
       });
 
       return c.json({

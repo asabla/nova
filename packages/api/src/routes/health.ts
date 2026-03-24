@@ -170,33 +170,19 @@ health.post("/diagnostics", async (c) => {
     results.minio = { status: "fail", message: err.message, latencyMs: 0 };
   }
 
-  // 5. LiteLLM proxy
+  // 5. LLM providers (models from DB)
   try {
     const start = performance.now();
-    const litellmUrl = env.LITELLM_API_URL ?? "http://localhost:4000";
-    const res = await fetch(`${litellmUrl}/health`, { signal: AbortSignal.timeout(5000) });
-    results.litellm = {
-      status: res.ok ? "pass" : "warn",
-      message: res.ok ? "LiteLLM healthy" : `HTTP ${res.status}`,
+    const { listModels } = await import("../lib/litellm");
+    const modelList = await listModels();
+    results.llm_providers = {
+      status: modelList.data.length > 0 ? "pass" : "warn",
+      message: `${modelList.data.length} model(s) configured`,
       latencyMs: Math.round(performance.now() - start),
+      details: { models: modelList.data.map((m: any) => m.id).slice(0, 20) },
     };
-
-    // Also try listing models
-    const modelRes = await fetch(`${litellmUrl}/models`, {
-      headers: { Authorization: `Bearer ${env.LITELLM_MASTER_KEY}` },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (modelRes.ok) {
-      const modelData = await modelRes.json() as { data?: { id: string }[] };
-      results.litellm_models = {
-        status: "pass",
-        message: `${modelData.data?.length ?? 0} model(s) available`,
-        latencyMs: Math.round(performance.now() - start),
-        details: { models: modelData.data?.map((m: any) => m.id).slice(0, 20) },
-      };
-    }
   } catch (err: any) {
-    results.litellm = { status: "fail", message: err.message, latencyMs: 0 };
+    results.llm_providers = { status: "fail", message: err.message, latencyMs: 0 };
   }
 
   // 6. Temporal

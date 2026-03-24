@@ -13,8 +13,8 @@ const envSchema = z.object({
   MINIO_ROOT_PASSWORD: z.string(),
   MINIO_BUCKET: z.string().default("nova-files"),
 
-  LITELLM_API_URL: z.string().url(),
-  LITELLM_MASTER_KEY: z.string(),
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_BASE_URL: z.string().url().optional(),
   EMBEDDING_MODEL: z.string().optional(),
 
   TEMPORAL_ADDRESS: z.string().default("localhost:7233"),

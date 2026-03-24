@@ -1,12 +1,12 @@
 import { Hono } from "hono";
 import type { AppContext } from "../types/context";
-import { env } from "../lib/env";
 import { AppError } from "@nova/shared/utils";
+import { openai } from "../lib/litellm";
 
 const voiceRoutes = new Hono<AppContext>();
 
 /**
- * POST /transcribe - Transcribe an audio file using LiteLLM/Whisper (Stories #227, #229)
+ * POST /transcribe - Transcribe an audio file using Whisper (Stories #227, #229)
  * Accepts multipart/form-data with an "audio" field containing the audio file.
  */
 voiceRoutes.post("/transcribe", async (c) => {
@@ -34,32 +34,23 @@ voiceRoutes.post("/transcribe", async (c) => {
   const language = (body["language"] as string) ?? undefined;
   const model = (body["model"] as string) ?? "whisper-1";
 
-  // Forward to LiteLLM /audio/transcriptions (OpenAI-compatible)
-  const formData = new FormData();
-  formData.append("file", audio, audio.name || "audio.webm");
-  formData.append("model", model);
-  if (language) formData.append("language", language);
+  try {
+    const result = await openai.audio.transcriptions.create({
+      file: audio,
+      model,
+      language,
+    }, {
+      timeout: 60_000,
+    });
 
-  const response = await fetch(`${env.LITELLM_API_URL}/audio/transcriptions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.LITELLM_MASTER_KEY}`,
-    },
-    body: formData,
-    signal: AbortSignal.timeout(60_000),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => "Unknown error");
-    throw new AppError(502, "Transcription Failed", errorText);
+    return c.json({ text: result.text, model });
+  } catch (err: any) {
+    throw new AppError(502, "Transcription Failed", err.message ?? "Unknown error");
   }
-
-  const result = await response.json() as { text: string };
-  return c.json({ text: result.text, model });
 });
 
 /**
- * POST /tts - Generate speech from text using LiteLLM/TTS (Story #228)
+ * POST /tts - Generate speech from text using TTS (Story #228)
  * Returns audio/mpeg stream.
  */
 voiceRoutes.post("/tts", async (c) => {
@@ -77,29 +68,27 @@ voiceRoutes.post("/tts", async (c) => {
     throw AppError.badRequest("Text too long. Maximum 4096 characters.");
   }
 
-  const response = await fetch(`${env.LITELLM_API_URL}/audio/speech`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${env.LITELLM_MASTER_KEY}`,
-    },
-    body: JSON.stringify({ model, input: text, voice, speed }),
-    signal: AbortSignal.timeout(60_000),
-  });
+  try {
+    const response = await openai.audio.speech.create({
+      model,
+      input: text,
+      voice: voice as any,
+      speed,
+    }, {
+      timeout: 60_000,
+    });
 
-  if (!response.ok || !response.body) {
-    const errorText = await response.text().catch(() => "Unknown error");
-    throw new AppError(502, "TTS Failed", errorText);
+    c.header("Content-Type", "audio/mpeg");
+    c.header("Content-Disposition", `inline; filename="speech.mp3"`);
+    return new Response(response.body, {
+      headers: {
+        "Content-Type": "audio/mpeg",
+        "Cache-Control": "no-cache",
+      },
+    });
+  } catch (err: any) {
+    throw new AppError(502, "TTS Failed", err.message ?? "Unknown error");
   }
-
-  c.header("Content-Type", "audio/mpeg");
-  c.header("Content-Disposition", `inline; filename="speech.mp3"`);
-  return new Response(response.body, {
-    headers: {
-      "Content-Type": "audio/mpeg",
-      "Cache-Control": "no-cache",
-    },
-  });
 });
 
 export { voiceRoutes };

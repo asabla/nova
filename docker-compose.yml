@@ -54,31 +54,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # ─── LiteLLM Proxy ──────────────────────────────
-  litellm:
-    image: ghcr.io/berriai/litellm:main-latest
-    container_name: nova-litellm
-    restart: unless-stopped
-    ports:
-      - "4000:4000"
-    volumes:
-      - ./infra/docker/litellm-config.yaml:/app/config.yaml
-    command: ["--config", "/app/config.yaml"]
-    environment:
-      LITELLM_MASTER_KEY: sk-nova-litellm-dev
-      DATABASE_URL: postgresql://nova:nova@postgres:5432/litellm
-      UI_USERNAME: ${LITELLM_UI_USERNAME:-admin}
-      UI_PASSWORD: ${LITELLM_UI_PASSWORD:-admin}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      LOCAL_MODEL_API_BASE: ${LOCAL_MODEL_API_BASE:-}
-      LOCAL_MODEL_NAME: ${LOCAL_MODEL_NAME:-}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
   # ─── Temporal Server ─────────────────────────────
   temporal:
     image: temporalio/auto-setup:latest
@@ -210,8 +185,8 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
       MINIO_BUCKET: nova-files
-      LITELLM_API_URL: http://litellm:4000
-      LITELLM_MASTER_KEY: sk-nova-litellm-dev
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       BETTER_AUTH_SECRET: change-me-in-production-use-openssl-rand-base64-32
       BETTER_AUTH_URL: http://localhost:5173
       APP_URL: http://localhost:5173
@@ -244,8 +219,8 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
       MINIO_BUCKET: nova-files
-      LITELLM_API_URL: http://litellm:4000
-      LITELLM_MASTER_KEY: sk-nova-litellm-dev
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       TEMPORAL_ADDRESS: temporal:7233
       BETTER_AUTH_SECRET: change-me-in-production-use-openssl-rand-base64-32
       BETTER_AUTH_URL: http://localhost:5173
@@ -282,7 +257,8 @@ services:
       DATABASE_URL: postgres://nova:nova@postgres:5432/nova
       REDIS_URL: redis://redis:6379
       TEMPORAL_ADDRESS: temporal:7233
-      LITELLM_URL: http://litellm:4000
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       SEARXNG_URL: http://searxng:8080
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ROOT_USER: minioadmin
@@ -318,7 +294,8 @@ services:
       DATABASE_URL: postgres://nova:nova@postgres:5432/nova
       REDIS_URL: redis://redis:6379
       TEMPORAL_ADDRESS: temporal:7233
-      LITELLM_URL: http://litellm:4000
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -348,7 +325,8 @@ services:
       DATABASE_URL: postgres://nova:nova@postgres:5432/nova
       REDIS_URL: redis://redis:6379
       TEMPORAL_ADDRESS: temporal:7233
-      LITELLM_URL: http://litellm:4000
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       SEARXNG_URL: http://searxng:8080
       MINIO_ENDPOINT: http://minio:9000
       MINIO_ROOT_USER: minioadmin

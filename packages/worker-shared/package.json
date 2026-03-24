@@ -43,6 +43,10 @@
       "types": "./dist/tar.d.ts",
       "default": "./src/tar.ts"
     },
+    "./model-client": {
+      "types": "./dist/model-client.d.ts",
+      "default": "./src/model-client.ts"
+    },
     "./agent-sdk-model": {
       "types": "./dist/agent-sdk-model.d.ts",
       "default": "./src/agent-sdk-model.ts"

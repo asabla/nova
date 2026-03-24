@@ -12,8 +12,8 @@ const envSchema = z.object({
 
   WORKER_BUILD_ID: z.string().default("dev"),
 
-  LITELLM_URL: z.string().url().optional(),
-  LITELLM_API_KEY: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_BASE_URL: z.string().url().optional(),
   EMBEDDING_MODEL: z.string().optional(),
   RESEARCH_MODEL: z.string().optional(),
   VISION_MODEL: z.string().optional(),
