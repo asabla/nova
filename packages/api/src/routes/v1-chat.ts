@@ -73,6 +73,7 @@ v1ChatRoutes.post("/completions", async (c) => {
       tool_choice: body.tool_choice,
       response_format: body.response_format,
       stop: body.stop,
+      orgId,
     });
 
     return new Response(stream.toReadableStream(), {
@@ -93,6 +94,7 @@ v1ChatRoutes.post("/completions", async (c) => {
     tool_choice: body.tool_choice,
     response_format: body.response_format,
     stop: body.stop,
+    orgId,
   });
 
   return c.json(result);
@@ -100,7 +102,7 @@ v1ChatRoutes.post("/completions", async (c) => {
 
 // OpenAI-compatible embeddings endpoint
 const embeddingSchema = z.object({
-  model: z.string().default("default-embedding-model"),
+  model: z.string().default("text-embedding-3-small"),
   input: z.union([z.string(), z.array(z.string())]),
   encoding_format: z.enum(["float", "base64"]).optional(),
 });
@@ -122,7 +124,8 @@ v1ChatRoutes.post("/../embeddings", async (c) => {
 // List available models (OpenAI-compatible)
 v1ChatRoutes.get("/../models", async (c) => {
   const { listModels } = await import("../lib/litellm");
-  const modelsPage = await listModels();
+  const orgId = c.get("orgId");
+  const modelsPage = await listModels(orgId);
   const modelList = modelsPage?.data ?? [];
   return c.json({
     object: "list",
@@ -188,6 +191,7 @@ v1ChatRoutes.post("/../agents/run", async (c) => {
       temperature: modelParams.temperature as number | undefined,
       max_tokens: modelParams.maxTokens as number | undefined,
       top_p: modelParams.topP as number | undefined,
+      orgId,
     });
 
     return new Response(stream.toReadableStream(), {
@@ -205,6 +209,7 @@ v1ChatRoutes.post("/../agents/run", async (c) => {
     temperature: modelParams.temperature as number | undefined,
     max_tokens: modelParams.maxTokens as number | undefined,
     top_p: modelParams.topP as number | undefined,
+    orgId,
   });
 
   return c.json({

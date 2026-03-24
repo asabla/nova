@@ -1,4 +1,5 @@
 import { openai } from "@nova/worker-shared/litellm";
+import { buildChatParams } from "@nova/worker-shared/models";
 import type {
   ExecutionTier,
   EffortLevel,
@@ -29,8 +30,9 @@ export interface AssessTierInput {
  * Single lightweight LLM call with temperature 0 for deterministic output.
  */
 export async function assessTier(input: AssessTierInput): Promise<TierAssessment> {
-  const response = await openai.chat.completions.create({
-    model: PLANNING_MODEL_OVERRIDE ?? input.model,
+  const model = PLANNING_MODEL_OVERRIDE ?? input.model;
+  const params = await buildChatParams(model, {
+    model,
     messages: [
       {
         role: "system",
@@ -57,7 +59,8 @@ Respond with ONLY valid JSON:
       { role: "user" as const, content: input.userMessage },
     ],
     temperature: 0,
-  } as any);
+  });
+  const response = await openai.chat.completions.create(params as any);
 
   const content = (response as any).choices?.[0]?.message?.content ?? "";
   try {
@@ -115,8 +118,9 @@ export async function generateDAGPlan(input: GenerateDAGPlanInput): Promise<Plan
 - Aim for maximum parallelism while respecting true data dependencies.`
       : `\n- This is a sequential plan. Each step should depend on the previous one (e.g. step-2 depends on step-1).`;
 
-  const response = await openai.chat.completions.create({
-    model: PLANNING_MODEL_OVERRIDE ?? input.model,
+  const planModel = PLANNING_MODEL_OVERRIDE ?? input.model;
+  const planParams = await buildChatParams(planModel, {
+    model: planModel,
     messages: [
       {
         role: "system",
@@ -165,7 +169,8 @@ Rules:
     ],
     temperature: 0.3,
     max_tokens: 1500,
-  } as any);
+  });
+  const response = await openai.chat.completions.create(planParams as any);
 
   const content = (response as any).choices?.[0]?.message?.content ?? "";
   const planId = `plan-${Date.now()}`;

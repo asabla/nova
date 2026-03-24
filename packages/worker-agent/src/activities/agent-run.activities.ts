@@ -2,6 +2,7 @@ import { Agent, run } from "@openai/agents";
 import type { RunStreamEvent, FunctionTool } from "@openai/agents";
 import { heartbeat } from "@temporalio/activity";
 import { createLiteLLMModel } from "@nova/worker-shared/agent-sdk-model";
+import { openai } from "@nova/worker-shared/litellm";
 import { toAgentInput } from "@nova/worker-shared/message-convert";
 import {
   publishToken,
@@ -11,6 +12,8 @@ import {
   publishError,
 } from "@nova/worker-shared/stream";
 import { getBuiltinTools, loadCustomTools } from "@nova/worker-shared/tools";
+import { getModelParams } from "@nova/worker-shared/models";
+import { createReasoningModel } from "../reasoning-model";
 
 
 export interface AgentRunInput {
@@ -59,15 +62,28 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
     tools.push(...custom);
   }
 
+  // Check model-specific params (e.g. reasoning models that don't support temperature/max_tokens)
+  const modelParams = await getModelParams(input.model);
+  const dropParams = modelParams?.dropParams ?? [];
+  const dropSet = new Set(dropParams);
+
+  // For reasoning models, use a wrapper that intercepts the OpenAI client
+  // and strips unsupported params from the actual HTTP request.
+  // The Agent SDK always sends max_tokens/temperature even when undefined.
+  const model = dropParams.length > 0
+    ? await createReasoningModel(openai, input.model, dropParams)
+    : createLiteLLMModel(input.model);
+
+  const modelSettings: Record<string, unknown> = {};
+  if (!dropSet.has("temperature")) modelSettings.temperature = input.temperature ?? 0.7;
+  if (!dropSet.has("max_tokens")) modelSettings.maxTokens = input.maxTokens ?? 4096;
+
   const agent = new Agent({
     name: "nova-chat",
     instructions: input.systemPrompt ?? "You are a helpful assistant.",
-    model: createLiteLLMModel(input.model),
+    model,
     tools,
-    modelSettings: {
-      temperature: input.temperature ?? 0.7,
-      maxTokens: input.maxTokens ?? 4096,
-    },
+    modelSettings,
   });
 
   // Convert message history to SDK protocol format

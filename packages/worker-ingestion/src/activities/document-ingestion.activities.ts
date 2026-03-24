@@ -407,7 +407,7 @@ interface EnrichmentResult {
 
 async function enrichDocument(text: string, title?: string, fileType?: string): Promise<EnrichmentResult | null> {
   try {
-    const model = process.env.ENRICHMENT_MODEL ?? "default-model";
+    const model = process.env.ENRICHMENT_MODEL ?? "gpt-5.4";
     const snippet = text.slice(0, 4000);
 
     let typeSpecificInstructions = "";

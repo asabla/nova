@@ -1,6 +1,7 @@
 import { eq, and, isNull, sql, desc } from "drizzle-orm";
 import { db } from "@nova/worker-shared/db";
 import { openai } from "@nova/worker-shared/litellm";
+import { buildChatParams } from "@nova/worker-shared/models";
 import { agentMemoryVectors } from "@nova/shared/schemas";
 import { upsertPoints, searchVector, COLLECTIONS } from "@nova/worker-shared/qdrant";
 import { getDefaultEmbeddingModel } from "@nova/worker-shared/models";
@@ -126,7 +127,7 @@ export async function extractMemoryFacts(input: {
     .join("\n")
     .slice(0, 4000);
 
-  const response = await openai.chat.completions.create({
+  const memoryParams = await buildChatParams(input.model, {
     model: input.model,
     messages: [
       {
@@ -145,7 +146,8 @@ Return an empty array if no useful facts to extract. Maximum 5 facts.`,
     ],
     temperature: 0,
     max_tokens: 500,
-  } as any);
+  });
+  const response = await openai.chat.completions.create(memoryParams as any);
 
   const content = (response as any).choices?.[0]?.message?.content ?? "";
   let facts: string[] = [];

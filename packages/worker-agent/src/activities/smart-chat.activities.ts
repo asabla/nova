@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { eq } from "drizzle-orm";
 import { publishToken, publishToolStatus as pubToolStatus, publishDone as pubDone, publishError } from "@nova/worker-shared/stream";
 import { openai } from "@nova/worker-shared/litellm";
+import { buildChatParams } from "@nova/worker-shared/models";
 import { db } from "@nova/worker-shared/db";
 import { workflows } from "@nova/shared/schemas";
 import type { ToolCallStatus, WorkflowStatus } from "@nova/shared/constants";
@@ -83,7 +84,7 @@ export async function streamingLLMStep(input: {
 }> {
   const safeMessages = truncateMessages(input.messages);
 
-  const params: Record<string, unknown> = {
+  const rawParams: Record<string, unknown> = {
     model: input.model,
     messages: safeMessages,
     temperature: input.temperature ?? 0.7,
@@ -91,8 +92,10 @@ export async function streamingLLMStep(input: {
   };
 
   if (input.tools && input.tools.length > 0) {
-    params.tools = input.tools;
+    rawParams.tools = input.tools;
   }
+
+  const params = await buildChatParams(input.model, rawParams);
 
   try {
     const stream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk> = await openai.chat.completions.create({

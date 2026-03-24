@@ -1,4 +1,5 @@
 import { openai } from "@nova/worker-shared/litellm";
+import { buildChatParams } from "@nova/worker-shared/models";
 
 export interface SummarizeContextInput {
   messages: { role: string; content: string }[];
@@ -35,7 +36,7 @@ export async function summarizeContext(
     .join("\n");
 
   try {
-    const response = await openai.chat.completions.create({
+    const params = await buildChatParams(model, {
       model,
       messages: [
         {
@@ -46,7 +47,9 @@ export async function summarizeContext(
       ],
       temperature: 0,
       max_tokens: 500,
-    } as any);
+    });
+
+    const response = await openai.chat.completions.create(params as any);
 
     const summary = (response as any).choices?.[0]?.message?.content ?? "";
 

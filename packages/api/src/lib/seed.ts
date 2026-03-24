@@ -33,7 +33,7 @@ async function seed() {
 
   // Org settings
   const settings: Record<string, string> = {
-    defaultModel: "default-model",
+    defaultModel: "gpt-5.4",
     maxTokensPerMessage: "4096",
     maxMessagesPerConversation: "1000",
     maxFileSizeMb: "50",
@@ -106,25 +106,29 @@ async function seed() {
   console.log(`  User: ${SEED_USER.email} / ${SEED_USER.password}`);
 
   // ─── 3. Model Provider + Models ───────────────────
+  const openaiBaseUrl = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
+  const openaiApiKey = process.env.OPENAI_API_KEY ?? "";
+
   const [provider] = await db
     .insert(modelProviders)
     .values({
       orgId,
-      name: "LiteLLM Proxy",
-      type: "custom",
-      apiBaseUrl: "http://localhost:4000",
+      name: "OpenAI",
+      type: "openai",
+      apiBaseUrl: openaiBaseUrl,
+      apiKeyEncrypted: openaiApiKey,
     })
     .onConflictDoUpdate({
       target: [modelProviders.orgId, modelProviders.name],
-      set: { apiBaseUrl: "http://localhost:4000", updatedAt: new Date() },
+      set: { type: "openai", apiBaseUrl: openaiBaseUrl, apiKeyEncrypted: openaiApiKey, updatedAt: new Date() },
     })
     .returning();
 
-  const providerId = provider?.id ?? (await db.select().from(modelProviders).where(and(eq(modelProviders.orgId, orgId), eq(modelProviders.name, "LiteLLM Proxy"))).then((r) => r[0]!.id));
+  const providerId = provider?.id ?? (await db.select().from(modelProviders).where(and(eq(modelProviders.orgId, orgId), eq(modelProviders.name, "OpenAI"))).then((r) => r[0]!.id));
 
   const modelDefs = [
-    { name: "Default Model", modelIdExternal: "default-model", capabilities: ["chat", "vision"], contextWindow: 32000, isDefault: true },
-    { name: "Default Embedding Model", modelIdExternal: "default-embedding-model", capabilities: ["embeddings"], contextWindow: 8192 },
+    { name: "GPT-5.4", modelIdExternal: "gpt-5.4", capabilities: ["chat", "vision", "reasoning"], contextWindow: 128000, isDefault: true, modelParams: { dropParams: ["temperature", "top_p", "presence_penalty", "frequency_penalty", "logprobs", "top_logprobs", "parallel_tool_calls", "max_tokens"] } },
+    { name: "Text Embedding 3 Small", modelIdExternal: "text-embedding-3-small", capabilities: ["embeddings"], contextWindow: 8192, modelParams: null },
   ];
 
   for (const m of modelDefs) {
@@ -138,10 +142,11 @@ async function seed() {
         capabilities: m.capabilities,
         contextWindow: m.contextWindow,
         isDefault: m.isDefault ?? false,
+        modelParams: m.modelParams,
       })
       .onConflictDoUpdate({
         target: [models.orgId, models.modelIdExternal],
-        set: { name: m.name, capabilities: m.capabilities, contextWindow: m.contextWindow, isDefault: m.isDefault ?? false, updatedAt: new Date() },
+        set: { name: m.name, capabilities: m.capabilities, contextWindow: m.contextWindow, isDefault: m.isDefault ?? false, modelParams: m.modelParams, updatedAt: new Date() },
       });
   }
   console.log(`  Models: ${modelDefs.length} registered`);

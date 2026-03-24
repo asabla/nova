@@ -4,7 +4,7 @@ import { eq, and, isNull, desc, ilike, sql, inArray, asc, lte } from "drizzle-or
 import type { Conversation } from "@nova/shared/schemas";
 import { parsePagination, buildPaginatedResponse, type PaginationInput } from "@nova/shared/utils";
 import { AppError } from "@nova/shared/utils";
-import { chatCompletion } from "../lib/litellm";
+import { chatCompletion, getDefaultChatModel } from "../lib/litellm";
 import { syncConversationUpsert, syncConversationDelete } from "../lib/qdrant-sync";
 
 type UpdateConversationData = Partial<{
@@ -407,9 +407,10 @@ export async function getConversationsByIds(orgId: string, ids: string[]) {
 
 export async function generateConversationTitle(
   msgs: { role: string; content: string }[],
+  orgId?: string,
 ): Promise<string> {
   const result = await chatCompletion({
-    model: process.env.SUMMARY_MODEL ?? "default-model",
+    model: await getDefaultChatModel(),
     messages: [
       {
         role: "system" as const,
@@ -421,15 +422,17 @@ export async function generateConversationTitle(
       })),
     ],
     max_tokens: 30,
+    orgId,
   });
   return result.choices?.[0]?.message?.content?.trim() ?? "Untitled Conversation";
 }
 
 export async function generateConversationTags(
   msgs: { role: string; content: string }[],
+  orgId?: string,
 ): Promise<string[]> {
   const result = await chatCompletion({
-    model: process.env.SUMMARY_MODEL ?? "default-model",
+    model: await getDefaultChatModel(),
     messages: [
       {
         role: "system" as const,
@@ -444,6 +447,7 @@ export async function generateConversationTags(
       })),
     ],
     max_tokens: 60,
+    orgId,
   });
   const raw = result.choices?.[0]?.message?.content?.trim() ?? "[]";
   try {

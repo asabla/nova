@@ -1,7 +1,7 @@
 import { eq, and, isNull } from "drizzle-orm";
 import { db } from "@nova/worker-shared/db";
 import { openai } from "@nova/worker-shared/litellm";
-import { getDefaultChatModel } from "@nova/worker-shared/models";
+import { getDefaultChatModel, buildChatParams } from "@nova/worker-shared/models";
 import { agents, agentMemoryEntries, conversations, messages } from "@nova/shared/schemas";
 
 export async function getAgentConfig(orgId: string, agentId: string) {
@@ -80,7 +80,7 @@ export async function executeAgentStep(
     ...messageHistory,
   ];
 
-  const params: Record<string, unknown> = {
+  const rawParams: Record<string, unknown> = {
     model,
     messages: msgs,
     temperature: (agentConfig.modelParams as any)?.temperature ?? 0.7,
@@ -88,12 +88,13 @@ export async function executeAgentStep(
   };
 
   if (tools.length > 0) {
-    params.tools = tools.map((t) => ({
+    rawParams.tools = tools.map((t) => ({
       type: "function",
       function: { name: t.name, description: t.description, parameters: t.parameters },
     }));
   }
 
+  const params = await buildChatParams(model, rawParams);
   const data = await openai.chat.completions.create(params as any);
   const choice = data.choices?.[0];
 
@@ -305,12 +306,13 @@ export async function executeToolCall(
           { role: "user" as const, content: task },
         ];
 
-        const agentResult = await openai.chat.completions.create({
+        const agentCallParams = await buildChatParams(targetModel, {
           model: targetModel,
           messages: msgs,
           temperature: (targetAgent.modelParams as any)?.temperature ?? 0.7,
           max_tokens: (targetAgent.modelParams as any)?.maxTokens ?? 16384,
         });
+        const agentResult = await openai.chat.completions.create(agentCallParams as any);
 
         rawResult = {
           agent_name: targetAgent.name,
