@@ -11,7 +11,7 @@ import { DEFAULTS, TASK_QUEUES } from "@nova/shared/constants";
 import { notificationService } from "../services/notification.service";
 import { getTemporalClient } from "../lib/temporal";
 import { db } from "../lib/db";
-import { userProfiles, users, agents, orgSettings, files, toolCalls as toolCallsTable, messageAttachments, messages as messagesTable, models } from "@nova/shared/schemas";
+import { userProfiles, users, agents, orgSettings, files, toolCalls as toolCallsTable, messageAttachments, messages as messagesTable, models, workflows } from "@nova/shared/schemas";
 import { eq, and, isNull, inArray } from "drizzle-orm";
 import { extractFileContent } from "../lib/file-extract";
 import { SKILLS, SANDBOX_PACKAGES_NOTE } from "@nova/shared/skills";
@@ -686,16 +686,29 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         const relayPromise = relayRedisToSSE(stream, streamChannelId, { timeoutMs: 600_000 });
 
         const client = await getTemporalClient();
-        const workflowId = `agent-chat-${conversationId}-${Date.now()}`;
+        const temporalWorkflowId = `agent-chat-${conversationId}-${Date.now()}`;
+        const userId = c.get("userId");
+
+        // Create workflow record in DB so agent traces are tracked
+        const [wfRecord] = await db.insert(workflows).values({
+          orgId,
+          temporalWorkflowId,
+          type: "agent-chat",
+          status: "running",
+          conversationId,
+          initiatedById: userId,
+          input: { model: resolvedModel, temperature: body.temperature, maxTokens: body.maxTokens },
+        }).returning({ id: workflows.id });
 
         await client.workflow.start("agentWorkflow", {
           taskQueue: TASK_QUEUES.AGENT,
-          workflowId,
+          workflowId: temporalWorkflowId,
           args: [{
             orgId,
-            userId: c.get("userId"),
+            userId,
             conversationId,
             streamChannelId,
+            workflowId: wfRecord.id,
             userMessage: enrichedMessages.filter((m: any) => m.role === "user").pop()?.content,
             messageHistory: enrichedMessages,
             model: resolvedModel,

@@ -346,7 +346,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
       : finalStatus === "cancelled" ? "cancelled" as const
       : "completed" as const;
     await updateWorkflowStatus(input.workflowId, dbStatus, {
-      output: { tier, steps: currentStep, totalTokens, messageIds, terminalReason: finalStatus },
+      output: { tier, steps: currentStep, totalTokens, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, messageIds, terminalReason: finalStatus, model: input.model, plan },
     });
   }
 

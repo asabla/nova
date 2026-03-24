@@ -132,9 +132,16 @@ export interface AgentRun {
   startedAt: string;
   durationMs: number;
   totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
   costCents: number;
+  steps: number;
+  tier?: "direct" | "sequential" | "orchestrated";
+  tierReasoning?: string;
+  plan?: any; // Plan object from agent workflow — compatible with PlanDAGView
   toolCalls: ToolCall[];
   errorMessage?: string;
+  terminalReason?: string;
 }
 
 export interface ToolCall {

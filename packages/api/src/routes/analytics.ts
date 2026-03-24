@@ -9,7 +9,12 @@ const analyticsRoutes = new Hono<AppContext>();
 // ── Helper: parse date range from query params ─────────────────────
 function parseDateRange(c: any) {
   const from = c.req.query("from") ? new Date(c.req.query("from")!) : undefined;
-  const to = c.req.query("to") ? new Date(c.req.query("to")!) : undefined;
+  let to = c.req.query("to") ? new Date(c.req.query("to")!) : undefined;
+  // When "to" is a date-only string (e.g. "2026-03-24"), it parses as midnight UTC.
+  // Extend to end of day so records from that day are included.
+  if (to && c.req.query("to")!.length === 10) {
+    to.setUTCHours(23, 59, 59, 999);
+  }
   return { from, to };
 }
 
@@ -178,8 +183,15 @@ analyticsRoutes.get("/traces", requireRole("org-admin"), async (c) => {
   const orgId = c.get("orgId");
   const range = parseDateRange(c);
   const limit = parseInt(c.req.query("limit") ?? "50");
-  const traces = await analyticsService.getAgentTraces(orgId, range, limit);
-  return c.json({ data: traces });
+  const filters = {
+    status: c.req.query("status") || undefined,
+    tier: c.req.query("tier") || undefined,
+    agentId: c.req.query("agentId") || undefined,
+    search: c.req.query("search") || undefined,
+    cursor: c.req.query("cursor") || undefined,
+  };
+  const result = await analyticsService.getAgentTraces(orgId, range, limit, filters);
+  return c.json(result);
 });
 
 export { analyticsRoutes };

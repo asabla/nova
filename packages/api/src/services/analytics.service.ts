@@ -776,13 +776,40 @@ export const analyticsService = {
   },
 
   // ── Agent Traces ──────────────────────────────────────────────────
-  async getAgentTraces(orgId: string, range?: DateRange, limit = 50) {
+  async getAgentTraces(
+    orgId: string,
+    range?: DateRange,
+    limit = 50,
+    filters?: { status?: string; tier?: string; agentId?: string; search?: string; cursor?: string },
+  ) {
     const conditions: any[] = [
       eq(workflows.orgId, orgId),
       isNull(workflows.deletedAt),
     ];
     if (range?.from) conditions.push(gte(workflows.startedAt, range.from));
     if (range?.to) conditions.push(lte(workflows.startedAt, range.to));
+
+    // Cursor-based pagination
+    if (filters?.cursor) {
+      conditions.push(sql`${workflows.startedAt} < ${new Date(filters.cursor)}`);
+    }
+
+    // Status filter (map frontend status back to DB status)
+    if (filters?.status) {
+      const statusMap: Record<string, string> = { success: "completed", error: "error", timeout: "timeout", running: "running" };
+      const dbStatus = statusMap[filters.status];
+      if (dbStatus) conditions.push(eq(workflows.status, dbStatus));
+    }
+
+    // Tier filter via JSONB
+    if (filters?.tier) {
+      conditions.push(sql`${workflows.output}->>'tier' = ${filters.tier}`);
+    }
+
+    // Agent filter
+    if (filters?.agentId) {
+      conditions.push(eq(workflows.agentId, filters.agentId));
+    }
 
     const wfRows = await db
       .select({
@@ -791,6 +818,7 @@ export const analyticsService = {
         conversationId: workflows.conversationId,
         agentId: workflows.agentId,
         initiatedById: workflows.initiatedById,
+        input: workflows.input,
         output: workflows.output,
         errorMessage: workflows.errorMessage,
         startedAt: workflows.startedAt,
@@ -799,13 +827,17 @@ export const analyticsService = {
       .from(workflows)
       .where(and(...conditions))
       .orderBy(desc(workflows.startedAt))
-      .limit(limit);
+      .limit(limit + 1); // fetch one extra to determine nextCursor
 
-    if (wfRows.length === 0) return [];
+    // Check if there are more rows
+    const hasMore = wfRows.length > limit;
+    const rows = hasMore ? wfRows.slice(0, limit) : wfRows;
+
+    if (rows.length === 0) return { data: [], nextCursor: null };
 
     // Batch-fetch user names and agent names
-    const userIds = [...new Set(wfRows.map((w) => w.initiatedById))];
-    const agentIds = [...new Set(wfRows.map((w) => w.agentId).filter(Boolean))] as string[];
+    const userIds = [...new Set(rows.map((w) => w.initiatedById))];
+    const agentIds = [...new Set(rows.map((w) => w.agentId).filter(Boolean))] as string[];
 
     const [userRows, agentRows] = await Promise.all([
       userIds.length > 0
@@ -823,9 +855,12 @@ export const analyticsService = {
     const userNameMap = new Map(userRows.map((u) => [u.userId, u.displayName]));
     const agentNameMap = new Map(agentRows.map((a) => [a.id, a.name]));
 
+    // Search filter (by agent name — applied after batch fetch)
+    const searchLower = filters?.search?.toLowerCase();
+
     // Fetch tool calls for all workflows via their messageIds
     const allMessageIds: string[] = [];
-    for (const wf of wfRows) {
+    for (const wf of rows) {
       const output = wf.output as any;
       if (output?.messageIds) allMessageIds.push(...output.messageIds);
     }
@@ -858,6 +893,34 @@ export const analyticsService = {
       }
     }
 
+    // Batch-fetch model costs
+    const modelExternalIds = [...new Set(rows.map((wf) => {
+      const input = wf.input as any;
+      return input?.model as string | undefined;
+    }).filter(Boolean))] as string[];
+
+    const modelCostMap = new Map<string, { prompt: number; completion: number }>();
+    if (modelExternalIds.length > 0) {
+      const modelRows = await db
+        .select({
+          modelIdExternal: models.modelIdExternal,
+          costPerPromptTokenCents: models.costPerPromptTokenCents,
+          costPerCompletionTokenCents: models.costPerCompletionTokenCents,
+        })
+        .from(models)
+        .where(and(
+          eq(models.orgId, orgId),
+          sql`${models.modelIdExternal} = ANY(ARRAY[${sql.join(modelExternalIds.map((id) => sql`${id}`), sql`, `)}])`,
+        ));
+
+      for (const m of modelRows) {
+        modelCostMap.set(m.modelIdExternal, {
+          prompt: parseFloat(m.costPerPromptTokenCents ?? "0"),
+          completion: parseFloat(m.costPerCompletionTokenCents ?? "0"),
+        });
+      }
+    }
+
     // Map workflow status to frontend-expected status
     function mapStatus(s: string): "success" | "error" | "timeout" | "running" {
       if (s === "completed") return "success";
@@ -867,32 +930,66 @@ export const analyticsService = {
       return "success";
     }
 
-    return wfRows.map((wf) => {
+    const mapped = rows.map((wf) => {
       const output = wf.output as any;
+      const input = wf.input as any;
       const messageIds: string[] = output?.messageIds ?? [];
       const wfToolCalls = messageIds.flatMap((mid) => toolCallMap.get(mid) ?? []);
       const durationMs = wf.completedAt && wf.startedAt
         ? new Date(wf.completedAt).getTime() - new Date(wf.startedAt).getTime()
         : 0;
 
-      // Try to get model from output or use a default
-      const modelName = output?.model ?? "unknown";
+      const modelExternalId = input?.model ?? output?.model ?? "unknown";
+      const inputTokens = output?.inputTokens ?? 0;
+      const outputTokens = output?.outputTokens ?? 0;
+      const totalTokens = output?.totalTokens ?? (inputTokens + outputTokens);
+
+      // Compute real cost
+      const pricing = modelCostMap.get(modelExternalId);
+      const costCents = pricing
+        ? Math.round(inputTokens * pricing.prompt + outputTokens * pricing.completion)
+        : 0;
+
+      // Pass through the plan object (already structured as Plan type from agent workflow)
+      const plan = output?.plan ?? undefined;
+
+      const agentName = wf.agentId ? (agentNameMap.get(wf.agentId) ?? "Agent") : "Chat";
 
       return {
         id: wf.id,
-        agentName: wf.agentId ? (agentNameMap.get(wf.agentId) ?? "Agent") : "Chat",
+        agentName,
         conversationId: wf.conversationId ?? "",
         userId: wf.initiatedById,
         userName: userNameMap.get(wf.initiatedById) ?? "Unknown",
-        modelName,
+        modelName: modelExternalId,
         status: mapStatus(wf.status),
         startedAt: wf.startedAt?.toISOString() ?? "",
         durationMs,
-        totalTokens: output?.totalTokens ?? 0,
-        costCents: 0,
+        totalTokens,
+        inputTokens,
+        outputTokens,
+        costCents,
+        steps: output?.steps ?? 0,
+        tier: output?.tier,
+        tierReasoning: plan?.reasoning,
+        plan,
         toolCalls: wfToolCalls,
         errorMessage: wf.errorMessage ?? undefined,
+        terminalReason: output?.terminalReason,
       };
     });
+
+    // Apply search filter after mapping (needs agentName)
+    const filtered = searchLower
+      ? mapped.filter((t) =>
+          t.agentName.toLowerCase().includes(searchLower) ||
+          t.errorMessage?.toLowerCase().includes(searchLower) ||
+          t.userName.toLowerCase().includes(searchLower))
+      : mapped;
+
+    const lastRow = rows[rows.length - 1];
+    const nextCursor = hasMore && lastRow?.startedAt ? lastRow.startedAt.toISOString() : null;
+
+    return { data: filtered, nextCursor };
   },
 };

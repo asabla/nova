@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Download, Calendar, BarChart3, Bell, Activity, Link, Gauge } from "lucide-react";
@@ -18,7 +18,7 @@ import { SummaryCards, TrendCards } from "../../components/admin/analytics/Summa
 import { UsageChart } from "../../components/admin/analytics/UsageChart";
 import { CostBreakdown, CostOverview, ModelPerformanceTab } from "../../components/admin/analytics/ModelBreakdown";
 import { BudgetStatusSection, BudgetAlertRules, BudgetAlertForm } from "../../components/admin/analytics/BudgetAlerts";
-import { AgentTracesTab } from "../../components/admin/analytics/AgentTraces";
+import { AgentTracesTab, type TraceFilters } from "../../components/admin/analytics/AgentTraces";
 import { IntegrationsTab } from "../../components/admin/analytics/IntegrationCards";
 
 export const Route = createFileRoute("/_auth/admin/analytics")({
@@ -33,7 +33,7 @@ function AdminAnalyticsPage() {
   const [exporting, setExporting] = useState(false);
   const [mainTab, setMainTab] = useState<MainTab>("overview");
   const [costTab, setCostTab] = useState<CostBreakdownTab>("model");
-  const [expandedTraceId, setExpandedTraceId] = useState<string | null>(null);
+  const [traceFilters, setTraceFilters] = useState<TraceFilters>({});
   const [showBudgetForm, setShowBudgetForm] = useState(false);
   const [deleteAlertTarget, setDeleteAlertTarget] = useState<string | null>(null);
 
@@ -97,9 +97,28 @@ function AdminAnalyticsPage() {
     staleTime: 60_000,
   });
 
-  const { data: traces, isLoading: tracesLoading } = useQuery({
-    queryKey: ["analytics-traces", dateRange],
-    queryFn: () => api.get<{ data: AgentRun[] }>(`/api/analytics/traces${queryParams}&limit=50`),
+  const traceFilterParams = [
+    traceFilters.status ? `&status=${traceFilters.status}` : "",
+    traceFilters.tier ? `&tier=${traceFilters.tier}` : "",
+    traceFilters.search ? `&search=${encodeURIComponent(traceFilters.search)}` : "",
+  ].join("");
+
+  const {
+    data: tracesData,
+    isLoading: tracesLoading,
+    fetchNextPage: fetchMoreTraces,
+    hasNextPage: hasMoreTraces,
+    isFetchingNextPage: loadingMoreTraces,
+  } = useInfiniteQuery({
+    queryKey: ["analytics-traces", dateRange, traceFilters],
+    queryFn: ({ pageParam }) => {
+      const cursorParam = pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : "";
+      return api.get<{ data: AgentRun[]; nextCursor: string | null }>(
+        `/api/analytics/traces${queryParams}&limit=50${traceFilterParams}${cursorParam}`,
+      );
+    },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage: any) => lastPage?.nextCursor ?? undefined,
     staleTime: 60_000,
   });
 
@@ -114,7 +133,7 @@ function AdminAnalyticsPage() {
   const costData = (costs as any)?.data as CostData | undefined;
   const alertsData = (((budgetAlerts as any)?.data) ?? []) as BudgetAlert[];
   const statusData = (((budgetStatus as any)?.data) ?? []) as BudgetStatus[];
-  const agentTraces = (((traces as any)?.data) ?? []) as AgentRun[];
+  const agentTraces = (tracesData?.pages ?? []).flatMap((page: any) => (page?.data ?? []) as AgentRun[]);
 
   // ── Export handler ──────────────────────────────────────────────
 
@@ -335,8 +354,11 @@ function AdminAnalyticsPage() {
         <AgentTracesTab
           traces={agentTraces}
           loading={tracesLoading}
-          expandedTraceId={expandedTraceId}
-          onToggleTrace={(id) => setExpandedTraceId(expandedTraceId === id ? null : id)}
+          hasMore={!!hasMoreTraces}
+          onLoadMore={() => fetchMoreTraces()}
+          loadingMore={loadingMoreTraces}
+          filters={traceFilters}
+          onFiltersChange={setTraceFilters}
         />
       )}
 
