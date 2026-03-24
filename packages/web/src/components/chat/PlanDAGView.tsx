@@ -100,12 +100,12 @@ function PlanNodeRow({ node, depth = 0, allNodes }: { node: PlanNode; depth?: nu
         {expanded && node.result && (
           <div className="mt-1.5 ml-6">
             <pre className="text-xs text-text-secondary bg-surface rounded-lg p-2.5 overflow-x-auto font-mono max-h-32 overflow-y-auto whitespace-pre-wrap">
-              {node.result.content.slice(0, 500)}
-              {node.result.content.length > 500 && "..."}
+              {(node.result.content ?? "No content").slice(0, 500)}
+              {(node.result.content?.length ?? 0) > 500 && "..."}
             </pre>
-            {node.result.toolCallRecords.length > 0 && (
+            {((node.result as any).toolCallCount ?? node.result.toolCallRecords?.length ?? 0) > 0 && (
               <p className="text-[10px] text-text-tertiary mt-1">
-                {node.result.toolCallRecords.length} tool call(s), {node.result.tokensUsed} tokens
+                {(node.result as any).toolCallCount ?? node.result.toolCallRecords?.length} tool call(s), {node.result.tokensUsed} tokens
               </p>
             )}
           </div>

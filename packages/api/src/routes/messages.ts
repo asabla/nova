@@ -732,7 +732,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
               approvalRequired: wfPlan.approvalRequired, approved: wfPlan.approved,
               nodes: (wfPlan.nodes ?? []).map((n: any) => ({
                 id: n.id, description: n.description, tools: n.tools, dependencies: n.dependencies,
-                status: n.status, result: n.result ? { durationMs: n.result.durationMs, tokensUsed: n.result.tokensUsed, toolCallCount: n.result.toolCallRecords?.length ?? 0 } : undefined,
+                status: n.status, result: n.result ? { content: n.result.content ?? "", durationMs: n.result.durationMs, tokensUsed: n.result.tokensUsed, toolCallCount: n.result.toolCallRecords?.length ?? 0 } : undefined,
               })),
             };
           }
