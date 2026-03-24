@@ -3,6 +3,9 @@ import type { RunStreamEvent, FunctionTool } from "@openai/agents";
 import { heartbeat } from "@temporalio/activity";
 import { eq } from "drizzle-orm";
 import { createLiteLLMModel } from "@nova/worker-shared/agent-sdk-model";
+import { openai } from "@nova/worker-shared/litellm";
+import { getModelParams } from "@nova/worker-shared/models";
+import { createReasoningModel } from "@nova/worker-shared/reasoning-model";
 import { db } from "@nova/worker-shared/db";
 import { researchReports } from "@nova/shared/schemas";
 import {
@@ -201,15 +204,25 @@ ${analyticsGuidance}
 
 Begin by planning your research approach, then iterate through gather → analyze → deepen cycles before writing the report section by section.`;
 
+  // Check model-specific params (reasoning models don't support temperature/max_tokens)
+  const modelParams = await getModelParams(modelId);
+  const dropParams = modelParams?.dropParams ?? [];
+  const dropSet = new Set(dropParams);
+
+  const model = dropParams.length > 0
+    ? await createReasoningModel(openai, modelId, dropParams)
+    : createLiteLLMModel(modelId);
+
+  const modelSettings: Record<string, unknown> = {};
+  if (!dropSet.has("temperature")) modelSettings.temperature = input.temperature ?? 0.5;
+  if (!dropSet.has("max_tokens")) modelSettings.maxTokens = input.maxTokens ?? 16384;
+
   const agent = new Agent({
     name: "nova-research",
     instructions: RESEARCH_SYSTEM_PROMPT,
-    model: createLiteLLMModel(modelId),
+    model,
     tools,
-    modelSettings: {
-      temperature: input.temperature ?? 0.5,
-      maxTokens: input.maxTokens ?? 16384,
-    },
+    modelSettings,
   });
 
   let fullContent = "";

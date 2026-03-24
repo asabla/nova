@@ -16,7 +16,7 @@ import { describe, it, expect } from "bun:test";
  */
 
 // Import the testable proxy function directly
-import { wrapClientWithParamFilter } from "../src/reasoning-model";
+import { wrapClientWithParamFilter } from "@nova/worker-shared/reasoning-model";
 
 // ─── Unit: dropParams logic ─────────────────────────────
 

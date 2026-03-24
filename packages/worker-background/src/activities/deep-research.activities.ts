@@ -2,7 +2,7 @@ import { eq, and, inArray, isNull, sql, desc } from "drizzle-orm";
 import { Context } from "@temporalio/activity";
 import { db } from "@nova/worker-shared/db";
 import { openai } from "@nova/worker-shared/litellm";
-import { getDefaultChatModel } from "@nova/worker-shared/models";
+import { getDefaultChatModel, buildChatParams } from "@nova/worker-shared/models";
 import { researchReports, knowledgeChunks, knowledgeDocuments, files, fileChunks } from "@nova/shared/schemas";
 import { extractFromHtml } from "@nova/shared/content";
 
@@ -104,7 +104,7 @@ export async function analyzeSource(query: string, content: string): Promise<{ s
   const model = process.env.RESEARCH_MODEL ?? await getDefaultChatModel();
 
   try {
-    const result = await openai.chat.completions.create({
+    const params = await buildChatParams(model, {
       model,
       messages: [
         { role: "system", content: "Analyze this source for relevance to the research query. Return a JSON with 'summary' (200 words max) and 'relevance' (0-100 score)." },
@@ -113,6 +113,7 @@ export async function analyzeSource(query: string, content: string): Promise<{ s
       max_tokens: 500,
       temperature: 0.3,
     });
+    const result = await openai.chat.completions.create(params as any);
 
     const parsed = JSON.parse(result.choices?.[0]?.message?.content ?? "{}");
     return { summary: parsed.summary ?? "", relevance: parsed.relevance ?? 50 };
@@ -131,7 +132,7 @@ export async function generateResearchReport(
   const sourceSummaries = sources.map((s, i) => `[${i + 1}] ${s.title}\n${s.content}`).join("\n\n");
 
   Context.current().heartbeat(`Generating report from ${sources.length} sources`);
-  const result = await openai.chat.completions.create({
+  const reportParams = await buildChatParams(model, {
     model,
     messages: [
       { role: "system", content: "Generate a comprehensive research report in standard markdown format. Use ## headings for sections (Executive Summary, Key Findings, Detailed Analysis, Conclusion, References). Use paragraphs, bullet points, and numbered lists for content — do NOT use markdown tables. Use [n] format for inline citations that reference the numbered sources.\n\nIMPORTANT: The very first line of your response MUST be a concise title (max 80 characters) for this report, prefixed with \"TITLE: \". Then leave a blank line before the report content." },
@@ -140,6 +141,7 @@ export async function generateResearchReport(
     max_tokens: 4096,
     temperature: 0.5,
   });
+  const result = await openai.chat.completions.create(reportParams as any);
 
   const rawOutput = result.choices?.[0]?.message?.content ?? "Report generation failed.";
 

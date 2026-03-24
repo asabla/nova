@@ -13,7 +13,7 @@ import {
 } from "@nova/worker-shared/stream";
 import { getBuiltinTools, loadCustomTools } from "@nova/worker-shared/tools";
 import { getModelParams } from "@nova/worker-shared/models";
-import { createReasoningModel } from "../reasoning-model";
+import { createReasoningModel } from "@nova/worker-shared/reasoning-model";
 
 
 export interface AgentRunInput {

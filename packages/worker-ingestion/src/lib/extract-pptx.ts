@@ -1,6 +1,6 @@
 import { openai } from "@nova/worker-shared/litellm";
 import { env } from "@nova/worker-shared/env";
-import { getVisionModel } from "@nova/worker-shared/models";
+import { getVisionModel, buildChatParams } from "@nova/worker-shared/models";
 import { executeSandboxCode } from "../activities/sandbox.activities";
 
 const MAX_SLIDES = 50;
@@ -128,7 +128,7 @@ async function describeSlideWithVision(
 ): Promise<string> {
 
   try {
-    const response = await openai.chat.completions.create({
+    const params = await buildChatParams(visionModel, {
       model: visionModel,
       messages: [
         {
@@ -150,6 +150,7 @@ async function describeSlideWithVision(
       max_tokens: 500,
       temperature: 0.3,
     });
+    const response = await openai.chat.completions.create(params as any);
 
     return response.choices[0]?.message?.content ?? "";
   } catch (err) {

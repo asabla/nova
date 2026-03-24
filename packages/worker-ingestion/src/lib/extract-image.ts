@@ -1,5 +1,5 @@
 import { openai } from "@nova/worker-shared/litellm";
-import { getVisionModel } from "@nova/worker-shared/models";
+import { getVisionModel, buildChatParams } from "@nova/worker-shared/models";
 
 interface ImageMetadata {
   width?: number;
@@ -81,7 +81,7 @@ async function describeWithVision(buffer: Buffer, contentType: string): Promise<
   const base64 = buffer.toString("base64");
   const mediaType = contentType || "image/png";
 
-  const response = await openai.chat.completions.create({
+  const params = await buildChatParams(visionModel, {
     model: visionModel,
     messages: [
       {
@@ -103,6 +103,7 @@ async function describeWithVision(buffer: Buffer, contentType: string): Promise<
     max_tokens: 1000,
     temperature: 0.3,
   });
+  const response = await openai.chat.completions.create(params as any);
 
   return response.choices[0]?.message?.content ?? "";
 }

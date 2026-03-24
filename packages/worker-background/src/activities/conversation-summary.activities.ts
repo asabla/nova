@@ -1,7 +1,7 @@
 import { eq, asc, isNull, sql } from "drizzle-orm";
 import { db } from "@nova/worker-shared/db";
 import { openai } from "@nova/worker-shared/litellm";
-import { getDefaultChatModel } from "@nova/worker-shared/models";
+import { getDefaultChatModel, buildChatParams } from "@nova/worker-shared/models";
 import { messages, conversations } from "@nova/shared/schemas";
 
 export async function getConversationMessages(conversationId: string): Promise<{ role: string; content: string }[]> {
@@ -21,15 +21,16 @@ export async function getConversationMessages(conversationId: string): Promise<{
 export async function generateSummary(msgs: { role: string; content: string }[]): Promise<string> {
   const model = process.env.SUMMARY_MODEL ?? await getDefaultChatModel();
 
-  const result = await openai.chat.completions.create({
+  const params = await buildChatParams(model, {
     model,
     messages: [
       { role: "system", content: "Generate a short (5-8 word) title for this conversation. Respond with only the title." },
       ...msgs.slice(0, 4),
-    ] as any,
+    ],
     max_tokens: 30,
     temperature: 0.3,
   });
+  const result = await openai.chat.completions.create(params as any);
 
   return result.choices?.[0]?.message?.content?.trim() ?? "Untitled Conversation";
 }

@@ -2,7 +2,7 @@ import { eq, and } from "drizzle-orm";
 import { Context } from "@temporalio/activity";
 import { db } from "@nova/worker-shared/db";
 import { openai } from "@nova/worker-shared/litellm";
-import { getDefaultEmbeddingModel } from "@nova/worker-shared/models";
+import { getDefaultEmbeddingModel, buildChatParams } from "@nova/worker-shared/models";
 import { knowledgeDocuments, knowledgeChunks, knowledgeCollections, knowledgeTags, knowledgeDocumentTagAssignments } from "@nova/shared/schemas";
 import { files } from "@nova/shared/schema";
 import { extractFromHtml, chunkContent } from "@nova/shared/content";
@@ -427,13 +427,14 @@ ${typeSpecificInstructions}
 ${title ? `Title: ${title}\n` : ""}Content:
 ${snippet}`;
 
-    const response = await openai.chat.completions.create({
+    const params = await buildChatParams(model, {
       model,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
       temperature: 0.3,
       max_tokens: 500,
     });
+    const response = await openai.chat.completions.create(params as any);
 
     const raw = response.choices[0]?.message?.content;
     if (!raw) return null;

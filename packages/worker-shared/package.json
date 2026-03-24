@@ -58,6 +58,10 @@
     "./tools": {
       "types": "./dist/tools/index.d.ts",
       "default": "./src/tools/index.ts"
+    },
+    "./reasoning-model": {
+      "types": "./dist/reasoning-model.d.ts",
+      "default": "./src/reasoning-model.ts"
     }
   },
   "scripts": {
