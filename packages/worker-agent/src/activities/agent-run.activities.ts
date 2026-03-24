@@ -349,6 +349,28 @@ function buildResultSummary(toolName: string, result: unknown): string {
       const str = typeof result === "string" ? result : JSON.stringify(result);
       return `Read ${str.length.toLocaleString()} chars`;
     }
+    if (toolName === "invoke_agent") {
+      const name = typeof result === "object" && result !== null && "agent_name" in result
+        ? (result as any).agent_name : null;
+      return name ? `Delegated to ${name}` : "Delegated to agent";
+    }
+    if (toolName === "code_execute") {
+      const lang = typeof result === "object" && result !== null && "language" in result
+        ? (result as any).language : null;
+      return lang ? `Executed ${lang} code` : "Executed code";
+    }
+    if (toolName === "read_file") {
+      const str = typeof result === "string" ? result : JSON.stringify(result);
+      return `Read ${str.length.toLocaleString()} chars`;
+    }
+    if (toolName === "search_workspace") {
+      if (typeof result === "object" && result !== null && "results" in result) {
+        const arr = (result as any).results;
+        if (Array.isArray(arr))
+          return `Found ${arr.length} result${arr.length === 1 ? "" : "s"}`;
+      }
+      return "Search complete";
+    }
     return "Done";
   } catch {
     return "Done";
