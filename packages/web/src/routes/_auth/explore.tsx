@@ -102,7 +102,7 @@ const categories: { id: Category; label: string; icon: React.ElementType }[] = [
   { id: "education", label: "Education", icon: GraduationCap },
 ];
 
-const sampleConversations: SampleConversation[] = [
+export const sampleConversations: SampleConversation[] = [
   // General
   {
     id: "explain-concept",

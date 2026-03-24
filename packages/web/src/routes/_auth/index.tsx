@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  ArrowUp, Lightbulb, Code2, PenTool,
+  ArrowUp,
   ArrowRight, RefreshCw, MessageSquare, Paperclip, X, FileText, Microscope,
 } from "lucide-react";
 import { Button } from "../../components/ui/Button";
@@ -21,7 +21,7 @@ import { Dialog } from "../../components/ui/Dialog";
 import { NewResearchForm, type NewResearchFormSubmitData } from "../../components/research/NewResearchForm";
 import { toast } from "../../components/ui/Toast";
 import { TemplateInputDialog } from "../../components/explore/TemplateInputDialog";
-import type { SampleConversation } from "./explore";
+import { sampleConversations, type SampleConversation } from "./explore";
 
 export const Route = createFileRoute("/_auth/")({
   component: () => (
@@ -88,68 +88,14 @@ function HomePage() {
     [slash.handleSelect],
   );
 
-  const quickStarters: SampleConversation[] = [
-    {
-      id: "home-explain-pattern",
-      title: t("home.starterCode", "Explain a codebase pattern"),
-      description: "Get a clear explanation of a codebase pattern or concept with real-world examples.",
-      category: "code",
-      tags: ["learning", "code"],
-      icon: Code2,
-      color: "text-emerald-500",
-      bgColor: "bg-emerald-500/8",
-      starterMessage: "Explain {{topic}} in backend/software development. When should I use it and when should I avoid it? Show examples in a real use case.",
-      inputs: [
-        {
-          id: "topic",
-          type: "text",
-          label: "What pattern or concept do you want explained?",
-          placeholder: "e.g. the repository pattern, dependency injection, event sourcing, CQRS...",
-          required: true,
-        },
-      ],
-    },
-    {
-      id: "home-draft-document",
-      title: t("home.starterDraft", "Draft a document"),
-      description: "Get a well-structured document for any professional purpose.",
-      category: "creative",
-      tags: ["writing", "document"],
-      icon: PenTool,
-      color: "text-primary",
-      bgColor: "bg-primary/8",
-      starterMessage: "Draft the following document:\n\n{{request}}",
-      inputs: [
-        {
-          id: "request",
-          type: "textarea",
-          label: "What document do you need?",
-          placeholder: "e.g. An RFC template for proposing technical changes, a post-mortem template, a project kickoff brief...",
-          required: true,
-        },
-      ],
-    },
-    {
-      id: "home-break-down-problem",
-      title: t("home.starterProblem", "Break down a problem"),
-      description: "Get a structured breakdown of a problem with root causes, metrics, and actionable next steps.",
-      category: "general",
-      tags: ["problem-solving", "analysis"],
-      icon: Lightbulb,
-      color: "text-amber-500",
-      bgColor: "bg-amber-500/8",
-      starterMessage: "Break down this problem for me:\n\n{{problem}}\n\nIdentify root causes, what metrics I should track, and give me a prioritized list of actionable next steps.",
-      inputs: [
-        {
-          id: "problem",
-          type: "textarea",
-          label: "What problem do you need broken down?",
-          placeholder: "e.g. 40% of trial users drop off before completing onboarding in our B2B SaaS product...",
-          required: true,
-        },
-      ],
-    },
-  ];
+  const quickStarters = useMemo(() => {
+    const shuffled = [...sampleConversations];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled.slice(0, 3);
+  }, []);
 
   const { data: conversationsData, isLoading, isError, refetch } = useQuery({
     queryKey: queryKeys.conversations.list({ isArchived: false }),
