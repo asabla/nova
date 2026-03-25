@@ -177,8 +177,9 @@ knowledgeRoutes.post("/:id/documents/upload", async (c) => {
 
   const docs = [];
   for (const file of uploadedFiles) {
+    const filename = file.name || `upload-${crypto.randomUUID().slice(0, 8)}`;
     const contentType = file.type || "application/octet-stream";
-    const key = `${orgId}/${crypto.randomUUID()}/${file.name}`;
+    const key = `${orgId}/${crypto.randomUUID()}/${filename}`;
 
     // Upload directly to MinIO via the client (avoids presigned URL localhost issues in Docker)
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -187,11 +188,11 @@ knowledgeRoutes.post("/:id/documents/upload", async (c) => {
     });
 
     // Create file record in DB
-    const fileRecord = await fileService.createFileRecord(orgId, userId, file.name, contentType, file.size, key);
+    const fileRecord = await fileService.createFileRecord(orgId, userId, filename, contentType, file.size, key);
 
     // Create knowledge document linked to the file
     const doc = await knowledgeService.addDocument(orgId, collectionId, {
-      title: file.name,
+      title: filename,
       fileId: fileRecord.id,
     });
 
@@ -202,7 +203,7 @@ knowledgeRoutes.post("/:id/documents/upload", async (c) => {
       action: "knowledge.collection.document_add",
       resourceType: "knowledge_collection",
       resourceId: collectionId,
-      details: { documentId: doc.id, title: file.name },
+      details: { documentId: doc.id, title: filename },
     });
 
     await triggerDocumentIngestion(doc, orgId, collectionId);
