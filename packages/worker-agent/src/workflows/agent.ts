@@ -116,9 +116,9 @@ const { executeAgentStepWithSDK } = proxyActivities<typeof agentStepActivities>(
 });
 
 const { runAgentLoop } = proxyActivities<typeof agentRunActivities>({
-  startToCloseTimeout: "3 minutes",
-  heartbeatTimeout: "30 seconds",
-  retry: { maximumAttempts: 2 },
+  startToCloseTimeout: "30 minutes",
+  heartbeatTimeout: "60 seconds",
+  retry: { maximumAttempts: 3 },
 });
 
 const { publishDone, updateWorkflowStatus } = proxyActivities<typeof smartChatActivities>({
@@ -464,7 +464,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
     // Load agent config if agentId provided
     const agent = input.agentId ? await getAgentConfig(input.orgId, input.agentId) : null;
     const maxSteps = input.maxSteps ?? agent?.maxSteps ?? 25;
-    const timeoutSeconds = input.timeoutSeconds ?? agent?.timeoutSeconds ?? 300;
+    const timeoutSeconds = input.timeoutSeconds ?? agent?.timeoutSeconds ?? 600;
 
     // Load memory and create conversation in parallel (both depend on agent config)
     let memory: Record<string, unknown> = {};
@@ -720,9 +720,9 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
 
     // Use a per-node activity proxy so each node shows as a separate activity in Temporal timeline
     const { runAgentLoop: runNodeAgentLoop } = proxyActivities<typeof agentRunActivities>({
-      startToCloseTimeout: "3 minutes",
-      heartbeatTimeout: "30 seconds",
-      retry: { maximumAttempts: 2 },
+      startToCloseTimeout: "30 minutes",
+      heartbeatTimeout: "60 seconds",
+      retry: { maximumAttempts: 3 },
       activityId: `runAgentLoop-${node.id}`,
     });
 
