@@ -224,17 +224,28 @@ function DownloadButton({ attachment, onClick }: { attachment: Attachment; onCli
 
 // --- Toolbar for iframe-based previews ---
 
-function PreviewToolbar({ filename, onExpand }: { filename: string; onExpand: () => void }) {
+function PreviewToolbar({ filename, onExpand, onDownload }: { filename: string; onExpand: () => void; onDownload?: () => void }) {
   return (
     <div className="flex items-center justify-between px-3 py-1.5 bg-surface-tertiary border-b border-border rounded-t-lg">
       <span className="text-xs font-medium text-text truncate">{filename}</span>
-      <button
-        onClick={onExpand}
-        className="text-text-tertiary hover:text-text p-1 rounded transition-colors"
-        aria-label="Expand"
-      >
-        <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
-      </button>
+      <div className="flex items-center gap-1">
+        {onDownload && (
+          <button
+            onClick={onDownload}
+            className="text-text-tertiary hover:text-text p-1 rounded transition-colors"
+            aria-label="Download"
+          >
+            <Download className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        )}
+        <button
+          onClick={onExpand}
+          className="text-text-tertiary hover:text-text p-1 rounded transition-colors"
+          aria-label="Expand"
+        >
+          <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -258,6 +269,7 @@ export function AttachmentPreview({ attachment }: AttachmentPreviewProps) {
   const { ref, inView } = useInView();
   const { data: url, isLoading: urlLoading, isError: urlError } = usePresignedUrl(attachment.fileId, inView);
   const [expanded, setExpanded] = useState(false);
+  const [inlineOpen, setInlineOpen] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
   const needsContent = category === "csv" || category === "text" || category === "html";
@@ -343,30 +355,53 @@ export function AttachmentPreview({ attachment }: AttachmentPreviewProps) {
 
   // --- HTML ---
   if (category === "html") {
+    const sizeLabel = formatSize(attachment.sizeBytes);
     return (
-      <div ref={ref} className="w-full max-w-2xl">
-        {urlLoading || contentLoading || !fileContent ? (
-          <PreviewSkeleton className="h-[400px]" />
-        ) : (
-          <>
-            <div className="rounded-lg border border-border overflow-hidden">
-              <PreviewToolbar filename={filename} onExpand={() => setExpanded(true)} />
-              <iframe
-                srcDoc={fileContent}
-                sandbox="allow-scripts"
-                className="w-full h-[400px] bg-white"
-                title={filename}
-              />
+      <div ref={ref}>
+        {/* Collapsed button (default) */}
+        {!inlineOpen && (
+          <button
+            onClick={() => setInlineOpen(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface border border-border hover:bg-surface-secondary transition-colors text-left max-w-[280px]"
+          >
+            <FileText className="h-4 w-4 text-text-tertiary shrink-0" aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-text truncate">{filename}</p>
+              {sizeLabel && <p className="text-[10px] text-text-tertiary">{sizeLabel}</p>}
             </div>
-            <Dialog open={expanded} onClose={() => setExpanded(false)} title={filename} size="full">
-              <iframe
-                srcDoc={fileContent}
-                sandbox="allow-scripts"
-                className="w-full h-[70vh] rounded-lg border border-border bg-white"
-                title={filename}
-              />
-            </Dialog>
-          </>
+            <Maximize2 className="h-3.5 w-3.5 text-text-tertiary shrink-0" aria-hidden="true" />
+          </button>
+        )}
+
+        {/* Inline expanded preview */}
+        {inlineOpen && (
+          <div className="w-full max-w-2xl">
+            {urlLoading || contentLoading || !fileContent ? (
+              <PreviewSkeleton className="h-[400px]" />
+            ) : (
+              <div className="rounded-lg border border-border overflow-hidden">
+                <PreviewToolbar filename={filename} onExpand={() => setExpanded(true)} onDownload={handleDownload} />
+                <iframe
+                  srcDoc={fileContent}
+                  sandbox="allow-scripts"
+                  className="w-full h-[400px] bg-white"
+                  title={filename}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Full-screen dialog */}
+        {fileContent && (
+          <Dialog open={expanded} onClose={() => setExpanded(false)} title={filename} size="full">
+            <iframe
+              srcDoc={fileContent}
+              sandbox="allow-scripts"
+              className="w-full h-[70vh] rounded-lg border border-border bg-white"
+              title={filename}
+            />
+          </Dialog>
         )}
       </div>
     );
@@ -447,7 +482,7 @@ export function AttachmentPreview({ attachment }: AttachmentPreviewProps) {
         ) : (
           <>
             <div className="rounded-lg border border-border overflow-hidden">
-              <PreviewToolbar filename={filename} onExpand={() => setExpanded(true)} />
+              <PreviewToolbar filename={filename} onExpand={() => setExpanded(true)} onDownload={handleDownload} />
               <div className="max-h-[300px] overflow-auto">
                 <SortableCSVTable csv={fileContent} />
               </div>
