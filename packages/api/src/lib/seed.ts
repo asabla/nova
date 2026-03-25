@@ -6,6 +6,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { env } from "./env";
 import * as authSchema from "./auth-schema";
+import { seedExploreTemplates } from "./seed-templates";
 
 // Separate auth DB client (Better Auth tables)
 const authClient = postgres(env.DATABASE_URL);
@@ -454,6 +455,9 @@ What could go wrong and how to mitigate it.
       });
   }
   console.log(`  Agents: ${agentDefs.length} upserted`);
+
+  // ─── 6. Explore Templates ─────────────────────────
+  await seedExploreTemplates(orgId, userId);
 
   // ─── Done ─────────────────────────────────────────
   console.log("\n  Seed complete!");
