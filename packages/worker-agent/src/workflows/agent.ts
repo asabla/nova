@@ -25,7 +25,37 @@ import type {
   ToolCallRecord,
   UserInteractionRequest,
   UserInteractionResponse,
+  EffortLevel,
 } from "@nova/shared/types";
+
+// ---------------------------------------------------------------------------
+// Effort-level → prompt instructions & token caps
+// (inlined — Temporal workflow sandbox prohibits lib imports)
+// ---------------------------------------------------------------------------
+
+const EFFORT_INSTRUCTIONS: Record<EffortLevel, string> = {
+  low: [
+    "Keep your response brief and to the point. Aim for 1-3 short paragraphs maximum.",
+    "Do not elaborate beyond what is directly asked.",
+    "No preamble, no summaries of what you did, no 'let me know if you need anything else' closings.",
+    "If the answer is one sentence, give one sentence.",
+  ].join(" "),
+  medium: "Be concise but thorough. Cover key points without unnecessary elaboration. Use structured formatting to be scannable.",
+  high: "Provide a thorough, detailed response. Use structured formatting. It is appropriate to be comprehensive here.",
+};
+
+const EFFORT_TOKEN_CAPS: Record<EffortLevel, number> = {
+  low: 1024,
+  medium: 4096,
+  high: 8192,
+};
+
+function applyEffortToPrompt(systemPrompt: string | undefined, level: EffortLevel): string | undefined {
+  const instructions = EFFORT_INSTRUCTIONS[level];
+  if (!systemPrompt) return instructions ? `## Output Length\n${instructions}` : undefined;
+  return `${systemPrompt}\n\n## Output Length\n${instructions}`;
+}
+
 // ---------------------------------------------------------------------------
 // DAG executor (inlined — Temporal workflow sandbox prohibits lib imports)
 // ---------------------------------------------------------------------------
@@ -324,10 +354,14 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
   // Finalize
   // ------------------------------------------------------------------
 
-  // Collect final content from plan node results (only if synthesis didn't already set it)
+  // Collect final content from plan node results (only if synthesis didn't already set it).
+  // Use only the last completed node (typically the final artifact), not a raw concatenation
+  // of all intermediate outputs which can be extremely verbose.
   if (plan && !finalContent) {
     const completedNodes = plan.nodes.filter((n) => n.status === "completed" && n.result?.content);
-    finalContent = completedNodes.map((n) => n.result!.content).filter(Boolean).join("\n\n");
+    if (completedNodes.length > 0) {
+      finalContent = completedNodes[completedNodes.length - 1].result!.content;
+    }
   }
 
   // Signal done to the SSE relay
@@ -411,8 +445,16 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
       messageHistory.splice(0, messageHistory.length, ...summarized);
     }
 
-    const systemPrompt = messageHistory.find((m) => m.role === "system")?.content;
+    const rawSystemPrompt = messageHistory.find((m) => m.role === "system")?.content;
     const nonSystemHistory = messageHistory.filter((m) => m.role !== "system");
+
+    // Apply effort-aware prompt instructions and token caps
+    const effortLevel: EffortLevel = input.effort?.level ?? "medium";
+    const systemPrompt = applyEffortToPrompt(rawSystemPrompt, effortLevel);
+    const effortCap = EFFORT_TOKEN_CAPS[effortLevel];
+    const effectiveMaxTokens = input.modelParams?.maxTokens
+      ? Math.min(input.modelParams.maxTokens, effortCap)
+      : effortCap;
 
     const loop = async () => {
       if (isCancelled()) return;
@@ -423,7 +465,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         systemPrompt,
         messageHistory: nonSystemHistory,
         temperature: input.modelParams?.temperature,
-        maxTokens: input.modelParams?.maxTokens,
+        maxTokens: effectiveMaxTokens,
         maxTurns: input.maxSteps ?? 5,
         agentId: input.agentId,
         orgId: input.orgId,
@@ -654,14 +696,32 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         messageIds.push(msg.id);
       }
     } else if (completedWithContent.length > 1) {
+      // Truncate individual node results to avoid overflowing synthesis context.
+      // Keep the last node (usually the final artifact) intact but cap planning/intermediate nodes.
+      const NODE_RESULT_CAP = 12000; // ~3k tokens per intermediate node
       const nodeResults = completedWithContent
-        .map((n) => `[${n.id}: ${n.description}]:\n${n.result!.content}`)
+        .map((n, i) => {
+          const content = n.result!.content;
+          const isLast = i === completedWithContent.length - 1;
+          const truncated = !isLast && content.length > NODE_RESULT_CAP
+            ? content.slice(0, NODE_RESULT_CAP) + "\n\n[... truncated for brevity ...]"
+            : content;
+          return `[${n.id}: ${n.description}]:\n${truncated}`;
+        })
         .join("\n\n");
 
       const synthesis = await executeAgentStepWithSDK({
-        systemPrompt: "You are a helpful assistant. Synthesize the gathered information into a clear, concise response. Do not mention steps, subtasks, plans, or the synthesis process. Just answer the user's question naturally. Be brief — avoid repeating information, unnecessary preamble, or filler. Short questions deserve short answers. Maximum 3 paragraphs unless the user explicitly asked for a long-form or detailed response.",
+        systemPrompt: [
+          "You are a helpful assistant. Synthesize the gathered information into a clear, natural response.",
+          "Rules:",
+          "- Do NOT mention steps, subtasks, plans, or the synthesis process.",
+          "- If the result contains a code artifact (HTML, code file, etc.), present ONLY the final artifact with a brief 1-2 sentence introduction. Do not include planning notes, creative direction, or validation logs.",
+          "- If the result is informational (research, analysis), summarize concisely in 1-4 paragraphs.",
+          "- Never repeat content that already appears in the artifact.",
+          "- Never add filler closings like 'let me know if you need changes'.",
+        ].join("\n"),
         modelId: input.model,
-        modelParams: agent?.modelParams ?? {},
+        modelParams: { ...(agent?.modelParams ?? {}), maxTokens: 4096 },
         messageHistory: [
           { role: "assistant" as const, content: nodeResults },
           { role: "user" as const, content: `Based on the information above, provide a clear response to: "${input.userMessage ?? messageHistory.filter((m) => m.role === "user").pop()?.content ?? "the user's request"}"` },
@@ -745,9 +805,11 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         ? `\n\nAlready completed steps (do NOT repeat this work):\n${completedSummary}`
         : "";
 
-      const systemPrompt = agent?.systemPrompt
+      const nodeEffort: EffortLevel = node.effort ?? input.effort?.level ?? "low";
+      const nodeBase = agent?.systemPrompt
         ? `${agent.systemPrompt}\n\nYou are executing step "${node.id}": ${node.description}\nBe focused and concise. Complete this specific step only.${continuationNote}`
         : `You are executing step "${node.id}": ${node.description}\nBe focused and concise. Complete this specific step only.${continuationNote}`;
+      const systemPrompt = applyEffortToPrompt(nodeBase, nodeEffort)!;
 
       // Run the agent loop with tools — this handles tool calls natively
       const allowedBuiltinTools = (agent as any)?.builtinTools ?? null;
