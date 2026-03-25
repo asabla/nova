@@ -17,6 +17,7 @@ export interface AgentForm {
   memoryScope: "per-user" | "per-conversation" | "global";
   maxSteps: number;
   timeoutSeconds: number;
+  starters: string[];
 }
 
 export interface TestMessage {
@@ -34,6 +35,7 @@ const DEFAULT_FORM: AgentForm = {
   memoryScope: "per-user",
   maxSteps: 10,
   timeoutSeconds: 300,
+  starters: [],
 };
 
 export function useAgentForm(options: { mode: "create" | "edit"; agentId?: string }) {
@@ -74,6 +76,7 @@ export function useAgentForm(options: { mode: "create" | "edit"; agentId?: strin
         memoryScope: agent.memoryScope ?? "per-user",
         maxSteps: agent.maxSteps ?? 10,
         timeoutSeconds: agent.timeoutSeconds ?? 300,
+        starters: agent.starters ?? [],
       };
       setForm(loaded);
       savedFormRef.current = loaded;
@@ -259,13 +262,21 @@ export function useAgentForm(options: { mode: "create" | "edit"; agentId?: strin
       const hasExisting = form.systemPrompt.trim().length > 0;
       const needsName = !form.name.trim();
       const needsDescription = !form.description.trim();
-      const needsExtras = needsName || needsDescription;
+      const needsStarters = form.starters.filter((s) => s.trim()).length === 0;
+      const needsJson = needsName || needsDescription || needsStarters;
+
+      const jsonFields = [
+        `"systemPrompt": "the system prompt"`,
+        needsName ? `"name": "short agent name (2-4 words)"` : null,
+        needsDescription ? `"description": "one-sentence summary"` : null,
+        needsStarters ? `"starters": ["4 short conversation starter prompts relevant to this agent"]` : null,
+      ].filter(Boolean).join(", ");
 
       let metaPrompt: string;
       if (hasExisting) {
         metaPrompt = `You are an expert at crafting AI agent system prompts. Improve the following system prompt for an agent named "${form.name}"${form.description ? ` described as: "${form.description}"` : ""}. Make it more specific, structured, and effective while preserving the user's intent.`;
-        if (needsExtras) {
-          metaPrompt += `\n\nRespond with a JSON object: { "systemPrompt": "...", "name": "...", "description": "..." } where name is a short agent name (2-4 words) and description is a one-sentence summary. Only include name/description if they would improve clarity.`;
+        if (needsJson) {
+          metaPrompt += `\n\nRespond with a JSON object: { ${jsonFields} }.`;
         } else {
           metaPrompt += ` Return ONLY the improved system prompt, no explanation.`;
         }
@@ -277,8 +288,8 @@ export function useAgentForm(options: { mode: "create" | "edit"; agentId?: strin
             ? `for an agent described as: "${form.description}"`
             : "for a general-purpose AI assistant";
         metaPrompt = `You are an expert at crafting AI agent system prompts. Create a detailed, well-structured system prompt ${context}. The prompt should clearly define the agent's role, capabilities, tone, and behavior guidelines.`;
-        if (needsExtras) {
-          metaPrompt += `\n\nRespond with a JSON object: { "systemPrompt": "...", "name": "...", "description": "..." } where name is a short agent name (2-4 words) and description is a one-sentence summary.`;
+        if (needsJson) {
+          metaPrompt += `\n\nRespond with a JSON object: { ${jsonFields} }.`;
         } else {
           metaPrompt += ` Return ONLY the system prompt, no explanation.`;
         }
@@ -291,7 +302,7 @@ export function useAgentForm(options: { mode: "create" | "edit"; agentId?: strin
       const content = result.choices?.[0]?.message?.content;
       if (!content) return;
 
-      if (needsExtras) {
+      if (needsJson) {
         // Try to parse JSON response
         try {
           // Extract JSON from the response (handles markdown code blocks)
@@ -301,6 +312,9 @@ export function useAgentForm(options: { mode: "create" | "edit"; agentId?: strin
             if (parsed.systemPrompt) setField("systemPrompt", parsed.systemPrompt);
             if (needsName && parsed.name) setField("name", parsed.name);
             if (needsDescription && parsed.description) setField("description", parsed.description);
+            if (needsStarters && Array.isArray(parsed.starters) && parsed.starters.length > 0) {
+              setField("starters", parsed.starters.filter((s: any) => typeof s === "string" && s.trim()));
+            }
           } else {
             // Fallback: treat entire response as system prompt
             setField("systemPrompt", content);

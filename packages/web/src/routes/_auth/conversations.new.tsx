@@ -109,13 +109,16 @@ function NewConversationPage() {
     }
   }, [createAndSend]);
 
-  // Agent-specific starters (same as the test tab in agent edit)
-  const agentStarters = [
-    t("agents.testSample1", { defaultValue: "Introduce yourself" }),
-    t("agents.testSample2", { defaultValue: "What can you help me with?" }),
-    t("agents.testSample3", { defaultValue: "Give me an example of your work" }),
-    t("agents.testSample4", { defaultValue: "What are your limitations?" }),
-  ];
+  // Agent-specific starters: use custom starters if configured, otherwise defaults
+  const customStarters = agent?.starters?.filter((s: string) => s?.trim()) ?? [];
+  const agentStarters = customStarters.length > 0
+    ? customStarters
+    : [
+        t("agents.testSample1", { defaultValue: "Introduce yourself" }),
+        t("agents.testSample2", { defaultValue: "What can you help me with?" }),
+        t("agents.testSample3", { defaultValue: "Give me an example of your work" }),
+        t("agents.testSample4", { defaultValue: "What are your limitations?" }),
+      ];
 
   // Default starters if no templates exist
   const defaultStarters = [

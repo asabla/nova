@@ -105,12 +105,15 @@ export function PreviewPanel({ ctx }: { ctx: UseAgentFormReturn }) {
               })}
             </p>
             <div className="grid grid-cols-2 gap-2 max-w-sm">
-              {[
-                t("agents.testSample1", { defaultValue: "Introduce yourself" }),
-                t("agents.testSample2", { defaultValue: "What can you help me with?" }),
-                t("agents.testSample3", { defaultValue: "Give me an example of your work" }),
-                t("agents.testSample4", { defaultValue: "What are your limitations?" }),
-              ].map((sample) => (
+              {(form.starters.filter((s) => s.trim()).length > 0
+                ? form.starters.filter((s) => s.trim())
+                : [
+                    t("agents.testSample1", { defaultValue: "Introduce yourself" }),
+                    t("agents.testSample2", { defaultValue: "What can you help me with?" }),
+                    t("agents.testSample3", { defaultValue: "Give me an example of your work" }),
+                    t("agents.testSample4", { defaultValue: "What are your limitations?" }),
+                  ]
+              ).map((sample) => (
                 <button
                   key={sample}
                   onClick={() => sendTestMessage(sample)}

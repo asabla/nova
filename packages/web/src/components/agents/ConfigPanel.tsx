@@ -12,6 +12,8 @@ import {
   Sparkles,
   Loader2,
   Plus,
+  MessageSquare,
+  X,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -202,6 +204,11 @@ export function ConfigPanel({ ctx }: { ctx: UseAgentFormReturn }) {
 
         {/* Knowledge */}
         <KnowledgeSection ctx={ctx} />
+
+        <div className="border-t border-border" />
+
+        {/* Suggested Prompts */}
+        <StartersSection ctx={ctx} />
 
         {/* Version info (edit only) */}
         {mode === "edit" && agent && (
@@ -702,5 +709,82 @@ function CreateModeKnowledge({ ctx }: { ctx: UseAgentFormReturn }) {
         </p>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Suggested Prompts section
+// ---------------------------------------------------------------------------
+
+const MAX_STARTERS = 6;
+
+function StartersSection({ ctx }: { ctx: UseAgentFormReturn }) {
+  const { t } = useTranslation();
+  const { form, setField } = ctx;
+  const starters = form.starters ?? [];
+
+  const updateStarter = (index: number, value: string) => {
+    const updated = [...starters];
+    updated[index] = value;
+    setField("starters", updated);
+  };
+
+  const removeStarter = (index: number) => {
+    setField("starters", starters.filter((_, i) => i !== index));
+  };
+
+  const addStarter = () => {
+    if (starters.length < MAX_STARTERS) {
+      setField("starters", [...starters, ""]);
+    }
+  };
+
+  return (
+    <section className="space-y-3">
+      <h3 className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-2">
+        <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
+        {t("agents.suggestedPrompts", { defaultValue: "Suggested Prompts" })}
+      </h3>
+      <p className="text-[11px] text-text-tertiary leading-relaxed">
+        {t("agents.suggestedPromptsHint", {
+          defaultValue: "Conversation starters shown when users open a chat with this agent.",
+        })}
+      </p>
+
+      {starters.length > 0 && (
+        <div className="space-y-2">
+          {starters.map((starter, i) => (
+            <div key={i} className="flex items-center gap-2 group">
+              <input
+                type="text"
+                value={starter}
+                onChange={(e) => updateStarter(i, e.target.value)}
+                placeholder={t("agents.starterPlaceholder", {
+                  defaultValue: "e.g. Help me write a report...",
+                })}
+                className="flex-1 h-8 px-3 rounded-lg border border-border bg-surface text-xs text-text placeholder:text-text-tertiary transition-colors field-glow"
+              />
+              <button
+                onClick={() => removeStarter(i)}
+                className="p-1 rounded-md text-text-tertiary hover:text-danger hover:bg-danger/10 transition-colors opacity-0 group-hover:opacity-100"
+                aria-label={t("common.remove", { defaultValue: "Remove" })}
+              >
+                <X className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {starters.length < MAX_STARTERS && (
+        <button
+          onClick={addStarter}
+          className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+        >
+          <Plus className="h-3 w-3" aria-hidden="true" />
+          {t("agents.addStarter", { defaultValue: "Add prompt" })}
+        </button>
+      )}
+    </section>
   );
 }

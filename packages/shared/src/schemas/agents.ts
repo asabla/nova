@@ -25,6 +25,7 @@ export const agents = pgTable("agents", {
   cronSchedule: text("cron_schedule"),
   isEnabled: boolean("is_enabled").notNull().default(true),
   builtinTools: jsonb("builtin_tools").$type<string[]>(),
+  starters: jsonb("starters").$type<string[]>(),
   clonedFromAgentId: uuid("cloned_from_agent_id"),
   currentVersion: integer("current_version").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
