@@ -9,6 +9,7 @@ import {
   Search,
   Settings2,
   Activity,
+  Link2,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -23,6 +24,7 @@ import { SearchTab } from "../../components/knowledge/SearchTab";
 import { SettingsTab } from "../../components/knowledge/SettingsTab";
 import { ActivityTab } from "../../components/knowledge/ActivityTab";
 import { DocumentPreviewDialog } from "../../components/knowledge/DocumentPreviewDialog";
+import { SourcesTab } from "../../components/knowledge/SourcesTab";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import type { KnowledgeCollection, KnowledgeDocument } from "../../components/knowledge/types";
@@ -120,6 +122,7 @@ function KnowledgeDetailPage() {
 
   const tabs = [
     { id: "documents", label: t("knowledge.tabs.documents", { defaultValue: "Documents" }), icon: <FileText className="h-3.5 w-3.5" aria-hidden="true" /> },
+    { id: "sources", label: t("knowledge.tabs.sources", { defaultValue: "Sources" }), icon: <Link2 className="h-3.5 w-3.5" aria-hidden="true" /> },
     { id: "search", label: t("knowledge.tabs.search", { defaultValue: "Search" }), icon: <Search className="h-3.5 w-3.5" aria-hidden="true" /> },
     { id: "settings", label: t("knowledge.tabs.settings", { defaultValue: "Settings" }), icon: <Settings2 className="h-3.5 w-3.5" aria-hidden="true" /> },
     { id: "activity", label: t("knowledge.tabs.activity", { defaultValue: "Activity" }), icon: <Activity className="h-3.5 w-3.5" aria-hidden="true" /> },
@@ -179,6 +182,7 @@ function KnowledgeDetailPage() {
           {(activeTab) => (
             <div className="py-2">
               {activeTab === "documents" && <DocumentsPanel collectionId={id} />}
+              {activeTab === "sources" && <SourcesTab collectionId={id} />}
               {activeTab === "search" && <SearchTab collectionId={id} onViewDocument={handleViewDocumentFromSearch} />}
               {activeTab === "settings" && col && (
                 <SettingsTab

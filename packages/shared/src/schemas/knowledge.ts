@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, integer, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, integer, jsonb, boolean, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { organisations } from "./organisations";
@@ -32,6 +32,8 @@ export const knowledgeDocuments = pgTable("knowledge_documents", {
   knowledgeCollectionId: uuid("knowledge_collection_id").notNull().references(() => knowledgeCollections.id, { onDelete: "cascade" }),
   orgId: uuid("org_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
   fileId: uuid("file_id"),
+  connectorId: uuid("connector_id").references(() => knowledgeConnectors.id, { onDelete: "set null" }),
+  externalId: text("external_id"),
   sourceUrl: text("source_url"),
   title: text("title"),
   content: text("content"),
@@ -47,6 +49,7 @@ export const knowledgeDocuments = pgTable("knowledge_documents", {
 }, (table) => [
   index("idx_knowledge_documents_collection").on(table.knowledgeCollectionId),
   index("idx_knowledge_documents_org_id").on(table.orgId),
+  uniqueIndex("idx_knowledge_documents_connector_external").on(table.connectorId, table.externalId),
 ]);
 
 export const knowledgeChunks = pgTable("knowledge_chunks", {
@@ -91,6 +94,61 @@ export const knowledgeDocumentTagAssignments = pgTable("knowledge_document_tag_a
   index("idx_knowledge_doc_tag_doc").on(table.knowledgeDocumentId),
   index("idx_knowledge_doc_tag_tag").on(table.knowledgeTagId),
 ]);
+
+// ── Knowledge Connectors (Microsoft 365: SharePoint, OneDrive, Teams) ──
+
+export const knowledgeConnectors = pgTable("knowledge_connectors", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  knowledgeCollectionId: uuid("knowledge_collection_id").notNull().references(() => knowledgeCollections.id, { onDelete: "cascade" }),
+  createdBy: uuid("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  provider: text("provider").notNull(), // 'sharepoint' | 'onedrive' | 'teams'
+
+  // Azure AD app registration (per-connector)
+  tenantId: text("tenant_id").notNull(),
+  clientId: text("client_id").notNull(),
+  clientSecretEncrypted: text("client_secret_encrypted").notNull(),
+
+  // Source selection
+  resourceId: text("resource_id").notNull(), // siteId, driveId, or teamId
+  resourcePath: text("resource_path"), // e.g. "/Shared Documents/Reports" or channelId
+  resourceName: text("resource_name"), // display name for UI
+
+  // Sync config
+  syncEnabled: boolean("sync_enabled").notNull().default(true),
+  syncIntervalMinutes: integer("sync_interval_minutes").notNull().default(360),
+  folderFilter: text("folder_filter"),
+  fileTypeFilter: jsonb("file_type_filter"), // string[] of MIME types
+
+  // Sync state
+  lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+  lastSyncStatus: text("last_sync_status").notNull().default("pending"),
+  lastSyncError: text("last_sync_error"),
+  deltaCursor: text("delta_cursor"),
+  syncedDocumentCount: integer("synced_document_count").notNull().default(0),
+
+  // Metadata
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (table) => [
+  index("idx_knowledge_connectors_org").on(table.orgId),
+  index("idx_knowledge_connectors_collection").on(table.knowledgeCollectionId),
+  index("idx_knowledge_connectors_sync").on(table.syncEnabled, table.lastSyncAt),
+]);
+
+export const selectKnowledgeConnectorSchema = createSelectSchema(knowledgeConnectors);
+export const insertKnowledgeConnectorSchema = createInsertSchema(knowledgeConnectors, {
+  provider: z.enum(["sharepoint", "onedrive", "teams"]),
+  tenantId: z.string().min(1),
+  clientId: z.string().min(1),
+  clientSecretEncrypted: z.string().min(1),
+  resourceId: z.string().min(1),
+  syncIntervalMinutes: z.number().int().min(60).max(1440).default(360),
+}).omit({ id: true, orgId: true, createdBy: true, createdAt: true, updatedAt: true, deletedAt: true, lastSyncAt: true, lastSyncStatus: true, lastSyncError: true, deltaCursor: true, syncedDocumentCount: true });
+export type KnowledgeConnector = z.infer<typeof selectKnowledgeConnectorSchema>;
+export type InsertKnowledgeConnector = z.infer<typeof insertKnowledgeConnectorSchema>;
 
 export const selectKnowledgeCollectionSchema = createSelectSchema(knowledgeCollections);
 export const insertKnowledgeCollectionSchema = createInsertSchema(knowledgeCollections, {

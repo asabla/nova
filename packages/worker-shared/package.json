@@ -62,6 +62,10 @@
     "./reasoning-model": {
       "types": "./dist/reasoning-model.d.ts",
       "default": "./src/reasoning-model.ts"
+    },
+    "./microsoft-graph": {
+      "types": "./dist/microsoft-graph.d.ts",
+      "default": "./src/microsoft-graph.ts"
     }
   },
   "scripts": {

@@ -72,7 +72,29 @@ export async function setupSchedules() {
     }
   }
 
-  // ── 3. Register agent cron schedules (Story #107) ──
+  // ── 3. Knowledge connector sync dispatch (every 30 minutes) ──
+  try {
+    await client.schedule.create({
+      scheduleId: "nova-connector-sync-dispatch",
+      spec: { cronExpressions: ["*/30 * * * *"] },
+      action: {
+        type: "startWorkflow",
+        workflowType: "connectorSyncDispatchWorkflow",
+        taskQueue: TASK_QUEUES.INGESTION,
+        workflowId: "connector-sync-dispatch",
+      },
+      policies: { overlap: ScheduleOverlapPolicy.SKIP },
+    });
+    console.log("Registered connector sync dispatch schedule (every 30 min)");
+  } catch (err: any) {
+    if (err.message?.includes("already exists")) {
+      console.log("Connector sync dispatch schedule already registered");
+    } else {
+      console.error("Failed to register connector sync dispatch schedule:", err.message);
+    }
+  }
+
+  // ── 4. Register agent cron schedules (Story #107) ──
   await syncAgentSchedules(client);
 
   console.log("Schedule setup complete");

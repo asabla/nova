@@ -18,6 +18,7 @@ export const queryKeys = {
     all: ["knowledge"] as const,
     list: () => [...queryKeys.knowledge.all, "list"] as const,
     detail: (id: string) => [...queryKeys.knowledge.all, "detail", id] as const,
+    connectors: (collectionId: string) => [...queryKeys.knowledge.detail(collectionId), "connectors"] as const,
   },
   files: {
     all: ["files"] as const,

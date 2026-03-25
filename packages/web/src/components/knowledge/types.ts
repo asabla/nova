@@ -54,3 +54,25 @@ export interface HistoryEntry {
   details: Record<string, unknown> | null;
   createdAt: string;
 }
+
+export interface KnowledgeConnector {
+  id: string;
+  knowledgeCollectionId: string;
+  provider: "sharepoint" | "onedrive" | "teams";
+  tenantId: string;
+  clientId: string;
+  resourceId: string;
+  resourcePath?: string;
+  resourceName?: string;
+  syncEnabled: boolean;
+  syncIntervalMinutes: number;
+  folderFilter?: string;
+  fileTypeFilter?: string[];
+  lastSyncAt?: string;
+  lastSyncStatus: string;
+  lastSyncError?: string;
+  syncedDocumentCount: number;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
