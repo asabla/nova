@@ -198,59 +198,84 @@ export function useAgentForm(options: { mode: "create" | "edit"; agentId?: strin
   const save = mode === "create" ? handleCreate : () => updateMutation.mutate(form);
   const isSaving = mode === "create" ? creating : updateMutation.isPending;
 
-  // --- Test chat ---
-  const [testMessages, setTestMessages] = useState<TestMessage[]>([]);
-  const [testInput, setTestInput] = useState("");
-  const [isTesting, setIsTesting] = useState(false);
+  // --- Preview chat (full agent workflow) ---
+  const [previewConversationId, setPreviewConversationId] = useState<string | null>(null);
+  const [previewMessages, setPreviewMessages] = useState<TestMessage[]>([]);
+  const [previewInput, setPreviewInput] = useState("");
+  const [isCreatingPreview, setIsCreatingPreview] = useState(false);
   const promptAtChatStartRef = useRef(form.systemPrompt);
 
   const configChangedSinceChat =
-    testMessages.length > 0 && form.systemPrompt !== promptAtChatStartRef.current;
+    previewMessages.length > 0 && form.systemPrompt !== promptAtChatStartRef.current;
 
-  const resetTestChat = useCallback(() => {
-    setTestMessages([]);
-    setTestInput("");
+  const resetPreview = useCallback(() => {
+    // Fire-and-forget delete the temp conversation
+    if (previewConversationId) {
+      api.delete(`/api/conversations/${previewConversationId}`).catch(() => {});
+    }
+    setPreviewConversationId(null);
+    setPreviewMessages([]);
+    setPreviewInput("");
     promptAtChatStartRef.current = form.systemPrompt;
-  }, [form.systemPrompt]);
+  }, [form.systemPrompt, previewConversationId]);
 
-  const sendTestMessage = async (overrideInput?: string) => {
-    const msg = (overrideInput ?? testInput).trim();
-    if (!msg || isTesting) return;
-    setTestInput("");
+  const sendPreviewMessage = async (
+    overrideInput?: string,
+  ): Promise<{ conversationId: string; messages: Array<{ role: string; content: string }> } | null> => {
+    const msg = (overrideInput ?? previewInput).trim();
+    if (!msg || isCreatingPreview) return null;
+    setPreviewInput("");
+    setIsCreatingPreview(true);
 
-    if (testMessages.length === 0) {
+    if (previewMessages.length === 0) {
       promptAtChatStartRef.current = form.systemPrompt;
     }
 
-    const updatedMessages: TestMessage[] = [...testMessages, { role: "user", content: msg }];
-    setTestMessages(updatedMessages);
-    setIsTesting(true);
-
     try {
+      // Create conversation if none exists
+      let convId = previewConversationId;
+      if (!convId) {
+        const conv = await api.post<any>("/api/conversations", {
+          systemPrompt: form.systemPrompt || undefined,
+          modelId: form.modelId || undefined,
+        });
+        convId = conv.id ?? conv.data?.id;
+        setPreviewConversationId(convId!);
+      }
+
+      // Post user message to DB
+      await api.post(`/api/conversations/${convId}/messages`, {
+        content: msg,
+        senderType: "user",
+      });
+
+      // Add to local display
+      const updatedMessages: TestMessage[] = [...previewMessages, { role: "user", content: msg }];
+      setPreviewMessages(updatedMessages);
+
+      // Build message history for the stream
       const apiMessages = [
         ...(form.systemPrompt ? [{ role: "system", content: form.systemPrompt }] : []),
         ...updatedMessages
           .filter((m) => m.role !== "error")
           .map((m) => ({ role: m.role, content: m.content })),
       ];
-      const defaultModel = models[0]?.modelIdExternal ?? models[0]?.id ?? "gpt-4o";
-      const result = await api.post<any>("/v1/chat/completions", {
-        model: form.modelId || defaultModel,
-        messages: apiMessages,
-      });
-      const content =
-        result.choices?.[0]?.message?.content ??
-        t("agents.noResponse", { defaultValue: "No response" });
-      setTestMessages((prev) => [...prev, { role: "assistant", content }]);
+
+      return { conversationId: convId!, messages: apiMessages };
     } catch (err: any) {
-      setTestMessages((prev) => [
+      setPreviewMessages((prev) => [
         ...prev,
         { role: "error", content: err.message ?? t("agents.testFailed", { defaultValue: "Test failed" }) },
       ]);
+      return null;
     } finally {
-      setIsTesting(false);
+      setIsCreatingPreview(false);
     }
   };
+
+  const addAssistantMessage = useCallback((content: string) => {
+    setPreviewMessages((prev) => [...prev, { role: "assistant", content }]);
+  }, []);
 
   // --- AI prompt generation ---
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
@@ -360,13 +385,15 @@ export function useAgentForm(options: { mode: "create" | "edit"; agentId?: strin
     selectedCollectionIds,
     toggleTool,
     toggleCollection,
-    // Test chat
-    testMessages,
-    testInput,
-    setTestInput,
-    sendTestMessage,
-    resetTestChat,
-    isTesting,
+    // Preview chat
+    previewConversationId,
+    previewMessages,
+    previewInput,
+    setPreviewInput,
+    sendPreviewMessage,
+    resetPreview,
+    addAssistantMessage,
+    isCreatingPreview,
     configChangedSinceChat,
     // AI prompt
     isGeneratingPrompt,

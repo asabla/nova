@@ -1,7 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { Bot, Send, Loader2, User, Sparkles, RotateCcw, AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { getAgentBgStyle, getAgentIconStyle } from "../../lib/agent-appearance";
+import { useSSEStream } from "../../hooks/useSSE";
+import { MarkdownRenderer } from "../markdown/MarkdownRenderer";
+import { ToolStatusChip } from "../chat/ToolStatusChip";
 import type { UseAgentFormReturn } from "./useAgentForm";
 
 export function PreviewPanel({ ctx }: { ctx: UseAgentFormReturn }) {
@@ -10,25 +13,74 @@ export function PreviewPanel({ ctx }: { ctx: UseAgentFormReturn }) {
     form,
     agentColor,
     models,
-    testMessages,
-    testInput,
-    setTestInput,
-    sendTestMessage,
-    resetTestChat,
-    isTesting,
+    previewMessages,
+    previewInput,
+    setPreviewInput,
+    sendPreviewMessage,
+    resetPreview,
+    addAssistantMessage,
+    isCreatingPreview,
     configChangedSinceChat,
   } = ctx;
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const {
+    tokens,
+    status: streamStatus,
+    activeTools,
+    startStream,
+    stopStream,
+    resetStream,
+  } = useSSEStream();
 
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const prevStreamStatusRef = useRef(streamStatus);
+
+  // When stream finishes, save the completed content as an assistant message
+  useEffect(() => {
+    if (prevStreamStatusRef.current === "streaming" && streamStatus === "done" && tokens) {
+      addAssistantMessage(tokens);
+      resetStream();
+    }
+    prevStreamStatusRef.current = streamStatus;
+  }, [streamStatus, tokens, addAssistantMessage, resetStream]);
+
+  // Auto-scroll on new messages or streaming tokens
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [testMessages]);
+  }, [previewMessages, tokens]);
 
   const selectedModel = models.find(
     (m: any) => (m.modelIdExternal ?? m.id) === form.modelId,
   );
   const modelLabel = selectedModel?.name ?? "Default model";
+
+  const apiUrl = typeof window !== "undefined"
+    ? (import.meta as any).env?.VITE_API_URL ?? ""
+    : "";
+
+  const handleSend = useCallback(async (overrideInput?: string) => {
+    const input = overrideInput ?? previewInput;
+    if (!input?.trim() || isCreatingPreview || streamStatus === "streaming") return;
+
+    const result = await sendPreviewMessage(overrideInput);
+    if (!result) return;
+
+    // Start the real agent stream
+    startStream(`${apiUrl}/api/conversations/${result.conversationId}/messages/stream`, {
+      content: input.trim(),
+      model: form.modelId || "default",
+      enableTools: true,
+      messages: result.messages,
+    });
+  }, [previewInput, isCreatingPreview, streamStatus, sendPreviewMessage, startStream, apiUrl, form.modelId]);
+
+  const handleReset = useCallback(() => {
+    stopStream();
+    resetStream();
+    resetPreview();
+  }, [stopStream, resetStream, resetPreview]);
+
+  const isWorking = streamStatus === "streaming" || isCreatingPreview;
 
   return (
     <div className="flex flex-col h-full bg-surface">
@@ -48,9 +100,9 @@ export function PreviewPanel({ ctx }: { ctx: UseAgentFormReturn }) {
             {modelLabel}
           </span>
         </div>
-        {testMessages.length > 0 && (
+        {(previewMessages.length > 0 || streamStatus !== "idle") && (
           <button
-            onClick={resetTestChat}
+            onClick={handleReset}
             className="p-1 rounded-md hover:bg-surface-secondary text-text-tertiary hover:text-text transition-colors"
             title={t("agents.resetChat", { defaultValue: "Reset chat" })}
             aria-label={t("agents.resetChat", { defaultValue: "Reset chat" })}
@@ -70,7 +122,7 @@ export function PreviewPanel({ ctx }: { ctx: UseAgentFormReturn }) {
             })}
           </span>
           <button
-            onClick={resetTestChat}
+            onClick={handleReset}
             className="text-[11px] font-medium text-warning hover:text-warning/80 transition-colors px-2 py-0.5 rounded-md hover:bg-warning/10"
           >
             {t("agents.resetNow", { defaultValue: "Reset" })}
@@ -80,7 +132,7 @@ export function PreviewPanel({ ctx }: { ctx: UseAgentFormReturn }) {
 
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto px-5 py-6 space-y-4">
-        {testMessages.length === 0 && (
+        {previewMessages.length === 0 && streamStatus === "idle" && (
           <div className="flex flex-col items-center justify-center h-full text-center stagger-children">
             <div
               className="h-14 w-14 rounded-2xl flex items-center justify-center mb-4"
@@ -116,7 +168,7 @@ export function PreviewPanel({ ctx }: { ctx: UseAgentFormReturn }) {
               ).map((sample) => (
                 <button
                   key={sample}
-                  onClick={() => sendTestMessage(sample)}
+                  onClick={() => handleSend(sample)}
                   className="text-left text-xs p-3 rounded-xl bg-surface border border-border text-text-secondary hover:border-border-strong hover:text-text transition-all hover:shadow-sm active:scale-[0.98]"
                 >
                   {sample}
@@ -126,7 +178,8 @@ export function PreviewPanel({ ctx }: { ctx: UseAgentFormReturn }) {
           </div>
         )}
 
-        {testMessages.map((msg, i) => (
+        {/* Completed messages */}
+        {previewMessages.map((msg, i) => (
           <div
             key={i}
             className={`flex gap-3 animate-in slide-up-fade ${msg.role === "user" ? "justify-end" : ""}`}
@@ -152,7 +205,7 @@ export function PreviewPanel({ ctx }: { ctx: UseAgentFormReturn }) {
               </div>
             )}
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+              className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                 msg.role === "user"
                   ? "bg-primary text-primary-foreground rounded-br-md"
                   : msg.role === "error"
@@ -160,7 +213,11 @@ export function PreviewPanel({ ctx }: { ctx: UseAgentFormReturn }) {
                     : "bg-surface-secondary border border-border text-text rounded-bl-md"
               }`}
             >
-              {msg.content}
+              {msg.role === "assistant" ? (
+                <MarkdownRenderer content={msg.content} />
+              ) : (
+                msg.content
+              )}
             </div>
             {msg.role === "user" && (
               <div className="h-7 w-7 rounded-lg bg-surface-tertiary flex items-center justify-center shrink-0 mt-0.5">
@@ -170,10 +227,11 @@ export function PreviewPanel({ ctx }: { ctx: UseAgentFormReturn }) {
           </div>
         ))}
 
-        {isTesting && (
-          <div className="flex gap-3">
+        {/* Streaming message */}
+        {streamStatus === "streaming" && (
+          <div className="flex gap-3 animate-in slide-up-fade">
             <div
-              className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0"
+              className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
               style={getAgentBgStyle(agentColor)}
             >
               <Bot
@@ -182,21 +240,42 @@ export function PreviewPanel({ ctx }: { ctx: UseAgentFormReturn }) {
                 aria-hidden="true"
               />
             </div>
-            <div className="bg-surface-secondary border border-border rounded-2xl rounded-bl-md px-4 py-3">
-              <div className="flex items-center gap-1.5">
-                <div
-                  className="h-1.5 w-1.5 rounded-full animate-pulse"
-                  style={{ backgroundColor: agentColor }}
-                />
-                <div
-                  className="h-1.5 w-1.5 rounded-full animate-pulse"
-                  style={{ backgroundColor: agentColor, animationDelay: "0.2s" }}
-                />
-                <div
-                  className="h-1.5 w-1.5 rounded-full animate-pulse"
-                  style={{ backgroundColor: agentColor, animationDelay: "0.4s" }}
-                />
-              </div>
+            <div className="max-w-[85%] space-y-2">
+              {/* Tool status chips */}
+              {activeTools.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {activeTools.map((tool, i) => (
+                    <ToolStatusChip
+                      key={`${tool.name}-${i}`}
+                      name={tool.name}
+                      status={tool.status === "completed" ? "completed" : tool.status === "failed" ? "error" : "running"}
+                    />
+                  ))}
+                </div>
+              )}
+              {/* Streaming content */}
+              {tokens ? (
+                <div className="rounded-2xl rounded-bl-md bg-surface-secondary border border-border text-text px-4 py-2.5 text-sm leading-relaxed">
+                  <MarkdownRenderer content={tokens} />
+                </div>
+              ) : (
+                <div className="bg-surface-secondary border border-border rounded-2xl rounded-bl-md px-4 py-3">
+                  <div className="flex items-center gap-1.5">
+                    <div
+                      className="h-1.5 w-1.5 rounded-full animate-pulse"
+                      style={{ backgroundColor: agentColor }}
+                    />
+                    <div
+                      className="h-1.5 w-1.5 rounded-full animate-pulse"
+                      style={{ backgroundColor: agentColor, animationDelay: "0.2s" }}
+                    />
+                    <div
+                      className="h-1.5 w-1.5 rounded-full animate-pulse"
+                      style={{ backgroundColor: agentColor, animationDelay: "0.4s" }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -210,31 +289,31 @@ export function PreviewPanel({ ctx }: { ctx: UseAgentFormReturn }) {
           <div className="flex-1 relative input-glow rounded-xl">
             <input
               type="text"
-              value={testInput}
-              onChange={(e) => setTestInput(e.target.value)}
+              value={previewInput}
+              onChange={(e) => setPreviewInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  sendTestMessage();
+                  handleSend();
                 }
               }}
               placeholder={t("agents.testInputPlaceholder", {
                 defaultValue: "Type a message to test...",
               })}
-              disabled={isTesting}
+              disabled={isWorking}
               className="w-full h-10 pl-4 pr-12 rounded-xl border border-border bg-surface text-sm text-text placeholder:text-text-tertiary transition-colors"
             />
             <button
-              onClick={() => sendTestMessage()}
-              disabled={isTesting || !testInput.trim()}
+              onClick={() => handleSend()}
+              disabled={isWorking || !previewInput.trim()}
               className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-all disabled:opacity-30 active:scale-90"
               style={
-                !isTesting && testInput.trim()
+                !isWorking && previewInput.trim()
                   ? { backgroundColor: `${agentColor}20`, color: agentColor }
                   : undefined
               }
             >
-              {isTesting ? (
+              {isWorking ? (
                 <Loader2 className="h-4 w-4 animate-spin text-text-tertiary" aria-hidden="true" />
               ) : (
                 <Send className="h-4 w-4" aria-hidden="true" />

@@ -110,8 +110,8 @@ function NewConversationPage() {
   }, [createAndSend]);
 
   // Agent-specific starters: use custom starters if configured, otherwise defaults
-  const customStarters = agent?.starters?.filter((s: string) => s?.trim()) ?? [];
-  const agentStarters = customStarters.length > 0
+  const customStarters: string[] = agent?.starters?.filter((s: string) => s?.trim()) ?? [];
+  const agentStarters: string[] = customStarters.length > 0
     ? customStarters
     : [
         t("agents.testSample1", { defaultValue: "Introduce yourself" }),
