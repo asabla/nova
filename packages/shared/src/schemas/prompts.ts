@@ -4,6 +4,15 @@ import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 
+export interface PromptTemplateInput {
+  id: string;
+  type: "text" | "textarea" | "file";
+  label: string;
+  placeholder: string;
+  required: boolean;
+  accept?: string;
+}
+
 export const promptTemplates = pgTable("prompt_templates", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
@@ -16,6 +25,11 @@ export const promptTemplates = pgTable("prompt_templates", {
   firstMessage: text("first_message"),
   category: text("category"),
   tags: jsonb("tags"),
+  inputs: jsonb("inputs").$type<PromptTemplateInput[]>(),
+  icon: text("icon"),
+  color: text("color"),
+  bgColor: text("bg_color"),
+  isSystem: boolean("is_system").notNull().default(false),
   visibility: text("visibility").notNull().default("private"),
   isApproved: boolean("is_approved").notNull().default(false),
   currentVersion: integer("current_version").notNull().default(1),

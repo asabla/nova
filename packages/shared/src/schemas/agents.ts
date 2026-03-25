@@ -4,6 +4,7 @@ import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 import { conversations } from "./conversations";
+import { promptTemplates } from "./prompts";
 
 export const agents = pgTable("agents", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -127,6 +128,18 @@ export const agentKnowledgeCollections = pgTable("agent_knowledge_collections", 
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 }, (table) => [
   index("idx_agent_knowledge_collections_org_id").on(table.orgId),
+]);
+
+export const agentStarterTemplates = pgTable("agent_starter_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agentId: uuid("agent_id").notNull().references(() => agents.id, { onDelete: "cascade" }),
+  promptTemplateId: uuid("prompt_template_id").notNull().references(() => promptTemplates.id, { onDelete: "cascade" }),
+  orgId: uuid("org_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("idx_agent_starter_templates_agent_template").on(table.agentId, table.promptTemplateId),
+  index("idx_agent_starter_templates_org_id").on(table.orgId),
 ]);
 
 export const selectAgentSchema = createSelectSchema(agents);

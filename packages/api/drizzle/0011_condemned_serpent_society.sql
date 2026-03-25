@@ -1,4 +1,4 @@
-CREATE TABLE "knowledge_connectors" (
+CREATE TABLE IF NOT EXISTS "knowledge_connectors" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"knowledge_collection_id" uuid NOT NULL,
@@ -25,13 +25,29 @@ CREATE TABLE "knowledge_connectors" (
 	"deleted_at" timestamp with time zone
 );
 --> statement-breakpoint
-ALTER TABLE "knowledge_documents" ADD COLUMN "connector_id" uuid;--> statement-breakpoint
-ALTER TABLE "knowledge_documents" ADD COLUMN "external_id" text;--> statement-breakpoint
-ALTER TABLE "knowledge_connectors" ADD CONSTRAINT "knowledge_connectors_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "knowledge_connectors" ADD CONSTRAINT "knowledge_connectors_knowledge_collection_id_knowledge_collections_id_fk" FOREIGN KEY ("knowledge_collection_id") REFERENCES "public"."knowledge_collections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "knowledge_connectors" ADD CONSTRAINT "knowledge_connectors_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "idx_knowledge_connectors_org" ON "knowledge_connectors" USING btree ("org_id");--> statement-breakpoint
-CREATE INDEX "idx_knowledge_connectors_collection" ON "knowledge_connectors" USING btree ("knowledge_collection_id");--> statement-breakpoint
-CREATE INDEX "idx_knowledge_connectors_sync" ON "knowledge_connectors" USING btree ("sync_enabled","last_sync_at");--> statement-breakpoint
-ALTER TABLE "knowledge_documents" ADD CONSTRAINT "knowledge_documents_connector_id_knowledge_connectors_id_fk" FOREIGN KEY ("connector_id") REFERENCES "public"."knowledge_connectors"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "idx_knowledge_documents_connector_external" ON "knowledge_documents" USING btree ("connector_id","external_id");
+ALTER TABLE "knowledge_documents" ADD COLUMN IF NOT EXISTS "connector_id" uuid;--> statement-breakpoint
+ALTER TABLE "knowledge_documents" ADD COLUMN IF NOT EXISTS "external_id" text;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'knowledge_connectors_org_id_organisations_id_fk') THEN
+    ALTER TABLE "knowledge_connectors" ADD CONSTRAINT "knowledge_connectors_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'knowledge_connectors_knowledge_collection_id_knowledge_collections_id_fk') THEN
+    ALTER TABLE "knowledge_connectors" ADD CONSTRAINT "knowledge_connectors_knowledge_collection_id_knowledge_collections_id_fk" FOREIGN KEY ("knowledge_collection_id") REFERENCES "public"."knowledge_collections"("id") ON DELETE cascade ON UPDATE no action;
+  END IF;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'knowledge_connectors_created_by_users_id_fk') THEN
+    ALTER TABLE "knowledge_connectors" ADD CONSTRAINT "knowledge_connectors_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;
+  END IF;
+END $$;--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_knowledge_connectors_org" ON "knowledge_connectors" USING btree ("org_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_knowledge_connectors_collection" ON "knowledge_connectors" USING btree ("knowledge_collection_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "idx_knowledge_connectors_sync" ON "knowledge_connectors" USING btree ("sync_enabled","last_sync_at");--> statement-breakpoint
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'knowledge_documents_connector_id_knowledge_connectors_id_fk') THEN
+    ALTER TABLE "knowledge_documents" ADD CONSTRAINT "knowledge_documents_connector_id_knowledge_connectors_id_fk" FOREIGN KEY ("connector_id") REFERENCES "public"."knowledge_connectors"("id") ON DELETE set null ON UPDATE no action;
+  END IF;
+END $$;--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_knowledge_documents_connector_external" ON "knowledge_documents" USING btree ("connector_id","external_id");
