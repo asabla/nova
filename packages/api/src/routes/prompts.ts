@@ -7,6 +7,17 @@ import { parsePagination } from "@nova/shared/utils";
 
 const promptRoutes = new Hono<AppContext>();
 
+// --- Explore (system + org templates) ---
+
+promptRoutes.get("/explore", async (c) => {
+  const orgId = c.get("orgId");
+  const { limit, offset } = parsePagination(c.req.query());
+  const search = c.req.query("search");
+  const category = c.req.query("category");
+  const result = await promptService.listExplore(orgId, { search, category, limit, offset });
+  return c.json(result);
+});
+
 // --- Basic CRUD ---
 
 promptRoutes.get("/", async (c) => {
@@ -24,6 +35,15 @@ promptRoutes.get("/:id", async (c) => {
   return c.json(prompt);
 });
 
+const templateInputSchema = z.object({
+  id: z.string().min(1).max(100),
+  type: z.enum(["text", "textarea", "file"]),
+  label: z.string().min(1).max(200),
+  placeholder: z.string().max(500),
+  required: z.boolean(),
+  accept: z.string().max(500).optional(),
+});
+
 const createPromptSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
@@ -33,6 +53,10 @@ const createPromptSchema = z.object({
   systemPrompt: z.string().max(100_000).optional(),
   tags: z.array(z.string().max(50)).max(20).optional(),
   visibility: z.enum(["private", "team", "org"]).optional(),
+  inputs: z.array(templateInputSchema).max(10).optional(),
+  icon: z.string().max(50).optional(),
+  color: z.string().max(50).optional(),
+  bgColor: z.string().max(50).optional(),
 });
 
 promptRoutes.post("/", zValidator("json", createPromptSchema), async (c) => {
@@ -50,6 +74,10 @@ promptRoutes.patch("/:id", async (c) => {
     description: z.string().max(2000).optional(),
     content: z.string().max(100_000).optional(),
     category: z.string().max(100).optional(),
+    inputs: z.array(templateInputSchema).max(10).optional(),
+    icon: z.string().max(50).optional(),
+    color: z.string().max(50).optional(),
+    bgColor: z.string().max(50).optional(),
   }).parse(await c.req.json());
   const prompt = await promptService.update(orgId, c.req.param("id"), body);
   return c.json(prompt);

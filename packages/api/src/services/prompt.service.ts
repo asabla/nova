@@ -1,6 +1,7 @@
-import { eq, and, desc, ilike, sql } from "drizzle-orm";
+import { eq, and, or, desc, ilike, sql } from "drizzle-orm";
 import { db } from "../lib/db";
 import { promptTemplates, promptTemplateVersions } from "@nova/shared/schemas";
+import type { PromptTemplateInput } from "@nova/shared/schemas";
 import { AppError } from "@nova/shared/utils";
 
 export const promptService = {
@@ -19,6 +20,32 @@ export const promptService = {
       .where(and(...conditions))
       .orderBy(desc(promptTemplates.updatedAt))
       .limit(opts?.limit ?? 50)
+      .offset(opts?.offset ?? 0);
+
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(promptTemplates)
+      .where(and(...conditions));
+
+    return { data: result, total: count };
+  },
+
+  async listExplore(orgId: string, opts?: { search?: string; category?: string; limit?: number; offset?: number }) {
+    const orgOrSystem = or(eq(promptTemplates.orgId, orgId), eq(promptTemplates.isSystem, true));
+    const conditions = [orgOrSystem];
+    if (opts?.search) {
+      conditions.push(ilike(promptTemplates.name, `%${opts.search}%`));
+    }
+    if (opts?.category) {
+      conditions.push(eq(promptTemplates.category, opts.category));
+    }
+
+    const result = await db
+      .select()
+      .from(promptTemplates)
+      .where(and(...conditions))
+      .orderBy(desc(promptTemplates.isSystem), desc(promptTemplates.usageCount), desc(promptTemplates.updatedAt))
+      .limit(opts?.limit ?? 100)
       .offset(opts?.offset ?? 0);
 
     const [{ count }] = await db
@@ -48,6 +75,10 @@ export const promptService = {
     systemPrompt?: string;
     tags?: string[];
     visibility?: string;
+    inputs?: PromptTemplateInput[];
+    icon?: string;
+    color?: string;
+    bgColor?: string;
   }) {
     const [prompt] = await db
       .insert(promptTemplates)
@@ -62,6 +93,10 @@ export const promptService = {
         systemPrompt: data.systemPrompt,
         tags: data.tags,
         visibility: data.visibility ?? "private",
+        inputs: data.inputs,
+        icon: data.icon,
+        color: data.color,
+        bgColor: data.bgColor,
       })
       .returning();
 
@@ -84,6 +119,10 @@ export const promptService = {
     description: string;
     content: string;
     category: string;
+    inputs: PromptTemplateInput[];
+    icon: string;
+    color: string;
+    bgColor: string;
   }>) {
     const [prompt] = await db
       .update(promptTemplates)

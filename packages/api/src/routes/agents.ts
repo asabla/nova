@@ -1,9 +1,12 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { eq, and, asc } from "drizzle-orm";
 import type { AppContext } from "../types/context";
 import { agentService } from "../services/agent.service";
 import { writeAuditLog } from "../services/audit.service";
 import { parsePagination, AppError } from "@nova/shared/utils";
+import { db } from "../lib/db";
+import { agentStarterTemplates, promptTemplates } from "@nova/shared/schemas";
 
 const agentRoutes = new Hono<AppContext>();
 
@@ -251,6 +254,83 @@ agentRoutes.post("/bulk", async (c) => {
   });
 
   return c.json({ succeeded, failed, total: agentIds.length });
+});
+
+// --- Starter Templates ---
+
+agentRoutes.get("/:id/starters", async (c) => {
+  const orgId = c.get("orgId");
+  const agentId = c.req.param("id");
+
+  const rows = await db
+    .select({
+      id: agentStarterTemplates.id,
+      promptTemplateId: agentStarterTemplates.promptTemplateId,
+      sortOrder: agentStarterTemplates.sortOrder,
+      template: promptTemplates,
+    })
+    .from(agentStarterTemplates)
+    .innerJoin(promptTemplates, eq(agentStarterTemplates.promptTemplateId, promptTemplates.id))
+    .where(and(eq(agentStarterTemplates.agentId, agentId), eq(agentStarterTemplates.orgId, orgId)))
+    .orderBy(asc(agentStarterTemplates.sortOrder));
+
+  return c.json({ data: rows.map((r) => ({ ...r.template, sortOrder: r.sortOrder })) });
+});
+
+agentRoutes.post("/:id/starters", async (c) => {
+  const orgId = c.get("orgId");
+  const agentId = c.req.param("id");
+  const { promptTemplateId, sortOrder } = z.object({
+    promptTemplateId: z.string().uuid(),
+    sortOrder: z.number().int().min(0).optional(),
+  }).parse(await c.req.json());
+
+  const [row] = await db
+    .insert(agentStarterTemplates)
+    .values({ agentId, promptTemplateId, orgId, sortOrder: sortOrder ?? 0 })
+    .onConflictDoNothing()
+    .returning();
+
+  return c.json(row ?? { agentId, promptTemplateId }, 201);
+});
+
+agentRoutes.delete("/:id/starters/:templateId", async (c) => {
+  const orgId = c.get("orgId");
+  const agentId = c.req.param("id");
+  const templateId = c.req.param("templateId");
+
+  await db
+    .delete(agentStarterTemplates)
+    .where(and(
+      eq(agentStarterTemplates.agentId, agentId),
+      eq(agentStarterTemplates.promptTemplateId, templateId),
+      eq(agentStarterTemplates.orgId, orgId),
+    ));
+
+  return c.body(null, 204);
+});
+
+agentRoutes.patch("/:id/starters/reorder", async (c) => {
+  const orgId = c.get("orgId");
+  const agentId = c.req.param("id");
+  const { templateIds } = z.object({
+    templateIds: z.array(z.string().uuid()),
+  }).parse(await c.req.json());
+
+  await Promise.all(
+    templateIds.map((id, index) =>
+      db
+        .update(agentStarterTemplates)
+        .set({ sortOrder: index })
+        .where(and(
+          eq(agentStarterTemplates.agentId, agentId),
+          eq(agentStarterTemplates.promptTemplateId, id),
+          eq(agentStarterTemplates.orgId, orgId),
+        )),
+    ),
+  );
+
+  return c.json({ ok: true });
 });
 
 export { agentRoutes };
