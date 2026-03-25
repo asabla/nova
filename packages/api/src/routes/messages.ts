@@ -734,10 +734,12 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         let wfTier: string | undefined;
         let wfPlanSummary: Record<string, unknown> | undefined;
         try {
-          const handle = client.workflow.getHandle(workflowId);
+          console.log(`[stream] fetching workflow result for ${temporalWorkflowId}...`);
+          const handle = client.workflow.getHandle(temporalWorkflowId);
           const wfResult = await handle.result();
           toolCallRecords = (wfResult as any)?.toolCallRecords ?? [];
           wfTier = (wfResult as any)?.tier;
+          console.log(`[stream] workflow result: tier=${wfTier}, toolCallRecords=${toolCallRecords.length}, status=${(wfResult as any)?.status}`);
           const wfPlan = (wfResult as any)?.plan;
           if (wfPlan) {
             wfPlanSummary = {
@@ -749,7 +751,9 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
               })),
             };
           }
-        } catch { /* workflow may still be running */ }
+        } catch (wfErr) {
+          console.warn("[stream] Failed to retrieve workflow result (may still be running):", wfErr);
+        }
 
         const toolSummary = toolCallRecords.length > 0
           ? toolCallRecords.map((r: any) => ({ name: r.toolName, durationMs: r.durationMs, error: r.error, args: r.input }))
