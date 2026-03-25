@@ -53,9 +53,12 @@ export function StockWidget({ params }: { params?: Record<string, string> }) {
 
   if (!symbol || !price) {
     return (
-      <div className="flex items-center gap-2 px-4 py-3 text-xs text-text-secondary">
-        <Activity className="h-4 w-4 shrink-0" />
-        <span>{symbol ? `${symbol} —` : ""} Data provided by agent</span>
+      <div className="px-4 py-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <Activity className="h-4 w-4 shrink-0 text-text-tertiary" />
+          <span className="text-sm font-medium text-text">{symbol ?? "Stock"}</span>
+        </div>
+        <div className="text-xs text-text-tertiary">Awaiting price data...</div>
       </div>
     );
   }
@@ -91,10 +94,12 @@ export function StockWidget({ params }: { params?: Record<string, string> }) {
         </div>
       </div>
 
-      {sparklineData.length >= 2 && (
+      {sparklineData.length >= 2 ? (
         <div className="rounded-md overflow-hidden bg-surface-secondary">
           <Sparkline data={sparklineData} positive={positive} />
         </div>
+      ) : (
+        <div className="text-[10px] text-text-tertiary text-center py-2">No chart data available</div>
       )}
     </div>
   );

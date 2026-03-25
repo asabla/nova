@@ -23,6 +23,14 @@ import { StockWidget } from "./StockWidget";
 import { YouTubeWidget } from "./YouTubeWidget";
 import { KanbanWidget } from "./KanbanWidget";
 import { QuizWidget } from "./QuizWidget";
+import { TableWidget } from "./TableWidget";
+import { ComparisonWidget } from "./ComparisonWidget";
+import { ProsConsWidget } from "./ProsConsWidget";
+import { MetricWidget } from "./MetricWidget";
+import { FlashcardWidget } from "./FlashcardWidget";
+import { RatingWidget } from "./RatingWidget";
+import { GlossaryWidget } from "./GlossaryWidget";
+import { MatrixWidget } from "./MatrixWidget";
 
 export interface WidgetComponentProps {
   params?: Record<string, string>;
@@ -59,4 +67,12 @@ export const WIDGET_REGISTRY: Record<string, ComponentType<WidgetComponentProps>
   youtube: YouTubeWidget,
   kanban: KanbanWidget as ComponentType<WidgetComponentProps>,
   quiz: QuizWidget,
+  table: TableWidget,
+  comparison: ComparisonWidget,
+  proscons: ProsConsWidget,
+  metric: MetricWidget,
+  flashcard: FlashcardWidget,
+  rating: RatingWidget,
+  glossary: GlossaryWidget,
+  matrix: MatrixWidget,
 };

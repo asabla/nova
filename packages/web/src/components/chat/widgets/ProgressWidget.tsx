@@ -4,7 +4,11 @@ import { clsx } from "clsx";
 export function ProgressWidget({ params }: { params?: Record<string, string> }) {
   const steps = String(params?.steps ?? "Step 1,Step 2,Step 3").split(",").map((s) => s.trim());
   const current = Math.max(0, Math.min(steps.length - 1, parseInt(params?.current ?? "0", 10) || 0));
-  const status = (params?.status ?? "in-progress") as "in-progress" | "completed" | "failed";
+  const rawStatus = String(params?.status ?? "in-progress").toLowerCase();
+  const status: "in-progress" | "completed" | "failed" =
+    rawStatus.includes("complete") || rawStatus.includes("done") ? "completed"
+    : rawStatus.includes("fail") || rawStatus.includes("error") ? "failed"
+    : "in-progress";
 
   return (
     <div className="px-4 py-4">
@@ -38,6 +42,7 @@ export function ProgressWidget({ params }: { params?: Record<string, string> }) 
                     "text-[10px] mt-1.5 text-center max-w-16 truncate",
                     isCompleted || isCurrent ? "text-text" : "text-text-tertiary",
                   )}
+                  title={step}
                 >
                   {step}
                 </span>

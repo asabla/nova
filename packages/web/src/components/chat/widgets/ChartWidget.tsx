@@ -4,11 +4,15 @@ import { CHART_COLORS } from "@/constants/chart-colors";
 export function ChartWidget({ params }: { params?: Record<string, string> }) {
   const chartType = (params?.chartType ?? "bar") as "bar" | "line" | "pie";
   const dataValues = useMemo(
-    () => String(params?.data ?? "").split(",").map((s) => parseFloat(s.trim())).filter((n) => !isNaN(n)),
+    () => Array.isArray(params?.data)
+      ? (params.data as unknown as number[]).map(Number).filter((n) => !isNaN(n))
+      : String(params?.data ?? "").split(",").map((s) => parseFloat(s.trim())).filter((n) => !isNaN(n)),
     [params?.data],
   );
   const labels = useMemo(
-    () => String(params?.labels ?? "").split(",").map((s) => s.trim()).filter(Boolean),
+    () => Array.isArray(params?.labels)
+      ? (params.labels as unknown as string[]).map(String)
+      : String(params?.labels ?? "").split(",").map((s) => s.trim()).filter(Boolean),
     [params?.labels],
   );
 
@@ -93,13 +97,16 @@ function BarSlice({
                 onMouseEnter={() => setHoveredIndex(i)}
                 onMouseLeave={() => setHoveredIndex(null)}
                 className="transition-opacity duration-150 cursor-pointer"
-              />
+              >
+                <title>{labels[i]}: {value}</title>
+              </rect>
               <text x={x + barWidth / 2} y={chartHeight + 14} textAnchor="middle" className="fill-text-tertiary" fontSize={9}>
                 {labels[i].length > 8 ? labels[i].slice(0, 7) + "\u2026" : labels[i]}
+                <title>{labels[i]}</title>
               </text>
               {isHovered && (
                 <text x={x + barWidth / 2} y={y - 4} textAnchor="middle" className="fill-text" fontSize={9} fontWeight="600">
-                  {value}
+                  {labels[i]}: {value}
                 </text>
               )}
             </g>
@@ -170,18 +177,21 @@ function LineSlice({
             className="cursor-pointer transition-all duration-150"
             onMouseEnter={() => setHoveredIndex(i)}
             onMouseLeave={() => setHoveredIndex(null)}
-          />
+          >
+            <title>{labels[i]}: {data[i]}</title>
+          </circle>
         ))}
 
         {labels.map((label, i) => (
           <text key={i} x={padding + i * stepX} y={chartHeight + 14} textAnchor="middle" className="fill-text-tertiary" fontSize={9}>
             {label.length > 10 ? label.slice(0, 9) + "\u2026" : label}
+            <title>{label}</title>
           </text>
         ))}
 
         {hoveredIndex !== null && points[hoveredIndex] && (
           <text x={points[hoveredIndex].x} y={points[hoveredIndex].y - 8} textAnchor="middle" className="fill-text" fontSize={9} fontWeight="600">
-            {data[hoveredIndex]}
+            {labels[hoveredIndex]}: {data[hoveredIndex]}
           </text>
         )}
 
@@ -250,15 +260,18 @@ function PieSlice({
               opacity={isHovered ? 1 : 0.85}
               onMouseEnter={() => setHoveredIndex(i)}
               onMouseLeave={() => setHoveredIndex(null)}
-            />
+            >
+              <title>{slice.label}: {slice.value} ({Math.round((slice.value / total) * 100)}%)</title>
+            </path>
           );
         })}
         {hoveredIndex !== null && slices[hoveredIndex] && (
           <>
-            <text x={cx} y={cy - 6} textAnchor="middle" className="fill-text" fontSize={12} fontWeight="600">
+            <rect x={cx - 55} y={cy - 18} width={110} height={36} rx={6} className="fill-surface" fillOpacity={0.9} />
+            <text x={cx} y={cy - 3} textAnchor="middle" className="fill-text" fontSize={12} fontWeight="600">
               {slices[hoveredIndex].label}
             </text>
-            <text x={cx} y={cy + 10} textAnchor="middle" className="fill-text-secondary" fontSize={10}>
+            <text x={cx} y={cy + 12} textAnchor="middle" className="fill-text-secondary" fontSize={10}>
               {slices[hoveredIndex].value} ({Math.round((slices[hoveredIndex].value / total) * 100)}%)
             </text>
           </>

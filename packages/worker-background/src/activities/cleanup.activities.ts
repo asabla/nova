@@ -65,7 +65,7 @@ async function batchDelete(
       DELETE FROM ${table} WHERE ${idColumn} IN (SELECT ${idColumn} FROM to_delete)
       RETURNING 1`
     );
-    const count = result.rows.length;
+    const count = (result as unknown as { rows: unknown[] }).rows.length;
     total += count;
     if (count < BATCH_SIZE) break;
   }

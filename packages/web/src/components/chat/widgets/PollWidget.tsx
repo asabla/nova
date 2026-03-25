@@ -3,7 +3,9 @@ import { clsx } from "clsx";
 
 export function PollWidget({ params }: { params?: Record<string, string> }) {
   const question = params?.question ?? "What do you think?";
-  const options = String(params?.options ?? "Yes,No,Maybe").split(",").map((s) => s.trim());
+  const options = Array.isArray(params?.options)
+    ? (params.options as unknown as string[])
+    : String(params?.options ?? "Yes,No,Maybe").split(",").map((s) => s.trim());
   const [votes, setVotes] = useState<number[]>(() => options.map(() => 0));
   const [voted, setVoted] = useState(false);
 

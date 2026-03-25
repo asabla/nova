@@ -108,7 +108,8 @@ export function CalendarWidget({ params }: { params?: Record<string, string> }) 
               key={day.toISOString()}
               title={label}
               className={clsx(
-                "flex items-center justify-center h-7 w-full rounded text-xs transition-colors",
+                "flex flex-col items-center justify-center w-full rounded text-xs transition-colors",
+                label ? "h-10" : "h-7",
                 !inMonth && "opacity-30",
                 highlighted && "bg-primary/20 text-primary font-medium",
                 todayDay && !highlighted && "ring-1 ring-primary text-text",
@@ -116,6 +117,11 @@ export function CalendarWidget({ params }: { params?: Record<string, string> }) 
               )}
             >
               {format(day, "d")}
+              {label && (
+                <span className="text-[7px] leading-tight truncate max-w-full px-0.5 text-text-tertiary">
+                  {label}
+                </span>
+              )}
             </div>
           );
         })}

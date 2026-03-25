@@ -247,7 +247,7 @@ export function KanbanWidget({ params, artifactId }: KanbanWidgetProps) {
             >
               {/* Column header */}
               <div className="flex items-center justify-between px-3 py-2">
-                <span className="text-xs font-semibold text-text">{col.title}</span>
+                <span className="text-xs font-semibold text-text truncate" title={col.title}>{col.title}</span>
                 <span className="text-[10px] text-text-tertiary">{columnCards.length}</span>
               </div>
 
@@ -294,7 +294,7 @@ export function KanbanWidget({ params, artifactId }: KanbanWidgetProps) {
                           </button>
                         )}
                         {card.description && editingCardId !== card.id && (
-                          <p className="text-[10px] text-text-tertiary mt-0.5 line-clamp-2">
+                          <p className="text-[10px] text-text-tertiary mt-0.5 line-clamp-2" title={card.description}>
                             {card.description}
                           </p>
                         )}

@@ -1,4 +1,4 @@
-import { format, parseISO } from "date-fns";
+import { format, parseISO, isPast, isToday } from "date-fns";
 
 interface TimelineEvent {
   date: string;
@@ -51,21 +51,33 @@ export function TimelineWidget({ params }: { params?: Record<string, string> }) 
         {/* Vertical line */}
         <div className="absolute left-[4px] top-1 bottom-1 w-0.5 bg-border" />
 
-        <div className="space-y-4">
-          {events.map((event, i) => (
-            <div key={i} className="relative flex items-start gap-3 pl-5">
-              {/* Dot on the line */}
-              <div className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full bg-primary shrink-0" />
+        <div className="space-y-1">
+          {events.map((event, i) => {
+            const eventDate = parseISO(event.date);
+            const past = isPast(eventDate) && !isToday(eventDate);
 
-              <div className="min-w-0">
-                <div className="text-[10px] text-text-tertiary">{formatDate(event.date)}</div>
-                <div className="text-xs font-medium text-text">{event.title}</div>
-                {event.description && (
-                  <div className="text-[11px] text-text-secondary mt-0.5">{event.description}</div>
+            return (
+              <div
+                key={i}
+                className={`relative flex items-start gap-3 pl-5 rounded-lg py-1.5 px-2 ${i % 2 === 0 ? "bg-surface-tertiary/30" : ""}`}
+              >
+                {/* Dot on the line — filled for past, outlined for future */}
+                {past ? (
+                  <div className="absolute left-0 top-2 h-2.5 w-2.5 rounded-full bg-primary shrink-0" />
+                ) : (
+                  <div className="absolute left-0 top-2 h-2.5 w-2.5 rounded-full ring-2 ring-primary bg-surface shrink-0" />
                 )}
+
+                <div className="min-w-0">
+                  <div className="text-[10px] text-text-tertiary">{formatDate(event.date)}</div>
+                  <div className="text-xs font-medium text-text">{event.title}</div>
+                  {event.description && (
+                    <div className="text-xs text-text-secondary mt-0.5">{event.description}</div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

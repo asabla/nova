@@ -59,7 +59,7 @@ export function WeatherWidget({ params }: { params?: Record<string, string> }) {
     <div className="px-4 py-3 flex items-center gap-4">
       <div className="text-3xl font-light text-text">{data.temp}</div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-text truncate">{data.location}</div>
+        <div className="text-sm font-medium text-text truncate" title={data.location}>{data.location}</div>
         <div className="text-xs text-text-secondary">{data.condition}</div>
         <div className="text-xs text-text-tertiary mt-0.5">
           Humidity: {data.humidity} &middot; Wind: {data.wind}
