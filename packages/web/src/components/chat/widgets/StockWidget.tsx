@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import { TrendingUp, TrendingDown, Activity } from "lucide-react";
+import { parseNumberArray } from "./parse-params";
 
 const RANGE_LABELS: Record<string, string> = {
   "1d": "1 Day",
@@ -47,9 +48,7 @@ export function StockWidget({ params }: { params?: Record<string, string> }) {
   const change = params?.change ? Number(params.change) : undefined;
   const changePercent = params?.changePercent;
   const range = params?.range ?? "1d";
-  const sparklineData = params?.sparkline
-    ? params.sparkline.split(",").map(Number).filter((n) => !isNaN(n))
-    : [];
+  const sparklineData = parseNumberArray(params?.sparkline);
 
   if (!symbol || !price) {
     return (

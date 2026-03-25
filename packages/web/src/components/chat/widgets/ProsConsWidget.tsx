@@ -1,27 +1,14 @@
 import { useMemo } from "react";
 import { clsx } from "clsx";
 import { Check, X } from "lucide-react";
+import { parseStringArray } from "./parse-params";
 
 export function ProsConsWidget({ params }: { params?: Record<string, string> }) {
   const subject = params?.subject;
 
-  const pros = useMemo(
-    () =>
-      String(params?.pros ?? "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-    [params?.pros],
-  );
+  const pros = useMemo(() => parseStringArray(params?.pros), [params?.pros]);
 
-  const cons = useMemo(
-    () =>
-      String(params?.cons ?? "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean),
-    [params?.cons],
-  );
+  const cons = useMemo(() => parseStringArray(params?.cons), [params?.cons]);
 
   if (pros.length === 0 && cons.length === 0) {
     return <p className="p-4 text-sm text-text-tertiary">No pros/cons data provided</p>;

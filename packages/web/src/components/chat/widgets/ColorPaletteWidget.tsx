@@ -1,16 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { clsx } from "clsx";
 import { Copy, Check } from "lucide-react";
+import { parseStringArray } from "./parse-params";
 
 const DEFAULT_COLORS = ["#6366F1", "#EC4899", "#F59E0B", "#10B981", "#3B82F6"];
 
 export function ColorPaletteWidget({ params }: { params?: Record<string, string> }) {
-  const colors = params?.colors
-    ? params.colors.split(",").map((s) => s.trim())
-    : DEFAULT_COLORS;
-  const labels = params?.labels
-    ? params.labels.split(",").map((s) => s.trim())
-    : [];
+  const colors = parseStringArray(params?.colors, DEFAULT_COLORS);
+  const labels = parseStringArray(params?.labels);
 
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 

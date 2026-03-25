@@ -1,17 +1,13 @@
 import { useState } from "react";
 import { clsx } from "clsx";
 import { Check, Square, CheckSquare, Download } from "lucide-react";
+import { parseStringArray, parseNumberArray } from "./parse-params";
 
 export function ChecklistWidget({ params }: { params?: Record<string, string> }) {
-  const items = String(params?.items ?? "Item 1,Item 2,Item 3").split(",").map((s) => s.trim());
+  const items = parseStringArray(params?.items, ["Item 1", "Item 2", "Item 3"]);
   const [checked, setChecked] = useState<Set<number>>(() => {
     if (!params?.checked) return new Set();
-    return new Set(
-      params.checked
-        .split(",")
-        .map((s) => parseInt(s.trim(), 10))
-        .filter((n) => !isNaN(n) && n >= 0 && n < items.length),
-    );
+    return new Set(parseNumberArray(params.checked).filter((n) => n >= 0 && n < items.length));
   });
 
   const toggle = (index: number) => {

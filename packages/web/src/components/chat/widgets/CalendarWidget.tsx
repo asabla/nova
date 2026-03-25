@@ -26,12 +26,18 @@ export function CalendarWidget({ params }: { params?: Record<string, string> }) 
 
   const highlights = useMemo(() => {
     if (!params?.highlights) return [];
-    return params.highlights
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .map((s) => parseISO(s))
-      .filter((d) => !isNaN(d.getTime()));
+    // Handle both JSON array and CSV formats
+    let dateStrings: string[];
+    if (params.highlights.startsWith("[")) {
+      try {
+        dateStrings = JSON.parse(params.highlights);
+      } catch {
+        dateStrings = params.highlights.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+    } else {
+      dateStrings = params.highlights.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+    return dateStrings.map((s) => parseISO(s)).filter((d) => !isNaN(d.getTime()));
   }, [params?.highlights]);
 
   const labels = useMemo<Record<string, string>>(() => {

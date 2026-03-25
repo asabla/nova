@@ -1,20 +1,11 @@
 import { useState, useMemo } from "react";
 import { CHART_COLORS } from "@/constants/chart-colors";
+import { parseNumberArray, parseStringArray } from "./parse-params";
 
 export function ChartWidget({ params }: { params?: Record<string, string> }) {
   const chartType = (params?.chartType ?? "bar") as "bar" | "line" | "pie";
-  const dataValues = useMemo(
-    () => Array.isArray(params?.data)
-      ? (params.data as unknown as number[]).map(Number).filter((n) => !isNaN(n))
-      : String(params?.data ?? "").split(",").map((s) => parseFloat(s.trim())).filter((n) => !isNaN(n)),
-    [params?.data],
-  );
-  const labels = useMemo(
-    () => Array.isArray(params?.labels)
-      ? (params.labels as unknown as string[]).map(String)
-      : String(params?.labels ?? "").split(",").map((s) => s.trim()).filter(Boolean),
-    [params?.labels],
-  );
+  const dataValues = useMemo(() => parseNumberArray(params?.data), [params?.data]);
+  const labels = useMemo(() => parseStringArray(params?.labels), [params?.labels]);
 
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 

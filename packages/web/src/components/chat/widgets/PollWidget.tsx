@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { clsx } from "clsx";
+import { parseStringArray } from "./parse-params";
 
 export function PollWidget({ params }: { params?: Record<string, string> }) {
   const question = params?.question ?? "What do you think?";
-  const options = Array.isArray(params?.options)
-    ? (params.options as unknown as string[])
-    : String(params?.options ?? "Yes,No,Maybe").split(",").map((s) => s.trim());
+  const options = parseStringArray(params?.options, ["Yes", "No", "Maybe"]);
   const [votes, setVotes] = useState<number[]>(() => options.map(() => 0));
   const [voted, setVoted] = useState(false);
 
