@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { RefreshCw, ExternalLink } from "lucide-react";
+import { RefreshCw, ExternalLink, AlertTriangle } from "lucide-react";
 import { clsx } from "clsx";
 import { WIDGET_REGISTRY } from "./widgets/registry";
+import { WidgetErrorBoundary } from "./widgets/WidgetErrorBoundary";
+import { parseWidgetConfig } from "./widgets/schemas";
 
 /**
  * Dynamic Widget component (Story #131).
@@ -69,19 +71,37 @@ function normalizeParams(
     } else if (typeof value === "number" || typeof value === "boolean") {
       result[canonicalKey] = String(value);
     } else if (Array.isArray(value)) {
-      // Arrays of primitives → comma-separated string
-      // Arrays of objects → JSON string
-      if (value.length > 0 && typeof value[0] === "object") {
-        result[canonicalKey] = JSON.stringify(value);
-      } else {
-        result[canonicalKey] = value.join(",");
-      }
+      // Always JSON.stringify arrays for consistency — widgets use
+      // parseArrayParam() to handle both JSON and legacy CSV formats
+      result[canonicalKey] = JSON.stringify(value);
     } else if (typeof value === "object") {
       result[canonicalKey] = JSON.stringify(value);
     }
   }
 
   return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/** Compact fallback shown when widget config is invalid. */
+function WidgetInvalidFallback({ error, raw }: { error: string; raw: unknown }) {
+  return (
+    <div className="px-4 py-3">
+      <div className="flex items-center gap-2 text-xs text-warning">
+        <AlertTriangle className="size-3.5 shrink-0" />
+        <span>{error}</span>
+      </div>
+      {raw != null && (
+        <details className="mt-2">
+          <summary className="text-[10px] text-text-tertiary cursor-pointer hover:text-text-secondary">
+            Raw config
+          </summary>
+          <pre className="mt-1 text-[10px] text-text-tertiary bg-surface-tertiary/50 rounded-md p-2 overflow-x-auto whitespace-pre-wrap break-all max-h-40">
+            {JSON.stringify(raw, null, 2)}
+          </pre>
+        </details>
+      )}
+    </div>
+  );
 }
 
 interface DynamicWidgetProps {
@@ -91,6 +111,9 @@ interface DynamicWidgetProps {
 }
 
 export function DynamicWidget({ config, className, artifactId }: DynamicWidgetProps) {
+  // Validate config structure
+  const validation = useMemo(() => parseWidgetConfig(config), [config]);
+
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Auto-refresh
@@ -115,6 +138,27 @@ export function DynamicWidget({ config, className, artifactId }: DynamicWidgetPr
     () => normalizeParams(config.type, config.params as Record<string, unknown>),
     [config.type, config.params],
   );
+
+  // Show validation error fallback
+  if (!validation.ok) {
+    return (
+      <div
+        className={clsx(
+          "rounded-xl border border-border overflow-hidden bg-surface-secondary my-2",
+          className,
+        )}
+      >
+        <div className="flex items-center justify-between px-3 py-1.5 border-b border-border bg-surface-tertiary/50">
+          <span className="text-xs font-medium text-text truncate">
+            {(config as Record<string, unknown>).type
+              ? String((config as Record<string, unknown>).type)
+              : "widget"}
+          </span>
+        </div>
+        <WidgetInvalidFallback error={validation.error} raw={validation.raw} />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -154,17 +198,24 @@ export function DynamicWidget({ config, className, artifactId }: DynamicWidgetPr
 
       {/* Widget content */}
       <div key={refreshKey}>
-        {config.type === "iframe" && config.src ? (
+        {config.type === "iframe" && (config.src || normalizedParams?.src) ? (
           <iframe
-            src={config.src}
+            src={config.src ?? normalizedParams?.src}
             className="w-full border-0"
-            style={{ height: config.height ?? 300 }}
+            style={{ height: config.height ?? (normalizedParams?.height ? Number(normalizedParams.height) : 300) }}
             sandbox="allow-scripts allow-same-origin"
             title={config.title ?? "Embedded content"}
           />
         ) : WidgetComponent ? (
-          <WidgetComponent params={normalizedParams} endpoint={config.endpoint} artifactId={artifactId} />
-        ) : null}
+          <WidgetErrorBoundary widgetType={config.type}>
+            <WidgetComponent params={normalizedParams} endpoint={config.endpoint} artifactId={artifactId} />
+          </WidgetErrorBoundary>
+        ) : (
+          <WidgetInvalidFallback
+            error={`Unsupported widget type "${config.type}"`}
+            raw={config}
+          />
+        )}
       </div>
     </div>
   );

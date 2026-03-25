@@ -5,6 +5,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { CodeBlock } from "./CodeBlock";
 import { DynamicWidget, type WidgetConfig } from "../chat/DynamicWidget";
+import { parseWidgetConfig } from "../chat/widgets/schemas";
 import { ExcalidrawDiagram } from "../chat/ExcalidrawDiagram";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../ui/Table";
 import { PenTool } from "lucide-react";
@@ -354,12 +355,15 @@ const MD_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>["components"] = 
 
       if (lang === "widget") {
         try {
-          const config = JSON.parse(codeString) as WidgetConfig;
-          if (config.type) {
-            return <DynamicWidget config={config} />;
+          const raw = JSON.parse(codeString);
+          const result = parseWidgetConfig(raw);
+          if (result.ok) {
+            return <DynamicWidget config={raw as WidgetConfig} />;
           }
+          // Valid JSON but invalid widget config — show as JSON with context
+          return <CodeBlock code={codeString} language="json" />;
         } catch {
-          // Fall through to code block if JSON is invalid
+          // Malformed JSON (possibly mid-stream) — show as code block
         }
       }
 
