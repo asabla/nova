@@ -2,16 +2,35 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Sparkles, FileText, Loader2, Bot } from "lucide-react";
+import { Sparkles, FileText, Loader2, Bot, ArrowRight } from "lucide-react";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { MessageInput } from "../../components/chat/MessageInput";
 import { toast } from "../../components/ui/Toast";
-import { consumePendingFiles } from "../../lib/pending-files";
+import { consumePendingFiles, setPendingFiles } from "../../lib/pending-files";
+import { resolveIcon } from "../../lib/template-icons";
+import { TemplateInputDialog } from "../../components/explore/TemplateInputDialog";
+import type { ApiTemplate, ExploreTemplate } from "../../types/template";
 
 export const Route = createFileRoute("/_auth/conversations/new")({
   component: NewConversationPage,
 });
+
+function toExploreTemplate(t: ApiTemplate): ExploreTemplate {
+  return {
+    id: t.id,
+    name: t.name,
+    description: t.description ?? "",
+    content: t.content,
+    category: t.category ?? "general",
+    tags: (t.tags as string[]) ?? [],
+    inputs: t.inputs ?? undefined,
+    icon: resolveIcon(t.icon),
+    color: t.color ?? "text-primary",
+    bgColor: t.bgColor ?? "bg-primary/10",
+    isSystem: t.isSystem,
+  };
+}
 
 function NewConversationPage() {
   const { t } = useTranslation();
@@ -23,6 +42,7 @@ function NewConversationPage() {
     ? new URLSearchParams(window.location.search).get("agentId") ?? undefined
     : undefined;
   const [isCreating, setIsCreating] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<ExploreTemplate | null>(null);
 
   const { data: agentData } = useQuery({
     queryKey: ["agents", agentId],
@@ -32,6 +52,16 @@ function NewConversationPage() {
   });
 
   const agent = agentId ? (agentData as any) : null;
+
+  // Load linked starter templates for this agent
+  const { data: agentStartersData } = useQuery({
+    queryKey: ["agents", agentId, "starters"],
+    queryFn: () => api.get<any>(`/api/agents/${agentId}/starters`),
+    enabled: !!agentId,
+    staleTime: 60_000,
+  });
+
+  const linkedTemplates: ExploreTemplate[] = ((agentStartersData as any)?.data ?? []).map((t: any) => toExploreTemplate(t));
 
   // Load conversation starters from prompt templates (story #182)
   const { data: starterTemplates } = useQuery({
@@ -109,8 +139,9 @@ function NewConversationPage() {
     }
   }, [createAndSend]);
 
-  // Agent-specific starters: use custom starters if configured, otherwise defaults
+  // Agent-specific starters: use linked templates first, then custom starters, then defaults
   const customStarters: string[] = agent?.starters?.filter((s: string) => s?.trim()) ?? [];
+  const hasLinkedTemplates = linkedTemplates.length > 0;
   const agentStarters: string[] = customStarters.length > 0
     ? customStarters
     : [
@@ -129,6 +160,23 @@ function NewConversationPage() {
   ];
 
   const hasTemplateStarters = !agent && starters.length > 0;
+
+  const handleTemplateClick = (tmpl: ExploreTemplate) => {
+    if (tmpl.inputs?.length) {
+      setSelectedTemplate(tmpl);
+      return;
+    }
+    createAndSend(tmpl.content);
+  };
+
+  const handleTemplateSubmit = (resolvedMessage: string, files?: File[]) => {
+    if (files?.length) {
+      setPendingFiles(files);
+    }
+    setSelectedTemplate(null);
+    const pendingFiles = consumePendingFiles();
+    createAndSend(resolvedMessage, undefined, pendingFiles.length > 0 ? pendingFiles : undefined);
+  };
 
   return (
     <div className="flex flex-col flex-1">
@@ -158,17 +206,64 @@ function NewConversationPage() {
           {!isCreating && (
             <>
               {agent ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {agentStarters.map((prompt) => (
-                    <button
-                      key={prompt}
-                      onClick={() => createAndSend(prompt)}
-                      className="text-left text-xs p-3 rounded-xl bg-surface-secondary border border-border text-text-secondary hover:bg-surface-tertiary hover:text-text transition-colors"
-                    >
-                      {prompt}
-                    </button>
-                  ))}
-                </div>
+                <>
+                  {/* Rich linked templates */}
+                  {hasLinkedTemplates && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                      {linkedTemplates.map((tmpl) => {
+                        const Icon = tmpl.icon;
+                        return (
+                          <button
+                            key={tmpl.id}
+                            onClick={() => handleTemplateClick(tmpl)}
+                            className="text-left p-3 rounded-xl bg-surface-secondary border border-border hover:bg-surface-tertiary hover:border-border-strong transition-colors group"
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className={`h-6 w-6 rounded-md ${tmpl.bgColor} flex items-center justify-center`}>
+                                <Icon className={`h-3 w-3 ${tmpl.color}`} aria-hidden="true" />
+                              </div>
+                              <p className="text-xs font-medium text-text truncate">{tmpl.name}</p>
+                              {tmpl.inputs?.length && (
+                                <ArrowRight className="h-3 w-3 text-text-tertiary ml-auto shrink-0 transition-transform group-hover:translate-x-0.5" />
+                              )}
+                            </div>
+                            <p className="text-[11px] text-text-tertiary line-clamp-2 pl-8">
+                              {tmpl.description}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {/* Plain text starters */}
+                  {!hasLinkedTemplates && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {agentStarters.map((prompt) => (
+                        <button
+                          key={prompt}
+                          onClick={() => createAndSend(prompt)}
+                          className="text-left text-xs p-3 rounded-xl bg-surface-secondary border border-border text-text-secondary hover:bg-surface-tertiary hover:text-text transition-colors"
+                        >
+                          {prompt}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {/* Show plain starters below linked templates if both exist */}
+                  {hasLinkedTemplates && customStarters.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {customStarters.map((prompt) => (
+                        <button
+                          key={prompt}
+                          onClick={() => createAndSend(prompt)}
+                          className="text-left text-xs p-3 rounded-xl bg-surface-secondary border border-border text-text-secondary hover:bg-surface-tertiary hover:text-text transition-colors"
+                        >
+                          {prompt}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
               ) : hasTemplateStarters ? (
                 <div className="space-y-3">
                   <p className="text-xs text-text-tertiary">
@@ -211,6 +306,13 @@ function NewConversationPage() {
       </div>
 
       <MessageInput onSend={(content, files) => createAndSend(content, undefined, files)} disabled={isCreating} />
+
+      <TemplateInputDialog
+        open={!!selectedTemplate}
+        onClose={() => setSelectedTemplate(null)}
+        template={selectedTemplate}
+        onSubmit={handleTemplateSubmit}
+      />
     </div>
   );
 }

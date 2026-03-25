@@ -54,6 +54,7 @@ export const queryKeys = {
   prompts: {
     all: ["prompts"] as const,
     starters: () => [...queryKeys.prompts.all, "starters"] as const,
+    explore: (filters?: Record<string, unknown>) => [...queryKeys.prompts.all, "explore", filters] as const,
   },
   user: {
     profile: () => ["user", "profile"] as const,

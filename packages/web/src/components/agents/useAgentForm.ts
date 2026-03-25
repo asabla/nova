@@ -147,6 +147,7 @@ export function useAgentForm(options: { mode: "create" | "edit"; agentId?: strin
   // Local tool/knowledge selection for create mode (before agent exists)
   const [selectedToolIds, setSelectedToolIds] = useState<string[]>([]);
   const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>([]);
+  const [selectedStarterTemplateIds, setSelectedStarterTemplateIds] = useState<string[]>([]);
 
   const toggleTool = useCallback((toolId: string) => {
     setSelectedToolIds((prev) =>
@@ -159,6 +160,14 @@ export function useAgentForm(options: { mode: "create" | "edit"; agentId?: strin
       prev.includes(collectionId)
         ? prev.filter((id) => id !== collectionId)
         : [...prev, collectionId],
+    );
+  }, []);
+
+  const toggleStarterTemplate = useCallback((templateId: string) => {
+    setSelectedStarterTemplateIds((prev) =>
+      prev.includes(templateId)
+        ? prev.filter((id) => id !== templateId)
+        : [...prev, templateId],
     );
   }, []);
 
@@ -181,6 +190,13 @@ export function useAgentForm(options: { mode: "create" | "edit"; agentId?: strin
         await Promise.allSettled(
           selectedCollectionIds.map((collectionId) =>
             api.post(`/api/agents/${newId}/knowledge`, { knowledgeCollectionId: collectionId }),
+          ),
+        );
+      }
+      if (newId && selectedStarterTemplateIds.length > 0) {
+        await Promise.allSettled(
+          selectedStarterTemplateIds.map((promptTemplateId, index) =>
+            api.post(`/api/agents/${newId}/starters`, { promptTemplateId, sortOrder: index }),
           ),
         );
       }
@@ -380,11 +396,13 @@ export function useAgentForm(options: { mode: "create" | "edit"; agentId?: strin
     updateMutation,
     deleteMutation,
     cloneMutation,
-    // Create-mode tool/knowledge selection
+    // Create-mode tool/knowledge/starter selection
     selectedToolIds,
     selectedCollectionIds,
+    selectedStarterTemplateIds,
     toggleTool,
     toggleCollection,
+    toggleStarterTemplate,
     // Preview chat
     previewConversationId,
     previewMessages,

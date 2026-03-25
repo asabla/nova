@@ -720,8 +720,9 @@ const MAX_STARTERS = 6;
 
 function StartersSection({ ctx }: { ctx: UseAgentFormReturn }) {
   const { t } = useTranslation();
-  const { form, setField } = ctx;
+  const { form, setField, mode, agent } = ctx;
   const starters = form.starters ?? [];
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
 
   const updateStarter = (index: number, value: string) => {
     const updated = [...starters];
@@ -751,6 +752,14 @@ function StartersSection({ ctx }: { ctx: UseAgentFormReturn }) {
         })}
       </p>
 
+      {/* Linked templates */}
+      {mode === "create" ? (
+        <CreateModeStarters ctx={ctx} showPicker={showTemplatePicker} setShowPicker={setShowTemplatePicker} />
+      ) : (
+        <EditModeStarters ctx={ctx} showPicker={showTemplatePicker} setShowPicker={setShowTemplatePicker} />
+      )}
+
+      {/* Plain text starters */}
       {starters.length > 0 && (
         <div className="space-y-2">
           {starters.map((starter, i) => (
@@ -776,15 +785,171 @@ function StartersSection({ ctx }: { ctx: UseAgentFormReturn }) {
         </div>
       )}
 
-      {starters.length < MAX_STARTERS && (
+      <div className="flex items-center gap-3">
+        {starters.length < MAX_STARTERS && (
+          <button
+            onClick={addStarter}
+            className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
+          >
+            <Plus className="h-3 w-3" aria-hidden="true" />
+            {t("agents.addStarter", { defaultValue: "Add text prompt" })}
+          </button>
+        )}
         <button
-          onClick={addStarter}
+          onClick={() => setShowTemplatePicker(true)}
           className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
         >
-          <Plus className="h-3 w-3" aria-hidden="true" />
-          {t("agents.addStarter", { defaultValue: "Add prompt" })}
+          <Link2 className="h-3 w-3" aria-hidden="true" />
+          {t("agents.linkTemplate", { defaultValue: "Link template" })}
         </button>
-      )}
+      </div>
     </section>
+  );
+}
+
+function CreateModeStarters({ ctx, showPicker, setShowPicker }: { ctx: UseAgentFormReturn; showPicker: boolean; setShowPicker: (v: boolean) => void }) {
+  const { t } = useTranslation();
+  const { selectedStarterTemplateIds, toggleStarterTemplate } = ctx;
+
+  const { data: templatesData, isLoading } = useQuery({
+    queryKey: ["prompts", "explore"],
+    queryFn: () => api.get<any>("/api/prompts/explore?limit=100"),
+    staleTime: 60_000,
+  });
+
+  const allTemplates: any[] = (templatesData as any)?.data ?? [];
+  const selected = allTemplates.filter((t: any) => selectedStarterTemplateIds.includes(t.id));
+  const available = allTemplates.filter((t: any) => !selectedStarterTemplateIds.includes(t.id));
+
+  return (
+    <div className="space-y-2">
+      {selected.length > 0 && (
+        <div className="space-y-1.5">
+          {selected.map((tmpl: any) => (
+            <div key={tmpl.id} className="flex items-center gap-2 p-2 rounded-lg border border-border bg-surface-secondary group">
+              <FileText className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden="true" />
+              <span className="text-xs font-medium text-text truncate flex-1">{tmpl.name}</span>
+              <button
+                onClick={() => toggleStarterTemplate(tmpl.id)}
+                className="text-[10px] text-text-tertiary hover:text-danger transition-colors opacity-0 group-hover:opacity-100"
+              >
+                {t("agents.disconnect", { defaultValue: "Disconnect" })}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showPicker && (
+        <div className="border border-border rounded-lg p-2 space-y-1.5 max-h-48 overflow-y-auto bg-surface">
+          {isLoading ? (
+            <Skeleton className="h-8 w-full rounded-lg" />
+          ) : available.length === 0 ? (
+            <p className="text-xs text-text-tertiary p-2">{t("agents.noTemplatesAvailable", { defaultValue: "No more templates available" })}</p>
+          ) : (
+            available.map((tmpl: any) => (
+              <div key={tmpl.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-surface-secondary transition-colors">
+                <FileText className="h-3.5 w-3.5 text-text-tertiary shrink-0" aria-hidden="true" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-text truncate">{tmpl.name}</p>
+                  {tmpl.description && <p className="text-[10px] text-text-tertiary truncate">{tmpl.description}</p>}
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => toggleStarterTemplate(tmpl.id)} className="text-[10px] h-6 px-2">
+                  {t("agents.connect", { defaultValue: "Connect" })}
+                </Button>
+              </div>
+            ))
+          )}
+          <button onClick={() => setShowPicker(false)} className="text-[10px] text-text-tertiary hover:text-text mt-1">
+            {t("common.close", { defaultValue: "Close" })}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EditModeStarters({ ctx, showPicker, setShowPicker }: { ctx: UseAgentFormReturn; showPicker: boolean; setShowPicker: (v: boolean) => void }) {
+  const { t } = useTranslation();
+  const { agent } = ctx;
+  const queryClient = useQueryClient();
+  const agentId = agent?.id;
+
+  const { data: linkedData, isLoading: linkedLoading } = useQuery({
+    queryKey: ["agents", agentId, "starters"],
+    queryFn: () => api.get<any>(`/api/agents/${agentId}/starters`),
+    enabled: !!agentId,
+  });
+
+  const linkedTemplates: any[] = (linkedData as any)?.data ?? [];
+
+  const linkMutation = useMutation({
+    mutationFn: (templateId: string) =>
+      api.post(`/api/agents/${agentId}/starters`, { promptTemplateId: templateId, sortOrder: linkedTemplates.length }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["agents", agentId, "starters"] }),
+  });
+
+  const unlinkMutation = useMutation({
+    mutationFn: (templateId: string) =>
+      api.delete(`/api/agents/${agentId}/starters/${templateId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["agents", agentId, "starters"] }),
+  });
+
+  const { data: templatesData } = useQuery({
+    queryKey: ["prompts", "explore"],
+    queryFn: () => api.get<any>("/api/prompts/explore?limit=100"),
+    staleTime: 60_000,
+    enabled: showPicker,
+  });
+
+  const allTemplates: any[] = (templatesData as any)?.data ?? [];
+  const linkedIds = new Set(linkedTemplates.map((t: any) => t.id));
+  const available = allTemplates.filter((t: any) => !linkedIds.has(t.id));
+
+  return (
+    <div className="space-y-2">
+      {linkedLoading && <Skeleton className="h-8 w-full rounded-lg" />}
+
+      {linkedTemplates.length > 0 && (
+        <div className="space-y-1.5">
+          {linkedTemplates.map((tmpl: any) => (
+            <div key={tmpl.id} className="flex items-center gap-2 p-2 rounded-lg border border-border bg-surface-secondary group">
+              <FileText className="h-3.5 w-3.5 text-primary shrink-0" aria-hidden="true" />
+              <span className="text-xs font-medium text-text truncate flex-1">{tmpl.name}</span>
+              <button
+                onClick={() => unlinkMutation.mutate(tmpl.id)}
+                className="text-[10px] text-text-tertiary hover:text-danger transition-colors opacity-0 group-hover:opacity-100"
+              >
+                {t("agents.disconnect", { defaultValue: "Disconnect" })}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showPicker && (
+        <div className="border border-border rounded-lg p-2 space-y-1.5 max-h-48 overflow-y-auto bg-surface">
+          {available.length === 0 ? (
+            <p className="text-xs text-text-tertiary p-2">{t("agents.noTemplatesAvailable", { defaultValue: "No more templates available" })}</p>
+          ) : (
+            available.map((tmpl: any) => (
+              <div key={tmpl.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-surface-secondary transition-colors">
+                <FileText className="h-3.5 w-3.5 text-text-tertiary shrink-0" aria-hidden="true" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-text truncate">{tmpl.name}</p>
+                  {tmpl.description && <p className="text-[10px] text-text-tertiary truncate">{tmpl.description}</p>}
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => linkMutation.mutate(tmpl.id)} className="text-[10px] h-6 px-2">
+                  {t("agents.connect", { defaultValue: "Connect" })}
+                </Button>
+              </div>
+            ))
+          )}
+          <button onClick={() => setShowPicker(false)} className="text-[10px] text-text-tertiary hover:text-text mt-1">
+            {t("common.close", { defaultValue: "Close" })}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

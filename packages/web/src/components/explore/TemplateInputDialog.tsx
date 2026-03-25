@@ -3,12 +3,12 @@ import { useTranslation } from "react-i18next";
 import { Upload, X, FileText, ArrowRight } from "lucide-react";
 import { Dialog } from "../ui/Dialog";
 import { Button } from "../ui/Button";
-import type { SampleConversation, TemplateInput } from "../../routes/_auth/explore";
+import type { ExploreTemplate, TemplateInput } from "../../types/template";
 
 interface TemplateInputDialogProps {
   open: boolean;
   onClose: () => void;
-  conversation: SampleConversation | null;
+  template: ExploreTemplate | null;
   onSubmit: (resolvedMessage: string, files?: File[]) => void;
 }
 
@@ -41,21 +41,21 @@ function resolveTemplate(
   });
 }
 
-export function TemplateInputDialog({ open, onClose, conversation, onSubmit }: TemplateInputDialogProps) {
+export function TemplateInputDialog({ open, onClose, template, onSubmit }: TemplateInputDialogProps) {
   const { t } = useTranslation();
   const [textValues, setTextValues] = useState<Record<string, string>>({});
   const [fileValues, setFileValues] = useState<Record<string, File | null>>({});
   const [errors, setErrors] = useState<Record<string, boolean>>({});
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  // Reset state when conversation changes
+  // Reset state when template changes
   useEffect(() => {
     if (open) {
       setTextValues({});
       setFileValues({});
       setErrors({});
     }
-  }, [open, conversation?.id]);
+  }, [open, template?.id]);
 
   const handleTextChange = useCallback((id: string, value: string) => {
     setTextValues((prev) => ({ ...prev, [id]: value }));
@@ -76,9 +76,9 @@ export function TemplateInputDialog({ open, onClose, conversation, onSubmit }: T
   }, [handleFileSelect]);
 
   const handleSubmit = useCallback(() => {
-    if (!conversation?.inputs) return;
+    if (!template?.inputs) return;
 
-    const groups = groupInputs(conversation.inputs);
+    const groups = groupInputs(template.inputs);
     const newErrors: Record<string, boolean> = {};
     let hasError = false;
 
@@ -97,26 +97,26 @@ export function TemplateInputDialog({ open, onClose, conversation, onSubmit }: T
       return;
     }
 
-    const resolved = resolveTemplate(conversation.starterMessage, textValues, fileValues);
+    const resolved = resolveTemplate(template.content, textValues, fileValues);
     const files = Object.values(fileValues).filter((f): f is File => f !== null);
 
     onSubmit(resolved, files.length > 0 ? files : undefined);
-  }, [conversation, textValues, fileValues, onSubmit]);
+  }, [template, textValues, fileValues, onSubmit]);
 
-  if (!conversation?.inputs) return null;
+  if (!template?.inputs) return null;
 
-  const groups = groupInputs(conversation.inputs);
-  const Icon = conversation.icon;
+  const groups = groupInputs(template.inputs);
+  const Icon = template.icon;
 
   return (
-    <Dialog open={open} onClose={onClose} title={conversation.title} size="lg">
+    <Dialog open={open} onClose={onClose} title={template.name} size="lg">
       {/* Context header */}
       <div className="flex items-start gap-3 mb-6 p-3 rounded-lg bg-surface-secondary">
-        <div className={`h-8 w-8 rounded-lg ${conversation.bgColor} flex items-center justify-center shrink-0`}>
-          <Icon className={`h-4 w-4 ${conversation.color}`} aria-hidden="true" />
+        <div className={`h-8 w-8 rounded-lg ${template.bgColor} flex items-center justify-center shrink-0`}>
+          <Icon className={`h-4 w-4 ${template.color}`} aria-hidden="true" />
         </div>
         <p className="text-sm text-text-secondary leading-relaxed">
-          {conversation.description}
+          {template.description}
         </p>
       </div>
 

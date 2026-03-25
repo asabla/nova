@@ -21,7 +21,8 @@ import { Dialog } from "../../components/ui/Dialog";
 import { NewResearchForm, type NewResearchFormSubmitData } from "../../components/research/NewResearchForm";
 import { toast } from "../../components/ui/Toast";
 import { TemplateInputDialog } from "../../components/explore/TemplateInputDialog";
-import { sampleConversations, type SampleConversation } from "./explore";
+import { resolveIcon } from "../../lib/template-icons";
+import type { ApiTemplate, ExploreTemplate } from "../../types/template";
 
 export const Route = createFileRoute("/_auth/")({
   component: () => (
@@ -46,7 +47,7 @@ function HomePage() {
   const [message, setMessage] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [researchModalOpen, setResearchModalOpen] = useState(false);
-  const [selectedStarter, setSelectedStarter] = useState<SampleConversation | null>(null);
+  const [selectedStarter, setSelectedStarter] = useState<ExploreTemplate | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -88,14 +89,35 @@ function HomePage() {
     [slash.handleSelect],
   );
 
+  // Fetch explore templates for quick starters
+  const { data: exploreData } = useQuery({
+    queryKey: ["prompts", "explore", "home"],
+    queryFn: () => api.get<any>("/api/prompts/explore?limit=20"),
+    staleTime: 120_000,
+  });
+
   const quickStarters = useMemo(() => {
-    const shuffled = [...sampleConversations];
+    const raw: ApiTemplate[] = (exploreData as any)?.data ?? [];
+    const templates: ExploreTemplate[] = raw.map((t) => ({
+      id: t.id,
+      name: t.name,
+      description: t.description ?? "",
+      content: t.content,
+      category: t.category ?? "general",
+      tags: (t.tags as string[]) ?? [],
+      inputs: t.inputs ?? undefined,
+      icon: resolveIcon(t.icon),
+      color: t.color ?? "text-primary",
+      bgColor: t.bgColor ?? "bg-primary/10",
+      isSystem: t.isSystem,
+    }));
+    const shuffled = [...templates];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
     return shuffled.slice(0, 3);
-  }, []);
+  }, [exploreData]);
 
   const { data: conversationsData, isLoading, isError, refetch } = useQuery({
     queryKey: queryKeys.conversations.list({ isArchived: false }),
@@ -264,7 +286,7 @@ function HomePage() {
                     <Icon className={`h-5 w-5 ${starter.color}`} aria-hidden="true" />
                   </div>
                   <span className="text-xs font-medium text-text-secondary group-hover:text-text transition-colors leading-tight">
-                    {starter.title}
+                    {starter.name}
                   </span>
                 </button>
               );
@@ -360,7 +382,7 @@ function HomePage() {
       <TemplateInputDialog
         open={!!selectedStarter}
         onClose={() => setSelectedStarter(null)}
-        conversation={selectedStarter}
+        template={selectedStarter}
         onSubmit={(resolvedMessage, files) => {
           if (files?.length) {
             storePendingFiles(files);
