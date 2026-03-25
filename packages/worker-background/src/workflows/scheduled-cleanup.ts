@@ -7,7 +7,7 @@ const {
   cleanupOrphanedFiles,
   cleanupSoftDeletedRecords,
 } = proxyActivities<typeof activities>({
-  startToCloseTimeout: "10 minutes",
+  startToCloseTimeout: "30 minutes",
   retry: { maximumAttempts: 2 },
 });
 
