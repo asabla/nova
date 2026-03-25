@@ -56,6 +56,7 @@ export const sessions = pgTable("sessions", {
 }, (table) => [
   index("idx_sessions_token_hash").on(table.tokenHash),
   index("idx_sessions_user_id").on(table.userId),
+  index("idx_sessions_expires_at").on(table.expiresAt),
 ]);
 
 export const mfaCredentials = pgTable("mfa_credentials", {

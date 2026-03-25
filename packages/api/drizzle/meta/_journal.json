@@ -71,6 +71,13 @@
       "when": 1774372310772,
       "tag": "0009_nebulous_juggernaut",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1774450558214,
+      "tag": "0010_aromatic_masque",
+      "breakpoints": true
     }
   ]
 }

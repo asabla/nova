@@ -21,6 +21,7 @@ export const files = pgTable("files", {
 }, (table) => [
   index("idx_files_org_user").on(table.orgId, table.userId),
   index("idx_files_org_active").on(table.orgId),
+  index("idx_files_orphan_cleanup").on(table.sizeBytes, table.createdAt),
 ]);
 
 export const fileChunks = pgTable("file_chunks", {

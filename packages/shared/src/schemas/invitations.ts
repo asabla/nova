@@ -21,6 +21,7 @@ export const invitations = pgTable("invitations", {
   index("idx_invitations_org_id").on(table.orgId),
   index("idx_invitations_token_hash").on(table.tokenHash),
   index("idx_invitations_email").on(table.email),
+  index("idx_invitations_expires_at").on(table.expiresAt),
 ]);
 
 export const selectInvitationSchema = createSelectSchema(invitations);

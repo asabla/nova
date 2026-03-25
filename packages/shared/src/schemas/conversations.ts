@@ -25,6 +25,8 @@ export const conversations = pgTable("conversations", {
   index("idx_conversations_org_owner").on(table.orgId, table.ownerId),
   uniqueIndex("idx_conversations_share_token").on(table.publicShareToken),
   index("idx_conversations_org_active").on(table.orgId),
+  index("idx_conversations_org_deleted").on(table.orgId, table.deletedAt),
+  index("idx_conversations_org_archived").on(table.orgId, table.isArchived, table.updatedAt),
 ]);
 
 export const conversationParticipants = pgTable("conversation_participants", {
