@@ -43,6 +43,12 @@ export const agentService = {
     systemPrompt?: string;
     modelId?: string;
     modelParams?: Record<string, unknown>;
+    visibility?: string;
+    toolApprovalMode?: string;
+    memoryScope?: string;
+    maxSteps?: number;
+    timeoutSeconds?: number;
+    starters?: string[];
   }) {
     const [agent] = await db
       .insert(agents)
@@ -54,6 +60,12 @@ export const agentService = {
         systemPrompt: data.systemPrompt,
         modelId: data.modelId,
         modelParams: data.modelParams,
+        ...(data.visibility && { visibility: data.visibility }),
+        ...(data.toolApprovalMode && { toolApprovalMode: data.toolApprovalMode }),
+        ...(data.memoryScope && { memoryScope: data.memoryScope }),
+        ...(data.maxSteps != null && { maxSteps: data.maxSteps }),
+        ...(data.timeoutSeconds != null && { timeoutSeconds: data.timeoutSeconds }),
+        ...(data.starters && { starters: data.starters }),
       })
       .returning();
 

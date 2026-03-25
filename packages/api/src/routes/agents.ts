@@ -26,8 +26,14 @@ const createAgentSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
   systemPrompt: z.string().max(100_000).optional(),
-  modelId: z.string().uuid().optional(),
+  modelId: z.union([z.string().uuid(), z.literal("")]).optional().transform((v) => v || undefined),
   modelParams: z.record(z.unknown()).optional(),
+  visibility: z.enum(["private", "team", "org", "public"]).optional(),
+  toolApprovalMode: z.enum(["auto", "always-ask", "never"]).optional(),
+  memoryScope: z.enum(["per-user", "per-conversation", "global"]).optional(),
+  maxSteps: z.number().int().min(1).max(100).optional(),
+  timeoutSeconds: z.number().int().min(1).max(3600).optional(),
+  starters: z.array(z.string()).optional(),
 });
 
 agentRoutes.post("/", async (c) => {
