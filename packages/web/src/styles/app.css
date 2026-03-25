@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "katex/dist/katex.min.css";
 
 @theme {
   /* Primary — a rich warm indigo that nods to "nova" (luminous, stellar) */
