@@ -2,9 +2,9 @@ ALTER TABLE "workspace_memberships" DISABLE ROW LEVEL SECURITY;--> statement-bre
 ALTER TABLE "workspaces" DISABLE ROW LEVEL SECURITY;--> statement-breakpoint
 DROP TABLE "workspace_memberships" CASCADE;--> statement-breakpoint
 DROP TABLE "workspaces" CASCADE;--> statement-breakpoint
-ALTER TABLE "conversations" DROP CONSTRAINT "conversations_workspace_id_workspaces_id_fk";
+ALTER TABLE "conversations" DROP CONSTRAINT IF EXISTS "conversations_workspace_id_workspaces_id_fk";
 --> statement-breakpoint
-ALTER TABLE "files" DROP CONSTRAINT "files_workspace_id_workspaces_id_fk";
+ALTER TABLE "files" DROP CONSTRAINT IF EXISTS "files_workspace_id_workspaces_id_fk";
 --> statement-breakpoint
 DROP INDEX "idx_conversations_workspace";--> statement-breakpoint
 DROP INDEX "idx_files_workspace";--> statement-breakpoint

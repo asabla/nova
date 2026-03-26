@@ -125,18 +125,17 @@ health.post("/diagnostics", async (c) => {
     results.database = { status: "fail", message: err.message, latencyMs: 0 };
   }
 
-  // 2. Database extensions (pgvector, pg_trgm)
+  // 2. Database extensions (pg_trgm)
   try {
     const start = performance.now();
     const extensions = (await db.execute(sql`SELECT extname FROM pg_extension`)) as any[];
     const extNames = extensions.map((e: any) => e.extname);
-    const hasVector = extNames.includes("vector");
     const hasTrgm = extNames.includes("pg_trgm");
     results.database_extensions = {
-      status: hasVector && hasTrgm ? "pass" : "warn",
+      status: hasTrgm ? "pass" : "warn",
       message: `Extensions: ${extNames.join(", ")}`,
       latencyMs: Math.round(performance.now() - start),
-      details: { pgvector: hasVector, pg_trgm: hasTrgm },
+      details: { pg_trgm: hasTrgm },
     };
   } catch (err: any) {
     results.database_extensions = { status: "warn", message: err.message, latencyMs: 0 };

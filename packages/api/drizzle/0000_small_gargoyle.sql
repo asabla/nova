@@ -444,7 +444,7 @@ CREATE TABLE "knowledge_chunks" (
 	"org_id" uuid NOT NULL,
 	"chunk_index" integer NOT NULL,
 	"content" text NOT NULL,
-	"embedding" vector,
+	"embedding" text,
 	"token_count" integer,
 	"metadata" jsonb,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,

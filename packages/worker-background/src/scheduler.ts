@@ -28,7 +28,21 @@ export async function setupSchedules() {
     console.log("Registered system cleanup schedule (daily 3AM UTC)");
   } catch (err: any) {
     if (err.message?.includes("already exists")) {
-      console.log("System cleanup schedule already registered");
+      try {
+        const handle = client.schedule.getHandle("nova-system-cleanup");
+        await handle.update((prev) => ({
+          ...prev,
+          action: {
+            type: "startWorkflow" as const,
+            workflowType: "scheduledCleanupWorkflow",
+            taskQueue: TASK_QUEUES.BACKGROUND,
+            workflowId: "cleanup-scheduled",
+          },
+        }));
+        console.log("Updated system cleanup schedule");
+      } catch {
+        console.log("System cleanup schedule already registered");
+      }
     } else {
       console.error("Failed to register cleanup schedule:", err.message);
     }
@@ -88,7 +102,21 @@ export async function setupSchedules() {
     console.log("Registered connector sync dispatch schedule (every 30 min)");
   } catch (err: any) {
     if (err.message?.includes("already exists")) {
-      console.log("Connector sync dispatch schedule already registered");
+      try {
+        const handle = client.schedule.getHandle("nova-connector-sync-dispatch");
+        await handle.update((prev) => ({
+          ...prev,
+          action: {
+            type: "startWorkflow" as const,
+            workflowType: "connectorSyncDispatchWorkflow",
+            taskQueue: TASK_QUEUES.INGESTION,
+            workflowId: "connector-sync-dispatch",
+          },
+        }));
+        console.log("Updated connector sync dispatch schedule");
+      } catch {
+        console.log("Connector sync dispatch schedule already registered");
+      }
     } else {
       console.error("Failed to register connector sync dispatch schedule:", err.message);
     }

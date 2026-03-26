@@ -20,7 +20,7 @@ CREATE TABLE "agent_memory_vectors" (
 	"user_id" uuid,
 	"scope" text DEFAULT 'global' NOT NULL,
 	"content" text NOT NULL,
-	"embedding" vector,
+	"embedding" text,
 	"metadata" jsonb,
 	"source_type" text,
 	"source_id" text,

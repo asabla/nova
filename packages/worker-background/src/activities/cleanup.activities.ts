@@ -58,14 +58,14 @@ async function batchDelete(
 ): Promise<number> {
   let total = 0;
   while (true) {
-    const result = await db.execute<{ count: string }>(
+    const result = await db.execute(
       sql`WITH to_delete AS (
         SELECT ${idColumn} FROM ${table} WHERE ${condition} LIMIT ${BATCH_SIZE}
       )
       DELETE FROM ${table} WHERE ${idColumn} IN (SELECT ${idColumn} FROM to_delete)
       RETURNING 1`
     );
-    const count = (result as unknown as { rows: unknown[] }).rows.length;
+    const count = (result as unknown as unknown[]).length;
     total += count;
     if (count < BATCH_SIZE) break;
   }
