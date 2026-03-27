@@ -241,6 +241,36 @@ export async function relayResearchToSSE(
             }));
             break;
 
+          // Agent flow events (from agentWorkflow tier assessment/planning)
+          case "tier.assessed":
+            safeWrite("tier.assessed", JSON.stringify({ tier: data.tier, reasoning: data.reasoning }));
+            break;
+
+          case "plan.generated":
+            safeWrite("plan.generated", JSON.stringify({ plan: data.plan }));
+            // Also publish as research progress for the research UI
+            safeWrite("research.progress", JSON.stringify({
+              type: "info",
+              message: `Execution plan: ${data.plan?.nodes?.length ?? 0} step(s)`,
+            }));
+            break;
+
+          case "plan.approved":
+            safeWrite("plan.approved", JSON.stringify({ planId: data.planId }));
+            break;
+
+          case "plan.node.status":
+            safeWrite("plan.node.status", JSON.stringify({
+              nodeId: data.nodeId,
+              status: data.status,
+              detail: data.detail,
+            }));
+            break;
+
+          case "content_clear":
+            safeWrite("content_clear", JSON.stringify({ reason: data.reason }));
+            break;
+
           case "done":
             // Agent "done" event — treat as research.done for the relay
             if (settled) return;

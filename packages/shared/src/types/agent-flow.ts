@@ -125,6 +125,28 @@ export interface UserInteractionResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Research Config (passed to agentWorkflow for research mode)
+// ---------------------------------------------------------------------------
+
+export interface ResearchConfig {
+  reportId: string;
+  query: string;
+  maxSources: number;
+  sources: {
+    webSearch: boolean;
+    knowledgeCollectionIds: string[];
+    fileIds: string[];
+  };
+  /** Present when this is a refinement of an existing report. */
+  refinement?: {
+    previousContent: string;
+    previousSources: unknown[];
+    prompt: string;
+    versionId: string;
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Research Report Versioning
 // ---------------------------------------------------------------------------
 
@@ -188,6 +210,8 @@ export interface AgentWorkflowInput {
   enableSearchAttributes?: boolean;
   /** Pre-assessed tier from the API — skips the workflow's own tier assessment */
   preAssessedTier?: "direct" | "sequential" | "orchestrated";
+  /** When set, this run is a research task. Research tools are injected and results persisted to research_reports. */
+  researchConfig?: ResearchConfig;
 }
 
 export interface AgentWorkflowResult {

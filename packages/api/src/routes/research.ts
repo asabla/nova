@@ -301,23 +301,31 @@ researchRoutes.post("/", async (c) => {
     config: { maxSources: body.maxSources, maxIterations: body.maxIterations, sources: body.sources },
   }).returning();
 
-  // Start Temporal workflow
+  // Start Temporal workflow (dispatched to agent worker)
   try {
     const client = await getTemporalClient();
     const hasKnowledge = body.sources.knowledgeCollectionIds.length > 0;
     const hasFiles = body.sources.fileIds.length > 0;
-    await client.workflow.start("researchAgentWorkflow", {
-      taskQueue: TASK_QUEUES.BACKGROUND,
+    const maxTurns = Math.max(20, body.maxSources * 2 + (hasKnowledge ? 10 : 0) + (hasFiles ? 5 : 0));
+    await client.workflow.start("agentWorkflow", {
+      taskQueue: TASK_QUEUES.AGENT,
       workflowId: `research-${report.id}`,
       args: [{
         orgId,
-        conversationId: body.conversationId,
-        reportId: report.id,
-        query: body.query,
-        maxSources: body.maxSources,
-        maxTurns: Math.max(20, body.maxSources * 2 + (hasKnowledge ? 10 : 0) + (hasFiles ? 5 : 0)),
+        userId,
+        conversationId: report.conversationId,
         streamChannelId: `research:${report.id}`,
-        sources: body.sources,
+        model: "default",
+        userMessage: body.query,
+        messageHistory: [],
+        maxSteps: maxTurns,
+        timeoutSeconds: 1800,
+        researchConfig: {
+          reportId: report.id,
+          query: body.query,
+          maxSources: body.maxSources,
+          sources: body.sources,
+        },
       }],
     });
   } catch {
@@ -483,19 +491,27 @@ researchRoutes.post("/:id/rerun", async (c) => {
     const maxSources = body.maxSources ?? config.maxSources ?? 10;
     const rerunHasKnowledge = resolvedSources.knowledgeCollectionIds.length > 0;
     const rerunHasFiles = resolvedSources.fileIds.length > 0;
+    const maxTurns = Math.max(20, maxSources * 2 + (rerunHasKnowledge ? 10 : 0) + (rerunHasFiles ? 5 : 0));
     const client = await getTemporalClient();
-    await client.workflow.start("researchAgentWorkflow", {
-      taskQueue: TASK_QUEUES.BACKGROUND,
+    await client.workflow.start("agentWorkflow", {
+      taskQueue: TASK_QUEUES.AGENT,
       workflowId: `research-${newReport.id}`,
       args: [{
         orgId,
+        userId,
         conversationId: originalReport.conversationId,
-        reportId: newReport.id,
-        query: originalReport.query,
-        maxSources,
-        maxTurns: Math.max(20, maxSources * 2 + (rerunHasKnowledge ? 10 : 0) + (rerunHasFiles ? 5 : 0)),
         streamChannelId: `research:${newReport.id}`,
-        sources: resolvedSources,
+        model: "default",
+        userMessage: originalReport.query,
+        messageHistory: [],
+        maxSteps: maxTurns,
+        timeoutSeconds: 1800,
+        researchConfig: {
+          reportId: newReport.id,
+          query: originalReport.query,
+          maxSources,
+          sources: resolvedSources,
+        },
       }],
     });
   } catch {
@@ -595,24 +611,37 @@ researchRoutes.post("/:id/refine", async (c) => {
     updatedAt: new Date(),
   }).where(eq(researchReports.id, reportId));
 
-  // Start refinement workflow
+  // Start refinement workflow (dispatched to agent worker)
   try {
     const client = await getTemporalClient();
     const streamChannelId = `research:${reportId}:v${newVersion}`;
+    const reportConfig = (report.config as Record<string, any>) ?? {};
 
-    await client.workflow.start("researchRefinementWorkflow", {
-      taskQueue: TASK_QUEUES.BACKGROUND,
+    await client.workflow.start("agentWorkflow", {
+      taskQueue: TASK_QUEUES.AGENT,
       workflowId: `research-refine-${reportId}-v${newVersion}`,
       args: [{
         orgId,
+        userId,
         conversationId: report.conversationId,
-        reportId,
-        versionId: versionEntry.id,
-        refinementPrompt,
-        previousContent: report.reportContent ?? "",
-        previousSources: (report.sources as any[]) ?? [],
-        maxSources: 10,
         streamChannelId,
+        model: "default",
+        userMessage: refinementPrompt,
+        messageHistory: [],
+        maxSteps: 25,
+        timeoutSeconds: 900,
+        researchConfig: {
+          reportId,
+          query: report.query,
+          maxSources: reportConfig.maxSources ?? 10,
+          sources: reportConfig.sources ?? { webSearch: true, knowledgeCollectionIds: [], fileIds: [] },
+          refinement: {
+            previousContent: report.reportContent ?? "",
+            previousSources: (report.sources as any[]) ?? [],
+            prompt: refinementPrompt,
+            versionId: versionEntry.id,
+          },
+        },
       }],
     });
 

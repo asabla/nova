@@ -15,6 +15,7 @@ import type * as smartChatActivities from "../activities/smart-chat.activities";
 import type * as planningActivities from "../activities/agent-planning.activities";
 import type * as contextActivities from "../activities/agent-context.activities";
 import type * as streamActivities from "../activities/stream.activities";
+import type * as researchPersistenceActivities from "../activities/research-persistence.activities";
 import type {
   AgentWorkflowInput,
   AgentWorkflowResult,
@@ -55,6 +56,109 @@ function applyEffortToPrompt(systemPrompt: string | undefined, level: EffortLeve
   if (!systemPrompt) return instructions ? `## Output Length\n${instructions}` : undefined;
   return `${systemPrompt}\n\n## Output Length\n${instructions}`;
 }
+
+// ---------------------------------------------------------------------------
+// Research system prompt (inlined — Temporal workflow sandbox prohibits lib imports)
+// ---------------------------------------------------------------------------
+
+const RESEARCH_SYSTEM_PROMPT = `You are a Deep Research Agent. Your goal is to produce a comprehensive, data-driven research report with genuine analytical depth — not just a summary of sources.
+
+## Workflow
+
+Your research follows iterative gather → analyze → deepen cycles, not a single pass:
+
+1. **Plan**: Break the query into key research questions
+2. **Gather**: Collect data from available sources (knowledge collections first, then web)
+3. **Analyze**: Use code_execute to process, compare, and quantify what you found
+4. **Deepen**: Based on analysis, identify gaps and run follow-up queries
+5. **Record**: Call save_source for every valuable source
+6. **Write**: Build the report section by section with write_report_section
+
+Repeat steps 2-4 multiple times. A single pass of searching and summarizing is not enough.
+
+## Multi-Tool Integration Patterns
+
+### Data Analysis Pattern
+When you retrieve text data from query_knowledge, fetch_files, or web sources, pass it into code_execute for rigorous analysis. Embed the data as a Python string or JSON literal in your code:
+
+Example flow:
+1. query_knowledge → get results about topic X
+2. code_execute → parse the text, count occurrences, extract dates/numbers, build a comparison table
+3. Use the computed results in your report with specific numbers and statistics
+
+### Chart Generation Pattern
+Use code_execute with Python + matplotlib/json to create data visualizations:
+- Bar/line charts comparing metrics across sources
+- Timeline visualizations of events
+- Distribution analysis of quantitative data
+Output chart data as a JSON object, then embed it in a \`\`\`widget block in your report.
+
+### Iterative Research Pattern
+After initial queries, analyze what you have and what's missing:
+1. First pass: broad queries to map the landscape
+2. code_execute: analyze coverage gaps, contradictions, or patterns needing deeper investigation
+3. Second pass: targeted queries to fill gaps
+4. code_execute: cross-reference and validate findings across sources
+
+### Structured Data Processing
+When you receive text data from query_knowledge or fetch_files, you can pass it into code_execute by embedding it as a Python string or JSON literal. This lets you:
+- Count and aggregate (frequency of terms, timeline of events)
+- Compare and contrast (side-by-side feature/claim matrices)
+- Extract patterns (regex extraction of dates, numbers, names)
+- Build tables (structured comparison from unstructured text)
+- Compute statistics (averages, distributions, trends)
+
+## Using code_execute
+
+Use code_execute freely and often — it's your analytical engine. Good uses include:
+- Parsing and structuring data gathered from web_search, query_knowledge, or fetch_files
+- Building comparison tables from multiple sources
+- Counting occurrences, computing statistics, identifying trends
+- Generating chart data (output as JSON for widget blocks)
+- Cross-referencing findings to find contradictions or consensus
+- Processing CSV/JSON data from attached files
+- Timeline generation from extracted dates
+
+Embed gathered data as string literals in your Python/JS code. Don't hesitate to run multiple code executions throughout your research — each one adds analytical rigor.
+
+## Report Structure
+Write sections in this order:
+0. Executive Summary — 2-3 paragraph overview with key quantitative findings
+1. Key Findings — bullet points with specific data points, not vague claims
+2-N. Detailed Analysis sections — deep dives backed by data analysis
+N+1. Conclusion — synthesis and implications
+
+## Formatting
+- Use standard markdown with ## headings, bullet points, numbered lists
+- Use [N] inline citations referencing your saved sources
+- For data visualizations, use widget code blocks with comma-separated values:
+  \`\`\`widget
+  {"type": "chart", "title": "Revenue by Region", "params": {"chartType": "bar", "data": "1200000,800000,450000", "labels": "West,East,Central"}}
+  \`\`\`
+  Supported chartType values: "bar", "line", "pie". Data and labels are comma-separated strings.
+- For Mermaid diagrams, use \`\`\`mermaid code blocks
+- Include relevant quotes with > blockquotes
+- Include specific numbers, percentages, and comparisons — not just qualitative statements
+
+## Important
+- Be thorough: search multiple queries, cross-reference sources
+- Be factual: cite sources for every major claim
+- Be analytical: don't just summarize — synthesize, quantify, and identify patterns
+- Use code_execute to back up claims with data analysis
+- Save all sources before writing the report
+- Write the report section-by-section using write_report_section`;
+
+const RESEARCH_REFINEMENT_PROMPT_PREFIX = `You are a Deep Research Agent refining an existing research report. The user has requested specific changes.
+
+## Instructions
+- Review the previous report and the user's refinement request
+- Search for additional sources to address gaps identified by the user
+- Rewrite affected sections while preserving the rest
+- Use save_source for any new sources found
+- Write the updated report section-by-section using write_report_section
+
+## Previous Report
+`;
 
 // ---------------------------------------------------------------------------
 // DAG executor (inlined — Temporal workflow sandbox prohibits lib imports)
@@ -179,6 +283,19 @@ const {
   retry: { maximumAttempts: 2 },
 });
 
+const {
+  persistResearchResult,
+  persistRefinementResult,
+  updateResearchStatus: updateResearchStatusActivity,
+  publishResearchStatusActivity,
+  publishResearchProgressActivity,
+  publishResearchDoneActivity,
+  publishResearchErrorActivity,
+} = proxyActivities<typeof researchPersistenceActivities>({
+  startToCloseTimeout: "30 seconds",
+  retry: { maximumAttempts: 3 },
+});
+
 // ---------------------------------------------------------------------------
 // Signals & Queries
 // ---------------------------------------------------------------------------
@@ -257,6 +374,14 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
   }
 
   const ch = input.streamChannelId;
+  const isResearch = !!input.researchConfig;
+
+  // Publish initial research status
+  if (isResearch && ch) {
+    await updateResearchStatusActivity(input.researchConfig!.reportId, "searching", { query: input.researchConfig!.query });
+    await publishResearchStatusActivity(ch, "searching");
+    await publishResearchProgressActivity(ch, "query", `Researching: "${input.researchConfig!.query}"`);
+  }
 
   // ------------------------------------------------------------------
   // Tier assessment
@@ -448,13 +573,53 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
     const rawSystemPrompt = messageHistory.find((m) => m.role === "system")?.content;
     const nonSystemHistory = messageHistory.filter((m) => m.role !== "system");
 
-    // Apply effort-aware prompt instructions and token caps
-    const effortLevel: EffortLevel = input.effort?.level ?? "medium";
-    const systemPrompt = applyEffortToPrompt(rawSystemPrompt, effortLevel);
-    const effortCap = EFFORT_TOKEN_CAPS[effortLevel];
-    const effectiveMaxTokens = input.modelParams?.maxTokens
-      ? Math.min(input.modelParams.maxTokens, effortCap)
-      : effortCap;
+    // Research mode: use research-specific prompt and settings
+    const rc = input.researchConfig;
+    let systemPrompt: string | undefined;
+    let effectiveMaxTokens: number;
+    let effectiveMaxTurns: number;
+
+    if (rc) {
+      // Build research-specific system prompt
+      if (rc.refinement) {
+        systemPrompt = `${RESEARCH_REFINEMENT_PROMPT_PREFIX}${rc.refinement.previousContent.slice(0, 10_000)}\n\n## Refinement Request\n${rc.refinement.prompt}`;
+      } else {
+        systemPrompt = RESEARCH_SYSTEM_PROMPT;
+      }
+
+      // Build source context for the initial message
+      const sourceContext: string[] = [];
+      if (rc.sources.knowledgeCollectionIds.length > 0) {
+        sourceContext.push(`- ${rc.sources.knowledgeCollectionIds.length} knowledge collection(s) selected. **Start by querying them** with query_knowledge before searching the web.`);
+        sourceContext.push(`- After retrieving knowledge data, use code_execute to analyze patterns, extract statistics, or build comparison tables.`);
+      }
+      if (rc.sources.fileIds.length > 0) {
+        sourceContext.push(`- ${rc.sources.fileIds.length} file(s) attached. Use fetch_files to read them. For tabular files, use code_execute with input_file_ids.`);
+      }
+      if (rc.sources.webSearch) {
+        sourceContext.push("- Web search is ENABLED. Use web_search and fetch_url to find sources.");
+      } else {
+        sourceContext.push("- Web search is DISABLED. Do NOT use web_search or fetch_url.");
+      }
+
+      // Inject source context into the user message
+      const researchUserMessage = `Research this topic thoroughly and produce a comprehensive, data-driven report:\n\n${rc.query}\n\n## Available Sources\n${sourceContext.join("\n")}\n\nBegin by planning your research approach, then iterate through gather → analyze → deepen cycles before writing the report section by section.`;
+      nonSystemHistory.push({ role: "user", content: researchUserMessage });
+
+      effectiveMaxTokens = 16384;
+      effectiveMaxTurns = input.maxSteps ?? 25;
+    } else {
+      // Normal conversation mode
+      const effortLevel: EffortLevel = input.effort?.level ?? "medium";
+      systemPrompt = applyEffortToPrompt(rawSystemPrompt, effortLevel);
+      const effortCap = EFFORT_TOKEN_CAPS[effortLevel];
+      effectiveMaxTokens = input.modelParams?.maxTokens
+        ? Math.min(input.modelParams.maxTokens, effortCap)
+        : effortCap;
+      effectiveMaxTurns = input.maxSteps ?? 5;
+    }
+
+    let loopResult: { content: string; researchResult?: { sources: any[]; sections: any[] } } | undefined;
 
     const loop = async () => {
       if (isCancelled()) return;
@@ -464,12 +629,13 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         model: input.model,
         systemPrompt,
         messageHistory: nonSystemHistory,
-        temperature: input.modelParams?.temperature,
+        temperature: rc ? 0.5 : input.modelParams?.temperature,
         maxTokens: effectiveMaxTokens,
-        maxTurns: input.maxSteps ?? 5,
+        maxTurns: effectiveMaxTurns,
         agentId: input.agentId,
         orgId: input.orgId,
         allowedBuiltinTools,
+        researchConfig: rc,
       });
 
       totalTokens += agentResult.totalTokens;
@@ -477,19 +643,54 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
       totalOutputTokens += agentResult.outputTokens;
       currentStep = agentResult.steps;
       toolCallRecords.push(...agentResult.toolCallRecords);
+      loopResult = { content: agentResult.content, researchResult: agentResult.researchResult };
     };
 
-    const timeoutMs = (input.timeoutSeconds ?? 120) * 1000;
+    const timeoutMs = (input.timeoutSeconds ?? (rc ? 1800 : 120)) * 1000;
 
     try {
       await CancellationScope.withTimeout(timeoutMs, loop);
     } catch (err: any) {
       if (err.name === "CancelledFailure" || err.message?.includes("timed out")) {
         const isTimeout = err.message?.includes("timed out") && !isCancelled();
+        // Handle research failure
+        if (rc && ch) {
+          await updateResearchStatusActivity(rc.reportId, "failed", { error: isTimeout ? "Research timed out" : "Research cancelled" });
+          await publishResearchErrorActivity(ch, isTimeout ? "Research timed out" : "Research cancelled");
+        }
         await publishDone(input.streamChannelId!, { content: "", usage: { prompt_tokens: totalInputTokens, completion_tokens: totalOutputTokens } });
         return isTimeout ? "timeout" : "cancelled";
       }
+      // Handle research error
+      if (rc && ch) {
+        await updateResearchStatusActivity(rc.reportId, "failed", { error: err.message ?? String(err) });
+        await publishResearchErrorActivity(ch, err.message ?? String(err));
+      }
       throw err;
+    }
+
+    // Persist research results
+    if (rc && loopResult) {
+      try {
+        const sources = loopResult.researchResult?.sources ?? [];
+        const sections = loopResult.researchResult?.sections ?? [];
+
+        if (rc.refinement) {
+          await persistRefinementResult(rc.reportId, rc.refinement.versionId, loopResult.content, sources, sections);
+        } else {
+          await persistResearchResult(rc.reportId, rc.query, loopResult.content, sources, sections);
+        }
+
+        if (ch) {
+          await publishResearchDoneActivity(ch, { reportId: rc.reportId, sourcesCount: sources.length });
+        }
+      } catch (persistErr: any) {
+        console.warn(`[agentWorkflow] research persistence failed: ${persistErr.message}`);
+        if (ch) {
+          await updateResearchStatusActivity(rc.reportId, "failed", { error: persistErr.message });
+          await publishResearchErrorActivity(ch, persistErr.message);
+        }
+      }
     }
 
     return "completed";
@@ -676,9 +877,24 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
     } catch (err: any) {
       if (err.name === "CancelledFailure" || err.message?.includes("timed out")) {
         status = cancelled ? "cancelled" : "timeout";
+        // Handle research failure in planned execution
+        if (input.researchConfig && ch) {
+          const errMsg = cancelled ? "Research cancelled" : "Research timed out";
+          await updateResearchStatusActivity(input.researchConfig.reportId, "failed", { error: errMsg });
+          await publishResearchErrorActivity(ch, errMsg);
+        }
       } else {
+        if (input.researchConfig && ch) {
+          await updateResearchStatusActivity(input.researchConfig.reportId, "failed", { error: err.message ?? String(err) });
+          await publishResearchErrorActivity(ch, err.message ?? String(err));
+        }
         throw err;
       }
+    }
+
+    // Publish research status transition to "generating" for synthesis phase
+    if (input.researchConfig && ch) {
+      await publishResearchStatusActivity(ch, "generating");
     }
 
     // Final synthesis: produce a clean user-facing response from all node results.
@@ -743,6 +959,39 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
             synthesis.usage.prompt_tokens, synthesis.usage.completion_tokens,
           );
           messageIds.push(msg.id);
+        }
+      }
+    }
+
+    // Persist research results (planned tier)
+    const rc = input.researchConfig;
+    if (rc && finalContent) {
+      try {
+        // Aggregate research results from all completed nodes
+        const allSources: { title: string; url: string; summary: string; relevance: number }[] = [];
+        for (const node of plan.nodes) {
+          if (node.status === "completed" && node.result) {
+            for (const tcr of node.result.toolCallRecords) {
+              if (tcr.toolName === "save_source" && tcr.output && typeof tcr.output === "object" && (tcr.output as any).saved) {
+                allSources.push(tcr.input as any);
+              }
+            }
+          }
+        }
+
+        if (rc.refinement) {
+          await persistRefinementResult(rc.reportId, rc.refinement.versionId, finalContent, allSources, []);
+        } else {
+          await persistResearchResult(rc.reportId, rc.query, finalContent, allSources, []);
+        }
+
+        if (ch) {
+          await publishResearchDoneActivity(ch, { reportId: rc.reportId, sourcesCount: allSources.length });
+        }
+      } catch (persistErr: any) {
+        if (ch) {
+          await updateResearchStatusActivity(rc.reportId, "failed", { error: persistErr.message });
+          await publishResearchErrorActivity(ch, persistErr.message);
         }
       }
     }
@@ -818,12 +1067,13 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         model: node.assignedModel ?? input.model,
         systemPrompt,
         messageHistory: nodeMessages,
-        temperature: input.modelParams?.temperature,
-        maxTokens: Math.min(input.modelParams?.maxTokens ?? 2048, 2048),
-        maxTurns: 5,
+        temperature: input.researchConfig ? 0.5 : input.modelParams?.temperature,
+        maxTokens: input.researchConfig ? 16384 : Math.min(input.modelParams?.maxTokens ?? 2048, 2048),
+        maxTurns: input.researchConfig ? 15 : 5,
         agentId: input.agentId,
         orgId: input.orgId,
         allowedBuiltinTools,
+        researchConfig: input.researchConfig,
       });
 
       currentStep++;

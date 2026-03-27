@@ -59,6 +59,10 @@
       "types": "./dist/tools/index.d.ts",
       "default": "./src/tools/index.ts"
     },
+    "./research-queries": {
+      "types": "./dist/research-queries.d.ts",
+      "default": "./src/research-queries.ts"
+    },
     "./reasoning-model": {
       "types": "./dist/reasoning-model.d.ts",
       "default": "./src/reasoning-model.ts"

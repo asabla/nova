@@ -11,9 +11,11 @@ import {
   publishDone,
   publishError,
 } from "@nova/worker-shared/stream";
-import { getBuiltinTools, loadCustomTools } from "@nova/worker-shared/tools";
+import { getBuiltinTools, loadCustomTools, createResearchTools } from "@nova/worker-shared/tools";
+import type { ResearchSource, ReportSection } from "@nova/worker-shared/tools";
 import { getModelParams } from "@nova/worker-shared/models";
 import { createReasoningModel } from "@nova/worker-shared/reasoning-model";
+import type { ResearchConfig } from "@nova/shared/types";
 
 
 export interface AgentRunInput {
@@ -30,6 +32,8 @@ export interface AgentRunInput {
   orgId?: string;
   /** When set, only these builtin tools are available. Null/undefined = all tools. */
   allowedBuiltinTools?: string[] | null;
+  /** When set, research-specific tools are injected and research results are tracked. */
+  researchConfig?: ResearchConfig;
 }
 
 export interface AgentRunResult {
@@ -45,6 +49,11 @@ export interface AgentRunResult {
     error?: string;
     durationMs: number;
   }[];
+  /** Present when researchConfig was provided — accumulated sources and sections. */
+  researchResult?: {
+    sources: ResearchSource[];
+    sections: ReportSection[];
+  };
 }
 
 /**
@@ -60,6 +69,25 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
   if (input.agentId) {
     const custom = await loadCustomTools(input.agentId);
     tools.push(...custom);
+  }
+
+  // Inject research-specific tools when running in research mode
+  let getResearchSources: (() => ResearchSource[]) | undefined;
+  let getResearchSections: (() => ReportSection[]) | undefined;
+  if (input.researchConfig) {
+    const rc = input.researchConfig;
+    const { tools: researchTools, getSources, getSections } = createResearchTools({
+      orgId: input.orgId ?? "",
+      streamChannelId: input.streamChannelId,
+      collectionIds: rc.sources.knowledgeCollectionIds,
+      fileIds: rc.sources.fileIds,
+    });
+    tools.push(...researchTools);
+    getResearchSources = getSources;
+    getResearchSections = getSections;
+    // Remove invoke_agent from research (not useful)
+    const invokeIdx = tools.findIndex((t) => (t as any).name === "invoke_agent");
+    if (invokeIdx >= 0) tools.splice(invokeIdx, 1);
   }
 
   // Check model-specific params (e.g. reasoning models that don't support temperature/max_tokens)
@@ -337,6 +365,12 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
     outputTokens,
     steps,
     toolCallRecords,
+    ...(getResearchSources && getResearchSections ? {
+      researchResult: {
+        sources: getResearchSources(),
+        sections: getResearchSections(),
+      },
+    } : {}),
   };
 }
 
