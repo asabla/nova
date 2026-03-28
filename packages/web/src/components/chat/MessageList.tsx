@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowDown } from "lucide-react";
 import { MessageBubble } from "./MessageBubble";
@@ -23,9 +23,20 @@ interface MessageListProps {
   onFork?: (messageId: string) => void;
 }
 
+const YT_ID_REGEX = /(?:youtube\.com\/watch\?[^\s)]*v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+
 export function MessageList({ messages, artifactsByMessageId, streamingContent, isStreaming, activeTools, agentFlow, userName, conversationId, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork }: MessageListProps) {
   const { t } = useTranslation();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Extract YouTube video ID from any message in the conversation for timestamp auto-linking
+  const youtubeVideoId = useMemo(() => {
+    for (const msg of messages) {
+      const match = msg.content?.match(YT_ID_REGEX);
+      if (match) return match[1];
+    }
+    return undefined;
+  }, [messages]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
   const [showNewMessages, setShowNewMessages] = useState(false);
@@ -123,6 +134,7 @@ export function MessageList({ messages, artifactsByMessageId, streamingContent, 
             message={msg}
             artifacts={artifactsByMessageId?.get(msg.id)}
             userName={userName}
+            youtubeVideoId={youtubeVideoId}
             onRate={onRate}
             onEdit={onEdit}
             onEditAndRerun={onEditAndRerun}
@@ -133,7 +145,7 @@ export function MessageList({ messages, artifactsByMessageId, streamingContent, 
         ))}
 
         {isStreaming && streamingContent !== undefined && (
-          <StreamingMessage content={streamingContent} activeTools={activeTools} agentFlow={agentFlow} conversationId={conversationId} />
+          <StreamingMessage content={streamingContent} activeTools={activeTools} agentFlow={agentFlow} conversationId={conversationId} youtubeVideoId={youtubeVideoId} />
         )}
 
         {conversationId && (

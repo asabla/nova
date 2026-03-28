@@ -14,9 +14,10 @@ interface StreamingMessageProps {
   activeTools?: ActiveTool[];
   agentFlow?: AgentFlowState;
   conversationId?: string;
+  youtubeVideoId?: string;
 }
 
-export function StreamingMessage({ content, activeTools, agentFlow, conversationId }: StreamingMessageProps) {
+export function StreamingMessage({ content, activeTools, agentFlow, conversationId, youtubeVideoId }: StreamingMessageProps) {
   const timestamp = useMemo(
     () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }),
     [],
@@ -66,7 +67,7 @@ export function StreamingMessage({ content, activeTools, agentFlow, conversation
         <div className="text-sm text-text leading-relaxed">
           {visibleContent ? (
             <>
-              <MarkdownRenderer content={visibleContent} />
+              <MarkdownRenderer content={visibleContent} youtubeVideoId={youtubeVideoId} />
               <span className="inline-block w-1.5 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom" aria-hidden="true" />
             </>
           ) : (

@@ -60,9 +60,11 @@ interface MessageBubbleProps {
   onRerun?: (messageId: string, modelId?: string) => void;
   onNote?: (messageId: string, content: string) => void;
   onFork?: (messageId: string) => void;
+  /** YouTube video ID from conversation context for timestamp auto-linking */
+  youtubeVideoId?: string;
 }
 
-export const MessageBubble = memo(function MessageBubble({ message, artifacts, userName, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message, artifacts, userName, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork, youtubeVideoId }: MessageBubbleProps) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -311,7 +313,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
               {displayContent ? (
                 isAssistant ? (
                   <div className="text-sm text-text leading-relaxed">
-                    <MarkdownRenderer content={displayContent} />
+                    <MarkdownRenderer content={displayContent} youtubeVideoId={youtubeVideoId} />
                   </div>
                 ) : (
                   <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">{displayContent}</p>

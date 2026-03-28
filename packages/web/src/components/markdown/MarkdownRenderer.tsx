@@ -12,6 +12,8 @@ import { PenTool, Play } from "lucide-react";
 
 interface MarkdownRendererProps {
   content: string;
+  /** YouTube video ID from conversation context — enables timestamp auto-linking even when the URL isn't in this message */
+  youtubeVideoId?: string;
 }
 
 function MermaidDiagram({ code }: { code: string }) {
@@ -417,14 +419,13 @@ const MD_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>["components"] = 
  * `a` component renders as clickable timestamp chips. Operates independently of LLM
  * prompting — works regardless of how the agent formats its response.
  */
-function linkifyYouTubeTimestamps(text: string): string {
-  // Extract YouTube video ID from the content
+function linkifyYouTubeTimestamps(text: string, fallbackVideoId?: string): string {
+  // Extract YouTube video ID from the content, or use fallback from conversation context
   const ytUrlMatch = text.match(
     /(?:youtube\.com\/watch\?[^\s)]*v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
   );
-  if (!ytUrlMatch) return text;
-
-  const videoId = ytUrlMatch[1];
+  const videoId = ytUrlMatch?.[1] ?? fallbackVideoId;
+  if (!videoId) return text;
 
   const tsToSeconds = (ts: string): number => {
     const parts = ts.split(":").map(Number);
@@ -438,7 +439,7 @@ function linkifyYouTubeTimestamps(text: string): string {
   };
 
   // Timestamp pattern: M:SS, MM:SS, or H:MM:SS
-  const TS = `\\d{1,2}:\\d{2}(?::\\d{2})?`;
+  const TS = `(\\d{1,2}:\\d{2}(?::\\d{2})?)`;
 
   const lines = text.split("\n");
   let inCodeFence = false;
@@ -451,27 +452,30 @@ function linkifyYouTubeTimestamps(text: string): string {
     if (inCodeFence) return line;
 
     // Skip lines that already have markdown links with timestamps
-    // (the agent preserved the original links)
     if (/\[\d{1,2}:\d{2}(?::\d{2})?\]\(https?:\/\//.test(line)) return line;
 
-    // Replace **MM:SS** (bold timestamps — most common agent pattern)
+    // Replace bold timestamp ranges: **1:00 to 2:00** or **1:00 and 2:00**
     line = line.replace(
-      new RegExp(`\\*\\*(${TS})\\*\\*`, "g"),
+      new RegExp(`\\*\\*${TS}\\s+(?:to|and|–|-)\\s+${TS}\\*\\*`, "g"),
+      (_, ts1, ts2) => `${makeLink(ts1)} to ${makeLink(ts2)}`,
+    );
+
+    // Replace bold single timestamps: **MM:SS**
+    line = line.replace(
+      new RegExp(`\\*\\*${TS}\\*\\*`, "g"),
       (_, ts) => makeLink(ts),
     );
 
-    // Replace remaining bare timestamps at word boundaries, but not inside
-    // existing markdown links [...](...) or URLs
+    // Replace remaining bare timestamps at word boundaries
     line = line.replace(
-      new RegExp(`(?<![\\[\\d/.:])\\b(${TS})\\b(?![\\]\\d/.:}])(?!\\])`, "g"),
+      new RegExp(`(?<![\\[\\d/.:=])\\b${TS}\\b(?![\\]\\d/.:}])(?!\\])`, "g"),
       (match, ts, offset) => {
-        // Don't replace if inside a markdown link [...](...)
         const before = line.slice(0, offset);
+        // Don't replace inside markdown links [...]
         const openBracket = before.lastIndexOf("[");
         const closeBracket = before.lastIndexOf("]");
-        if (openBracket > closeBracket) return match; // inside [...]
-
-        // Don't replace if inside a URL
+        if (openBracket > closeBracket) return match;
+        // Don't replace inside URLs
         if (/https?:\/\/\S*$/.test(before)) return match;
 
         return makeLink(ts);
@@ -544,12 +548,12 @@ function wrapLargeCsvBlocks(text: string): string {
 
 const MAX_MARKDOWN_CHARS = 30_000; // Beyond this, markdown parsing becomes sluggish
 
-export function MarkdownRenderer({ content }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, youtubeVideoId }: MarkdownRendererProps) {
   const normalized = useMemo(
     () => {
       let text = content.replace(/<br\s*\/?>/gi, "\n");
       // Auto-linkify bare YouTube timestamps into clickable markdown links
-      text = linkifyYouTubeTimestamps(text);
+      text = linkifyYouTubeTimestamps(text, youtubeVideoId);
       // Auto-detect and wrap large inline CSV blocks for paginated rendering
       text = wrapLargeCsvBlocks(text);
       // If content is still extremely large after CSV wrapping, truncate the non-fenced parts
