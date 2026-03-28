@@ -70,6 +70,10 @@
     "./microsoft-graph": {
       "types": "./dist/microsoft-graph.d.ts",
       "default": "./src/microsoft-graph.ts"
+    },
+    "./prompt-resolver": {
+      "types": "./dist/prompt-resolver.d.ts",
+      "default": "./src/prompt-resolver.ts"
     }
   },
   "scripts": {

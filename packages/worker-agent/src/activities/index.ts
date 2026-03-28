@@ -10,3 +10,4 @@ export { streamingLLMStep, publishToolStatus, publishDone, updateWorkflowStatus 
 export { persistResearchResult, persistRefinementResult, updateResearchStatus, publishResearchStatusActivity, publishResearchProgressActivity, publishResearchDoneActivity, publishResearchErrorActivity } from "./research-persistence.activities";
 export { proxyWorkerActivity } from "./proxy-worker.activities";
 export { resolveWorkerForAgent } from "./resolve-worker.activities";
+export { resolveWorkflowPrompts, resolvePromptBySlug } from "./prompt-resolution.activities";

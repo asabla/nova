@@ -6,6 +6,7 @@ import {
   condition,
   CancellationScope,
   executeChild,
+  startChild,
   upsertSearchAttributes,
 } from "@temporalio/workflow";
 import type * as agentActivities from "../activities/agent-execution.activities";
@@ -18,6 +19,7 @@ import type * as streamActivities from "../activities/stream.activities";
 import type * as researchPersistenceActivities from "../activities/research-persistence.activities";
 import type * as proxyWorkerActivities from "../activities/proxy-worker.activities";
 import type * as resolveWorkerActivities from "../activities/resolve-worker.activities";
+import type * as promptResolutionActivities from "../activities/prompt-resolution.activities";
 import type {
   AgentWorkflowInput,
   AgentWorkflowResult,
@@ -327,6 +329,11 @@ const { resolveWorkerForAgent } = proxyActivities<typeof resolveWorkerActivities
   retry: { maximumAttempts: 2 },
 });
 
+const { resolveWorkflowPrompts } = proxyActivities<typeof promptResolutionActivities>({
+  startToCloseTimeout: "10 seconds",
+  retry: { maximumAttempts: 2 },
+});
+
 // ---------------------------------------------------------------------------
 // Signals & Queries
 // ---------------------------------------------------------------------------
@@ -407,6 +414,14 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
   const ch = input.streamChannelId;
   const isResearch = !!input.researchConfig;
 
+  // Resolve DB-backed system prompts (falls back to hardcoded defaults)
+  let resolvedPrompts: Awaited<ReturnType<typeof resolveWorkflowPrompts>> | null = null;
+  try {
+    resolvedPrompts = await resolveWorkflowPrompts(input.orgId);
+  } catch {
+    // Fallback to inlined prompts on resolution failure
+  }
+
   // Publish initial research status
   if (isResearch && ch) {
     await updateResearchStatusActivity(input.researchConfig!.reportId, "searching", { query: input.researchConfig!.query });
@@ -447,6 +462,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         userMessage: input.userMessage ?? history.find((m) => m.role === "user")?.content ?? "",
         model: input.model,
         context: contextSummary,
+        orgId: input.orgId,
       });
       tier = assessment.tier;
 
@@ -538,6 +554,28 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
     await updateWorkflowStatus(input.workflowId, dbStatus, {
       output: { tier, steps: currentStep, totalTokens, inputTokens: totalInputTokens, outputTokens: totalOutputTokens, messageIds, terminalReason: finalStatus, model: input.model, plan },
     });
+  }
+
+  // Dispatch async eval on the background worker (fire-and-forget)
+  if (finalStatus === "completed" && messageIds.length > 0) {
+    const evalType = isResearch ? "research" : (tier === "direct" ? "chat" : "planning");
+    const lastMessageId = messageIds[messageIds.length - 1];
+    try {
+      await startChild("evalWorkflow", {
+        taskQueue: "nova-background",
+        workflowId: `eval-${lastMessageId}-${Date.now()}`,
+        args: [{
+          orgId: input.orgId,
+          messageId: lastMessageId,
+          conversationId: input.conversationId,
+          evalType,
+          executionTier: tier,
+          promptVersionId: resolvedPrompts?.effortMedium?.versionId,
+        }],
+      });
+    } catch {
+      // Non-critical: don't fail the workflow if eval dispatch fails
+    }
   }
 
   return {
@@ -650,11 +688,12 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
     let effectiveMaxTurns: number;
 
     if (rc) {
-      // Build research-specific system prompt
+      // Build research-specific system prompt (prefer DB-backed, fallback to inlined)
       if (rc.refinement) {
-        systemPrompt = `${RESEARCH_REFINEMENT_PROMPT_PREFIX}${rc.refinement.previousContent.slice(0, 10_000)}\n\n## Refinement Request\n${rc.refinement.prompt}`;
+        const refinementPrompt = resolvedPrompts?.researchRefinement?.content || RESEARCH_REFINEMENT_PROMPT_PREFIX;
+        systemPrompt = `${refinementPrompt}${rc.refinement.previousContent.slice(0, 10_000)}\n\n## Refinement Request\n${rc.refinement.prompt}`;
       } else {
-        systemPrompt = RESEARCH_SYSTEM_PROMPT;
+        systemPrompt = resolvedPrompts?.research?.content || RESEARCH_SYSTEM_PROMPT;
       }
 
       // Build source context for the initial message
@@ -679,9 +718,21 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
       effectiveMaxTokens = 16384;
       effectiveMaxTurns = input.maxSteps ?? 25;
     } else {
-      // Normal conversation mode
+      // Normal conversation mode — use DB-backed effort/formatting prompts if available
       const effortLevel: EffortLevel = input.effort?.level ?? "medium";
-      systemPrompt = applyEffortToPrompt(rawSystemPrompt, effortLevel);
+      if (resolvedPrompts) {
+        const effortMap = {
+          low: resolvedPrompts.effortLow.content,
+          medium: resolvedPrompts.effortMedium.content,
+          high: resolvedPrompts.effortHigh.content,
+        };
+        const effortContent = effortMap[effortLevel] || EFFORT_INSTRUCTIONS[effortLevel];
+        const formattingContent = resolvedPrompts.formatting.content || FORMATTING_INSTRUCTIONS;
+        const combined = `## Output Length\n${effortContent}\n\n## Formatting\n${formattingContent}`;
+        systemPrompt = rawSystemPrompt ? `${rawSystemPrompt}\n\n${combined}` : combined;
+      } else {
+        systemPrompt = applyEffortToPrompt(rawSystemPrompt, effortLevel);
+      }
       const effortCap = EFFORT_TOKEN_CAPS[effortLevel];
       effectiveMaxTokens = input.modelParams?.maxTokens
         ? Math.min(input.modelParams.maxTokens, effortCap)
@@ -849,6 +900,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
       model: input.model,
       tier,
       conversationContext,
+      orgId: input.orgId,
     });
 
     if (ch) {

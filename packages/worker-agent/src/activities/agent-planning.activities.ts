@@ -1,5 +1,6 @@
 import { openai } from "@nova/worker-shared/litellm";
 import { buildChatParams } from "@nova/worker-shared/models";
+import { resolveSystemPrompt } from "@nova/worker-shared/prompt-resolver";
 import type {
   ExecutionTier,
   EffortLevel,
@@ -14,29 +15,7 @@ import type {
 // for deployments that want a dedicated cheaper/faster model.
 const PLANNING_MODEL_OVERRIDE = process.env.NOVA_PLANNING_MODEL;
 
-// ---------------------------------------------------------------------------
-// Tier Assessment
-// ---------------------------------------------------------------------------
-
-export interface AssessTierInput {
-  userMessage: string;
-  model: string;
-  /** Optional context (e.g. conversation history summary) for better classification. */
-  context?: string;
-}
-
-/**
- * Classify a user message into an execution tier.
- * Single lightweight LLM call with temperature 0 for deterministic output.
- */
-export async function assessTier(input: AssessTierInput): Promise<TierAssessment> {
-  const model = PLANNING_MODEL_OVERRIDE ?? input.model;
-  const params = await buildChatParams(model, {
-    model,
-    messages: [
-      {
-        role: "system",
-        content: `You are a task complexity router. Classify the user's request into one of three execution tiers and suggest an appropriate effort level.
+const TIER_ASSESSMENT_FALLBACK = `You are a task complexity router. Classify the user's request into one of three execution tiers and suggest an appropriate effort level.
 
 Tiers:
 - "direct": Single-turn response. Greetings, factual Q&A, casual conversation, simple follow-ups to a prior answer, requests to reformat/summarize/visualize data that is already in the conversation. No tools needed — the LLM can answer from its context.
@@ -51,7 +30,71 @@ Effort levels:
 - "high": Deep analysis, extended reasoning, thorough exploration.
 
 Respond with ONLY valid JSON:
-{"tier": "direct"|"sequential"|"orchestrated", "confidence": 0.0-1.0, "reasoning": "one sentence why", "suggestedEffort": "low"|"medium"|"high"}`,
+{"tier": "direct"|"sequential"|"orchestrated", "confidence": 0.0-1.0, "reasoning": "one sentence why", "suggestedEffort": "low"|"medium"|"high"}`;
+
+const DAG_PLANNING_FALLBACK = `You are a task planner. Given a user request and available tools, create an execution plan as a directed acyclic graph (DAG).
+
+Respond with ONLY valid JSON:
+{
+  "reasoning": "Brief explanation of your approach",
+  "nodes": [
+    {
+      "id": "step-1",
+      "description": "What to do in this step",
+      "tools": ["tool_name"],
+      "dependencies": []
+    },
+    {
+      "id": "step-2",
+      "description": "Next step",
+      "tools": ["tool_name"],
+      "dependencies": ["step-1"]
+    }
+  ]
+}
+
+Rules:
+- Use IDs like "step-1", "step-2", etc.
+- "dependencies" is an array of step IDs that must complete before this step can start.
+- The first step(s) always have "dependencies": [].
+- Keep plans concise: 2-8 nodes maximum.
+- Only reference tools from the available list.
+- Every node must be reachable from a root node (no cycles).
+- If prior conversation context is provided, do NOT plan steps for work already completed. Only plan NEW work needed.`;
+
+// ---------------------------------------------------------------------------
+// Tier Assessment
+// ---------------------------------------------------------------------------
+
+export interface AssessTierInput {
+  userMessage: string;
+  model: string;
+  /** Optional context (e.g. conversation history summary) for better classification. */
+  context?: string;
+  /** Org ID — used to resolve org-specific system prompts from DB. */
+  orgId?: string;
+}
+
+/**
+ * Classify a user message into an execution tier.
+ * Single lightweight LLM call with temperature 0 for deterministic output.
+ */
+export async function assessTier(input: AssessTierInput): Promise<TierAssessment & { promptVersionId?: string }> {
+  const model = PLANNING_MODEL_OVERRIDE ?? input.model;
+
+  // Resolve tier assessment prompt from DB (falls back to hardcoded default)
+  const resolved = input.orgId
+    ? await resolveSystemPrompt(input.orgId, "tier_assessment")
+    : null;
+  const tierPromptContent = resolved?.content || TIER_ASSESSMENT_FALLBACK;
+  const promptVersionId = resolved?.versionId;
+
+  const params = await buildChatParams(model, {
+    model,
+    messages: [
+      {
+        role: "system",
+        content: tierPromptContent,
       },
       ...(input.context
         ? [{ role: "system" as const, content: `Conversation context: ${input.context}` }]
@@ -70,9 +113,10 @@ Respond with ONLY valid JSON:
       confidence: Math.max(0, Math.min(1, parsed.confidence ?? 0.5)),
       reasoning: parsed.reasoning ?? "",
       suggestedEffort: validateEffort(parsed.suggestedEffort),
+      promptVersionId,
     };
   } catch {
-    return { tier: "direct", confidence: 0.5, reasoning: "Parse failure, defaulting to direct", suggestedEffort: "low" };
+    return { tier: "direct", confidence: 0.5, reasoning: "Parse failure, defaulting to direct", suggestedEffort: "low", promptVersionId };
   }
 }
 
@@ -98,6 +142,8 @@ export interface GenerateDAGPlanInput {
   tier: ExecutionTier;
   /** Summary of prior conversation turns so the planner knows what was already done. */
   conversationContext?: string;
+  /** Org ID — used to resolve org-specific DAG planning prompt from DB. */
+  orgId?: string;
 }
 
 /**
@@ -118,46 +164,25 @@ export async function generateDAGPlan(input: GenerateDAGPlanInput): Promise<Plan
 - Aim for maximum parallelism while respecting true data dependencies.`
       : `\n- This is a sequential plan. Each step should depend on the previous one (e.g. step-2 depends on step-1).`;
 
+  // Resolve DAG planning prompt from DB (falls back to hardcoded default)
+  const resolvedDag = input.orgId
+    ? await resolveSystemPrompt(input.orgId, "dag_planning")
+    : null;
+  const dagBasePrompt = resolvedDag?.content || DAG_PLANNING_FALLBACK;
+
   const planModel = PLANNING_MODEL_OVERRIDE ?? input.model;
   const planParams = await buildChatParams(planModel, {
     model: planModel,
     messages: [
       {
         role: "system",
-        content: `You are a task planner. Given a user request and available tools, create an execution plan as a directed acyclic graph (DAG).
+        content: `${dagBasePrompt}
 
 Available tools:
 ${toolList}
 
 ${input.systemPrompt ? `Agent context: ${input.systemPrompt}` : ""}
-
-Respond with ONLY valid JSON:
-{
-  "reasoning": "Brief explanation of your approach",
-  "nodes": [
-    {
-      "id": "step-1",
-      "description": "What to do in this step",
-      "tools": ["tool_name"],
-      "dependencies": []
-    },
-    {
-      "id": "step-2",
-      "description": "Next step",
-      "tools": ["tool_name"],
-      "dependencies": ["step-1"]
-    }
-  ]
-}
-
-Rules:
-- Use IDs like "step-1", "step-2", etc.
-- "dependencies" is an array of step IDs that must complete before this step can start.
-- The first step(s) always have "dependencies": [].${parallelInstructions}
-- Keep plans concise: 2-8 nodes maximum.
-- Only reference tools from the available list.
-- Every node must be reachable from a root node (no cycles).
-- If prior conversation context is provided, do NOT plan steps for work already completed. Only plan NEW work needed.`,
+${parallelInstructions}`,
       },
       ...(input.conversationContext
         ? [{
