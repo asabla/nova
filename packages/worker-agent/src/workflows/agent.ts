@@ -58,18 +58,6 @@ const FORMATTING_INSTRUCTIONS = [
   "Never use bold text on every other phrase — reserve bold for one or two genuinely key terms per section at most.",
 ].join("\n");
 
-/** Appended to every system prompt regardless of DB overrides */
-const YOUTUBE_FORMATTING = [
-  "## YouTube & Video Content",
-  "When your response references YouTube video content (from fetch_url transcripts or knowledge base results):",
-  "- ALWAYS make timestamps clickable by formatting them as markdown links: [MM:SS](https://www.youtube.com/watch?v=VIDEO_ID&t=SECONDS). The UI renders these as special video timestamp chips. Never write bare timestamps like \"at 0:00\" or \"around 1:00\".",
-  "- When summarizing a video with multiple topics or sections, include a timeline widget to give a visual chapter overview:",
-  "  ```widget",
-  '  {"type": "timeline", "title": "Video Overview", "params": {"events": [{"date": "0:00", "title": "Section Title", "description": "Brief description", "url": "https://www.youtube.com/watch?v=VIDEO_ID&t=0"}, {"date": "5:30", "title": "Next Section", "url": "https://www.youtube.com/watch?v=VIDEO_ID&t=330"}]}}',
-  "  ```",
-  "  Use the timestamp (MM:SS) in the date field, include the YouTube timestamp URL in the url field, and keep descriptions concise.",
-].join("\n");
-
 const EFFORT_TOKEN_CAPS: Record<EffortLevel, number> = {
   low: 1024,
   medium: 4096,
@@ -78,7 +66,7 @@ const EFFORT_TOKEN_CAPS: Record<EffortLevel, number> = {
 
 function applyEffortToPrompt(systemPrompt: string | undefined, level: EffortLevel): string | undefined {
   const instructions = EFFORT_INSTRUCTIONS[level];
-  const combined = `## Output Length\n${instructions}\n\n## Formatting\n${FORMATTING_INSTRUCTIONS}\n\n${YOUTUBE_FORMATTING}`;
+  const combined = `## Output Length\n${instructions}\n\n## Formatting\n${FORMATTING_INSTRUCTIONS}`;
   if (!systemPrompt) return combined;
   return `${systemPrompt}\n\n${combined}`;
 }
@@ -740,7 +728,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         };
         const effortContent = effortMap[effortLevel] || EFFORT_INSTRUCTIONS[effortLevel];
         const formattingContent = resolvedPrompts.formatting.content || FORMATTING_INSTRUCTIONS;
-        const combined = `## Output Length\n${effortContent}\n\n## Formatting\n${formattingContent}\n\n${YOUTUBE_FORMATTING}`;
+        const combined = `## Output Length\n${effortContent}\n\n## Formatting\n${formattingContent}`;
         systemPrompt = rawSystemPrompt ? `${rawSystemPrompt}\n\n${combined}` : combined;
       } else {
         systemPrompt = applyEffortToPrompt(rawSystemPrompt, effortLevel);

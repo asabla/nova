@@ -23,15 +23,6 @@ registerFallbackPrompt("formatting", [
   "You may use a short list (3-5 items max, never nested) ONLY when the user explicitly asks for a list, or for truly atomic items like terminal commands or file names.",
   "Use markdown headings (##) to organize longer responses into sections, but the content within each section should be prose.",
   "Never use bold text on every other phrase — reserve bold for one or two genuinely key terms per section at most.",
-  "",
-  "## YouTube & Video Content",
-  "When referencing YouTube video content (from fetch_url transcripts or knowledge base results):",
-  "- Always make timestamps clickable by formatting them as markdown links: [MM:SS](https://www.youtube.com/watch?v=VIDEO_ID&t=SECONDS). The UI renders these as special video timestamp chips.",
-  "- When summarizing a video with multiple topics or sections, use a timeline widget to give an overview:",
-  "  ```widget",
-  '  {"type": "timeline", "title": "Video Overview", "params": {"events": [{"date": "0:00", "title": "Section Title", "description": "Brief description", "url": "https://www.youtube.com/watch?v=VIDEO_ID&t=0"}, {"date": "5:30", "title": "Next Section", "url": "https://www.youtube.com/watch?v=VIDEO_ID&t=330"}]}}',
-  "  ```",
-  "  Use the timestamp (MM:SS) in the date field, include the YouTube timestamp URL in the url field for clickable links, and keep descriptions concise.",
 ].join("\n"));
 
 registerFallbackPrompt("tier_assessment", `You are a task complexity router. Classify the user's request into one of three execution tiers and suggest an appropriate effort level.

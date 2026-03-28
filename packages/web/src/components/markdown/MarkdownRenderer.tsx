@@ -412,6 +412,77 @@ const MD_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>["components"] = 
 };
 
 /**
+ * Auto-linkify bare YouTube timestamps (e.g. "0:00", "**1:30**", "at 5:04") when the
+ * message content contains a YouTube URL. Converts them to markdown links that the
+ * `a` component renders as clickable timestamp chips. Operates independently of LLM
+ * prompting — works regardless of how the agent formats its response.
+ */
+function linkifyYouTubeTimestamps(text: string): string {
+  // Extract YouTube video ID from the content
+  const ytUrlMatch = text.match(
+    /(?:youtube\.com\/watch\?[^\s)]*v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+  );
+  if (!ytUrlMatch) return text;
+
+  const videoId = ytUrlMatch[1];
+
+  const tsToSeconds = (ts: string): number => {
+    const parts = ts.split(":").map(Number);
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return parts[0] * 60 + parts[1];
+  };
+
+  const makeLink = (ts: string) => {
+    const secs = tsToSeconds(ts);
+    return `[${ts}](https://www.youtube.com/watch?v=${videoId}&t=${secs})`;
+  };
+
+  // Timestamp pattern: M:SS, MM:SS, or H:MM:SS
+  const TS = `\\d{1,2}:\\d{2}(?::\\d{2})?`;
+
+  const lines = text.split("\n");
+  let inCodeFence = false;
+
+  return lines.map((line) => {
+    if (line.startsWith("```")) {
+      inCodeFence = !inCodeFence;
+      return line;
+    }
+    if (inCodeFence) return line;
+
+    // Skip lines that already have markdown links with timestamps
+    // (the agent preserved the original links)
+    if (/\[\d{1,2}:\d{2}(?::\d{2})?\]\(https?:\/\//.test(line)) return line;
+
+    // Replace **MM:SS** (bold timestamps — most common agent pattern)
+    line = line.replace(
+      new RegExp(`\\*\\*(${TS})\\*\\*`, "g"),
+      (_, ts) => makeLink(ts),
+    );
+
+    // Replace remaining bare timestamps at word boundaries, but not inside
+    // existing markdown links [...](...) or URLs
+    line = line.replace(
+      new RegExp(`(?<![\\[\\d/.:])\\b(${TS})\\b(?![\\]\\d/.:}])(?!\\])`, "g"),
+      (match, ts, offset) => {
+        // Don't replace if inside a markdown link [...](...)
+        const before = line.slice(0, offset);
+        const openBracket = before.lastIndexOf("[");
+        const closeBracket = before.lastIndexOf("]");
+        if (openBracket > closeBracket) return match; // inside [...]
+
+        // Don't replace if inside a URL
+        if (/https?:\/\/\S*$/.test(before)) return match;
+
+        return makeLink(ts);
+      },
+    );
+
+    return line;
+  }).join("\n");
+}
+
+/**
  * Detect large blocks of CSV-like content (many comma-separated lines not in a code fence)
  * and wrap them in ```csv fences so the CsvTable renderer handles them with pagination.
  */
@@ -477,6 +548,8 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   const normalized = useMemo(
     () => {
       let text = content.replace(/<br\s*\/?>/gi, "\n");
+      // Auto-linkify bare YouTube timestamps into clickable markdown links
+      text = linkifyYouTubeTimestamps(text);
       // Auto-detect and wrap large inline CSV blocks for paginated rendering
       text = wrapLargeCsvBlocks(text);
       // If content is still extremely large after CSV wrapping, truncate the non-fenced parts
