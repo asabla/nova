@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nova.dev/schemas/invoke-result.json",
+  "title": "InvokeResult",
+  "description": "Result payload returned in the 'done' SSE event from a Nova worker.",
+  "type": "object",
+  "required": ["content", "usage"],
+  "properties": {
+    "conversationId": { "type": "string" },
+    "content": { "type": "string" },
+    "messageIds": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "usage": {
+      "type": "object",
+      "required": ["inputTokens", "outputTokens", "totalTokens"],
+      "properties": {
+        "inputTokens": { "type": "integer" },
+        "outputTokens": { "type": "integer" },
+        "totalTokens": { "type": "integer" }
+      }
+    },
+    "steps": { "type": "integer" },
+    "status": {
+      "type": "string",
+      "enum": ["completed", "cancelled", "timeout", "max_steps", "awaiting_input", "awaiting_approval"]
+    },
+    "toolCallRecords": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["toolName", "input", "durationMs"],
+        "properties": {
+          "toolName": { "type": "string" },
+          "input": { "type": "object" },
+          "output": {},
+          "error": { "type": "string" },
+          "durationMs": { "type": "number" }
+        }
+      }
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["direct", "sequential", "orchestrated"]
+    }
+  }
+}

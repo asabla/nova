@@ -16,6 +16,8 @@ import type * as planningActivities from "../activities/agent-planning.activitie
 import type * as contextActivities from "../activities/agent-context.activities";
 import type * as streamActivities from "../activities/stream.activities";
 import type * as researchPersistenceActivities from "../activities/research-persistence.activities";
+import type * as proxyWorkerActivities from "../activities/proxy-worker.activities";
+import type * as resolveWorkerActivities from "../activities/resolve-worker.activities";
 import type {
   AgentWorkflowInput,
   AgentWorkflowResult,
@@ -296,6 +298,17 @@ const {
   retry: { maximumAttempts: 3 },
 });
 
+const { proxyWorkerActivity } = proxyActivities<typeof proxyWorkerActivities>({
+  startToCloseTimeout: "30 minutes",
+  heartbeatTimeout: "60 seconds",
+  retry: { maximumAttempts: 2 },
+});
+
+const { resolveWorkerForAgent } = proxyActivities<typeof resolveWorkerActivities>({
+  startToCloseTimeout: "10 seconds",
+  retry: { maximumAttempts: 2 },
+});
+
 // ---------------------------------------------------------------------------
 // Signals & Queries
 // ---------------------------------------------------------------------------
@@ -532,6 +545,45 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
     _cancelled: boolean,
     isCancelled: () => boolean,
   ): Promise<AgentWorkflowResult["status"]> {
+    // ── Custom worker routing ──────────────────────────────────────
+    // If the agent has a custom worker configured, proxy the entire
+    // execution to the external HTTP worker via proxyWorkerActivity.
+    const customWorker = await resolveWorkerForAgent(
+      input.orgId,
+      input.agentId,
+      input.conversationId,
+    );
+
+    if (customWorker && input.streamChannelId) {
+      try {
+        const workerResult = await proxyWorkerActivity({
+          workerUrl: customWorker.workerUrl,
+          workerAuthSecret: customWorker.workerAuthSecret,
+          workflowInput: input,
+          streamChannelId: input.streamChannelId,
+          timeoutMs: customWorker.timeoutSeconds * 1000,
+          gatewayJwt: customWorker.gatewayJwt,
+        });
+
+        totalTokens += workerResult.totalTokens;
+        totalInputTokens += workerResult.inputTokens;
+        totalOutputTokens += workerResult.outputTokens;
+        currentStep = workerResult.steps;
+        toolCallRecords.push(...workerResult.toolCallRecords);
+        finalContent = workerResult.content;
+        messageIds.push(...workerResult.messageIds);
+        return workerResult.status;
+      } catch (err: any) {
+        // If fallback is enabled, log the error and continue with built-in execution
+        if (customWorker.fallbackToBuiltin) {
+          console.warn(`Custom worker failed, falling back to built-in: ${err.message}`);
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    // ── Built-in execution (default path) ──────────────────────────
     // Load agent config for tool filtering
     const agent = input.agentId ? await getAgentConfig(input.orgId, input.agentId) : null;
     const allowedBuiltinTools = (agent as any)?.builtinTools ?? null;

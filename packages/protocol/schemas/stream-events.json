@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nova.dev/schemas/stream-events.json",
+  "title": "WorkerSSEEvents",
+  "description": "Server-Sent Event types that a Nova worker can emit from POST /invoke. Each SSE event has 'event: <type>' and 'data: <json>' fields.",
+  "oneOf": [
+    {
+      "title": "TokenEvent",
+      "type": "object",
+      "required": ["type", "content"],
+      "properties": {
+        "type": { "const": "token" },
+        "content": { "type": "string" }
+      }
+    },
+    {
+      "title": "ToolStatusEvent",
+      "type": "object",
+      "required": ["type", "tool", "status"],
+      "properties": {
+        "type": { "const": "tool_status" },
+        "tool": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "running", "completed", "failed", "approval_required", "timeout"] },
+        "args": { "type": "object" },
+        "resultSummary": { "type": "string" }
+      }
+    },
+    {
+      "title": "ContentClearEvent",
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "content_clear" },
+        "reason": { "type": "string" }
+      }
+    },
+    {
+      "title": "DoneEvent",
+      "type": "object",
+      "required": ["type", "content", "usage"],
+      "properties": {
+        "type": { "const": "done" },
+        "content": { "type": "string" },
+        "messageIds": { "type": "array", "items": { "type": "string" } },
+        "usage": {
+          "type": "object",
+          "required": ["inputTokens", "outputTokens", "totalTokens"],
+          "properties": {
+            "inputTokens": { "type": "integer" },
+            "outputTokens": { "type": "integer" },
+            "totalTokens": { "type": "integer" }
+          }
+        },
+        "toolCallRecords": { "type": "array", "items": { "$ref": "invoke-result.json#/properties/toolCallRecords/items" } },
+        "steps": { "type": "integer" }
+      }
+    },
+    {
+      "title": "ErrorEvent",
+      "type": "object",
+      "required": ["type", "message"],
+      "properties": {
+        "type": { "const": "error" },
+        "message": { "type": "string" },
+        "retryable": { "type": "boolean" }
+      }
+    },
+    {
+      "title": "TierAssessedEvent",
+      "type": "object",
+      "required": ["type", "tier", "reasoning"],
+      "properties": {
+        "type": { "const": "tier.assessed" },
+        "tier": { "type": "string", "enum": ["direct", "sequential", "orchestrated"] },
+        "reasoning": { "type": "string" }
+      }
+    },
+    {
+      "title": "PlanNodeStatusEvent",
+      "type": "object",
+      "required": ["type", "nodeId", "status"],
+      "properties": {
+        "type": { "const": "plan.node.status" },
+        "nodeId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "ready", "running", "completed", "failed", "skipped"] },
+        "detail": { "type": "string" }
+      }
+    },
+    {
+      "title": "InteractionRequestEvent",
+      "type": "object",
+      "required": ["type", "request"],
+      "properties": {
+        "type": { "const": "interaction.request" },
+        "request": {
+          "type": "object",
+          "required": ["id", "type", "prompt", "timeoutMs"],
+          "properties": {
+            "id": { "type": "string" },
+            "type": { "type": "string", "enum": ["option_selection", "feedback_prompt", "approval_gate", "text_input"] },
+            "prompt": { "type": "string" },
+            "options": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "label"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "label": { "type": "string" },
+                  "description": { "type": "string" }
+                }
+              }
+            },
+            "nodeId": { "type": "string" },
+            "timeoutMs": { "type": "integer" }
+          }
+        }
+      }
+    },
+    {
+      "title": "ResearchStatusEvent",
+      "type": "object",
+      "required": ["type", "status"],
+      "properties": {
+        "type": { "const": "research.status" },
+        "status": { "type": "string", "enum": ["pending", "queued", "searching", "analyzing", "generating", "completed", "failed", "cancelled"] },
+        "phase": { "type": "string" }
+      }
+    },
+    {
+      "title": "ResearchDoneEvent",
+      "type": "object",
+      "required": ["type", "reportId", "sourcesCount"],
+      "properties": {
+        "type": { "const": "research.done" },
+        "reportId": { "type": "string" },
+        "sourcesCount": { "type": "integer" }
+      }
+    },
+    {
+      "title": "RetryEvent",
+      "type": "object",
+      "required": ["type", "attempt", "maxAttempts", "error"],
+      "properties": {
+        "type": { "const": "retry" },
+        "attempt": { "type": "integer" },
+        "maxAttempts": { "type": "integer" },
+        "error": { "type": "string" }
+      }
+    }
+  ]
+}

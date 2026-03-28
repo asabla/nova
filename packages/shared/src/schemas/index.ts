@@ -22,3 +22,4 @@ export * from "./invitations";
 export * from "./system";
 export * from "./agent-tasks";
 export * from "./agent-memory-vectors";
+export * from "./custom-workers";

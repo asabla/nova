@@ -1,0 +1,56 @@
+# syntax=docker/dockerfile:1
+
+# Nova Gateway — internal HTTP service wrapping infrastructure access.
+# Workers call this for DB, Redis, Qdrant, MinIO, and LLM operations.
+
+FROM node:22-slim AS builder
+
+WORKDIR /app
+
+# Install bun for dependency resolution (workspace uses bun lockfile)
+RUN npm install -g bun
+
+# Copy workspace package files
+COPY package.json bun.lock* ./
+COPY packages/shared/package.json packages/shared/
+COPY packages/protocol/package.json packages/protocol/
+COPY packages/gateway/package.json packages/gateway/
+COPY packages/sdk-ts/package.json packages/sdk-ts/
+COPY packages/worker-shared/package.json packages/worker-shared/
+COPY packages/worker-agent/package.json packages/worker-agent/
+COPY packages/worker-ingestion/package.json packages/worker-ingestion/
+COPY packages/worker-background/package.json packages/worker-background/
+COPY packages/api/package.json packages/api/
+COPY packages/web/package.json packages/web/
+
+RUN bun install --frozen-lockfile
+
+# Copy source for gateway and its deps
+COPY packages/shared/ packages/shared/
+COPY packages/protocol/ packages/protocol/
+COPY packages/worker-shared/ packages/worker-shared/
+COPY packages/gateway/ packages/gateway/
+
+# Build
+RUN rm -rf packages/shared/dist packages/protocol/dist \
+           packages/worker-shared/dist packages/gateway/dist && \
+    npx tsc -b packages/gateway/tsconfig.json
+
+# Production deps
+RUN bun install --frozen-lockfile --production
+
+# ── Runtime ──
+FROM node:22-slim
+
+WORKDIR /app
+
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages/shared ./packages/shared
+COPY --from=builder /app/packages/protocol ./packages/protocol
+COPY --from=builder /app/packages/worker-shared ./packages/worker-shared
+COPY --from=builder /app/packages/gateway ./packages/gateway
+COPY --from=builder /app/package.json ./
+
+EXPOSE 3001
+
+CMD ["npx", "tsx", "packages/gateway/src/server.ts"]

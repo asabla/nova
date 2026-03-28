@@ -8,3 +8,5 @@ export { embedAndStoreMemory, searchSemanticMemory, extractMemoryFacts } from ".
 export { executeSandboxCode } from "./sandbox.activities";
 export { streamingLLMStep, publishToolStatus, publishDone, updateWorkflowStatus } from "./smart-chat.activities";
 export { persistResearchResult, persistRefinementResult, updateResearchStatus, publishResearchStatusActivity, publishResearchProgressActivity, publishResearchDoneActivity, publishResearchErrorActivity } from "./research-persistence.activities";
+export { proxyWorkerActivity } from "./proxy-worker.activities";
+export { resolveWorkerForAgent } from "./resolve-worker.activities";

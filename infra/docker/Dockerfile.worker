@@ -12,6 +12,9 @@ WORKDIR /app
 # Copy all workspace package.json files for dependency resolution
 COPY package.json bun.lock* ./
 COPY packages/shared/package.json packages/shared/
+COPY packages/protocol/package.json packages/protocol/
+COPY packages/gateway/package.json packages/gateway/
+COPY packages/sdk-ts/package.json packages/sdk-ts/
 COPY packages/worker-shared/package.json packages/worker-shared/
 COPY packages/worker-agent/package.json packages/worker-agent/
 COPY packages/worker-ingestion/package.json packages/worker-ingestion/
@@ -40,10 +43,16 @@ RUN for f in node_modules/@openai/agents-core/dist/types/protocol.mjs \
 
 # Copy and build shared packages (same for all workers)
 COPY packages/shared/ packages/shared/
+COPY packages/protocol/ packages/protocol/
+COPY packages/gateway/ packages/gateway/
+COPY packages/sdk-ts/ packages/sdk-ts/
 COPY packages/worker-shared/ packages/worker-shared/
 
-RUN rm -rf packages/shared/dist packages/worker-shared/dist \
-           packages/shared/*.tsbuildinfo packages/worker-shared/*.tsbuildinfo && \
+RUN rm -rf packages/shared/dist packages/protocol/dist packages/gateway/dist \
+           packages/sdk-ts/dist packages/worker-shared/dist \
+           packages/shared/*.tsbuildinfo packages/protocol/*.tsbuildinfo \
+           packages/gateway/*.tsbuildinfo packages/sdk-ts/*.tsbuildinfo \
+           packages/worker-shared/*.tsbuildinfo && \
     cd packages/worker-shared && bunx tsc -b
 
 # ── Stage 2: Worker-specific build ──
@@ -74,11 +83,25 @@ RUN for f in node_modules/@openai/agents-core/dist/types/protocol.mjs \
       "; \
     done
 
-# Create zod/v4 shim — openai@6.27 imports 'zod/v4' but zod 3.x doesn't export it.
-RUN mkdir -p node_modules/zod/v4 && \
-    echo '// zod v4 shim — re-exports zod v3 for openai SDK compatibility' > node_modules/zod/v4/index.js && \
-    echo 'module.exports = require("zod");' >> node_modules/zod/v4/index.js && \
-    echo 'export * from "zod";' > node_modules/zod/v4/index.mjs
+# Create zod/v3 and zod/v4 shims — openai SDK imports 'zod/v3' and 'zod/v4'
+# but zod 3.x doesn't export either. Must patch files AND package.json exports.
+RUN for v in v3 v4; do \
+      mkdir -p node_modules/zod/$v && \
+      echo "// zod $v shim — re-exports zod v3 for openai SDK compatibility" > node_modules/zod/$v/index.js && \
+      echo 'module.exports = require("zod");' >> node_modules/zod/$v/index.js && \
+      echo 'export * from "zod";' > node_modules/zod/$v/index.mjs; \
+    done && \
+    bun -e " \
+      const pkg = JSON.parse(await Bun.file('node_modules/zod/package.json').text()); \
+      if (!pkg.exports) pkg.exports = {}; \
+      for (const v of ['./v3', './v4']) { \
+        if (!pkg.exports[v]) { \
+          const dir = v.slice(2); \
+          pkg.exports[v] = { import: './' + dir + '/index.mjs', require: './' + dir + '/index.js', default: './' + dir + '/index.js' }; \
+        } \
+      } \
+      await Bun.write('node_modules/zod/package.json', JSON.stringify(pkg, null, 2)); \
+    "
 
 # ── Stage 3: Runtime (Node.js — required by Temporal) ──
 FROM node:22-slim
@@ -92,6 +115,9 @@ WORKDIR /app
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages/shared ./packages/shared
+COPY --from=builder /app/packages/protocol ./packages/protocol
+COPY --from=builder /app/packages/gateway ./packages/gateway
+COPY --from=builder /app/packages/sdk-ts ./packages/sdk-ts
 COPY --from=builder /app/packages/worker-shared ./packages/worker-shared
 COPY --from=builder /app/packages/${WORKER_PACKAGE} ./packages/${WORKER_PACKAGE}
 COPY --from=builder /app/package.json ./

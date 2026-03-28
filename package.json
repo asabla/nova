@@ -3,6 +3,9 @@
   "private": true,
   "workspaces": [
     "packages/shared",
+    "packages/protocol",
+    "packages/gateway",
+    "packages/sdk-ts",
     "packages/worker-shared",
     "packages/worker-agent",
     "packages/worker-ingestion",

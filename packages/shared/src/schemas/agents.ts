@@ -5,6 +5,7 @@ import { organisations } from "./organisations";
 import { users } from "./users";
 import { conversations } from "./conversations";
 import { promptTemplates } from "./prompts";
+import { customWorkers } from "./custom-workers";
 
 export const agents = pgTable("agents", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -28,6 +29,7 @@ export const agents = pgTable("agents", {
   builtinTools: jsonb("builtin_tools").$type<string[]>(),
   starters: jsonb("starters").$type<string[]>(),
   clonedFromAgentId: uuid("cloned_from_agent_id"),
+  customWorkerId: uuid("custom_worker_id").references(() => customWorkers.id, { onDelete: "set null" }),
   currentVersion: integer("current_version").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

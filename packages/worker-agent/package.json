@@ -10,6 +10,7 @@
   "dependencies": {
     "@nova/shared": "workspace:*",
     "@nova/worker-shared": "workspace:*",
+    "@nova/gateway": "workspace:*",
     "@openai/agents": "^0.7.0",
     "@temporalio/activity": "^1.11.7",
     "@temporalio/client": "^1.11.7",

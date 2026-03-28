@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nova.dev/schemas/invoke-request.json",
+  "title": "InvokeRequest",
+  "description": "Request body for POST /invoke on a Nova worker. This is the contract between Nova's orchestration layer and any worker implementation.",
+  "type": "object",
+  "required": ["orgId", "userId", "conversationId", "model"],
+  "properties": {
+    "orgId": { "type": "string", "format": "uuid" },
+    "userId": { "type": "string", "format": "uuid" },
+    "conversationId": { "type": "string", "format": "uuid" },
+    "streamChannelId": { "type": "string" },
+    "agentId": { "type": "string", "format": "uuid" },
+    "workflowId": { "type": "string", "format": "uuid" },
+    "userMessage": { "type": "string" },
+    "messageHistory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["role", "content"],
+        "properties": {
+          "role": { "type": "string" },
+          "content": { "type": "string" }
+        }
+      }
+    },
+    "pendingToolCalls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "function"],
+        "properties": {
+          "id": { "type": "string" },
+          "function": {
+            "type": "object",
+            "required": ["name", "arguments"],
+            "properties": {
+              "name": { "type": "string" },
+              "arguments": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "model": { "type": "string" },
+    "modelParams": {
+      "type": "object",
+      "properties": {
+        "temperature": { "type": "number" },
+        "maxTokens": { "type": "integer" }
+      }
+    },
+    "effort": {
+      "type": "object",
+      "required": ["level"],
+      "properties": {
+        "level": { "type": "string", "enum": ["low", "medium", "high"] },
+        "thinkingBudgetTokens": { "type": "integer" },
+        "reasoningEffort": { "type": "string", "enum": ["low", "medium", "high"] }
+      }
+    },
+    "tools": { "type": "array", "items": {} },
+    "maxSteps": { "type": "integer" },
+    "timeoutSeconds": { "type": "integer" },
+    "preAssessedTier": { "type": "string", "enum": ["direct", "sequential", "orchestrated"] },
+    "researchConfig": {
+      "type": "object",
+      "required": ["reportId", "query", "maxSources", "sources"],
+      "properties": {
+        "reportId": { "type": "string" },
+        "query": { "type": "string" },
+        "maxSources": { "type": "integer" },
+        "sources": {
+          "type": "object",
+          "required": ["webSearch", "knowledgeCollectionIds", "fileIds"],
+          "properties": {
+            "webSearch": { "type": "boolean" },
+            "knowledgeCollectionIds": { "type": "array", "items": { "type": "string" } },
+            "fileIds": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "refinement": {
+          "type": "object",
+          "required": ["previousContent", "previousSources", "prompt", "versionId"],
+          "properties": {
+            "previousContent": { "type": "string" },
+            "previousSources": { "type": "array", "items": {} },
+            "prompt": { "type": "string" },
+            "versionId": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}
