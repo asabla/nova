@@ -29,8 +29,13 @@ knowledgeConnectorRoutes.get("/:collectionId/connectors", async (c) => {
   return c.json({ data: connectors });
 });
 
-const createConnectorSchema = z.object({
-  provider: z.enum(["sharepoint", "onedrive", "teams"]),
+// ── Git providers use a simpler schema (no Azure AD, just URL + token) ──
+
+const GIT_PROVIDERS = ["github", "gitlab", "bitbucket", "git"] as const;
+const M365_PROVIDERS = ["sharepoint", "onedrive", "teams"] as const;
+
+const createM365ConnectorSchema = z.object({
+  provider: z.enum(M365_PROVIDERS),
   tenantId: z.string().min(1),
   clientId: z.string().min(1),
   clientSecret: z.string().min(1),
@@ -44,16 +49,59 @@ const createConnectorSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
 });
 
+const createGitConnectorSchema = z.object({
+  provider: z.enum(GIT_PROVIDERS),
+  repoUrl: z.string().url(),
+  branch: z.string().default("main"),
+  authToken: z.string().optional(),
+  resourceName: z.string().optional(),
+  syncEnabled: z.boolean().optional(),
+  syncIntervalMinutes: z.number().int().min(60).max(1440).optional(),
+  includeGlobs: z.array(z.string()).optional(),
+  excludeGlobs: z.array(z.string()).optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+const createConnectorSchema = z.union([createM365ConnectorSchema, createGitConnectorSchema]);
+
 knowledgeConnectorRoutes.post("/:collectionId/connectors", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const collectionId = c.req.param("collectionId");
   const body = createConnectorSchema.parse(await c.req.json());
 
-  const connector = await knowledgeConnectorService.createConnector(orgId, userId, {
-    knowledgeCollectionId: collectionId,
-    ...body,
-  });
+  let connectorInput: Parameters<typeof knowledgeConnectorService.createConnector>[2];
+
+  if ("repoUrl" in body) {
+    // Git provider — map to connector fields
+    connectorInput = {
+      knowledgeCollectionId: collectionId,
+      provider: body.provider,
+      // Git connectors don't use Azure AD fields — use placeholder values
+      tenantId: "git",
+      clientId: "git",
+      clientSecret: body.authToken ?? "",
+      resourceId: body.repoUrl,
+      resourceName: body.resourceName ?? body.repoUrl.split("/").slice(-1)[0]?.replace(".git", ""),
+      syncEnabled: body.syncEnabled,
+      syncIntervalMinutes: body.syncIntervalMinutes,
+      metadata: {
+        ...body.metadata,
+        repoUrl: body.repoUrl,
+        branch: body.branch,
+        includeGlobs: body.includeGlobs ?? [],
+        excludeGlobs: body.excludeGlobs ?? [],
+      },
+    };
+  } else {
+    // M365 provider — pass through as-is
+    connectorInput = {
+      knowledgeCollectionId: collectionId,
+      ...body,
+    };
+  }
+
+  const connector = await knowledgeConnectorService.createConnector(orgId, userId, connectorInput);
 
   await writeAuditLog({
     orgId,
@@ -62,7 +110,7 @@ knowledgeConnectorRoutes.post("/:collectionId/connectors", async (c) => {
     action: "knowledge.connector.create",
     resourceType: "knowledge_connector",
     resourceId: connector.id,
-    details: { provider: body.provider, resourceId: body.resourceId },
+    details: { provider: body.provider },
   });
 
   return c.json(connector, 201);
@@ -156,6 +204,115 @@ knowledgeConnectorRoutes.post("/:collectionId/connectors/:connectorId/sync", asy
   });
 
   return c.json(result);
+});
+
+// ── Git Repository Validation ──
+
+function parseGitRepoUrl(url: string): { provider: "github" | "gitlab"; owner: string; repo: string } | null {
+  try {
+    const parsed = new URL(url);
+    const pathParts = parsed.pathname.replace(/^\//, "").replace(/\.git$/, "").split("/");
+    if (pathParts.length < 2) return null;
+    const [owner, repo] = pathParts;
+    if (parsed.hostname === "github.com") return { provider: "github", owner, repo };
+    if (parsed.hostname === "gitlab.com") return { provider: "gitlab", owner, repo };
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function validateViaApi(
+  parsed: { provider: "github" | "gitlab"; owner: string; repo: string },
+  token?: string,
+): Promise<{ valid: boolean; defaultBranch?: string; error?: string }> {
+  try {
+    if (parsed.provider === "github") {
+      const headers: Record<string, string> = {
+        Accept: "application/vnd.github.v3+json",
+        "User-Agent": "Nova/1.0",
+      };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const resp = await fetch(
+        `https://api.github.com/repos/${parsed.owner}/${parsed.repo}`,
+        { headers },
+      );
+      if (!resp.ok) {
+        if (resp.status === 404) return { valid: false, error: "Repository not found" };
+        if (resp.status === 401 || resp.status === 403) return { valid: false, error: "Authentication failed — check your access token" };
+        return { valid: false, error: `GitHub API returned ${resp.status}` };
+      }
+      const data = (await resp.json()) as { default_branch: string };
+      return { valid: true, defaultBranch: data.default_branch };
+    }
+
+    if (parsed.provider === "gitlab") {
+      const projectId = encodeURIComponent(`${parsed.owner}/${parsed.repo}`);
+      const headers: Record<string, string> = {};
+      if (token) headers["PRIVATE-TOKEN"] = token;
+      const resp = await fetch(`https://gitlab.com/api/v4/projects/${projectId}`, { headers });
+      if (!resp.ok) {
+        if (resp.status === 404) return { valid: false, error: "Repository not found" };
+        if (resp.status === 401 || resp.status === 403) return { valid: false, error: "Authentication failed — check your access token" };
+        return { valid: false, error: `GitLab API returned ${resp.status}` };
+      }
+      const data = (await resp.json()) as { default_branch: string };
+      return { valid: true, defaultBranch: data.default_branch };
+    }
+
+    return { valid: false, error: "Unsupported provider" };
+  } catch (err) {
+    return { valid: false, error: err instanceof Error ? err.message : "Validation failed" };
+  }
+}
+
+const validateGitRepoSchema = z.object({
+  repoUrl: z.string().url(),
+  authToken: z.string().optional(),
+});
+
+knowledgeConnectorRoutes.post("/connectors/git/validate", async (c) => {
+  const body = validateGitRepoSchema.parse(await c.req.json());
+
+  try {
+    // Use provider API to validate (no git binary needed on API server)
+    const parsed = parseGitRepoUrl(body.repoUrl);
+    if (parsed) {
+      const result = await validateViaApi(parsed, body.authToken);
+      if (result.valid) return c.json(result);
+      return c.json(result, 422);
+    }
+
+    // Fallback for non-GitHub/GitLab URLs: use git ls-remote
+    const { execFile } = await import("node:child_process");
+    const { promisify } = await import("node:util");
+    const exec = promisify(execFile);
+
+    let authUrl = body.repoUrl;
+    if (body.authToken) {
+      const url = new URL(body.repoUrl);
+      url.username = "x-access-token";
+      url.password = body.authToken;
+      authUrl = url.toString();
+    }
+
+    const { stdout } = await exec("git", ["ls-remote", "--symref", authUrl, "HEAD"], {
+      timeout: 30_000,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    });
+
+    const branchMatch = stdout.match(/ref: refs\/heads\/(\S+)\s+HEAD/);
+    return c.json({ valid: true, defaultBranch: branchMatch?.[1] ?? "main" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    let error = `Failed to access repository: ${message}`;
+    if (message.includes("Authentication") || message.includes("403") || message.includes("401")) {
+      error = "Authentication failed — check your access token";
+    } else if (message.includes("not found") || message.includes("404")) {
+      error = "Repository not found";
+    }
+    return c.json({ valid: false, error }, 422);
+  }
 });
 
 // ── Delegated OAuth for Interactive Browsing ──

@@ -79,7 +79,7 @@ export const knowledgeConnectorService = {
     userId: string,
     data: {
       knowledgeCollectionId: string;
-      provider: "sharepoint" | "onedrive" | "teams";
+      provider: string;
       tenantId: string;
       clientId: string;
       clientSecret: string;
@@ -105,8 +105,11 @@ export const knowledgeConnectorService = {
       );
     if (!collection) throw AppError.notFound("Collection not found");
 
-    // Test credentials by acquiring an app-only token
-    await this.testCredentials(data.tenantId, data.clientId, data.clientSecret);
+    // Test credentials — only for Microsoft 365 providers (git uses token auth validated at route level)
+    const gitProviders = ["github", "gitlab", "bitbucket", "git"];
+    if (!gitProviders.includes(data.provider)) {
+      await this.testCredentials(data.tenantId, data.clientId, data.clientSecret);
+    }
 
     const { clientSecret, fileTypeFilter, ...rest } = data;
 

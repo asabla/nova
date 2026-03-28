@@ -21,6 +21,7 @@ import {
   type GraphMessage,
 } from "@nova/worker-shared/microsoft-graph";
 import type { ConnectorSyncInput } from "../workflows/connector-sync";
+import { syncRepoFiles } from "./repo-sync.activities";
 
 // ── Status Updates ──
 
@@ -112,6 +113,11 @@ export async function syncConnectorDocuments(
       return syncOneDrive(token, connector, input);
     case "teams":
       return syncTeams(token, connector, input);
+    case "github":
+    case "gitlab":
+    case "bitbucket":
+    case "git":
+      return syncRepoFiles(input);
     default:
       throw new Error(`Unknown provider: ${connector.provider}`);
   }
