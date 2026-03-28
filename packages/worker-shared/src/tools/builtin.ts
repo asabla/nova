@@ -1,6 +1,13 @@
 import { tool } from "@openai/agents";
 import type { FunctionTool } from "@openai/agents";
 import { extractFromHtml } from "@nova/shared/content";
+import {
+  isYouTubeUrl,
+  extractYouTubeVideoId,
+  fetchYouTubeTranscript,
+  fetchYouTubeMetadata,
+  assembleTranscriptMarkdown,
+} from "../youtube";
 import { eq, and, isNull } from "drizzle-orm";
 import { db } from "../db";
 import { openai } from "../litellm";
@@ -122,7 +129,9 @@ export const webSearchTool = tool({
 
 export const fetchUrlTool = tool({
   name: "fetch_url",
-  description: "Fetch and extract the readable content of a web page at the given URL. Returns the article text in markdown format, not raw HTML.",
+  description:
+    "Fetch and extract the readable content of a web page at the given URL. Returns the article text in markdown format, not raw HTML. " +
+    "For YouTube URLs, automatically extracts the full video transcript with chapter headings and clickable timestamp links instead of scraping the page.",
   parameters: {
     type: "object" as const,
     properties: {
@@ -133,6 +142,26 @@ export const fetchUrlTool = tool({
   },
   execute: async (args: unknown) => {
     const { url } = args as { url: string };
+
+    // YouTube URLs — extract transcript with timestamps
+    if (isYouTubeUrl(url)) {
+      const videoId = extractYouTubeVideoId(url)!;
+      const [meta, segments] = await Promise.all([
+        fetchYouTubeMetadata(videoId),
+        fetchYouTubeTranscript(videoId),
+      ]);
+
+      if (segments.length === 0) {
+        return `# ${meta.title}\n\nChannel: ${meta.channelName}\n\nNo transcript available for this video (captions are disabled or unavailable).`;
+      }
+
+      const transcript = assembleTranscriptMarkdown(segments, meta.chapters, videoId);
+      const header = `# ${meta.title}\n\nChannel: ${meta.channelName}`;
+      const result = `${header}\n\n${transcript}`;
+      // Transcripts can be long — allow up to 12000 chars (~3000 tokens) for video content
+      return result.slice(0, 12_000);
+    }
+
     const resp = await fetch(url, {
       headers: { "User-Agent": "NOVA-Agent/1.0" },
       signal: AbortSignal.timeout(15_000),
