@@ -43,9 +43,18 @@ const EFFORT_INSTRUCTIONS: Record<EffortLevel, string> = {
     "No preamble, no summaries of what you did, no 'let me know if you need anything else' closings.",
     "If the answer is one sentence, give one sentence.",
   ].join(" "),
-  medium: "Be concise but thorough. Cover key points without unnecessary elaboration. Use structured formatting to be scannable.",
-  high: "Provide a thorough, detailed response. Use structured formatting. It is appropriate to be comprehensive here.",
+  medium: "Be concise but thorough. Cover key points without unnecessary elaboration.",
+  high: "Provide a thorough, detailed response. It is appropriate to be comprehensive here.",
 };
+
+const FORMATTING_INSTRUCTIONS = [
+  "Write in natural prose paragraphs, like a knowledgeable colleague explaining something.",
+  "Do NOT structure your response as bullet-point lists or numbered lists. Lists feel robotic and are hard to read.",
+  "Instead of a bulleted list of points, weave those points into flowing paragraphs with clear topic sentences.",
+  "You may use a short list (3-5 items max, never nested) ONLY when the user explicitly asks for a list, or for truly atomic items like terminal commands or file names.",
+  "Use markdown headings (##) to organize longer responses into sections, but the content within each section should be prose.",
+  "Never use bold text on every other phrase — reserve bold for one or two genuinely key terms per section at most.",
+].join("\n");
 
 const EFFORT_TOKEN_CAPS: Record<EffortLevel, number> = {
   low: 1024,
@@ -55,8 +64,9 @@ const EFFORT_TOKEN_CAPS: Record<EffortLevel, number> = {
 
 function applyEffortToPrompt(systemPrompt: string | undefined, level: EffortLevel): string | undefined {
   const instructions = EFFORT_INSTRUCTIONS[level];
-  if (!systemPrompt) return instructions ? `## Output Length\n${instructions}` : undefined;
-  return `${systemPrompt}\n\n## Output Length\n${instructions}`;
+  const combined = `## Output Length\n${instructions}\n\n## Formatting\n${FORMATTING_INSTRUCTIONS}`;
+  if (!systemPrompt) return combined;
+  return `${systemPrompt}\n\n${combined}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -126,12 +136,13 @@ Embed gathered data as string literals in your Python/JS code. Don't hesitate to
 ## Report Structure
 Write sections in this order:
 0. Executive Summary — 2-3 paragraph overview with key quantitative findings
-1. Key Findings — bullet points with specific data points, not vague claims
+1. Key Findings — concise paragraphs with specific data points, not vague claims
 2-N. Detailed Analysis sections — deep dives backed by data analysis
 N+1. Conclusion — synthesis and implications
 
 ## Formatting
-- Use standard markdown with ## headings, bullet points, numbered lists
+- Write in prose paragraphs, not bullet-point lists. Weave findings into narrative paragraphs with clear topic sentences. Reserve short flat lists (never nested) for truly atomic items like tool names or file paths.
+- Use ## headings to organize sections, but the content within each section must be prose paragraphs
 - Use [N] inline citations referencing your saved sources
 - For data visualizations, use widget code blocks with comma-separated values:
   \`\`\`widget
@@ -995,7 +1006,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
               "You are a Deep Research Agent. Synthesize the gathered research into a comprehensive, well-structured report.",
               "Rules:",
               "- Combine all research findings into a unified, thorough report.",
-              "- Use markdown formatting: ## headings, bullet points, numbered lists.",
+              "- Use markdown ## headings to organize sections. Write the content within each section as prose paragraphs, not bullet-point lists.",
               "- Include ALL relevant data, statistics, quotes, and details from the research nodes.",
               "- Use [N] inline citations referencing the sources found during research.",
               "- Structure: Executive Summary → Key Findings → Detailed Analysis sections → Conclusion.",
@@ -1042,6 +1053,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
             "- If the result contains a code artifact (HTML, code file, etc.), present ONLY the final artifact with a brief 1-2 sentence introduction. Do not include planning notes, creative direction, or validation logs.",
             "- If the result is informational (research, analysis), summarize concisely in 1-4 paragraphs.",
             "- Never repeat content that already appears in the artifact.",
+            "- Write in natural prose paragraphs. Do NOT use bullet-point or numbered lists — they feel robotic. Weave points into flowing paragraphs instead.",
             "- Never add filler closings like 'let me know if you need changes'.",
           ].join("\n"),
           modelId: input.model,
