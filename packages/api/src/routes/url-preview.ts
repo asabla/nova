@@ -5,6 +5,9 @@ import type { AppContext } from "../types/context";
 import { AppError } from "@nova/shared/utils";
 import { domainService } from "../services/domain.service";
 import { extractFromHtml } from "@nova/shared/content";
+import { eq, and } from "drizzle-orm";
+import { orgSettings, models } from "@nova/shared/schemas";
+import { db } from "../lib/db";
 
 const urlPreviewRoutes = new Hono<AppContext>();
 
@@ -288,8 +291,16 @@ urlPreviewRoutes.post(
         ? `Summarize this YouTube video page content. Provide a concise summary with key points and takeaways:\n\n${textContent}`
         : `Provide a TL;DR summary of this article. Include the main points, key arguments, and conclusions:\n\n${textContent}`;
 
+      // Resolve the org's default model
+      const [modelSetting] = await db.select().from(orgSettings).where(and(eq(orgSettings.orgId, orgId), eq(orgSettings.key, "defaultModel")));
+      let resolvedModel = modelSetting?.value;
+      if (!resolvedModel) {
+        const [m] = await db.select({ modelIdExternal: models.modelIdExternal }).from(models).where(and(eq(models.orgId, orgId), eq(models.isDefault, true), eq(models.isEnabled, true))).limit(1);
+        resolvedModel = m?.modelIdExternal ?? "gpt-5.4";
+      }
+
       const result = await chatCompletion({
-        model: "default",
+        model: resolvedModel,
         messages: [
           { role: "system", content: "You are a concise content summarizer. Provide structured summaries with key takeaways." },
           { role: "user", content: prompt },

@@ -5,7 +5,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { TASK_QUEUES } from "@nova/shared/constants";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
-import { researchReports, researchReportVersions } from "@nova/shared/schemas";
+import { researchReports, researchReportVersions, orgSettings, models } from "@nova/shared/schemas";
 import { getTemporalClient } from "../lib/temporal";
 import { AppError } from "@nova/shared/utils";
 import { relayResearchToSSE } from "../lib/stream-relay";
@@ -219,6 +219,15 @@ function crc32(data: Uint8Array): number {
   return (crc ^ 0xFFFFFFFF) >>> 0;
 }
 
+/** Resolve the org's default model external ID (e.g. "gpt-5.4") */
+async function resolveDefaultModel(orgId: string): Promise<string> {
+  const [setting] = await db.select().from(orgSettings).where(and(eq(orgSettings.orgId, orgId), eq(orgSettings.key, "defaultModel")));
+  if (setting?.value) return setting.value;
+  // Fallback: first enabled default model in the org
+  const [m] = await db.select({ modelIdExternal: models.modelIdExternal }).from(models).where(and(eq(models.orgId, orgId), eq(models.isDefault, true), eq(models.isEnabled, true))).limit(1);
+  return m?.modelIdExternal ?? "gpt-5.4";
+}
+
 researchRoutes.get("/", async (c) => {
   const orgId = c.get("orgId");
   const result = await db.select().from(researchReports)
@@ -304,6 +313,7 @@ researchRoutes.post("/", async (c) => {
   // Start Temporal workflow (dispatched to agent worker)
   try {
     const client = await getTemporalClient();
+    const resolvedModel = await resolveDefaultModel(orgId);
     const hasKnowledge = body.sources.knowledgeCollectionIds.length > 0;
     const hasFiles = body.sources.fileIds.length > 0;
     const maxTurns = Math.max(20, body.maxSources * 2 + (hasKnowledge ? 10 : 0) + (hasFiles ? 5 : 0));
@@ -315,7 +325,7 @@ researchRoutes.post("/", async (c) => {
         userId,
         conversationId: report.conversationId,
         streamChannelId: `research:${report.id}`,
-        model: "default",
+        model: resolvedModel,
         userMessage: body.query,
         messageHistory: [],
         maxSteps: maxTurns,
@@ -492,6 +502,7 @@ researchRoutes.post("/:id/rerun", async (c) => {
     const rerunHasKnowledge = resolvedSources.knowledgeCollectionIds.length > 0;
     const rerunHasFiles = resolvedSources.fileIds.length > 0;
     const maxTurns = Math.max(20, maxSources * 2 + (rerunHasKnowledge ? 10 : 0) + (rerunHasFiles ? 5 : 0));
+    const resolvedModel = await resolveDefaultModel(orgId);
     const client = await getTemporalClient();
     await client.workflow.start("agentWorkflow", {
       taskQueue: TASK_QUEUES.AGENT,
@@ -501,7 +512,7 @@ researchRoutes.post("/:id/rerun", async (c) => {
         userId,
         conversationId: originalReport.conversationId,
         streamChannelId: `research:${newReport.id}`,
-        model: "default",
+        model: resolvedModel,
         userMessage: originalReport.query,
         messageHistory: [],
         maxSteps: maxTurns,
@@ -614,6 +625,7 @@ researchRoutes.post("/:id/refine", async (c) => {
   // Start refinement workflow (dispatched to agent worker)
   try {
     const client = await getTemporalClient();
+    const resolvedModel = await resolveDefaultModel(orgId);
     const streamChannelId = `research:${reportId}:v${newVersion}`;
     const reportConfig = (report.config as Record<string, any>) ?? {};
 
@@ -625,7 +637,7 @@ researchRoutes.post("/:id/refine", async (c) => {
         userId,
         conversationId: report.conversationId,
         streamChannelId,
-        model: "default",
+        model: resolvedModel,
         userMessage: refinementPrompt,
         messageHistory: [],
         maxSteps: 25,
