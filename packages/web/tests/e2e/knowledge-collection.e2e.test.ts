@@ -98,10 +98,11 @@ test.describe("Knowledge Collection UI", () => {
 
     // Verify detail page tabs are present (scoped to main content area)
     const main = page.getByRole("main");
-    await expect(main.getByRole("button", { name: "Documents" })).toBeVisible();
-    await expect(main.getByRole("button", { name: "Query Test" })).toBeVisible();
-    await expect(main.getByRole("button", { name: "Settings" })).toBeVisible();
-    await expect(main.getByRole("button", { name: "Activity" })).toBeVisible();
+    await expect(main.getByRole("tab", { name: "Documents" })).toBeVisible();
+    await expect(main.getByRole("tab", { name: "Sources" })).toBeVisible();
+    await expect(main.getByRole("tab", { name: "Search" })).toBeVisible();
+    await expect(main.getByRole("tab", { name: "Settings" })).toBeVisible();
+    await expect(main.getByRole("tab", { name: "Activity" })).toBeVisible();
 
     // Clean up: delete the collection
     await deleteCurrentCollection(page);

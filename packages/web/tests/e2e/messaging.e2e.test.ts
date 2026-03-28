@@ -28,35 +28,75 @@ async function loginAndGoHome(page: Page) {
   await page.waitForURL((url) => !url.pathname.includes("/login"), { timeout: 10_000 });
 }
 
-/** Helper: create a new conversation and navigate to it */
-async function createConversation(page: Page, title?: string) {
-  await page.goto(`${BASE_URL}/`);
-  // Wait for the home page to load
-  await page.waitForLoadState("networkidle");
+/** Helper: wait for streaming to finish — either the send button appears,
+ *  or we stop it manually if it takes too long */
+async function ensureNotStreaming(page: Page) {
+  const sendButton = page.getByRole("button", { name: "Send message" });
+  const stopButton = page.getByRole("button", { name: "Stop streaming" });
 
-  // Click New Conversation button (could be in sidebar or main area)
-  const newConvButton = page.getByRole("link", { name: /new conversation/i })
-    .or(page.getByRole("button", { name: /new conversation/i }))
-    .or(page.getByRole("link", { name: /new chat/i }));
-
-  if (await newConvButton.isVisible({ timeout: 3_000 }).catch(() => false)) {
-    await newConvButton.first().click();
-  } else {
-    // Fallback: create via API
-    const res = await page.request.post(`${BASE_URL}/api/conversations`, {
-      data: { title: title ?? "E2E Test Chat" },
-      headers: { "Content-Type": "application/json" },
-    });
-    expect(res.ok()).toBe(true);
-    const body = await res.json();
-    await page.goto(`${BASE_URL}/conversations/${body.id}`);
+  // Wait up to 20s, clicking stop whenever we see it
+  for (let i = 0; i < 20; i++) {
+    if (await sendButton.isVisible().catch(() => false)) {
+      // Double-check: wait a beat and verify it's still there (not a brief flash)
+      await page.waitForTimeout(500);
+      if (await sendButton.isVisible().catch(() => false)) {
+        return;
+      }
+    }
+    // Click stop if visible
+    if (await stopButton.isVisible().catch(() => false)) {
+      await stopButton.click();
+    }
+    await page.waitForTimeout(1000);
   }
 
-  // Wait for conversation page to load (message input should appear)
-  await expect(
-    page.getByRole("textbox", { name: /message input/i })
-      .or(page.locator("textarea[placeholder]"))
-  ).toBeVisible({ timeout: 10_000 });
+  // Final check
+  await expect(sendButton).toBeVisible({ timeout: 5_000 });
+}
+
+/** Helper: create a new conversation by sending a message from the home page,
+ *  then wait for streaming to finish so the send button is available. */
+async function createConversation(page: Page) {
+  await page.goto(`${BASE_URL}/`);
+  await page.waitForLoadState("networkidle");
+
+  // The home page has a textarea for starting a new conversation
+  const homeInput = page.getByPlaceholder("Ask anything...");
+  await expect(homeInput).toBeVisible({ timeout: 10_000 });
+
+  // Type an initial message and send to create the conversation
+  await homeInput.fill("E2E test init");
+
+  // Click the send button and wait for navigation to the conversation page
+  await page.getByRole("button", { name: /send/i }).click();
+
+  // Wait for redirect through /conversations/new to /conversations/:uuid
+  await page.waitForURL(/\/conversations\/[0-9a-f]{8}-/, { timeout: 20_000 });
+
+  // Wait for the message input in the conversation page to appear
+  await expect(page.getByLabel("Message input")).toBeVisible({ timeout: 10_000 });
+
+  // Wait for agent streaming to finish (or stop it)
+  await ensureNotStreaming(page);
+}
+
+/** Helper: send a message in an existing conversation and wait for the POST */
+async function sendMessage(page: Page, text: string) {
+  const input = page.getByLabel("Message input");
+  await input.fill(text);
+
+  const sendButton = page.getByRole("button", { name: "Send message" });
+  await expect(sendButton).toBeEnabled({ timeout: 5_000 });
+
+  const [msgResponse] = await Promise.all([
+    page.waitForResponse(
+      (res) => res.url().includes("/messages") && res.request().method() === "POST" && !res.url().includes("/stream"),
+      { timeout: 15_000 },
+    ),
+    sendButton.click(),
+  ]);
+
+  return msgResponse;
 }
 
 test.describe("Messaging", () => {
@@ -67,23 +107,7 @@ test.describe("Messaging", () => {
   test("can create a conversation and send a message", async ({ page }) => {
     await createConversation(page);
 
-    // Type a message
-    const input = page.getByRole("textbox", { name: /message input/i })
-      .or(page.locator("textarea[placeholder]"));
-    await input.fill("Hello from E2E test!");
-
-    // Send button should be enabled
-    const sendButton = page.getByRole("button", { name: /send/i });
-    await expect(sendButton).toBeEnabled();
-
-    // Send the message and wait for the API response
-    const [msgResponse] = await Promise.all([
-      page.waitForResponse(
-        (res) => res.url().includes("/messages") && res.request().method() === "POST" && !res.url().includes("/stream"),
-        { timeout: 10_000 },
-      ),
-      sendButton.click(),
-    ]);
+    const msgResponse = await sendMessage(page, "Hello from E2E test!");
     expect(msgResponse.status()).toBe(201);
 
     // Verify the message appears in the chat
@@ -93,12 +117,11 @@ test.describe("Messaging", () => {
   test("send button is disabled when input is empty", async ({ page }) => {
     await createConversation(page);
 
-    const input = page.getByRole("textbox", { name: /message input/i })
-      .or(page.locator("textarea[placeholder]"));
+    const input = page.getByLabel("Message input");
     await expect(input).toBeVisible();
 
     // Send button should be disabled when empty
-    const sendButton = page.getByRole("button", { name: /send/i });
+    const sendButton = page.getByRole("button", { name: "Send message" });
     await expect(sendButton).toBeDisabled();
 
     // Type something — should become enabled
@@ -113,14 +136,14 @@ test.describe("Messaging", () => {
   test("can send message with Enter key", async ({ page }) => {
     await createConversation(page);
 
-    const input = page.getByRole("textbox", { name: /message input/i })
-      .or(page.locator("textarea[placeholder]"));
+    const input = page.getByLabel("Message input");
     await input.fill("Enter key test");
+    await expect(page.getByRole("button", { name: "Send message" })).toBeEnabled({ timeout: 5_000 });
 
     const [msgResponse] = await Promise.all([
       page.waitForResponse(
         (res) => res.url().includes("/messages") && res.request().method() === "POST" && !res.url().includes("/stream"),
-        { timeout: 10_000 },
+        { timeout: 15_000 },
       ),
       input.press("Enter"),
     ]);
@@ -132,9 +155,9 @@ test.describe("Messaging", () => {
   test("Shift+Enter creates new line instead of sending", async ({ page }) => {
     await createConversation(page);
 
-    const input = page.getByRole("textbox", { name: /message input/i })
-      .or(page.locator("textarea[placeholder]"));
-    await input.fill("Line 1");
+    const input = page.getByLabel("Message input");
+    await input.click();
+    await input.type("Line 1");
     await input.press("Shift+Enter");
     await input.type("Line 2");
 
@@ -147,17 +170,8 @@ test.describe("Messaging", () => {
   test("input clears after sending", async ({ page }) => {
     await createConversation(page);
 
-    const input = page.getByRole("textbox", { name: /message input/i })
-      .or(page.locator("textarea[placeholder]"));
-    await input.fill("Clear test");
-
-    await Promise.all([
-      page.waitForResponse(
-        (res) => res.url().includes("/messages") && res.request().method() === "POST" && !res.url().includes("/stream"),
-        { timeout: 10_000 },
-      ),
-      input.press("Enter"),
-    ]);
+    const input = page.getByLabel("Message input");
+    await sendMessage(page, "Clear test");
 
     // Input should be cleared after send
     await expect(input).toHaveValue("");
@@ -166,30 +180,15 @@ test.describe("Messaging", () => {
   test("messages appear in chronological order", async ({ page }) => {
     await createConversation(page);
 
-    const input = page.getByRole("textbox", { name: /message input/i })
-      .or(page.locator("textarea[placeholder]"));
-
     // Send first message
-    await input.fill("First message");
-    await Promise.all([
-      page.waitForResponse(
-        (res) => res.url().includes("/messages") && res.request().method() === "POST" && !res.url().includes("/stream"),
-      ),
-      input.press("Enter"),
-    ]);
+    await sendMessage(page, "First message");
     await expect(page.getByText("First message")).toBeVisible({ timeout: 10_000 });
 
-    // Wait briefly for the stream to start/error and settle
-    await page.waitForTimeout(1000);
+    // Wait for streaming to finish before sending another message
+    await ensureNotStreaming(page);
 
     // Send second message
-    await input.fill("Second message");
-    await Promise.all([
-      page.waitForResponse(
-        (res) => res.url().includes("/messages") && res.request().method() === "POST" && !res.url().includes("/stream"),
-      ),
-      input.press("Enter"),
-    ]);
+    await sendMessage(page, "Second message");
     await expect(page.getByText("Second message")).toBeVisible({ timeout: 10_000 });
 
     // Verify order: "First message" should appear before "Second message" in DOM
@@ -204,24 +203,25 @@ test.describe("Conversation navigation", () => {
   test("navigating to a conversation shows message history", async ({ page }) => {
     await loginAndGoHome(page);
 
-    // Create conversation and send a message via API
-    const convRes = await page.request.post(`${BASE_URL}/api/conversations`, {
-      data: { title: "History Test" },
-      headers: { "Content-Type": "application/json" },
-    });
-    const conv = await convRes.json();
-    const convId = conv.id;
+    // Create a conversation by sending a message from the home page
+    const homeInput = page.getByPlaceholder("Ask anything...");
+    await expect(homeInput).toBeVisible({ timeout: 10_000 });
+    await homeInput.fill("History test message");
+    await page.getByRole("button", { name: /send/i }).click();
 
-    // Send a message via API
-    await page.request.post(`${BASE_URL}/api/conversations/${convId}/messages`, {
-      data: { content: "Pre-existing message" },
-      headers: { "Content-Type": "application/json" },
-    });
+    // Wait for redirect through /conversations/new to /conversations/:uuid
+    await page.waitForURL(/\/conversations\/[0-9a-f]{8}-/, { timeout: 20_000 });
+    await expect(page.getByText("History test message").first()).toBeVisible({ timeout: 10_000 });
 
-    // Navigate to conversation
-    await page.goto(`${BASE_URL}/conversations/${convId}`);
+    // Capture the conversation URL
+    const convUrl = page.url();
+
+    // Navigate away and back to verify history persists
+    await page.goto(`${BASE_URL}/`);
+    await page.waitForLoadState("networkidle");
+    await page.goto(convUrl);
 
     // Verify message appears
-    await expect(page.getByText("Pre-existing message")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("History test message").first()).toBeVisible({ timeout: 10_000 });
   });
 });
