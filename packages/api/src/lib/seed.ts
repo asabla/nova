@@ -106,51 +106,69 @@ async function seed() {
 
   console.log(`  User: ${SEED_USER.email} / ${SEED_USER.password}`);
 
-  // ─── 3. Model Provider + Models ───────────────────
-  const openaiBaseUrl = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
-  const openaiApiKey = process.env.OPENAI_API_KEY ?? "";
-
-  const [provider] = await db
-    .insert(modelProviders)
-    .values({
-      orgId,
+  // ─── 3. Model Providers + Models ──────────────────
+  const providerDefs = [
+    {
       name: "OpenAI",
-      type: "openai",
-      apiBaseUrl: openaiBaseUrl,
-      apiKeyEncrypted: openaiApiKey,
-    })
-    .onConflictDoUpdate({
-      target: [modelProviders.orgId, modelProviders.name],
-      set: { type: "openai", apiBaseUrl: openaiBaseUrl, apiKeyEncrypted: openaiApiKey, updatedAt: new Date() },
-    })
-    .returning();
-
-  const providerId = provider?.id ?? (await db.select().from(modelProviders).where(and(eq(modelProviders.orgId, orgId), eq(modelProviders.name, "OpenAI"))).then((r) => r[0]!.id));
-
-  const modelDefs = [
-    { name: "GPT-5.4", modelIdExternal: "gpt-5.4", capabilities: ["chat", "vision", "reasoning"], contextWindow: 128000, isDefault: true, modelParams: { dropParams: ["temperature", "top_p", "presence_penalty", "frequency_penalty", "logprobs", "top_logprobs", "parallel_tool_calls", "max_tokens"] } },
-    { name: "Text Embedding 3 Small", modelIdExternal: "text-embedding-3-small", capabilities: ["embeddings"], contextWindow: 8192, modelParams: null },
+      type: "openai" as const,
+      apiBaseUrl: process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1",
+      apiKey: process.env.OPENAI_API_KEY ?? "",
+      models: [
+        { name: "GPT-5.4", modelIdExternal: "gpt-5.4", capabilities: ["chat", "vision", "reasoning"], contextWindow: 128000, isDefault: true, modelParams: { dropParams: ["temperature", "top_p", "presence_penalty", "frequency_penalty", "logprobs", "top_logprobs", "parallel_tool_calls", "max_tokens"] } },
+        { name: "Text Embedding 3 Small", modelIdExternal: "text-embedding-3-small", capabilities: ["embeddings"], contextWindow: 8192, modelParams: null },
+      ],
+    },
+    {
+      name: "Anthropic",
+      type: "anthropic" as const,
+      apiBaseUrl: process.env.ANTHROPIC_BASE_URL ?? "https://api.anthropic.com/v1",
+      apiKey: process.env.ANTHROPIC_API_KEY ?? "",
+      models: [
+        { name: "Claude Sonnet 5.6", modelIdExternal: "claude-sonnet-5-6", capabilities: ["chat", "vision"], contextWindow: 200000, isDefault: false, modelParams: null },
+      ],
+    },
   ];
 
-  for (const m of modelDefs) {
-    await db
-      .insert(models)
+  let totalModels = 0;
+  for (const prov of providerDefs) {
+    const [provider] = await db
+      .insert(modelProviders)
       .values({
         orgId,
-        modelProviderId: providerId,
-        name: m.name,
-        modelIdExternal: m.modelIdExternal,
-        capabilities: m.capabilities,
-        contextWindow: m.contextWindow,
-        isDefault: m.isDefault ?? false,
-        modelParams: m.modelParams,
+        name: prov.name,
+        type: prov.type,
+        apiBaseUrl: prov.apiBaseUrl,
+        apiKeyEncrypted: prov.apiKey,
       })
       .onConflictDoUpdate({
-        target: [models.orgId, models.modelIdExternal],
-        set: { name: m.name, capabilities: m.capabilities, contextWindow: m.contextWindow, isDefault: m.isDefault ?? false, modelParams: m.modelParams, updatedAt: new Date() },
-      });
+        target: [modelProviders.orgId, modelProviders.name],
+        set: { type: prov.type, apiBaseUrl: prov.apiBaseUrl, apiKeyEncrypted: prov.apiKey, updatedAt: new Date() },
+      })
+      .returning();
+
+    const providerId = provider?.id ?? (await db.select().from(modelProviders).where(and(eq(modelProviders.orgId, orgId), eq(modelProviders.name, prov.name))).then((r) => r[0]!.id));
+
+    for (const m of prov.models) {
+      await db
+        .insert(models)
+        .values({
+          orgId,
+          modelProviderId: providerId,
+          name: m.name,
+          modelIdExternal: m.modelIdExternal,
+          capabilities: m.capabilities,
+          contextWindow: m.contextWindow,
+          isDefault: m.isDefault ?? false,
+          modelParams: m.modelParams,
+        })
+        .onConflictDoUpdate({
+          target: [models.orgId, models.modelIdExternal],
+          set: { name: m.name, capabilities: m.capabilities, contextWindow: m.contextWindow, isDefault: m.isDefault ?? false, modelParams: m.modelParams, updatedAt: new Date() },
+        });
+    }
+    totalModels += prov.models.length;
   }
-  console.log(`  Models: ${modelDefs.length} registered`);
+  console.log(`  Models: ${totalModels} registered (${providerDefs.length} providers)`);
 
   // ─── 4. Prompt Templates ──────────────────────────
   const prompts = [
