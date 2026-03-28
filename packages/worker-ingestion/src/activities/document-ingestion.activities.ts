@@ -12,6 +12,15 @@ import type { DocumentIngestionInput } from "../workflows/document-ingestion";
 import { extractCsv, extractXlsx, tabularToDescriptor } from "../lib/extract-tabular";
 import { extractImageContent } from "../lib/extract-image";
 import { extractPptxContent } from "../lib/extract-pptx";
+import {
+  isYouTubeUrl,
+  extractYouTubeVideoId,
+  fetchYouTubeMetadata,
+  fetchYouTubeTranscript,
+  assembleTranscriptMarkdown,
+  chunkTranscriptWithTimestamps,
+  type TranscriptSegment,
+} from "../lib/extract-youtube";
 import { upsertPoints, deletePointsByFilter, COLLECTIONS } from "@nova/worker-shared/qdrant";
 
 async function getMinioClient() {
@@ -131,6 +140,7 @@ interface ResolvedContent {
   extractedMetadata?: ExtractedMetadata;
   documentMetadata?: Record<string, unknown>;
   fileType?: string;
+  transcriptSegments?: TranscriptSegment[];
 }
 
 function isHtmlContent(text: string, contentType?: string): boolean {
@@ -159,6 +169,37 @@ async function resolveDocumentContent(input: DocumentIngestionInput): Promise<Re
 
   if (doc.sourceUrl || input.sourceUrl) {
     const url = doc.sourceUrl ?? input.sourceUrl!;
+
+    // YouTube URL — extract transcript with timestamps
+    if (isYouTubeUrl(url)) {
+      const videoId = extractYouTubeVideoId(url)!;
+      const meta = await fetchYouTubeMetadata(videoId);
+      const segments = await fetchYouTubeTranscript(videoId);
+
+      if (segments.length === 0) {
+        throw new Error(
+          "No captions available for this YouTube video. Videos without subtitles cannot be ingested yet.",
+        );
+      }
+
+      const text = assembleTranscriptMarkdown(segments, meta.chapters);
+      return {
+        text,
+        title: meta.title,
+        sourceUrl: url,
+        fileType: "youtube",
+        transcriptSegments: segments,
+        documentMetadata: {
+          fileType: "youtube",
+          videoId,
+          channelName: meta.channelName,
+          thumbnailUrl: meta.thumbnailUrl,
+          chapters: meta.chapters,
+          hasTranscript: true,
+        },
+      };
+    }
+
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`Failed to fetch URL ${url}: ${resp.status}`);
     const contentType = resp.headers.get("content-type") ?? "";
@@ -368,6 +409,10 @@ async function persistChunks(
           documentTitle: documentTitle ?? null,
           sourceUrl: sourceUrl ?? null,
           sectionHeading: chunk.metadata.sectionHeading ?? null,
+          startTimeMs: chunk.metadata.startTimeMs ?? null,
+          endTimeMs: chunk.metadata.endTimeMs ?? null,
+          timestampUrl: chunk.metadata.timestampUrl ?? null,
+          chapterTitle: chunk.metadata.chapterTitle ?? null,
           createdAt: new Date().toISOString(),
         },
       });
@@ -417,6 +462,8 @@ async function enrichDocument(text: string, title?: string, fileType?: string): 
       typeSpecificInstructions = `\nThis is an image description. Focus tags on: content type, subjects, visual style (e.g. "photograph", "chart", "diagram", "screenshot").`;
     } else if (fileType === "presentation") {
       typeSpecificInstructions = `\nThis is a presentation/slideshow. Focus tags on: topic, audience, presentation type (e.g. "quarterly-review", "product-roadmap", "training").`;
+    } else if (fileType === "youtube") {
+      typeSpecificInstructions = `\nThis is a YouTube video transcript. Focus tags on: topic, speaker/channel, content type (e.g. "tutorial", "interview", "lecture", "conference-talk", "podcast", "review").`;
     }
 
     const prompt = `Analyze this document and return a JSON object with:
@@ -531,10 +578,18 @@ export async function ingestDocument(input: DocumentIngestionInput): Promise<{ c
     .from(knowledgeCollections)
     .where(eq(knowledgeCollections.id, input.collectionId));
 
-  const chunks = chunkContent(resolved.text, {
-    maxChunkSize: collection?.chunkSize ?? 1500,
-    overlap: collection?.chunkOverlap ?? 150,
-  });
+  // YouTube transcripts get chapter-aware chunking with timestamp metadata
+  const chunks = resolved.fileType === "youtube" && resolved.transcriptSegments
+    ? chunkTranscriptWithTimestamps(
+        resolved.transcriptSegments,
+        (resolved.documentMetadata?.chapters as any[]) ?? [],
+        (resolved.documentMetadata?.videoId as string) ?? "",
+        { maxChunkSize: collection?.chunkSize ?? 1500, overlap: collection?.chunkOverlap ?? 150 },
+      )
+    : chunkContent(resolved.text, {
+        maxChunkSize: collection?.chunkSize ?? 1500,
+        overlap: collection?.chunkOverlap ?? 150,
+      });
 
   if (chunks.length === 0) {
     throw new Error("Document produced no chunks after processing");

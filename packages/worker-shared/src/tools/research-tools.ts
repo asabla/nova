@@ -41,7 +41,8 @@ export function createResearchTools(opts: {
   const queryKnowledgeTool = tool({
     name: "query_knowledge",
     description:
-      "Search knowledge collections by text similarity. Returns relevant document chunks ranked by relevance score. Use this to find information from the user's internal knowledge base.",
+      "Search knowledge collections by text similarity. Returns relevant document chunks ranked by relevance score. Use this to find information from the user's internal knowledge base. " +
+      "For video transcript results, use the 'timestampUrl' field to link to the specific moment, e.g. [2:30](timestampUrl).",
     parameters: {
       type: "object" as const,
       properties: {
@@ -86,6 +87,9 @@ export function createResearchTools(opts: {
         content: r.content,
         score: r.score,
         ...(r.fileId ? { fileId: r.fileId, hint: `To analyze this file's raw data, use code_execute with input_file_ids: ["${r.fileId}"]` } : {}),
+        ...(r.sourceUrl ? { sourceUrl: r.sourceUrl } : {}),
+        ...(r.timestampUrl ? { timestampUrl: r.timestampUrl } : {}),
+        ...(r.chapterTitle ? { chapterTitle: r.chapterTitle } : {}),
       }));
     },
   });

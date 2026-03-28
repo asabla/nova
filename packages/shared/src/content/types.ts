@@ -17,7 +17,7 @@ export interface ChunkMetadata {
   headingHierarchy: string[];
   sectionHeading?: string;
   positionRatio: number;
-  chunkType: "text" | "code" | "table" | "mixed" | "image";
+  chunkType: "text" | "code" | "table" | "mixed" | "image" | "transcript";
   /** Programming language (e.g. "typescript", "python") — set for code file chunks */
   language?: string;
   /** Symbol name (e.g. "validateSession") — set when chunk represents a single symbol */
@@ -28,6 +28,14 @@ export interface ChunkMetadata {
   filePath?: string;
   /** Whether the symbol is exported from its module */
   isExported?: boolean;
+  /** Start time in milliseconds (video/audio transcript chunks) */
+  startTimeMs?: number;
+  /** End time in milliseconds (video/audio transcript chunks) */
+  endTimeMs?: number;
+  /** Deep-link URL with timestamp (e.g. youtube.com/watch?v=X&t=123) */
+  timestampUrl?: string;
+  /** Chapter title from video description */
+  chapterTitle?: string;
 }
 
 export interface ContentChunk {

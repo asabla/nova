@@ -349,7 +349,8 @@ export function createSearchWorkspaceTool(orgId: string) {
       "IMPORTANT: Always use type 'all' unless the user specifically asks to search only one type. " +
       "For temporal queries like 'yesterday' or 'last week', use dateFrom/dateTo to filter by time range. " +
       "You can combine date filters with a broad query (e.g. query='' with dateFrom to list recent activity). " +
-      "When referencing conversations in your response, use the 'url' field from the results to create markdown links, e.g. [Title](url). These are relative URLs that the app handles internally.",
+      "When referencing conversations in your response, use the 'url' field from the results to create markdown links, e.g. [Title](url). These are relative URLs that the app handles internally. " +
+      "For video transcript chunks, use the 'timestampUrl' field to link to the specific moment in the video, e.g. [2:30](timestampUrl).",
     parameters: {
       type: "object" as const,
       properties: {
@@ -539,6 +540,9 @@ export function createSearchWorkspaceTool(orgId: string) {
               documentId: r.payload.documentId,
               content: truncate(r.payload.content as string, 500),
               score: r.score,
+              ...(r.payload.sourceUrl ? { sourceUrl: r.payload.sourceUrl } : {}),
+              ...(r.payload.timestampUrl ? { timestampUrl: r.payload.timestampUrl } : {}),
+              ...(r.payload.chapterTitle ? { chapterTitle: r.payload.chapterTitle } : {}),
             }));
           } catch (err) {
             console.error(`[search_workspace] knowledge chunks search failed:`, err instanceof Error ? err.message : err);

@@ -9,6 +9,9 @@ export interface KnowledgeChunkResult {
   content: string;
   score: number;
   fileId?: string;
+  sourceUrl?: string;
+  timestampUrl?: string;
+  chapterTitle?: string;
 }
 
 export async function queryKnowledgeCollections(
@@ -26,6 +29,7 @@ export async function queryKnowledgeCollections(
       collectionId: knowledgeChunks.knowledgeCollectionId,
       documentId: knowledgeChunks.knowledgeDocumentId,
       content: knowledgeChunks.content,
+      metadata: knowledgeChunks.metadata,
       score: sql<number>`similarity(${knowledgeChunks.content}, ${query})`.as("score"),
     })
     .from(knowledgeChunks)
@@ -50,14 +54,20 @@ export async function queryKnowledgeCollections(
   const docNameMap = new Map(docs.map((d) => [d.id, d.title ?? "Untitled"]));
   const docFileMap = new Map(docs.map((d) => [d.id, d.fileId ?? undefined]));
 
-  return results.map((r) => ({
-    collectionId: r.collectionId,
-    documentId: r.documentId,
-    documentName: docNameMap.get(r.documentId) ?? "Untitled",
-    content: r.content,
-    score: r.score ?? 0,
-    fileId: docFileMap.get(r.documentId),
-  }));
+  return results.map((r) => {
+    const meta = r.metadata as Record<string, unknown> | null;
+    return {
+      collectionId: r.collectionId,
+      documentId: r.documentId,
+      documentName: docNameMap.get(r.documentId) ?? "Untitled",
+      content: r.content,
+      score: r.score ?? 0,
+      fileId: docFileMap.get(r.documentId),
+      sourceUrl: (meta?.sourceUrl as string) ?? undefined,
+      timestampUrl: (meta?.timestampUrl as string) ?? undefined,
+      chapterTitle: (meta?.chapterTitle as string) ?? undefined,
+    };
+  });
 }
 
 const TABULAR_MIME_TYPES = new Set([
