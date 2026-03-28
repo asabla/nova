@@ -8,7 +8,7 @@ import { DynamicWidget, type WidgetConfig } from "../chat/DynamicWidget";
 import { parseWidgetConfig } from "../chat/widgets/schemas";
 import { ExcalidrawDiagram } from "../chat/ExcalidrawDiagram";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../ui/Table";
-import { PenTool } from "lucide-react";
+import { PenTool, Play } from "lucide-react";
 
 interface MarkdownRendererProps {
   content: string;
@@ -240,6 +240,35 @@ const MD_COMPONENTS: React.ComponentProps<typeof ReactMarkdown>["components"] = 
     // sandbox: URIs are internal file references — render as plain text
     if (href?.startsWith("sandbox:")) {
       return <span className="text-accent font-medium">{children}</span>;
+    }
+    // YouTube timestamp links — render as inline video timestamp chips
+    if (href) {
+      const ytMatch = href.match(/(?:youtube\.com\/watch\?.*v=([a-zA-Z0-9_-]{11})|youtu\.be\/([a-zA-Z0-9_-]{11}))/);
+      const tMatch = href.match(/[?&]t=(\d+)/);
+      if (ytMatch && tMatch) {
+        const seconds = parseInt(tMatch[1], 10);
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+        const timestamp = hours > 0
+          ? `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`
+          : `${minutes}:${String(secs).padStart(2, "0")}`;
+
+        return (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors text-sm font-mono no-underline"
+          >
+            <Play className="h-3 w-3" fill="currentColor" />
+            <span>{timestamp}</span>
+            {children && typeof children !== "string" ? null : children && children !== href ? (
+              <span className="text-text-secondary font-sans text-xs ml-0.5 max-w-[200px] truncate">{children}</span>
+            ) : null}
+          </a>
+        );
+      }
     }
     // Internal app links (e.g. /conversations/uuid) — use client-side navigation
     const isInternal = href && /^\/(?:conversations|folders|search)(\/|$)/.test(href);

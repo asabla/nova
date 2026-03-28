@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileText, Globe, Clock, Layers, ChevronDown } from "lucide-react";
+import { FileText, Globe, Clock, Layers, ChevronDown, Play } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Dialog } from "../ui/Dialog";
@@ -9,6 +9,17 @@ import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { formatRelativeTime } from "../../lib/format";
 import type { KnowledgeDocument, KnowledgeChunk } from "./types";
+
+function formatTimestamp(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
 
 interface DocumentPreviewDialogProps {
   open: boolean;
@@ -108,19 +119,52 @@ export function DocumentPreviewDialog({ open, onClose, collectionId, document }:
             {t("knowledge.viewChunks", { defaultValue: "View individual chunks" })} ({chunks.length})
           </summary>
           <div className="space-y-2 mt-2 max-h-60 overflow-auto">
-            {chunks.map((chunk) => (
-              <div key={chunk.id} className="rounded border border-border bg-surface px-3 py-2">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-mono text-text-tertiary">
-                    {t("knowledge.chunkNumber", { defaultValue: "Chunk" })} #{chunk.chunkIndex}
-                  </span>
-                  {chunk.tokenCount != null && (
-                    <span className="text-xs text-text-tertiary">{chunk.tokenCount} {t("knowledge.tokens", { defaultValue: "tokens" })}</span>
-                  )}
+            {chunks.map((chunk) => {
+              const meta = chunk.metadata as Record<string, unknown> | undefined;
+              const timestampUrl = meta?.timestampUrl as string | undefined;
+              const startTimeMs = meta?.startTimeMs as number | undefined;
+              const endTimeMs = meta?.endTimeMs as number | undefined;
+              const chapterTitle = meta?.chapterTitle as string | undefined;
+
+              return (
+                <div key={chunk.id} className="rounded border border-border bg-surface px-3 py-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono text-text-tertiary">
+                        {t("knowledge.chunkNumber", { defaultValue: "Chunk" })} #{chunk.chunkIndex}
+                      </span>
+                      {startTimeMs != null && (
+                        timestampUrl ? (
+                          <a
+                            href={timestampUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-mono text-primary hover:text-primary/80 transition-colors"
+                          >
+                            <Play className="h-3 w-3" aria-hidden="true" />
+                            {formatTimestamp(startTimeMs)}
+                            {endTimeMs != null && <span className="text-text-tertiary">– {formatTimestamp(endTimeMs)}</span>}
+                          </a>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs font-mono text-text-secondary">
+                            <Play className="h-3 w-3" aria-hidden="true" />
+                            {formatTimestamp(startTimeMs)}
+                            {endTimeMs != null && <span>– {formatTimestamp(endTimeMs)}</span>}
+                          </span>
+                        )
+                      )}
+                      {chapterTitle && (
+                        <span className="text-xs text-text-secondary truncate max-w-[200px]">{chapterTitle}</span>
+                      )}
+                    </div>
+                    {chunk.tokenCount != null && (
+                      <span className="text-xs text-text-tertiary">{chunk.tokenCount} {t("knowledge.tokens", { defaultValue: "tokens" })}</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-text whitespace-pre-wrap line-clamp-4">{chunk.content}</p>
                 </div>
-                <p className="text-sm text-text whitespace-pre-wrap line-clamp-4">{chunk.content}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </details>
       )}

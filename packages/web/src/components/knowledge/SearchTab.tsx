@@ -1,11 +1,22 @@
 import { useState } from "react";
-import { Search, FileText, Eye } from "lucide-react";
+import { Search, FileText, Eye, Play } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { toast } from "../ui/Toast";
 import { api } from "../../lib/api";
 import type { RetrievedChunk } from "./types";
+
+function formatTimestamp(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
 
 interface SearchTabProps {
   collectionId: string;
@@ -118,6 +129,11 @@ export function SearchTab({ collectionId, onViewDocument }: SearchTabProps) {
                 ? chunk.content.slice(0, 400) + (chunk.content.length > 400 ? "..." : "")
                 : chunk.content;
 
+              const meta = chunk.metadata as Record<string, unknown> | undefined;
+              const timestampUrl = meta?.timestampUrl as string | undefined;
+              const startTimeMs = meta?.startTimeMs as number | undefined;
+              const chapterTitle = meta?.chapterTitle as string | undefined;
+
               return (
                 <div
                   key={chunk.id}
@@ -127,6 +143,20 @@ export function SearchTab({ collectionId, onViewDocument }: SearchTabProps) {
                     <div className="flex items-center gap-2 min-w-0">
                       <FileText className="h-3.5 w-3.5 text-text-tertiary shrink-0" aria-hidden="true" />
                       <span className="text-sm font-medium text-text truncate">{chunk.documentName}</span>
+                      {startTimeMs != null && timestampUrl && (
+                        <a
+                          href={timestampUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-mono text-primary hover:text-primary/80 transition-colors shrink-0"
+                        >
+                          <Play className="h-3 w-3" aria-hidden="true" />
+                          {formatTimestamp(startTimeMs)}
+                        </a>
+                      )}
+                      {chapterTitle && (
+                        <span className="text-xs text-text-secondary truncate max-w-[150px]">{chapterTitle}</span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       <RelevanceBar score={chunk.score} />
