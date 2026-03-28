@@ -1,6 +1,6 @@
 export const RATE_LIMITS = {
   PER_IP: {
-    maxRequests: 100,
+    maxRequests: 300,
     windowSeconds: 60,
   },
   PER_USER: {
