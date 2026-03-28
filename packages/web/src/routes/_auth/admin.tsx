@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, Link, redirect, useMatchRoute, useNavigate } f
 import { useTranslation } from "react-i18next";
 import {
   Users, BarChart3, Shield, Settings, Activity, Heart, Gauge, AlertTriangle,
-  Database, CreditCard, Palette, Link2, FileSearch, UserCog,
+  Database, CreditCard, Palette, Link2, FileSearch, UserCog, Sparkles,
 } from "lucide-react";
 import { useAuthStore } from "../../stores/auth.store";
 import { clsx } from "clsx";
@@ -48,6 +48,7 @@ const tabGroupDefs: TabGroupDef[] = [
     labelDefault: "AI & Limits",
     tabs: [
       { to: "/admin/models", icon: Activity, label: "admin.models" },
+      { to: "/admin/evals", icon: Sparkles, label: "admin.evals" },
       { to: "/admin/content-filter", icon: AlertTriangle, label: "admin.contentSafety" },
       { to: "/admin/rate-limits", icon: Gauge, label: "admin.rateLimits" },
     ],

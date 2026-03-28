@@ -57,6 +57,7 @@ import { webhookRoutes } from "./routes/webhooks";
 import { voiceRoutes } from "./routes/voice";
 import { superAdminRoutes } from "./routes/super-admin";
 import { customWorkerRoutes } from "./routes/custom-workers";
+import evalRoutes from "./routes/evals";
 
 const app = new Hono<AppContext>();
 
@@ -149,5 +150,6 @@ app.route("/api/url", urlPreviewRoutes);
 app.route("/api/voice", voiceRoutes);
 app.route("/api/super-admin", superAdminRoutes);
 app.route("/api/custom-workers", customWorkerRoutes);
+app.route("/api/evals", evalRoutes);
 
 export { app };

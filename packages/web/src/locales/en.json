@@ -265,6 +265,7 @@
     "auditUser": "User",
     "auditTimestamp": "Timestamp",
     "auditDetails": "Details",
+    "evals": "Quality Evals",
     "rateLimits": "Rate limits",
     "quotas": "Quotas",
     "contentSafety": "Content Safety",
