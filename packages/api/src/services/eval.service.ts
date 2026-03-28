@@ -176,6 +176,13 @@ export async function approvePromptVersion(orgId: string, slug: string, versionI
     })
     .where(and(eq(systemPromptVersions.id, versionId), eq(systemPromptVersions.orgId, orgId)))
     .returning();
+
+  // Update any linked optimization run
+  await db
+    .update(promptOptimizationRuns)
+    .set({ status: "approved", updatedAt: new Date() })
+    .where(and(eq(promptOptimizationRuns.orgId, orgId), eq(promptOptimizationRuns.proposedVersionId, versionId)));
+
   return updated;
 }
 
@@ -185,6 +192,13 @@ export async function rejectPromptVersion(orgId: string, versionId: string) {
     .set({ status: "retired", updatedAt: new Date() })
     .where(and(eq(systemPromptVersions.id, versionId), eq(systemPromptVersions.orgId, orgId)))
     .returning();
+
+  // Update any linked optimization run
+  await db
+    .update(promptOptimizationRuns)
+    .set({ status: "rejected", updatedAt: new Date() })
+    .where(and(eq(promptOptimizationRuns.orgId, orgId), eq(promptOptimizationRuns.proposedVersionId, versionId)));
+
   return updated;
 }
 
@@ -217,6 +231,12 @@ export async function deployPromptVersion(orgId: string, slug: string, versionId
     .update(systemPrompts)
     .set({ activeVersionId: versionId, updatedAt: new Date() })
     .where(eq(systemPrompts.id, sp.id));
+
+  // Update any linked optimization run
+  await db
+    .update(promptOptimizationRuns)
+    .set({ status: "deployed", updatedAt: new Date() })
+    .where(and(eq(promptOptimizationRuns.orgId, orgId), eq(promptOptimizationRuns.proposedVersionId, versionId)));
 
   return newActive;
 }
