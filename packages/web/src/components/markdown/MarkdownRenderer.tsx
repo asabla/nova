@@ -546,6 +546,50 @@ function wrapLargeCsvBlocks(text: string): string {
   return result.join("\n");
 }
 
+/**
+ * Enrich timeline widget events with YouTube timestamp URLs when the conversation
+ * has a YouTube video. Operates on the raw markdown text, finding widget code blocks
+ * with timeline type and injecting url fields for timestamp-format dates.
+ */
+function enrichTimelineWidgets(text: string, videoId: string): string {
+  const TS_RE = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/;
+
+  const tsToSeconds = (ts: string): number => {
+    const m = ts.match(TS_RE);
+    if (!m) return 0;
+    const h = m[3] !== undefined ? parseInt(m[1], 10) : 0;
+    const min = m[3] !== undefined ? parseInt(m[2], 10) : parseInt(m[1], 10);
+    const sec = m[3] !== undefined ? parseInt(m[3], 10) : parseInt(m[2], 10);
+    return h * 3600 + min * 60 + sec;
+  };
+
+  // Match ```widget ... ``` blocks
+  return text.replace(/```widget\s*\n([\s\S]*?)```/g, (fullMatch, jsonStr: string) => {
+    try {
+      const config = JSON.parse(jsonStr.trim());
+      if (config.type !== "timeline" || !config.params?.events) return fullMatch;
+
+      const events = Array.isArray(config.params.events) ? config.params.events : JSON.parse(config.params.events);
+      let changed = false;
+
+      for (const event of events) {
+        // Only add url if it's a timestamp and no url is already set
+        const dateStr = (event.date ?? "").split(/[-–]/)[0].trim();
+        if (!event.url && TS_RE.test(dateStr)) {
+          event.url = `https://www.youtube.com/watch?v=${videoId}&t=${tsToSeconds(dateStr)}`;
+          changed = true;
+        }
+      }
+
+      if (!changed) return fullMatch;
+      config.params.events = events;
+      return "```widget\n" + JSON.stringify(config) + "\n```";
+    } catch {
+      return fullMatch;
+    }
+  });
+}
+
 const MAX_MARKDOWN_CHARS = 30_000; // Beyond this, markdown parsing becomes sluggish
 
 export function MarkdownRenderer({ content, youtubeVideoId }: MarkdownRendererProps) {
@@ -554,6 +598,10 @@ export function MarkdownRenderer({ content, youtubeVideoId }: MarkdownRendererPr
       let text = content.replace(/<br\s*\/?>/gi, "\n");
       // Auto-linkify bare YouTube timestamps into clickable markdown links
       text = linkifyYouTubeTimestamps(text, youtubeVideoId);
+      // Inject YouTube URLs into timeline widget events with timestamp dates
+      if (youtubeVideoId) {
+        text = enrichTimelineWidgets(text, youtubeVideoId);
+      }
       // Auto-detect and wrap large inline CSV blocks for paginated rendering
       text = wrapLargeCsvBlocks(text);
       // If content is still extremely large after CSV wrapping, truncate the non-fenced parts

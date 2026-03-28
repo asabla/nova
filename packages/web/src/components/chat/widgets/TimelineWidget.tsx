@@ -13,9 +13,9 @@ const DEFAULT_EVENTS: TimelineEvent[] = [
   { date: "2025-06-15", title: "Public launch" },
 ];
 
-/** Detect timestamp formats like "0:00", "5:30", "1:23:45" */
+/** Detect timestamp formats like "0:00", "5:30", "1:23:45", or ranges like "0:00–1:00" */
 function isTimestamp(dateStr: string): boolean {
-  return /^\d{1,2}:\d{2}(:\d{2})?$/.test(dateStr);
+  return /^\d{1,2}:\d{2}(:\d{2})?([-–]\d{1,2}:\d{2}(:\d{2})?)?$/.test(dateStr);
 }
 
 function formatDate(dateStr: string): string {
