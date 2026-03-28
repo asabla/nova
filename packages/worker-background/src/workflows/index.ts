@@ -4,3 +4,6 @@ export { researchRefinementWorkflow } from "./research-refinement.js";
 export { conversationSummaryWorkflow } from "./conversation-summary.js";
 export { conversationSummaryBatchWorkflow } from "./conversation-summary-batch.js";
 export { scheduledCleanupWorkflow } from "./scheduled-cleanup.js";
+export { evalWorkflow } from "./eval.js";
+export { evalAggregateWorkflow } from "./eval-aggregate.js";
+export { promptOptimizationWorkflow } from "./prompt-optimization.js";

@@ -242,6 +242,11 @@ export async function rateMessage(orgId: string, messageId: string, userId: stri
       .set({ rating, feedback, updatedAt: new Date() })
       .where(eq(messageRatings.id, existing[0].id))
       .returning();
+
+    // Dispatch eval on thumbs-down
+    if (rating === -1) {
+      dispatchEvalForRating(orgId, messageId).catch(() => {});
+    }
     return result[0];
   }
 
@@ -252,7 +257,34 @@ export async function rateMessage(orgId: string, messageId: string, userId: stri
     rating,
     feedback,
   }).returning();
+
+  // Dispatch eval on thumbs-down
+  if (rating === -1) {
+    dispatchEvalForRating(orgId, messageId).catch(() => {});
+  }
   return result[0];
+}
+
+async function dispatchEvalForRating(orgId: string, messageId: string) {
+  // Look up the message's conversation
+  const [msg] = await db
+    .select({ conversationId: messages.conversationId })
+    .from(messages)
+    .where(eq(messages.id, messageId))
+    .limit(1);
+  if (!msg) return;
+
+  const client = await getTemporalClient();
+  await client.workflow.start("evalWorkflow", {
+    taskQueue: TASK_QUEUES.BACKGROUND,
+    workflowId: `eval-rating-${messageId}-${Date.now()}`,
+    args: [{
+      orgId,
+      messageId,
+      conversationId: msg.conversationId,
+      evalType: "chat",
+    }],
+  });
 }
 
 export async function addNote(orgId: string, messageId: string, userId: string, content: string) {
