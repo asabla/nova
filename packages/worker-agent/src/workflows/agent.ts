@@ -251,6 +251,13 @@ const { executeAgentStepWithSDK } = proxyActivities<typeof agentStepActivities>(
   retry: { maximumAttempts: 3 },
 });
 
+// Longer timeout for research synthesis which can produce 16k+ tokens
+const { executeAgentStepWithSDK: executeResearchSynthesis } = proxyActivities<typeof agentStepActivities>({
+  startToCloseTimeout: "10 minutes",
+  heartbeatTimeout: "60 seconds",
+  retry: { maximumAttempts: 2 },
+});
+
 const { runAgentLoop } = proxyActivities<typeof agentRunActivities>({
   startToCloseTimeout: "30 minutes",
   heartbeatTimeout: "60 seconds",
@@ -978,39 +985,85 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         })
         .join("\n\n");
 
-      const synthesis = await executeAgentStepWithSDK({
-        systemPrompt: [
-          "You are a helpful assistant. Synthesize the gathered information into a clear, natural response.",
-          "Rules:",
-          "- Do NOT mention steps, subtasks, plans, or the synthesis process.",
-          "- If the result contains a code artifact (HTML, code file, etc.), present ONLY the final artifact with a brief 1-2 sentence introduction. Do not include planning notes, creative direction, or validation logs.",
-          "- If the result is informational (research, analysis), summarize concisely in 1-4 paragraphs.",
-          "- Never repeat content that already appears in the artifact.",
-          "- Never add filler closings like 'let me know if you need changes'.",
-        ].join("\n"),
-        modelId: input.model,
-        modelParams: { ...(agent?.modelParams ?? {}), maxTokens: 4096 },
-        messageHistory: [
-          { role: "assistant" as const, content: nodeResults },
-          { role: "user" as const, content: `Based on the information above, provide a clear response to: "${input.userMessage ?? messageHistory.filter((m) => m.role === "user").pop()?.content ?? "the user's request"}"` },
-        ],
-        singleTurn: true,
-      });
+      if (input.researchConfig) {
+        // Research mode: use a research-aware synthesis that produces a full report,
+        // not the generic 1-4 paragraph summary which crushes research output.
+        // Uses the longer-timeout proxy since research synthesis can be slow (16k+ tokens).
+        try {
+          const synthesis = await executeResearchSynthesis({
+            systemPrompt: [
+              "You are a Deep Research Agent. Synthesize the gathered research into a comprehensive, well-structured report.",
+              "Rules:",
+              "- Combine all research findings into a unified, thorough report.",
+              "- Use markdown formatting: ## headings, bullet points, numbered lists.",
+              "- Include ALL relevant data, statistics, quotes, and details from the research nodes.",
+              "- Use [N] inline citations referencing the sources found during research.",
+              "- Structure: Executive Summary → Key Findings → Detailed Analysis sections → Conclusion.",
+              "- Do NOT summarize briefly — the goal is a comprehensive research report.",
+              "- Do NOT mention steps, subtasks, plans, or the synthesis process.",
+              "- Do NOT add filler closings.",
+            ].join("\n"),
+            modelId: input.model,
+            modelParams: { ...(agent?.modelParams ?? {}), maxTokens: 16384 },
+            messageHistory: [
+              { role: "assistant" as const, content: nodeResults },
+              { role: "user" as const, content: `Based on all the research above, produce a comprehensive research report on: "${input.researchConfig.query}"` },
+            ],
+            singleTurn: true,
+          });
 
-      totalInputTokens += synthesis.usage.prompt_tokens ?? 0;
-      totalOutputTokens += synthesis.usage.completion_tokens ?? 0;
-      totalTokens += (synthesis.usage.prompt_tokens ?? 0) + (synthesis.usage.completion_tokens ?? 0);
+          totalInputTokens += synthesis.usage.prompt_tokens ?? 0;
+          totalOutputTokens += synthesis.usage.completion_tokens ?? 0;
+          totalTokens += (synthesis.usage.prompt_tokens ?? 0) + (synthesis.usage.completion_tokens ?? 0);
 
-      if (synthesis.content) {
-        finalContent = synthesis.content;
-        if (ch) await publishTokenActivity(ch, synthesis.content);
+          if (synthesis.content) {
+            finalContent = synthesis.content;
+            if (ch) await publishTokenActivity(ch, synthesis.content);
+          }
+        } catch (synthErr: any) {
+          // Fallback: use concatenated node results directly if synthesis fails
+          console.warn(`[agentWorkflow] research synthesis failed, using raw node output: ${synthErr.message}`);
+          finalContent = completedWithContent
+            .map((n) => n.result!.content)
+            .join("\n\n---\n\n");
+          if (ch) await publishTokenActivity(ch, finalContent);
+        }
+      } else {
+        // Normal conversation: concise synthesis
+        const synthesis = await executeAgentStepWithSDK({
+          systemPrompt: [
+            "You are a helpful assistant. Synthesize the gathered information into a clear, natural response.",
+            "Rules:",
+            "- Do NOT mention steps, subtasks, plans, or the synthesis process.",
+            "- If the result contains a code artifact (HTML, code file, etc.), present ONLY the final artifact with a brief 1-2 sentence introduction. Do not include planning notes, creative direction, or validation logs.",
+            "- If the result is informational (research, analysis), summarize concisely in 1-4 paragraphs.",
+            "- Never repeat content that already appears in the artifact.",
+            "- Never add filler closings like 'let me know if you need changes'.",
+          ].join("\n"),
+          modelId: input.model,
+          modelParams: { ...(agent?.modelParams ?? {}), maxTokens: 4096 },
+          messageHistory: [
+            { role: "assistant" as const, content: nodeResults },
+            { role: "user" as const, content: `Based on the information above, provide a clear response to: "${input.userMessage ?? messageHistory.filter((m) => m.role === "user").pop()?.content ?? "the user's request"}"` },
+          ],
+          singleTurn: true,
+        });
 
-        if (conversationId && input.agentId) {
-          const msg = await saveAgentMessage(
-            input.orgId, conversationId, synthesis.content, input.agentId, agent?.modelId ?? null,
-            synthesis.usage.prompt_tokens, synthesis.usage.completion_tokens,
-          );
-          messageIds.push(msg.id);
+        totalInputTokens += synthesis.usage.prompt_tokens ?? 0;
+        totalOutputTokens += synthesis.usage.completion_tokens ?? 0;
+        totalTokens += (synthesis.usage.prompt_tokens ?? 0) + (synthesis.usage.completion_tokens ?? 0);
+
+        if (synthesis.content) {
+          finalContent = synthesis.content;
+          if (ch) await publishTokenActivity(ch, synthesis.content);
+
+          if (conversationId && input.agentId) {
+            const msg = await saveAgentMessage(
+              input.orgId, conversationId, synthesis.content, input.agentId, agent?.modelId ?? null,
+              synthesis.usage.prompt_tokens, synthesis.usage.completion_tokens,
+            );
+            messageIds.push(msg.id);
+          }
         }
       }
     }
