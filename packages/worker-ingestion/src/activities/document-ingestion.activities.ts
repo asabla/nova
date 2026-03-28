@@ -22,6 +22,8 @@ import {
   type TranscriptSegment,
 } from "../lib/extract-youtube";
 import { upsertPoints, deletePointsByFilter, COLLECTIONS } from "@nova/worker-shared/qdrant";
+import { chunkCodeFile } from "../lib/code-chunker";
+import { CODE_FILE_EXTENSIONS } from "@nova/shared/constants";
 
 async function getMinioClient() {
   const { Client: MinioClient } = await import("minio");
@@ -140,6 +142,7 @@ interface ResolvedContent {
   extractedMetadata?: ExtractedMetadata;
   documentMetadata?: Record<string, unknown>;
   fileType?: string;
+  filename?: string;
   transcriptSegments?: TranscriptSegment[];
 }
 
@@ -314,7 +317,13 @@ async function resolveDocumentContent(input: DocumentIngestionInput): Promise<Re
         extractedMetadata: { byline: extracted.byline, publishedDate: extracted.publishedDate, description: extracted.description, language: extracted.language, siteName: extracted.siteName, wordCount: extracted.wordCount },
       };
     }
-    return { text };
+
+    // Detect code files by extension
+    const fname = fileRecord.filename?.toLowerCase() ?? "";
+    const ext = fname.includes(".") ? `.${fname.split(".").pop()}` : "";
+    const isCode = (CODE_FILE_EXTENSIONS as readonly string[]).includes(ext);
+
+    return { text, filename: fileRecord.filename ?? undefined, fileType: isCode ? "code" : undefined };
   }
 
   return { text: "" };
@@ -578,18 +587,26 @@ export async function ingestDocument(input: DocumentIngestionInput): Promise<{ c
     .from(knowledgeCollections)
     .where(eq(knowledgeCollections.id, input.collectionId));
 
-  // YouTube transcripts get chapter-aware chunking with timestamp metadata
-  const chunks = resolved.fileType === "youtube" && resolved.transcriptSegments
-    ? chunkTranscriptWithTimestamps(
-        resolved.transcriptSegments,
-        (resolved.documentMetadata?.chapters as any[]) ?? [],
-        (resolved.documentMetadata?.videoId as string) ?? "",
-        { maxChunkSize: collection?.chunkSize ?? 1500, overlap: collection?.chunkOverlap ?? 150 },
-      )
-    : chunkContent(resolved.text, {
-        maxChunkSize: collection?.chunkSize ?? 1500,
-        overlap: collection?.chunkOverlap ?? 150,
-      });
+  // Choose chunking strategy based on file type
+  let chunks: ContentChunk[];
+  if (resolved.fileType === "youtube" && resolved.transcriptSegments) {
+    chunks = chunkTranscriptWithTimestamps(
+      resolved.transcriptSegments,
+      (resolved.documentMetadata?.chapters as any[]) ?? [],
+      (resolved.documentMetadata?.videoId as string) ?? "",
+      { maxChunkSize: collection?.chunkSize ?? 1500, overlap: collection?.chunkOverlap ?? 150 },
+    );
+  } else if (resolved.fileType === "code" && resolved.filename) {
+    // Use tree-sitter symbol-aware chunking for code files
+    chunks = await chunkCodeFile(resolved.text, resolved.filename, {
+      maxChunkSize: collection?.chunkSize ?? 2000,
+    });
+  } else {
+    chunks = chunkContent(resolved.text, {
+      maxChunkSize: collection?.chunkSize ?? 1500,
+      overlap: collection?.chunkOverlap ?? 150,
+    });
+  }
 
   if (chunks.length === 0) {
     throw new Error("Document produced no chunks after processing");
