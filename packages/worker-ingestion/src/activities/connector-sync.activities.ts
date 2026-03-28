@@ -103,6 +103,18 @@ export async function syncConnectorDocuments(
 
   if (!connector) throw new Error(`Connector ${input.connectorId} not found`);
 
+  // Git providers don't use Microsoft Graph auth
+  switch (connector.provider) {
+    case "github":
+    case "gitlab":
+    case "bitbucket":
+    case "git":
+      return syncRepoFiles(input);
+    default:
+      break;
+  }
+
+  // M365 providers — acquire Microsoft Graph token
   const clientSecret = Buffer.from(connector.clientSecretEncrypted, "base64").toString("utf-8");
   const token = await getAppToken(connector.tenantId, connector.clientId, clientSecret);
 
@@ -113,11 +125,6 @@ export async function syncConnectorDocuments(
       return syncOneDrive(token, connector, input);
     case "teams":
       return syncTeams(token, connector, input);
-    case "github":
-    case "gitlab":
-    case "bitbucket":
-    case "git":
-      return syncRepoFiles(input);
     default:
       throw new Error(`Unknown provider: ${connector.provider}`);
   }

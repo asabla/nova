@@ -9,6 +9,7 @@ import {
   Cloud,
   HardDrive,
   MessageSquare,
+  GitBranch,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -30,12 +31,20 @@ const PROVIDER_ICONS: Record<string, React.ReactNode> = {
   sharepoint: <Cloud className="h-4 w-4" aria-hidden="true" />,
   onedrive: <HardDrive className="h-4 w-4" aria-hidden="true" />,
   teams: <MessageSquare className="h-4 w-4" aria-hidden="true" />,
+  github: <GitBranch className="h-4 w-4" aria-hidden="true" />,
+  gitlab: <GitBranch className="h-4 w-4" aria-hidden="true" />,
+  bitbucket: <GitBranch className="h-4 w-4" aria-hidden="true" />,
+  git: <GitBranch className="h-4 w-4" aria-hidden="true" />,
 };
 
 const PROVIDER_LABELS: Record<string, string> = {
   sharepoint: "SharePoint",
   onedrive: "OneDrive",
   teams: "Teams",
+  github: "GitHub",
+  gitlab: "GitLab",
+  bitbucket: "Bitbucket",
+  git: "Git",
 };
 
 function syncStatusBadge(status: string) {
@@ -125,7 +134,7 @@ export function SourcesTab({ collectionId }: SourcesTabProps) {
           </h3>
           <p className="text-sm text-text-secondary max-w-sm mt-1">
             {t("knowledge.sources.emptyHint", {
-              defaultValue: "Sync documents automatically from Microsoft 365.",
+              defaultValue: "Sync code from Git repositories or documents from Microsoft 365.",
             })}
           </p>
           <div className="mt-5">
@@ -146,7 +155,7 @@ export function SourcesTab({ collectionId }: SourcesTabProps) {
               <p className="text-xs text-text-secondary mt-0.5">
                 {t("knowledge.sources.description", {
                   defaultValue:
-                    "Connect Microsoft 365 sources to automatically sync documents into this collection.",
+                    "Connect Git repositories or Microsoft 365 sources to automatically sync into this collection.",
                 })}
               </p>
             </div>

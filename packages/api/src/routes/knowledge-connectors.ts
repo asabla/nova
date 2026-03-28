@@ -113,6 +113,11 @@ knowledgeConnectorRoutes.post("/:collectionId/connectors", async (c) => {
     details: { provider: body.provider },
   });
 
+  // Auto-trigger initial sync
+  knowledgeConnectorService.triggerSync(orgId, connector.id).catch((err) =>
+    console.error("[connector] Failed to auto-trigger initial sync:", err),
+  );
+
   return c.json(connector, 201);
 });
 

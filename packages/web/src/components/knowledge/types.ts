@@ -58,7 +58,7 @@ export interface HistoryEntry {
 export interface KnowledgeConnector {
   id: string;
   knowledgeCollectionId: string;
-  provider: "sharepoint" | "onedrive" | "teams";
+  provider: "sharepoint" | "onedrive" | "teams" | "github" | "gitlab" | "bitbucket" | "git";
   tenantId: string;
   clientId: string;
   resourceId: string;
