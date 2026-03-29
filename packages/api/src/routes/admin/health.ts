@@ -48,15 +48,17 @@ adminHealthRoutes.get("/", async (c) => {
     checks.minio = { status: "unhealthy", error: err.message };
   }
 
-  // Temporal (use the UI port which is HTTP)
+  // Temporal — check via the Temporal UI's HTTP API (gRPC port 7233 is not HTTP)
   try {
-    const temporalHost = env.TEMPORAL_HOST ?? "temporal";
+    const temporalUiHost = env.TEMPORAL_UI_HOST ?? "temporal-ui";
+    const temporalUiPort = env.TEMPORAL_UI_PORT ?? "8080";
     const start = Date.now();
-    // Try the frontend HTTP health endpoint
-    const resp = await fetch(`http://${temporalHost}:7233/api/v1/namespaces`, { signal: AbortSignal.timeout(5000) }).catch(() => null);
-    checks.temporal = { status: resp?.ok ? "healthy" : "unknown", latencyMs: Date.now() - start };
-  } catch {
-    checks.temporal = { status: "unknown" };
+    const resp = await fetch(`http://${temporalUiHost}:${temporalUiPort}/api/v1/namespaces`, { signal: AbortSignal.timeout(5000) });
+    const data = await resp.json().catch(() => null);
+    const hasNamespaces = Array.isArray(data?.namespaces) && data.namespaces.length > 0;
+    checks.temporal = { status: resp.ok && hasNamespaces ? "healthy" : "unhealthy", latencyMs: Date.now() - start };
+  } catch (err: any) {
+    checks.temporal = { status: "unhealthy", error: err.message };
   }
 
   // SearxNG
