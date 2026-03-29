@@ -24,9 +24,9 @@ export const adminApp = new Hono<AppContext>().basePath("/admin-api");
 // Admin Middleware Chain (separate from main app)
 // ---------------------------------------------------------------------------
 
-// CORS — stricter: only admin domain
+// CORS — allow admin portal origins
 adminApp.use("*", cors({
-  origin: env.ADMIN_CORS_ORIGIN ?? "http://localhost:5174",
+  origin: (env.ADMIN_CORS_ORIGIN ?? "http://localhost:5174,http://localhost:5173,http://localhost:3000").split(","),
   credentials: true,
 }));
 

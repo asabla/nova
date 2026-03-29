@@ -1,35 +1,45 @@
 /**
  * Admin authentication middleware.
  * Validates that the request comes from a super-admin user.
- * Completely separate from the main app's auth/org-scope chain.
+ * Reads the Better Auth session cookie (nova_session), hashes it,
+ * and looks up the session in the database.
  */
 
 import { createMiddleware } from "hono/factory";
+import { createHash } from "crypto";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
 import { users, sessions } from "@nova/shared/schemas";
 import { eq, and, isNull, gte } from "drizzle-orm";
 
-export const adminAuth = createMiddleware<AppContext>(async (c, next) => {
-  // Extract session token from cookie or Authorization header
-  const cookieHeader = c.req.header("cookie") ?? "";
-  const cookies = Object.fromEntries(
-    cookieHeader.split(";").map((c) => {
-      const [k, ...v] = c.trim().split("=");
-      return [k, v.join("=")];
-    }),
-  );
+function parseCookies(header: string): Record<string, string> {
+  const cookies: Record<string, string> = {};
+  for (const part of header.split(";")) {
+    const [k, ...v] = part.trim().split("=");
+    if (k) cookies[k] = v.join("=");
+  }
+  return cookies;
+}
 
+export const adminAuth = createMiddleware<AppContext>(async (c, next) => {
+  const cookieHeader = c.req.header("cookie") ?? "";
+  const cookies = parseCookies(cookieHeader);
+
+  // Better Auth cookie name (configured in auth.ts)
   const token =
-    cookies["better-auth.session_token"] ??
+    cookies["nova_session"] ??
     cookies["nova.session_token"] ??
+    cookies["better-auth.session_token"] ??
     c.req.header("authorization")?.replace("Bearer ", "");
 
   if (!token) {
     return c.json({ error: "Authentication required" }, 401);
   }
 
-  // Look up session and user
+  // Better Auth stores sessions as SHA-256 hash of the token
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+
+  // Look up session by token hash
   const [session] = await db
     .select({
       sessionId: sessions.id,
@@ -38,7 +48,7 @@ export const adminAuth = createMiddleware<AppContext>(async (c, next) => {
     })
     .from(sessions)
     .where(and(
-      eq(sessions.token, token),
+      eq(sessions.tokenHash, tokenHash),
       gte(sessions.expiresAt, new Date()),
     ));
 
