@@ -1,7 +1,7 @@
 # ADR-0001: Technology Stack
 
-- **Status:** Accepted
-- **Date:** 2026-03-06
+- **Status:** Accepted (updated 2026-03-29 to reflect pgvector→Qdrant migration and LiteLLM removal)
+- **Date:** 2026-03-06 (original), 2026-03-29 (updated)
 - **Deciders:** NOVA Core Team
 
 ## Context
@@ -20,7 +20,7 @@ NOVA is a self-hosted-first AI chat platform with multi-tenancy designed in from
 - Bun's Node.js compatibility layer has gaps, particularly with native modules and `worker_threads`
 - Memory leak reports exist for long-lived connections in production (Bun issues #16503, #17723, #25948)
 - SSE streams require explicit `idleTimeout: 0` to prevent silent disconnection (Bun issue #27479)
-- The `packages/worker` service MUST run on Node.js due to Temporal SDK requirements (see below)
+- The `packages/worker-*` services MUST run on Node.js due to Temporal SDK requirements (see below)
 
 **Mitigations:**
 - Hono framework allows zero-code-change migration to Node.js if Bun proves unstable
@@ -31,24 +31,29 @@ NOVA is a self-hosted-first AI chat platform with multi-tenancy designed in from
 
 **Decision:** Hono is the HTTP/WebSocket framework for the API server.
 
-### Database: PostgreSQL 16 + pgvector + pg_trgm
+### Database: PostgreSQL 16 + pg_trgm
 
-**Decision:** PostgreSQL 16 as the primary database with pgvector for vector embeddings and pg_trgm for full-text search.
+**Decision:** PostgreSQL 16 as the primary relational database with pg_trgm for full-text search.
 
 **Rationale:**
-- Single database for relational data, vector search, and full-text search reduces operational complexity
-- pgvector HNSW indexes provide excellent recall and performance for up to ~5M vectors
 - pg_trgm enables trigram-based fuzzy text search without external search infrastructure
 - PostgreSQL 16 brings performance improvements for concurrent workloads
 
-**Trade-offs:**
-- pgvector at extreme scale (>5M vectors) may need partitioning or a dedicated vector DB
-- No built-in semantic search reranking (must be done at application layer)
+> **UPDATE (2026-03-29):** pgvector was originally planned but replaced by Qdrant as a dedicated vector database. This provides better scaling characteristics and separates vector workloads from relational queries.
 
-**Consequences:**
-- Use HNSW indexes (not ivfflat) for better recall without periodic reindexing
-- Plan table partitioning by org_id for multi-tenant vector isolation
-- Monitor memory: HNSW indexes are memory-hungry (~1.5x the data size)
+### Vector Search: Qdrant
+
+**Decision:** Qdrant as the dedicated vector database for all embedding and similarity search (ports 6333/6334).
+
+**Rationale:**
+- Purpose-built for vector search with better performance characteristics than pgvector at scale
+- Separates vector workloads from relational queries, reducing PostgreSQL memory pressure
+- Rich filtering capabilities for multi-tenant vector isolation via org_id payloads
+- gRPC and REST APIs, native collection partitioning
+
+**Trade-offs:**
+- Additional infrastructure service to operate
+- Data split across two systems (relational in PostgreSQL, vectors in Qdrant)
 
 ### ORM: Drizzle ORM + drizzle-kit
 
@@ -94,24 +99,17 @@ NOVA is a self-hosted-first AI chat platform with multi-tenancy designed in from
 - Production MinIO with erasure coding needs minimum 4 drives
 - Single-node MinIO is acceptable for dev/staging but not production durability
 
-### AI Model Gateway: LiteLLM
+### ~~AI Model Gateway: LiteLLM~~ (Removed)
 
-**Decision:** LiteLLM (Docker) as the universal model gateway. All LLM and embedding API calls go through LiteLLM.
+> **UPDATE (2026-03-29):** LiteLLM has been removed from the architecture. LLM calls now go directly to providers (OpenAI, Anthropic, etc.) via a provider registry stored in the database. Model providers and their API keys are configured per-org through the admin UI. This eliminates the ~200-500MB RAM overhead and removes a Python dependency from the stack.
 
-**Rationale:**
-- Normalizes 100+ model providers behind an OpenAI-compatible API
-- Built-in function calling normalization across providers
-- Per-user/per-team cost tracking and budget limits
-- Streaming support (SSE) for chat completions
-- Embedding API support for the RAG pipeline
-- Model fallback and retry with exponential backoff
-- Apache 2.0 license, self-hosted Docker deployment
-- Virtual keys enable per-tenant metering for SaaS billing
+**Original decision:** LiteLLM (Docker) as the universal model gateway.
 
-**Trade-offs:**
-- Python/FastAPI process adds ~200-500MB RAM
-- Fast-moving project: pin Docker image versions tightly
-- Adds ~1-5ms latency per request (local proxy)
+**Why removed:**
+- Direct provider calls reduce latency and operational complexity
+- Provider registry in DB gives per-org configuration without a separate service
+- Cost tracking is handled at the application layer via usage_stats table
+- Model fallback is implemented in the agent workflow layer
 
 ### Workflow Engine: Temporal
 
@@ -132,7 +130,7 @@ NOVA is a self-hosted-first AI chat platform with multi-tenancy designed in from
 - Significant learning curve (event sourcing, deterministic constraints)
 
 **Consequences:**
-- `packages/worker` MUST use Node.js runtime, not Bun
+- `packages/worker-agent`, `packages/worker-ingestion`, `packages/worker-background` MUST use Node.js runtime, not Bun
 - `packages/api` uses `@temporalio/client` only (lighter, likely Bun-compatible for gRPC calls)
 - Validate `@temporalio/client` under Bun early in Phase 1
 - Docker Compose includes `temporal-server` and `temporal-ui` services
@@ -205,7 +203,7 @@ NOVA is a self-hosted-first AI chat platform with multi-tenancy designed in from
 - Works with the mixed Bun/Node.js runtime strategy
 
 **Consequences:**
-- `packages/worker` needs explicit Node.js configuration despite being in a Bun workspace
+- `packages/worker-*` need explicit Node.js configuration despite being in a Bun workspace
 - TypeScript project references ensure proper build order
 
 ### License: FSL-1.1-Apache-2.0
@@ -222,7 +220,7 @@ NOVA is a self-hosted-first AI chat platform with multi-tenancy designed in from
 
 The overall stack prioritizes:
 1. **Self-hosted simplicity** — Docker Compose gets the full platform running locally
-2. **TypeScript end-to-end** — except LiteLLM (Python) and Temporal server (Go)
+2. **TypeScript end-to-end** — except Temporal server (Go)
 3. **Portability** — Hono's multi-runtime support provides an escape hatch from Bun
-4. **Pragmatism** — nsjail before Firecracker, pgvector before dedicated vector DB
-5. **Mixed runtime** — Bun for API/web, Node.js for Temporal workers, Python for LiteLLM
+4. **Pragmatism** — nsjail before Firecracker, direct provider calls before gateway proxy
+5. **Mixed runtime** — Bun for API/web, Node.js for Temporal workers

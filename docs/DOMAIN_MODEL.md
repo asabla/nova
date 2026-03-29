@@ -2,7 +2,9 @@
 
 > Version: 1.0
 > Date: 2026-03-06
-> Status: Complete -- covers all 234 user stories
+> Status: **Partially outdated** -- covers the original 59 tables. Actual schema now has 75 tables.
+> Tables added since v1.0: evals (evalRuns, evalDimensions, evalAggregates), system (systemHealthChecks, systemPrompts, systemPromptVersions, rateLimitRules, dataJobs), models (models, modelProviders), SSO (ssoProviders, ssoSessions), knowledge extensions (knowledgeConnectors, knowledgeTags, knowledgeDocumentTagAssignments), agents extensions (agentMemoryVectors, agentTasks, agentStarterTemplates), custom workers (customWorkers), and others.
+> See `packages/shared/src/schemas/` for the authoritative schema definitions.
 
 ---
 

@@ -1,8 +1,8 @@
 # NOVA -- Refined System Plan
 
-> Version: 2.0 (Refined with comprehensive technology research)
-> Date: 2026-03-06
-> Status: Ready for implementation planning
+> Version: 2.1 (Updated to reflect implementation progress and architectural changes)
+> Date: 2026-03-29
+> Status: Implementation in progress — Phases 1-2 complete, Phase 3 at 84%
 
 ---
 
@@ -41,44 +41,47 @@ NOVA is a self-hosted-first AI chat platform with multi-tenancy, custom agents, 
    +------+------+  |  +----------+------+  +--+----------+--+
    | PostgreSQL  |  |  |    Redis       |  |    MinIO       |
    | (NOVA DB)   |  |  |  (pub/sub,    |  | (S3-compat     |
-   | + pgvector  |  |  |   sessions,   |  |  file store)   |
-   | + pg_trgm   |  |  |   rate lim)   |  +----------------+
-   +------+------+  |  +-------+-------+
+   | + pg_trgm   |  |  |   sessions,   |  |  file store)   |
+   +------+------+  |  |   rate lim)   |  +----------------+
+          |         |  +-------+-------+
           |         |          |
-          |    +----+----------+----+
-          |    |  LiteLLM           |
-          |    | (model gateway)    |
-          |    | Python/FastAPI     |
-          |    +---------+----------+
-          |              |
-          |    +---------+----------+    +------------------+
-          |    | LangFuse           |    | Prometheus       |
-          |    | (LLM tracing)      |    | + Grafana        |
-          |    +--------------------+    +------------------+
+          |    +----+----------+--+   +------------------+
+          |    | Qdrant            |   | Prometheus       |
+          |    | (vector search)  |   | + Grafana        |
+          |    | port 6333/6334   |   +------------------+
+          |    +------------------+
           |
+          |    +------------------+    (optional)
+          |    | LangFuse         |    +------------------+
+          |    | (LLM tracing)    |    | SearxNG          |
+          |    +------------------+    | (web search)     |
+          |                            +------------------+
    +------+------+    +------------------+
    | PostgreSQL  |    |  Temporal Server |
    | (Temporal   |    |  (Go binary)     |
    |  internal)  +----+  port 7233       |
    +-------------+    +--------+---------+
                                |
-                      +--------+---------+
-                      | Worker (Node.js) |
-                      | (Temporal        |
-                      |  activities)     |
-                      +--------+---------+
-                               |
-                      +--------+---------+
-                      | Code Sandbox     |
-                      | (nsjail/gVisor/  |
-                      |  Firecracker)    |
-                      +------------------+
+              +----------------+----------------+
+              |                |                |
+     +--------+------+ +------+-------+ +------+--------+
+     | worker-agent  | | worker-      | | worker-       |
+     | (Node.js)     | | ingestion    | | background    |
+     | Chat, tools,  | | (Node.js)    | | (Node.js)     |
+     | DAG workflows | | Doc/file     | | Research,     |
+     +--------+------+ | embedding    | | scheduling    |
+              |         +--------------+ +---------------+
+     +--------+---------+
+     | Code Sandbox     |
+     | (Docker/nsjail)  |
+     +------------------+
 
   Note: Arrows represent primary data flow directions.
   API Server connects to ALL data stores directly.
-  Worker connects to PostgreSQL (NOVA DB), MinIO, Redis, and LiteLLM.
+  Workers connect to PostgreSQL (NOVA DB), MinIO, Redis, Qdrant.
+  LLM calls go directly to providers (OpenAI, Anthropic, etc.) — no proxy.
   Two PostgreSQL instances: NOVA DB and Temporal internal DB.
-  LiteLLM optionally uses NOVA PostgreSQL for spend tracking.
+  LangFuse is optional (disabled by default, enabled via env vars).
 ```
 
 ---
@@ -91,10 +94,13 @@ NOVA is a self-hosted-first AI chat platform with multi-tenancy, custom agents, 
 |---------|---------|--------|
 | `packages/api` | Bun | Fast HTTP, native WS, TypeScript execution |
 | `packages/web` | Bun (Vite) | Fast HMR, build tooling |
-| `packages/worker` | **Node.js** | Temporal Worker SDK requires Node.js |
+| `packages/worker-agent` | **Node.js** | Temporal Worker SDK requires Node.js (task queue: `nova-agent`) |
+| `packages/worker-ingestion` | **Node.js** | Temporal Worker SDK requires Node.js (task queue: `nova-ingestion`) |
+| `packages/worker-background` | **Node.js** | Temporal Worker SDK requires Node.js (task queue: `nova-background`) |
+| `packages/worker-shared` | **Node.js** | Shared worker infrastructure (db, redis, qdrant, minio, sandbox) |
 | `packages/shared` | Both | Pure TypeScript types and utilities |
 
-This is the most significant finding from research. Temporal's Worker SDK depends on Node.js-specific APIs (`worker_threads`, `vm` module). The API server uses only `@temporalio/client` which is lighter.
+This is the most significant finding from research. Temporal's Worker SDK depends on Node.js-specific APIs (`worker_threads`, `vm` module). The API server uses only `@temporalio/client` which is lighter. Workers are split by concern into three packages with a shared infrastructure package.
 
 ### 2. Hono as API Framework
 
@@ -123,12 +129,12 @@ Abstract `SandboxBackend` interface from day 1 makes switching a config change.
 - Network: disabled
 - Supported languages: Python 3.12, Node.js 20, Bash
 
-### 4. WebSocket via Redis Pub/Sub
+### 4. Real-time: SSE + WebSocket via Redis Pub/Sub
 
-Hono's WS helper lacks Bun pub/sub support. Architecture:
-1. Hono `upgradeWebSocket()` for handshake and per-connection lifecycle
-2. Redis pub/sub for message fan-out (required for horizontal scaling across API pods)
-3. Optional: For single-pod high-throughput scenarios, drop to `Bun.serve()` native WebSocket API for specific endpoints (e.g., typing indicators) while using Redis for cross-pod events
+Both SSE and WebSocket are used, each serving different purposes:
+1. **SSE** (via `stream-relay.ts`): Chat token streaming, agent flow events. Events are dual-published to Redis pub/sub channels and Redis lists (`stream-events:{channelId}`) for replay on reconnection
+2. **WebSocket** (via Bun native WS at `/ws`): Typing indicators, presence, and low-latency bi-directional events
+3. Redis pub/sub provides fan-out across multiple API pods for horizontal scaling
 
 ### 5. SSE Hardening
 
@@ -146,12 +152,13 @@ Bun has a known issue where `idleTimeout` silently kills SSE streams:
 | Runtime (API) | Bun | Pin to latest stable; update monthly | With Node.js fallback via Hono |
 | Runtime (Worker) | Node.js | 20 LTS | Required by Temporal Worker SDK |
 | API Framework | Hono | ^4.12 (pin minor) | Multi-runtime, see ADR-0002 |
-| Database (NOVA) | PostgreSQL | 16.x | + pgvector 0.7+ + pg_trgm |
+| Database (NOVA) | PostgreSQL | 16.x | + pg_trgm (pgvector removed — see Qdrant) |
 | Database (Temporal) | PostgreSQL | 16.x | Separate instance for Temporal server |
 | ORM | Drizzle | Pin 1.0-beta.x; upgrade to 1.0 when stable | + drizzle-kit + drizzle-zod |
 | Cache/PubSub | Redis | 7.2+ | Sessions, pub/sub, rate limiting |
 | Object Storage | MinIO | Pin RELEASE tag (e.g. RELEASE.2026-03-01) | S3-compatible |
-| Model Gateway | LiteLLM | Pin Docker SHA digest | Python/FastAPI; all LLM calls routed through |
+| Vector Search | Qdrant | Pin release tag | Dedicated vector DB; replaced pgvector for all embedding/similarity search |
+| ~~Model Gateway~~ | ~~LiteLLM~~ | ~~Removed~~ | LLM calls go directly to providers via provider registry in DB |
 | Workflow Engine | Temporal | Pin auto-setup image tag (e.g. 1.24.x) | Durable workflows, human-in-loop |
 | Auth | Better Auth | ^1.4 (pin minor) | Hono + Drizzle + multi-tenancy |
 | Frontend | React 19 + Vite | React ^19.0, Vite ^6.0 | + Tailwind CSS v4 |
@@ -170,7 +177,10 @@ Bun has a known issue where `idleTimeout` silently kills SSE streams:
 
 ## User Story Summary
 
-Full inventory in `docs/USER_STORIES.md`. 234 total stories across 34 categories:
+Full inventory in `docs/USER_STORIES.md`. 234 total stories across 34 categories.
+
+> **Implementation status (as of 2026-03-29):** 181/234 stories complete (77%). See `docs/ROADMAP.md` for full tracking.
+> Phases 1-2 complete. Phase 3 at 84%, Phase 4 at 55%, Phase 5 at 31%.
 
 | Scope | Count |
 |-------|-------|
@@ -211,7 +221,7 @@ These categories were entirely missing from the original plan:
 | R5 | Better Auth security surface | Medium | Low | Phase 1: security review of auth implementation; Phase 5: full pentest before SaaS launch | 1, 5 |
 | R6 | Firecracker requires KVM hosts | Medium | Certain | nsjail for non-KVM deployments; document host requirements | 4 |
 | R7 | Temporal infrastructure complexity (2nd PostgreSQL, 2-4GB RAM) | Medium | Certain | Docker Compose for dev; managed Temporal Cloud as option | 1 |
-| R8 | pgvector memory pressure at scale | Low | Low | Partition by org_id; evaluate dedicated vector DB if >5M chunks | 4 |
+| R8 | ~~pgvector memory pressure at scale~~ | ~~Low~~ | ~~N/A~~ | **Resolved:** Migrated to Qdrant as dedicated vector DB | N/A |
 | R9 | LiteLLM version instability (fast-moving Python project) | Low | Medium | Pin Docker image SHA digests; test upgrades in staging | 1 |
 | R10 | Bun workspace limitations | Low | Medium | Can migrate to pnpm if needed | 1 |
 | R11 | Redis single point of failure | Medium | Medium | Phase 1-4: single instance acceptable; Phase 5: Redis Sentinel for HA | 5 |
@@ -328,7 +338,7 @@ These features are in Phase 4-5 and need technology research before implementati
 | `infra/INFRASTRUCTURE.md` | Docker Compose, K8s, CI/CD, env vars, monitoring | Complete |
 | `docs/intial_system_plan.md` | Original planning prompt (reference) | Reference |
 | `LICENSE` | FSL-1.1-Apache-2.0 | Complete |
-| `docs/DOMAIN_MODEL.md` | Entity model -- 29 groups, 59 tables, all fields and relationships | Complete |
+| `docs/DOMAIN_MODEL.md` | Entity model -- original 59 tables (actual schema now has 75 tables) | Needs update |
 | `docs/diagrams/er-diagram.mermaid` | Full ER diagram (59 entities) | Complete |
 | `docs/diagrams/system-overview.mermaid` | C4 Context diagram -- all services and connections | Complete |
 | `docs/diagrams/component-diagram.mermaid` | API package internal components | Complete |
@@ -340,21 +350,30 @@ These features are in Phase 4-5 and need technology research before implementati
 | `docs/API_DESIGN.md` | All REST endpoints, WebSocket events, SSE streams (1225 lines) | Complete |
 | `docs/DATABASE_SCHEMA.md` | Full SQL DDL with indexes, RLS, triggers (1830 lines) | Complete |
 | `packages/api/IMPLEMENTATION.md` | Hono API server implementation guide | Complete |
-| `packages/worker/IMPLEMENTATION.md` | Temporal worker implementation guide | Complete |
+| `packages/worker-*/IMPLEMENTATION.md` | Temporal worker implementation guides | Not yet created |
 | `packages/web/IMPLEMENTATION.md` | React 19 SPA implementation guide | Complete |
 | `packages/shared/IMPLEMENTATION.md` | Shared TypeScript code implementation guide | Complete |
 
 ---
 
-## Next Steps
+## Current Status & Next Steps
 
-All planning documents are complete. The project is ready for Sprint 0 implementation:
+> **Last updated:** 2026-03-29
 
-1. **Sprint 0 (1 week):** Execute validation checklist (see Early Validation section above)
-   - Validate `@temporalio/client` on Bun
-   - Set up monorepo with Bun workspaces
-   - Docker Compose with all 14 services running
-   - Drizzle schema from DATABASE_SCHEMA.md, run first migration
-   - Better Auth + Hono hello-world with session login
-   - SSE streaming proof-of-concept with `idleTimeout: 0`
-2. **Phase 1 Sprint 1-3:** Implement the 45 MVP stories per ROADMAP.md
+Phases 1 and 2 are complete. The project is deep into Phase 3 with active work on Phase 4.
+
+### Completed milestones
+- Sprint 0 validation: all critical items passed (`@temporalio/client` works under Bun, SSE streaming stable, Better Auth integrated)
+- Phase 1 (MVP): 45/45 stories ✅
+- Phase 2 (Teams): 55/55 stories ✅
+- Architectural pivots: pgvector → Qdrant, LiteLLM removed (direct provider calls), single worker → 3 workers
+
+### Current focus
+- **Phase 3 (Agents & Knowledge):** 42/50 stories done. Remaining: agent UX gaps (#52 stop mid-flight, #56 re-run failed step, #59 sub-agent visibility), tool marketplace (#145, #148), agent defaults (#105), memory limits (#113)
+- **Phase 4 (Power Features):** 30/55 stories done. Deep research, artifacts, analytics all landed. Remaining: error handling UX, integrations, voice, admin onboarding, model playground
+
+### Next priorities
+1. **Finish Phase 3** — 8 stories remaining, mostly agent execution UX
+2. **Phase 4 error handling UX** — #197-202 (user-facing rate limit warnings, reconnection, status banners)
+3. **Phase 4 integrations** — #215 (Slack), #216 (Teams), #219 (OpenAI-compat API)
+4. **Documentation debt** — Update DOMAIN_MODEL.md (59 → 75 tables), create worker IMPLEMENTATION.md guides

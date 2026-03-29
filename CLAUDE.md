@@ -10,7 +10,7 @@ NOVA — self-hosted-first AI chat platform (multi-tenant SaaS). License: FSL-1.
 
 Bun workspace monorepo with 7 packages:
 
-- **@nova/shared** — Drizzle schemas (65 tables), types, constants, utils, skills. Exports: `./schema`, `./schemas`, `./types`, `./constants`, `./utils`, `./content`, `./skills`
+- **@nova/shared** — Drizzle schemas (75 tables), types, constants, utils, skills. Exports: `./schema`, `./schemas`, `./types`, `./constants`, `./utils`, `./content`, `./skills`
 - **@nova/api** — Hono REST API on Bun runtime. Routes in `src/routes/`, services in `src/services/`, middleware in `src/middleware/`
 - **@nova/web** — React 19 + Vite + TanStack Router + TanStack Query + Zustand + Tailwind v4. Path alias `@/*` → `src/*`
 - **@nova/worker-shared** — Shared worker infrastructure (db, redis, model-client, stream-publisher, qdrant, minio, sandbox, tools). Conditional exports like `@nova/worker-shared/db`

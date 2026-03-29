@@ -1,7 +1,7 @@
 # NOVA -- Development Roadmap
 
-> Version: 2.0
-> Date: 2026-03-22
+> Version: 2.1
+> Date: 2026-03-29 (verified)
 > Source: All 234 user stories from `docs/USER_STORIES.md`, allocated per `docs/REFINED_SYSTEM_PLAN.md`
 >
 > Each story appears in EXACTLY ONE phase. Checkboxes track completion.
