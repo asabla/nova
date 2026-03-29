@@ -90,9 +90,13 @@ adminApp.get("/auth/me", async (c) => {
 
   const cookieHeader = c.req.header("cookie") ?? "";
   const match = cookieHeader.match(/nova_session=([^;]+)/);
-  const token = match?.[1];
+  const rawCookie = match?.[1];
 
-  if (!token) return c.json({ authenticated: false }, 401);
+  if (!rawCookie) return c.json({ authenticated: false }, 401);
+
+  // Better Auth uses signed cookies: "token.signature" — extract just the token
+  const decoded = decodeURIComponent(rawCookie);
+  const token = decoded.split(".")[0];
 
   // Look up in Better Auth's session table (plain token, not hashed)
   const [session] = await database.execute(

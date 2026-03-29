@@ -24,14 +24,19 @@ export const adminAuth = createMiddleware<AppContext>(async (c, next) => {
   const cookieHeader = c.req.header("cookie") ?? "";
   const cookies = parseCookies(cookieHeader);
 
-  const token =
+  const rawCookie =
     cookies["nova_session"] ??
     cookies["better-auth.session_token"] ??
     c.req.header("authorization")?.replace("Bearer ", "");
 
-  if (!token) {
+  if (!rawCookie) {
     return c.json({ error: "Authentication required" }, 401);
   }
+
+  // Better Auth uses signed cookies: "token.signature" — extract just the token part
+  // Also URL-decode since cookies may be percent-encoded
+  const decoded = decodeURIComponent(rawCookie);
+  const token = decoded.split(".")[0];
 
   // Look up session in Better Auth's session table (stores plain tokens)
   const [session] = await db.execute(
