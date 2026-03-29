@@ -101,6 +101,20 @@ function NewConversationPage() {
 
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
 
+      // Attach pre-selected knowledge collections (from home page)
+      try {
+        const knowledgeJson = sessionStorage.getItem("nova:starter-knowledge");
+        if (knowledgeJson) {
+          sessionStorage.removeItem("nova:starter-knowledge");
+          const collectionIds: string[] = JSON.parse(knowledgeJson);
+          await Promise.allSettled(
+            collectionIds.map((knowledgeCollectionId) =>
+              api.post(`/api/conversations/${conversation.id}/knowledge`, { knowledgeCollectionId }),
+            ),
+          );
+        }
+      } catch { /* ignore */ }
+
       // Upload files and build attachment list
       let attachmentMeta: { fileId: string; attachmentType: string }[] | undefined;
       if (files && files.length > 0) {

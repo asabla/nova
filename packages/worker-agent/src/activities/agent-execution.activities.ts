@@ -198,6 +198,7 @@ export async function executeToolCall(
   toolCallId: string,
   toolName: string,
   toolArguments: string,
+  knowledgeCollectionIds?: string[],
 ): Promise<StructuredToolResult> {
   try {
     const args = JSON.parse(toolArguments);
@@ -453,6 +454,26 @@ export async function executeToolCall(
           characterCount: fileText?.length ?? 0,
           ...(isTabular ? { displayHint: "When presenting this data to the user, wrap it in a ```csv code fence for proper table rendering." } : {}),
         };
+        break;
+      }
+      case "query_knowledge": {
+        if (!knowledgeCollectionIds || knowledgeCollectionIds.length === 0) {
+          rawResult = { results: [], message: "No knowledge collections attached to this conversation" };
+          break;
+        }
+        const { queryKnowledgeCollections } = await import("@nova/worker-shared/research-queries");
+        const query = args.query ?? "";
+        const topK = Math.min(args.topK ?? 5, 10);
+        const results = await queryKnowledgeCollections(orgId, knowledgeCollectionIds, query, topK);
+        rawResult = results.map((r: any) => ({
+          documentName: r.documentName,
+          content: r.content,
+          score: r.score,
+          ...(r.fileId ? { fileId: r.fileId, hint: `To analyze this file's raw data, use code_execute with input_file_ids: ["${r.fileId}"]` } : {}),
+          ...(r.sourceUrl ? { sourceUrl: r.sourceUrl } : {}),
+          ...(r.timestampUrl ? { timestampUrl: r.timestampUrl } : {}),
+          ...(r.chapterTitle ? { chapterTitle: r.chapterTitle } : {}),
+        }));
         break;
       }
       default: {

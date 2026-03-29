@@ -756,6 +756,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         agentId: input.agentId,
         orgId: input.orgId,
         allowedBuiltinTools,
+        knowledgeCollectionIds: input.knowledgeCollectionIds,
         researchConfig: rc,
       });
 
@@ -1246,6 +1247,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         agentId: input.agentId,
         orgId: input.orgId,
         allowedBuiltinTools,
+        knowledgeCollectionIds: input.knowledgeCollectionIds,
         researchConfig: input.researchConfig,
       });
 

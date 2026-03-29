@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Settings, Share, GitBranch, Archive, Download, Trash2, MoreHorizontal, Pencil, Pin, PinOff, FileJson, FileText, FileSpreadsheet, Globe, Star } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Settings, Share, GitBranch, Archive, Download, Trash2, MoreHorizontal, Pencil, Pin, PinOff, FileJson, FileText, FileSpreadsheet, Globe, Star, Database } from "lucide-react";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 import { Dropdown, DropdownItem } from "../ui/Dropdown";
@@ -116,6 +116,14 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
     window.open(`${apiBase}/api/export/conversations/${conversation.id}/html`, "_blank");
   };
 
+  const { data: knowledgeData } = useQuery({
+    queryKey: queryKeys.conversations.knowledge(conversation?.id),
+    queryFn: () => api.get<any>(`/api/conversations/${conversation.id}/knowledge`),
+    enabled: !!conversation?.id,
+    staleTime: 30_000,
+  });
+  const knowledgeCount = ((knowledgeData as any)?.data ?? []).length;
+
   if (!conversation) return null;
 
   return (
@@ -157,6 +165,16 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {knowledgeCount > 0 && (
+            <button
+              onClick={() => setShowSettings(true)}
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-primary bg-primary/5 hover:bg-primary/10 transition-colors"
+              title={t("conversation.knowledgeAttached", { defaultValue: "{{count}} knowledge collection(s) attached", count: knowledgeCount })}
+            >
+              <Database className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>{knowledgeCount}</span>
+            </button>
+          )}
           <button
             onClick={() => setShowSettings(true)}
             className="p-1.5 rounded-lg text-text-tertiary hover:text-text hover:bg-surface-secondary transition-colors"

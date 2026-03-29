@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "@tanstack/react-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Send, Square, Paperclip, Pause, Play, Microscope, X, Sparkles } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "../../lib/query-keys";
+import { Send, Square, Paperclip, Pause, Play, Microscope, X, Sparkles, Database, Check, Search } from "lucide-react";
 import { clsx } from "clsx";
 import { VoiceInput } from "./VoiceInput";
 import { AttachmentBar } from "./AttachmentBar";
@@ -70,6 +71,65 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
   const [helpOpen, setHelpOpen] = useState(false);
   const [researchModalOpen, setResearchModalOpen] = useState(false);
   const [researchDismissed, setResearchDismissed] = useState(false);
+
+  // --- Knowledge collection quick-attach ---
+  const [knowledgeOpen, setKnowledgeOpen] = useState(false);
+  const [knowledgeSearch, setKnowledgeSearch] = useState("");
+  const knowledgeRef = useRef<HTMLDivElement>(null);
+
+  // Close popover on outside click
+  useEffect(() => {
+    if (!knowledgeOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (knowledgeRef.current && !knowledgeRef.current.contains(e.target as Node)) {
+        setKnowledgeOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [knowledgeOpen]);
+
+  const { data: attachedKnowledgeData } = useQuery({
+    queryKey: queryKeys.conversations.knowledge(conversationId ?? ""),
+    queryFn: () => api.get<any>(`/api/conversations/${conversationId}/knowledge`),
+    enabled: !!conversationId,
+    staleTime: 30_000,
+  });
+
+  const { data: allKnowledgeData } = useQuery({
+    queryKey: queryKeys.knowledge.list(),
+    queryFn: () => api.get<any>("/api/knowledge?limit=100"),
+    enabled: knowledgeOpen,
+    staleTime: 30_000,
+  });
+
+  const attachedCollections: { knowledgeCollectionId: string; name: string }[] = (attachedKnowledgeData as any)?.data ?? [];
+  const allCollections: { id: string; name: string; description: string | null }[] = (allKnowledgeData as any)?.data ?? [];
+  const attachedIds = new Set(attachedCollections.map((c) => c.knowledgeCollectionId));
+  const knowledgeCount = attachedCollections.length;
+
+  const filteredKnowledge = useMemo(
+    () => knowledgeSearch
+      ? allCollections.filter((c) => c.name.toLowerCase().includes(knowledgeSearch.toLowerCase()))
+      : allCollections,
+    [allCollections, knowledgeSearch],
+  );
+
+  const attachKnowledge = useMutation({
+    mutationFn: (knowledgeCollectionId: string) =>
+      api.post(`/api/conversations/${conversationId}/knowledge`, { knowledgeCollectionId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.knowledge(conversationId ?? "") });
+    },
+  });
+
+  const detachKnowledge = useMutation({
+    mutationFn: (collectionId: string) =>
+      api.delete(`/api/conversations/${conversationId}/knowledge/${collectionId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.knowledge(conversationId ?? "") });
+    },
+  });
 
   // Auto-save draft on disconnect / page unload (story #202)
   const draftKey = conversationId ? `nova:message-draft:${conversationId}` : "nova:message-draft";
@@ -326,6 +386,84 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
                 className="hidden"
               />
             </>
+          )}
+
+          {/* Knowledge collection quick-attach */}
+          {conversationId && (
+            <div ref={knowledgeRef} className="relative shrink-0 mb-0.5">
+              <button
+                onClick={() => setKnowledgeOpen(!knowledgeOpen)}
+                className={clsx(
+                  "p-1.5 rounded-lg transition-colors relative",
+                  knowledgeCount > 0
+                    ? "text-primary hover:bg-primary/10"
+                    : "text-text-tertiary hover:text-text-secondary hover:bg-surface-tertiary",
+                )}
+                aria-label={t("knowledge.attach", { defaultValue: "Attach knowledge" })}
+                title={t("knowledge.attach", { defaultValue: "Attach knowledge collection" })}
+              >
+                <Database className="h-4 w-4" aria-hidden="true" />
+                {knowledgeCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-primary text-[9px] font-bold text-primary-foreground flex items-center justify-center">
+                    {knowledgeCount}
+                  </span>
+                )}
+              </button>
+
+              {knowledgeOpen && (
+                <div className="absolute bottom-full left-0 mb-2 w-72 rounded-xl border border-border bg-surface shadow-lg z-50 overflow-hidden">
+                  <div className="px-3 py-2 border-b border-border">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary" aria-hidden="true" />
+                      <input
+                        type="text"
+                        autoFocus
+                        value={knowledgeSearch}
+                        onChange={(e) => setKnowledgeSearch(e.target.value)}
+                        placeholder={t("knowledge.searchCollections", { defaultValue: "Search collections..." })}
+                        className="w-full h-8 pl-7 pr-3 text-xs bg-surface-secondary border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary text-text placeholder:text-text-tertiary"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                    {filteredKnowledge.length === 0 ? (
+                      <p className="text-xs text-text-tertiary p-3 text-center">
+                        {allCollections.length === 0
+                          ? t("knowledge.noCollections", { defaultValue: "No knowledge collections yet" })
+                          : t("knowledge.noMatch", { defaultValue: "No matches" })}
+                      </p>
+                    ) : (
+                      filteredKnowledge.map((c) => {
+                        const isAttached = attachedIds.has(c.id);
+                        return (
+                          <button
+                            key={c.id}
+                            onClick={() => {
+                              if (isAttached) detachKnowledge.mutate(c.id);
+                              else attachKnowledge.mutate(c.id);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-surface-hover text-xs transition-colors"
+                          >
+                            <span className={clsx(
+                              "flex-shrink-0 h-4 w-4 rounded border flex items-center justify-center transition-colors",
+                              isAttached ? "bg-primary border-primary text-white" : "border-border",
+                            )}>
+                              {isAttached && <Check className="h-3 w-3" />}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-text font-medium">{c.name}</div>
+                              {c.description && (
+                                <div className="truncate text-text-tertiary text-[10px]">{c.description}</div>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           <VoiceInput

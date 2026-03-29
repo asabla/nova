@@ -210,6 +210,8 @@ export interface AgentWorkflowInput {
   enableSearchAttributes?: boolean;
   /** Pre-assessed tier from the API — skips the workflow's own tier assessment */
   preAssessedTier?: "direct" | "sequential" | "orchestrated";
+  /** Knowledge collection IDs attached to the conversation for RAG */
+  knowledgeCollectionIds?: string[];
   /** When set, this run is a research task. Research tools are injected and results persisted to research_reports. */
   researchConfig?: ResearchConfig;
 }

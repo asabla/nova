@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { X, Settings, Eye, EyeOff, Globe, Lock, Users } from "lucide-react";
+import { X, Settings, Lock, Users, Globe, Database, Search, Check } from "lucide-react";
 import { clsx } from "clsx";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
@@ -55,10 +55,54 @@ export function ConversationSettings({ conversationId, conversation, open, onClo
     }
   }, [conversation]);
 
+  const [knowledgeSearch, setKnowledgeSearch] = useState("");
+
   const { data: modelsData } = useQuery({
     queryKey: queryKeys.models.all,
     queryFn: () => api.get<any>("/api/models"),
     staleTime: 60_000,
+  });
+
+  // Fetch attached knowledge collections
+  const { data: attachedData } = useQuery({
+    queryKey: queryKeys.conversations.knowledge(conversationId),
+    queryFn: () => api.get<any>(`/api/conversations/${conversationId}/knowledge`),
+    enabled: open,
+  });
+
+  // Fetch all available knowledge collections
+  const { data: allCollectionsData } = useQuery({
+    queryKey: queryKeys.knowledge.list(),
+    queryFn: () => api.get<any>("/api/knowledge?limit=100"),
+    staleTime: 30_000,
+    enabled: open,
+  });
+
+  const attachedCollections: { knowledgeCollectionId: string; name: string; description: string | null; documentCount: number }[] = (attachedData as any)?.data ?? [];
+  const allCollections: { id: string; name: string; description: string | null }[] = (allCollectionsData as any)?.data ?? [];
+  const attachedIds = new Set(attachedCollections.map((c) => c.knowledgeCollectionId));
+
+  const filteredCollections = useMemo(
+    () => knowledgeSearch
+      ? allCollections.filter((c) => c.name.toLowerCase().includes(knowledgeSearch.toLowerCase()))
+      : allCollections,
+    [allCollections, knowledgeSearch],
+  );
+
+  const attachKnowledge = useMutation({
+    mutationFn: (knowledgeCollectionId: string) =>
+      api.post(`/api/conversations/${conversationId}/knowledge`, { knowledgeCollectionId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.knowledge(conversationId) });
+    },
+  });
+
+  const detachKnowledge = useMutation({
+    mutationFn: (collectionId: string) =>
+      api.delete(`/api/conversations/${conversationId}/knowledge/${collectionId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.knowledge(conversationId) });
+    },
   });
 
   const update = useMutation({
@@ -164,6 +208,73 @@ export function ConversationSettings({ conversationId, conversation, open, onClo
           placeholder={t("settings.systemPromptPlaceholder", { defaultValue: "You are a helpful assistant..." })}
           className="w-full bg-surface-secondary resize-none"
         />
+
+        {/* Knowledge Collections */}
+        <div>
+          <label className="block text-xs font-medium text-text mb-1.5">
+            <span className="flex items-center gap-1.5">
+              <Database className="h-3.5 w-3.5" aria-hidden="true" />
+              {t("settings.knowledgeCollections", { defaultValue: "Knowledge Collections" })}
+            </span>
+          </label>
+          {attachedCollections.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {attachedCollections.map((c) => (
+                <span
+                  key={c.knowledgeCollectionId}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs"
+                >
+                  {c.name}
+                  <button
+                    onClick={() => detachKnowledge.mutate(c.knowledgeCollectionId)}
+                    className="hover:text-primary/70 ml-0.5"
+                    aria-label={`Remove ${c.name}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="relative mb-1.5">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary" aria-hidden="true" />
+            <input
+              type="text"
+              value={knowledgeSearch}
+              onChange={(e) => setKnowledgeSearch(e.target.value)}
+              placeholder={t("settings.searchCollections", { defaultValue: "Search collections..." })}
+              className="w-full h-8 pl-7 pr-3 text-xs bg-surface-secondary border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-text placeholder:text-text-tertiary"
+            />
+          </div>
+          <div className="max-h-32 overflow-y-auto rounded-md border border-border bg-surface-secondary">
+            {filteredCollections.length === 0 ? (
+              <p className="text-xs text-text-tertiary p-2 text-center">
+                {allCollections.length === 0
+                  ? t("settings.noCollections", { defaultValue: "No knowledge collections" })
+                  : t("settings.noMatch", { defaultValue: "No matches" })}
+              </p>
+            ) : (
+              filteredCollections.map((c) => {
+                const isAttached = attachedIds.has(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => isAttached ? detachKnowledge.mutate(c.id) : attachKnowledge.mutate(c.id)}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-surface-hover text-xs transition-colors"
+                  >
+                    <span className={clsx(
+                      "flex-shrink-0 h-4 w-4 rounded border flex items-center justify-center",
+                      isAttached ? "bg-primary border-primary text-white" : "border-border",
+                    )}>
+                      {isAttached && <Check className="h-3 w-3" />}
+                    </span>
+                    <span className="truncate text-text">{c.name}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
 
         {/* Temperature */}
         <div>

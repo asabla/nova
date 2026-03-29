@@ -4,8 +4,9 @@ import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUp,
-  ArrowRight, RefreshCw, MessageSquare, Paperclip, X, FileText, Microscope,
+  ArrowRight, RefreshCw, MessageSquare, Paperclip, X, FileText, Microscope, Database, Search, Check,
 } from "lucide-react";
+import { clsx } from "clsx";
 import { Button } from "../../components/ui/Button";
 import { CardSkeleton } from "../../components/ui/Skeleton";
 import { api } from "../../lib/api";
@@ -48,8 +49,12 @@ function HomePage() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [researchModalOpen, setResearchModalOpen] = useState(false);
   const [selectedStarter, setSelectedStarter] = useState<ExploreTemplate | null>(null);
+  const [knowledgeOpen, setKnowledgeOpen] = useState(false);
+  const [knowledgeSearch, setKnowledgeSearch] = useState("");
+  const [selectedCollectionIds, setSelectedCollectionIds] = useState<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const knowledgeRef = useRef<HTMLDivElement>(null);
 
   const startResearch = useMutation({
     mutationFn: (data: NewResearchFormSubmitData) =>
@@ -63,6 +68,44 @@ function HomePage() {
     onError: (err: any) =>
       toast(err.message ?? t("research.startFailed", "Failed to start research"), "error"),
   });
+
+  // --- Knowledge collection pre-selection ---
+  const { data: allKnowledgeData } = useQuery({
+    queryKey: queryKeys.knowledge.list(),
+    queryFn: () => api.get<any>("/api/knowledge?limit=100"),
+    enabled: knowledgeOpen,
+    staleTime: 30_000,
+  });
+
+  const allCollections: { id: string; name: string; description: string | null }[] = (allKnowledgeData as any)?.data ?? [];
+
+  const filteredKnowledge = useMemo(
+    () => knowledgeSearch
+      ? allCollections.filter((c) => c.name.toLowerCase().includes(knowledgeSearch.toLowerCase()))
+      : allCollections,
+    [allCollections, knowledgeSearch],
+  );
+
+  // Close popover on outside click
+  useEffect(() => {
+    if (!knowledgeOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (knowledgeRef.current && !knowledgeRef.current.contains(e.target as Node)) {
+        setKnowledgeOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [knowledgeOpen]);
+
+  const toggleCollection = useCallback((id: string) => {
+    setSelectedCollectionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   const greeting = getGreeting(t);
   const firstName = user?.name?.split(" ")[0] || "";
@@ -140,6 +183,12 @@ function HomePage() {
     if (!text && pendingFiles.length === 0) return;
     if (pendingFiles.length > 0) {
       storePendingFiles(pendingFiles);
+    }
+    // Store pre-selected knowledge collections for attachment after conversation creation
+    if (selectedCollectionIds.size > 0) {
+      try {
+        sessionStorage.setItem("nova:starter-knowledge", JSON.stringify([...selectedCollectionIds]));
+      } catch { /* ignore */ }
     }
     handleStartConversation(text || "Attached files");
   };
@@ -248,6 +297,79 @@ function HomePage() {
                 >
                   <Paperclip className="h-4 w-4" aria-hidden="true" />
                 </button>
+
+                {/* Knowledge collection pre-select */}
+                <div ref={knowledgeRef} className="relative">
+                  <button
+                    onClick={() => setKnowledgeOpen(!knowledgeOpen)}
+                    className={clsx(
+                      "p-2 rounded-lg transition-colors relative",
+                      selectedCollectionIds.size > 0
+                        ? "text-primary hover:bg-primary/10"
+                        : "text-text-tertiary hover:text-text-secondary hover:bg-surface-secondary",
+                    )}
+                    aria-label={t("knowledge.attach", { defaultValue: "Attach knowledge" })}
+                    title={t("knowledge.attach", { defaultValue: "Attach knowledge collection" })}
+                  >
+                    <Database className="h-4 w-4" aria-hidden="true" />
+                    {selectedCollectionIds.size > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-primary text-[9px] font-bold text-primary-foreground flex items-center justify-center">
+                        {selectedCollectionIds.size}
+                      </span>
+                    )}
+                  </button>
+
+                  {knowledgeOpen && (
+                    <div className="absolute bottom-full left-0 mb-2 w-72 rounded-xl border border-border bg-surface shadow-lg z-50 overflow-hidden">
+                      <div className="px-3 py-2 border-b border-border">
+                        <div className="relative">
+                          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary" aria-hidden="true" />
+                          <input
+                            type="text"
+                            autoFocus
+                            value={knowledgeSearch}
+                            onChange={(e) => setKnowledgeSearch(e.target.value)}
+                            placeholder={t("knowledge.searchCollections", { defaultValue: "Search collections..." })}
+                            className="w-full h-8 pl-7 pr-3 text-xs bg-surface-secondary border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary text-text placeholder:text-text-tertiary"
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto">
+                        {filteredKnowledge.length === 0 ? (
+                          <p className="text-xs text-text-tertiary p-3 text-center">
+                            {allCollections.length === 0
+                              ? t("knowledge.noCollections", { defaultValue: "No knowledge collections yet" })
+                              : t("knowledge.noMatch", { defaultValue: "No matches" })}
+                          </p>
+                        ) : (
+                          filteredKnowledge.map((c) => {
+                            const isSelected = selectedCollectionIds.has(c.id);
+                            return (
+                              <button
+                                key={c.id}
+                                onClick={() => toggleCollection(c.id)}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-surface-hover text-xs transition-colors"
+                              >
+                                <span className={clsx(
+                                  "flex-shrink-0 h-4 w-4 rounded border flex items-center justify-center transition-colors",
+                                  isSelected ? "bg-primary border-primary text-white" : "border-border",
+                                )}>
+                                  {isSelected && <Check className="h-3 w-3" />}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-text font-medium">{c.name}</div>
+                                  {c.description && (
+                                    <div className="truncate text-text-tertiary text-[10px]">{c.description}</div>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-1.5">
                 <button

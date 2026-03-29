@@ -17,6 +17,8 @@ export interface AgentStepInput {
   orgId?: string;
   /** Run a single turn (no tool loop) -- useful when the workflow needs to intercept between turns */
   singleTurn?: boolean;
+  /** Knowledge collection IDs attached to the conversation */
+  knowledgeCollectionIds?: string[];
 }
 
 export interface AgentStepResult {
@@ -48,7 +50,7 @@ export interface AgentStepResult {
 export async function executeAgentStepWithSDK(
   input: AgentStepInput,
 ): Promise<AgentStepResult> {
-  const tools: FunctionTool<any, any>[] = getBuiltinTools(input.orgId);
+  const tools: FunctionTool<any, any>[] = getBuiltinTools(input.orgId, null, input.knowledgeCollectionIds);
   if (input.agentId && !input.singleTurn) {
     const custom = await loadCustomTools(input.agentId);
     tools.push(...custom);

@@ -7,8 +7,8 @@ import { writeAuditLog } from "../services/audit.service";
 import { notificationService } from "../services/notification.service";
 import { AppError } from "@nova/shared/utils";
 import { db } from "../lib/db";
-import { userProfiles, users, agents } from "@nova/shared/schemas";
-import { eq, and, isNull } from "drizzle-orm";
+import { userProfiles, users, agents, conversationKnowledgeCollections, knowledgeCollections } from "@nova/shared/schemas";
+import { eq, and, isNull, sql } from "drizzle-orm";
 import { getTemporalClient } from "../lib/temporal";
 
 const conversations = new Hono<AppContext>();
@@ -350,6 +350,91 @@ conversations.get("/:id/mentionables", async (c) => {
   return c.json({
     data: [...mentionableUsers, ...mentionableAgents],
   });
+});
+
+// --- Knowledge collections ---
+
+conversations.get("/:id/knowledge", async (c) => {
+  const orgId = c.get("orgId");
+  const conversationId = c.req.param("id");
+
+  const conversation = await conversationService.getConversation(orgId, conversationId);
+  if (!conversation) throw AppError.notFound("Conversation");
+
+  const rows = await db
+    .select({
+      id: conversationKnowledgeCollections.id,
+      knowledgeCollectionId: conversationKnowledgeCollections.knowledgeCollectionId,
+      name: knowledgeCollections.name,
+      description: knowledgeCollections.description,
+      documentCount: sql<number>`(select count(*) from knowledge_documents where knowledge_documents.knowledge_collection_id = ${knowledgeCollections.id} and knowledge_documents.deleted_at is null)`.as("document_count"),
+      createdAt: conversationKnowledgeCollections.createdAt,
+    })
+    .from(conversationKnowledgeCollections)
+    .innerJoin(knowledgeCollections, eq(conversationKnowledgeCollections.knowledgeCollectionId, knowledgeCollections.id))
+    .where(
+      and(
+        eq(conversationKnowledgeCollections.conversationId, conversationId),
+        eq(conversationKnowledgeCollections.orgId, orgId),
+        isNull(conversationKnowledgeCollections.deletedAt),
+      ),
+    );
+
+  return c.json({ data: rows });
+});
+
+const attachKnowledgeSchema = z.object({
+  knowledgeCollectionId: z.string().uuid(),
+});
+
+conversations.post("/:id/knowledge", zValidator("json", attachKnowledgeSchema), async (c) => {
+  const orgId = c.get("orgId");
+  const conversationId = c.req.param("id");
+  const { knowledgeCollectionId } = c.req.valid("json");
+
+  const conversation = await conversationService.getConversation(orgId, conversationId);
+  if (!conversation) throw AppError.notFound("Conversation");
+
+  // Verify collection belongs to same org
+  const [collection] = await db
+    .select({ id: knowledgeCollections.id })
+    .from(knowledgeCollections)
+    .where(and(eq(knowledgeCollections.id, knowledgeCollectionId), eq(knowledgeCollections.orgId, orgId), isNull(knowledgeCollections.deletedAt)))
+    .limit(1);
+  if (!collection) throw AppError.notFound("Knowledge collection");
+
+  const [row] = await db
+    .insert(conversationKnowledgeCollections)
+    .values({ conversationId, knowledgeCollectionId, orgId })
+    .onConflictDoUpdate({
+      target: [conversationKnowledgeCollections.conversationId, conversationKnowledgeCollections.knowledgeCollectionId],
+      set: { deletedAt: null },
+    })
+    .returning();
+
+  return c.json(row, 201);
+});
+
+conversations.delete("/:id/knowledge/:collectionId", async (c) => {
+  const orgId = c.get("orgId");
+  const conversationId = c.req.param("id");
+  const knowledgeCollectionId = c.req.param("collectionId");
+
+  const [deleted] = await db
+    .update(conversationKnowledgeCollections)
+    .set({ deletedAt: new Date() })
+    .where(
+      and(
+        eq(conversationKnowledgeCollections.conversationId, conversationId),
+        eq(conversationKnowledgeCollections.knowledgeCollectionId, knowledgeCollectionId),
+        eq(conversationKnowledgeCollections.orgId, orgId),
+        isNull(conversationKnowledgeCollections.deletedAt),
+      ),
+    )
+    .returning();
+
+  if (!deleted) throw AppError.notFound("Knowledge collection attachment");
+  return c.json({ ok: true });
 });
 
 // --- Interaction response (send user interaction response to active workflow) ---

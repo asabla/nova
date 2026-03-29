@@ -8,6 +8,7 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.conversations.all, "detail", id] as const,
     messages: (id: string) => [...queryKeys.conversations.all, "messages", id] as const,
     artifacts: (id: string) => [...queryKeys.conversations.all, "artifacts", id] as const,
+    knowledge: (id: string) => [...queryKeys.conversations.all, "knowledge", id] as const,
   },
   agents: {
     all: ["agents"] as const,

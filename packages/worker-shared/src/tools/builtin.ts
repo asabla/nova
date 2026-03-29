@@ -758,6 +758,48 @@ const readFileTool = tool({
   },
 });
 
+/**
+ * Factory: creates a query_knowledge tool scoped to specific knowledge collections.
+ * Searches attached knowledge collections for relevant document chunks.
+ */
+export function createQueryKnowledgeTool(orgId: string, collectionIds: string[]) {
+  return tool({
+    name: "query_knowledge",
+    description:
+      "Search the attached knowledge collections by text similarity. Returns relevant document chunks ranked by relevance. " +
+      "Use this to find information from the user's internal knowledge base. " +
+      "For video transcript results, use the 'timestampUrl' field to link to the specific moment.",
+    parameters: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "The search query to find relevant knowledge" },
+        topK: { type: "number", description: "Maximum number of results to return (default 5, max 10)" },
+      },
+      required: ["query", "topK"],
+      additionalProperties: false,
+    },
+    execute: async (args: unknown) => {
+      const { query, topK = 5 } = args as { query: string; topK?: number };
+
+      if (collectionIds.length === 0) {
+        return { results: [], message: "No knowledge collections attached" };
+      }
+
+      const { queryKnowledgeCollections } = await import("../research-queries");
+      const results = await queryKnowledgeCollections(orgId, collectionIds, query, Math.min(topK, 10));
+      return results.map((r) => ({
+        documentName: r.documentName,
+        content: r.content,
+        score: r.score,
+        ...(r.fileId ? { fileId: r.fileId, hint: `To analyze this file's raw data, use code_execute with input_file_ids: ["${r.fileId}"]` } : {}),
+        ...(r.sourceUrl ? { sourceUrl: r.sourceUrl } : {}),
+        ...(r.timestampUrl ? { timestampUrl: r.timestampUrl } : {}),
+        ...(r.chapterTitle ? { chapterTitle: r.chapterTitle } : {}),
+      }));
+    },
+  });
+}
+
 /** Static built-in tools (no org context needed) */
 export const builtinTools = [webSearchTool, fetchUrlTool, invokeAgentTool, codeExecuteTool, readFileTool];
 
@@ -766,11 +808,15 @@ export const builtinTools = [webSearchTool, fetchUrlTool, invokeAgentTool, codeE
  * Includes org-scoped tools like search_workspace.
  * When allowedTools is provided, only returns tools whose names are in the list.
  * When allowedTools is null/undefined, returns all tools (backward compatible).
+ * When knowledgeCollectionIds is provided, adds the query_knowledge tool.
  */
-export function getBuiltinTools(orgId?: string, allowedTools?: string[] | null): FunctionTool<any, any>[] {
+export function getBuiltinTools(orgId?: string, allowedTools?: string[] | null, knowledgeCollectionIds?: string[]): FunctionTool<any, any>[] {
   let tools: FunctionTool<any, any>[] = [...builtinTools];
   if (orgId) {
     tools.push(createSearchWorkspaceTool(orgId));
+    if (knowledgeCollectionIds && knowledgeCollectionIds.length > 0) {
+      tools.push(createQueryKnowledgeTool(orgId, knowledgeCollectionIds));
+    }
   }
   if (allowedTools && allowedTools.length > 0) {
     tools = tools.filter((t) => allowedTools.includes(t.name));

@@ -32,6 +32,8 @@ export interface AgentRunInput {
   orgId?: string;
   /** When set, only these builtin tools are available. Null/undefined = all tools. */
   allowedBuiltinTools?: string[] | null;
+  /** Knowledge collection IDs attached to the conversation for RAG */
+  knowledgeCollectionIds?: string[];
   /** When set, research-specific tools are injected and research results are tracked. */
   researchConfig?: ResearchConfig;
 }
@@ -65,7 +67,7 @@ export interface AgentRunResult {
  */
 export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult> {
   // Build tools list: built-in (filtered by agent config) + any custom tools from DB
-  const tools: FunctionTool<any, any>[] = getBuiltinTools(input.orgId, input.allowedBuiltinTools);
+  const tools: FunctionTool<any, any>[] = getBuiltinTools(input.orgId, input.allowedBuiltinTools, input.knowledgeCollectionIds);
   if (input.agentId) {
     const custom = await loadCustomTools(input.agentId);
     tools.push(...custom);

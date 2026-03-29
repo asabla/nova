@@ -11,7 +11,7 @@ import { DEFAULTS, TASK_QUEUES } from "@nova/shared/constants";
 import { notificationService } from "../services/notification.service";
 import { getTemporalClient } from "../lib/temporal";
 import { db } from "../lib/db";
-import { userProfiles, users, agents, orgSettings, files, toolCalls as toolCallsTable, messageAttachments, messages as messagesTable, models, workflows } from "@nova/shared/schemas";
+import { userProfiles, users, agents, orgSettings, files, toolCalls as toolCallsTable, messageAttachments, messages as messagesTable, models, workflows, conversationKnowledgeCollections, knowledgeCollections } from "@nova/shared/schemas";
 import { eq, and, isNull, inArray } from "drizzle-orm";
 import { extractFileContent } from "../lib/file-extract";
 import { SKILLS, SANDBOX_PACKAGES_NOTE } from "@nova/shared/skills";
@@ -498,6 +498,23 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
     enrichedMessages.unshift(formattingInstruction);
   }
 
+  // Fetch knowledge collections attached to this conversation (needs to be in outer scope for workflow args)
+  const attachedCollections = await db
+    .select({
+      id: knowledgeCollections.id,
+      name: knowledgeCollections.name,
+      description: knowledgeCollections.description,
+    })
+    .from(conversationKnowledgeCollections)
+    .innerJoin(knowledgeCollections, eq(conversationKnowledgeCollections.knowledgeCollectionId, knowledgeCollections.id))
+    .where(
+      and(
+        eq(conversationKnowledgeCollections.conversationId, conversationId),
+        eq(conversationKnowledgeCollections.orgId, orgId),
+        isNull(conversationKnowledgeCollections.deletedAt),
+      ),
+    );
+
   // Fetch available agents and inject into system prompt so the LLM knows about them
   if (body.enableTools) {
     const availableAgents = await getAvailableAgents(orgId);
@@ -517,6 +534,21 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
       enrichedMessages[0] = {
         ...enrichedMessages[0],
         content: `${enrichedMessages[0].content}\n\n${agentSection}`,
+      };
+    }
+
+    if (attachedCollections.length > 0) {
+      const collectionList = attachedCollections
+        .map((c) => `- "${c.name}" (id: ${c.id})${c.description ? `: ${c.description}` : ""}`)
+        .join("\n");
+      const knowledgeSection = [
+        "## Knowledge Collections",
+        "The following knowledge collections are attached to this conversation. Use the query_knowledge tool to search them when the user's question may be answered by this knowledge.",
+        collectionList,
+      ].join("\n");
+      enrichedMessages[0] = {
+        ...enrichedMessages[0],
+        content: `${enrichedMessages[0].content}\n\n${knowledgeSection}`,
       };
     }
 
@@ -718,6 +750,30 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
           input: { model: resolvedModel, temperature: body.temperature, maxTokens: body.maxTokens },
         }).returning({ id: workflows.id });
 
+        // Build tools array — add query_knowledge when knowledge collections are attached
+        const conversationTools = [...DEFAULT_TOOLS];
+        const knowledgeCollectionIds = attachedCollections.map((c) => c.id);
+        if (knowledgeCollectionIds.length > 0) {
+          conversationTools.push({
+            type: "function" as const,
+            function: {
+              name: "query_knowledge",
+              description:
+                "Search the attached knowledge collections by text similarity. Returns relevant document chunks ranked by relevance. " +
+                "Use this to find information from the user's internal knowledge base. " +
+                "For video transcript results, use the 'timestampUrl' field to link to the specific moment.",
+              parameters: {
+                type: "object",
+                properties: {
+                  query: { type: "string", description: "The search query to find relevant knowledge" },
+                  topK: { type: "number", description: "Maximum number of results to return (default 5, max 10)" },
+                },
+                required: ["query", "topK"],
+              },
+            },
+          });
+        }
+
         await client.workflow.start("agentWorkflow", {
           taskQueue: TASK_QUEUES.AGENT,
           workflowId: temporalWorkflowId,
@@ -731,7 +787,8 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
             messageHistory: enrichedMessages,
             model: resolvedModel,
             modelParams: { temperature: body.temperature, maxTokens: body.maxTokens },
-            tools: DEFAULT_TOOLS,
+            tools: conversationTools,
+            knowledgeCollectionIds: knowledgeCollectionIds.length > 0 ? knowledgeCollectionIds : undefined,
             maxSteps: 25,
             enableSearchAttributes: true,
             preAssessedTier: assessedTier,

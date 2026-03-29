@@ -3,6 +3,7 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
+import { knowledgeCollections } from "./knowledge";
 export const conversations = pgTable("conversations", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
@@ -82,6 +83,19 @@ export const conversationTagAssignments = pgTable("conversation_tag_assignments"
 }, (table) => [
   index("idx_conversation_tag_assignments_conv").on(table.conversationId),
   index("idx_conversation_tag_assignments_org").on(table.orgId),
+]);
+
+export const conversationKnowledgeCollections = pgTable("conversation_knowledge_collections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  conversationId: uuid("conversation_id").notNull().references(() => conversations.id, { onDelete: "cascade" }),
+  knowledgeCollectionId: uuid("knowledge_collection_id").notNull().references(() => knowledgeCollections.id, { onDelete: "cascade" }),
+  orgId: uuid("org_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (table) => [
+  index("idx_conv_knowledge_collections_conv").on(table.conversationId),
+  index("idx_conv_knowledge_collections_org").on(table.orgId),
+  uniqueIndex("idx_conv_knowledge_collections_conv_coll").on(table.conversationId, table.knowledgeCollectionId),
 ]);
 
 export const selectConversationSchema = createSelectSchema(conversations);

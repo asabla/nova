@@ -1,5 +1,5 @@
 import { db } from "../lib/db";
-import { conversations, conversationParticipants, conversationTagAssignments, conversationTags, messages } from "@nova/shared/schemas";
+import { conversations, conversationParticipants, conversationTagAssignments, conversationTags, conversationKnowledgeCollections, messages } from "@nova/shared/schemas";
 import { eq, and, isNull, desc, ilike, sql, inArray, asc, lte } from "drizzle-orm";
 import type { Conversation } from "@nova/shared/schemas";
 import { parsePagination, buildPaginatedResponse, type PaginationInput } from "@nova/shared/utils";
@@ -215,6 +215,27 @@ export async function forkConversation(orgId: string, userId: string, conversati
         .set({ totalTokens, updatedAt: new Date() })
         .where(eq(conversations.id, forked.id));
     }
+  }
+
+  // Copy knowledge collection attachments
+  const knowledgeAttachments = await db
+    .select()
+    .from(conversationKnowledgeCollections)
+    .where(
+      and(
+        eq(conversationKnowledgeCollections.conversationId, conversationId),
+        eq(conversationKnowledgeCollections.orgId, orgId),
+        isNull(conversationKnowledgeCollections.deletedAt),
+      ),
+    );
+  if (knowledgeAttachments.length > 0) {
+    await db.insert(conversationKnowledgeCollections).values(
+      knowledgeAttachments.map((ka) => ({
+        conversationId: forked.id,
+        knowledgeCollectionId: ka.knowledgeCollectionId,
+        orgId,
+      })),
+    );
   }
 
   return forked;
