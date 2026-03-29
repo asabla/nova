@@ -11,7 +11,8 @@
     "packages/worker-ingestion",
     "packages/worker-background",
     "packages/api",
-    "packages/web"
+    "packages/web",
+    "packages/admin"
   ],
   "scripts": {
     "dev": "bun run --filter '*' dev",

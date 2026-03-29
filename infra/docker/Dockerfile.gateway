@@ -20,6 +20,7 @@ COPY packages/worker-shared/package.json packages/worker-shared/
 COPY packages/worker-agent/package.json packages/worker-agent/
 COPY packages/worker-ingestion/package.json packages/worker-ingestion/
 COPY packages/worker-background/package.json packages/worker-background/
+COPY packages/admin/package.json packages/admin/
 COPY packages/api/package.json packages/api/
 COPY packages/web/package.json packages/web/
 

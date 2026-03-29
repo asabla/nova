@@ -18,7 +18,7 @@ import { adminSettingsRoutes } from "./routes/admin/settings";
 import { adminMarketplaceRoutes } from "./routes/admin/marketplace";
 import { env } from "./lib/env";
 
-export const adminApp = new Hono<AppContext>();
+export const adminApp = new Hono<AppContext>().basePath("/admin-api");
 
 // ---------------------------------------------------------------------------
 // Admin Middleware Chain (separate from main app)
@@ -30,23 +30,18 @@ adminApp.use("*", cors({
   credentials: true,
 }));
 
-// Structured logging
-adminApp.use("*", logger());
-
 // Health check — unauthenticated (for Docker health checks)
-adminApp.get("/admin-api/health", (c) => c.json({ status: "ok", service: "admin-api" }));
+adminApp.get("/health", (c) => c.json({ status: "ok", service: "admin-api" }));
 
-// All other routes require super-admin authentication
-adminApp.use("/admin-api/*", adminAuth);
+// Apply auth to all sub-routes
+const authed = new Hono<AppContext>();
+authed.use("*", adminAuth);
+authed.route("/orgs", adminOrgRoutes);
+authed.route("/users", adminUserRoutes);
+authed.route("/stats", adminStatsRoutes);
+authed.route("/health-check", adminHealthRoutes);
+authed.route("/audit", adminAuditRoutes);
+authed.route("/settings", adminSettingsRoutes);
+authed.route("/marketplace", adminMarketplaceRoutes);
 
-// ---------------------------------------------------------------------------
-// Admin Routes
-// ---------------------------------------------------------------------------
-
-adminApp.route("/admin-api/orgs", adminOrgRoutes);
-adminApp.route("/admin-api/users", adminUserRoutes);
-adminApp.route("/admin-api/stats", adminStatsRoutes);
-adminApp.route("/admin-api/health-check", adminHealthRoutes);
-adminApp.route("/admin-api/audit", adminAuditRoutes);
-adminApp.route("/admin-api/settings", adminSettingsRoutes);
-adminApp.route("/admin-api/marketplace", adminMarketplaceRoutes);
+adminApp.route("/", authed);

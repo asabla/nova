@@ -424,6 +424,18 @@ services:
     depends_on:
       - api
 
+  # ── Admin Portal ──────────────────────────────────────
+  admin:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.admin
+    container_name: nova-admin
+    restart: unless-stopped
+    ports:
+      - "5174:80"
+    depends_on:
+      - api
+
 volumes:
   postgres_data:
   redis_data:

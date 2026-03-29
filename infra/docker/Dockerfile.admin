@@ -11,26 +11,26 @@ COPY packages/gateway/package.json packages/gateway/
 COPY packages/sdk-ts/package.json packages/sdk-ts/
 COPY packages/api/package.json packages/api/
 COPY packages/web/package.json packages/web/
+COPY packages/admin/package.json packages/admin/
 COPY packages/worker-shared/package.json packages/worker-shared/
 COPY packages/worker-agent/package.json packages/worker-agent/
 COPY packages/worker-ingestion/package.json packages/worker-ingestion/
 COPY packages/worker-background/package.json packages/worker-background/
-COPY packages/admin/package.json packages/admin/
 
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile
 
 COPY packages/shared/ packages/shared/
-COPY packages/web/ packages/web/
+COPY packages/admin/ packages/admin/
 
 # Vite build only — skip tsc type-check in Docker
-RUN cd packages/web && bunx vite build
+RUN cd packages/admin && bunx vite build
 
 # ── Runtime ──────────────────────────────────────
 FROM nginx:alpine
 
-COPY --from=builder /app/packages/web/dist /usr/share/nginx/html
-COPY infra/docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/packages/admin/dist /usr/share/nginx/html
+COPY infra/docker/nginx-admin.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 
