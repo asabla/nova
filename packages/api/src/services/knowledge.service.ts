@@ -97,6 +97,7 @@ export const knowledgeService = {
     const conditions = [
       eq(knowledgeDocuments.knowledgeCollectionId, collectionId),
       eq(knowledgeDocuments.orgId, orgId),
+      isNull(knowledgeDocuments.deletedAt),
     ];
 
     if (opts?.tagId) {
