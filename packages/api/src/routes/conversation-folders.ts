@@ -26,6 +26,7 @@ folderRoutes.get("/folders", async (c) => {
       id: conversationFolders.id,
       name: conversationFolders.name,
       parentFolderId: conversationFolders.parentFolderId,
+      defaultAgentId: conversationFolders.defaultAgentId,
       sortOrder: conversationFolders.sortOrder,
       createdAt: conversationFolders.createdAt,
       updatedAt: conversationFolders.updatedAt,
@@ -100,6 +101,7 @@ folderRoutes.get("/folders/:id", async (c) => {
 const createFolderSchema = z.object({
   name: z.string().min(1).max(200),
   parentFolderId: z.string().uuid().optional(),
+  defaultAgentId: z.string().uuid().nullable().optional(),
   sortOrder: z.number().int().optional(),
 });
 

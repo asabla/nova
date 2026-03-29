@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, or, isNull } from "drizzle-orm";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
 import { tools, toolVersions, toolCalls } from "@nova/shared/schemas";
@@ -59,15 +59,39 @@ toolRoutes.post("/", requireRole("power-user"), async (c) => {
 
 toolRoutes.patch("/:id", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const role = c.get("role");
   const body = z.object({
     name: z.string().min(1).max(200).optional(),
     description: z.string().max(2000).optional(),
     isEnabled: z.boolean().optional(),
     isApproved: z.boolean().optional(),
+    rejectionReason: z.string().max(2000).optional(),
+    tags: z.array(z.string()).optional(),
   }).parse(await c.req.json());
 
+  // Approval/rejection requires org-admin role
+  if (body.isApproved !== undefined) {
+    if (role !== "org-admin" && role !== "super-admin") {
+      throw AppError.forbidden("Only org admins can approve or reject tools");
+    }
+  }
+
+  const updateData: Record<string, unknown> = { updatedAt: new Date() };
+  if (body.name !== undefined) updateData.name = body.name;
+  if (body.description !== undefined) updateData.description = body.description;
+  if (body.isEnabled !== undefined) updateData.isEnabled = body.isEnabled;
+  if (body.tags !== undefined) updateData.tags = body.tags;
+
+  if (body.isApproved !== undefined) {
+    updateData.isApproved = body.isApproved;
+    updateData.approvedById = userId;
+    updateData.approvedAt = body.isApproved ? new Date() : null;
+    updateData.rejectionReason = body.isApproved ? null : (body.rejectionReason ?? null);
+  }
+
   const [tool] = await db.update(tools)
-    .set({ ...body, updatedAt: new Date() })
+    .set(updateData)
     .where(and(eq(tools.id, c.req.param("id")), eq(tools.orgId, orgId)))
     .returning();
 
@@ -140,7 +164,25 @@ toolRoutes.get("/marketplace/browse", async (c) => {
   const search = c.req.query("search");
   const type = c.req.query("type");
 
-  const conditions = [eq(tools.orgId, orgId), eq(tools.isApproved, true), eq(tools.isEnabled, true)];
+  const conditions: any[] = [
+    eq(tools.orgId, orgId),
+    eq(tools.isApproved, true),
+    eq(tools.isEnabled, true),
+    isNull(tools.deletedAt),
+  ];
+
+  if (search) {
+    conditions.push(
+      or(
+        ilike(tools.name, `%${search}%`),
+        ilike(tools.description, `%${search}%`),
+      ),
+    );
+  }
+
+  if (type && type !== "all") {
+    conditions.push(eq(tools.type, type));
+  }
 
   const result = await db.select().from(tools)
     .where(and(...conditions))

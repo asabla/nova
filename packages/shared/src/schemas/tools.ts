@@ -17,6 +17,10 @@ export const tools = pgTable("tools", {
   isApproved: boolean("is_approved").notNull().default(false),
   isEnabled: boolean("is_enabled").notNull().default(true),
   registeredById: uuid("registered_by_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  approvedById: uuid("approved_by_id").references(() => users.id, { onDelete: "set null" }),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  rejectionReason: text("rejection_reason"),
+  tags: jsonb("tags").$type<string[]>(),
   currentVersion: integer("current_version").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -70,7 +74,8 @@ export const selectToolSchema = createSelectSchema(tools);
 export const insertToolSchema = createInsertSchema(tools, {
   name: z.string().min(1).max(200),
   type: z.enum(["builtin", "openapi", "custom"]),
-}).omit({ id: true, orgId: true, registeredById: true, createdAt: true, updatedAt: true, deletedAt: true, currentVersion: true });
+  tags: z.array(z.string()).optional(),
+}).omit({ id: true, orgId: true, registeredById: true, approvedById: true, approvedAt: true, rejectionReason: true, createdAt: true, updatedAt: true, deletedAt: true, currentVersion: true });
 
 export type Tool = z.infer<typeof selectToolSchema>;
 export type InsertTool = z.infer<typeof insertToolSchema>;

@@ -374,6 +374,14 @@ function ConversationPage() {
 
   useClipboardPaste((file) => handleFileUpload([file]));
 
+  // Stop both the client-side SSE stream and the backend Temporal workflow
+  const handleStop = useCallback(() => {
+    stopStream();
+    api.post(`/api/conversations/${id}/stop`).catch(() => {
+      // Workflow may have already completed — ignore errors
+    });
+  }, [stopStream, id]);
+
   // Handle SSE error status — re-stream the last user message without creating a duplicate
   const handleRetryLastMessage = useCallback(() => {
     resetStream();
@@ -396,6 +404,11 @@ function ConversationPage() {
       ],
     });
   }, [messages, resetStream, conversation, getModelParams, startStream, id]);
+
+  // Retry a failed agent step by replaying the conversation from the last user message
+  const handleRetryStep = useCallback((_stepId: string) => {
+    handleRetryLastMessage();
+  }, [handleRetryLastMessage]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 relative" {...dragHandlers}>
@@ -429,6 +442,7 @@ function ConversationPage() {
             onRerun={handleRerun}
             onNote={handleNote}
             onFork={handleFork}
+            onRetryStep={handleRetryStep}
           />
 
           {/* SSE error state */}
@@ -448,7 +462,7 @@ function ConversationPage() {
 
       <MessageInput
         onSend={handleSend}
-        onStop={stopStream}
+        onStop={handleStop}
         onPause={pauseStream}
         onResume={resumeStream}
         isStreaming={status === "streaming"}

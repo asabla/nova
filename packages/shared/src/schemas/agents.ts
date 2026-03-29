@@ -21,6 +21,7 @@ export const agents = pgTable("agents", {
   isPublished: boolean("is_published").notNull().default(false),
   toolApprovalMode: text("tool_approval_mode").notNull().default("always-ask"),
   memoryScope: text("memory_scope").notNull().default("per-user"),
+  memoryLimitMb: integer("memory_limit_mb"),
   maxSteps: integer("max_steps"),
   timeoutSeconds: integer("timeout_seconds"),
   webhookUrl: text("webhook_url"),
@@ -150,6 +151,7 @@ export const insertAgentSchema = createInsertSchema(agents, {
   visibility: z.enum(["private", "team", "org", "public"]).default("private"),
   toolApprovalMode: z.enum(["auto", "always-ask", "never"]).default("always-ask"),
   memoryScope: z.enum(["per-user", "per-conversation", "global"]).default("per-user"),
+  memoryLimitMb: z.number().int().positive().max(1024).nullable().optional(),
 }).omit({
   id: true, orgId: true, ownerId: true,
   createdAt: true, updatedAt: true, deletedAt: true,

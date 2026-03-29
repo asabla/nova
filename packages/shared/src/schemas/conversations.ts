@@ -3,6 +3,7 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
+import { agents } from "./agents";
 import { knowledgeCollections } from "./knowledge";
 export const conversations = pgTable("conversations", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -51,6 +52,7 @@ export const conversationFolders = pgTable("conversation_folders", {
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   parentFolderId: uuid("parent_folder_id"),
+  defaultAgentId: uuid("default_agent_id").references(() => agents.id, { onDelete: "set null" }),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

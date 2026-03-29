@@ -21,11 +21,12 @@ interface MessageListProps {
   onRerun?: (messageId: string, modelId?: string) => void;
   onNote?: (messageId: string, content: string) => void;
   onFork?: (messageId: string) => void;
+  onRetryStep?: (stepId: string) => void;
 }
 
 const YT_ID_REGEX = /(?:youtube\.com\/watch\?[^\s)]*v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
 
-export function MessageList({ messages, artifactsByMessageId, streamingContent, isStreaming, activeTools, agentFlow, userName, conversationId, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork }: MessageListProps) {
+export function MessageList({ messages, artifactsByMessageId, streamingContent, isStreaming, activeTools, agentFlow, userName, conversationId, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork, onRetryStep }: MessageListProps) {
   const { t } = useTranslation();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -141,6 +142,7 @@ export function MessageList({ messages, artifactsByMessageId, streamingContent, 
             onRerun={onRerun}
             onNote={onNote}
             onFork={onFork}
+            onRetryStep={onRetryStep}
           />
         ))}
 

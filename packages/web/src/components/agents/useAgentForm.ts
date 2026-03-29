@@ -15,6 +15,7 @@ export interface AgentForm {
   visibility: "private" | "team" | "org" | "public";
   toolApprovalMode: "auto" | "always-ask" | "never";
   memoryScope: "per-user" | "per-conversation" | "global";
+  memoryLimitMb: number | null;
   maxSteps: number;
   timeoutSeconds: number;
   starters: string[];
@@ -33,6 +34,7 @@ const DEFAULT_FORM: AgentForm = {
   visibility: "private",
   toolApprovalMode: "always-ask",
   memoryScope: "per-user",
+  memoryLimitMb: null,
   maxSteps: 10,
   timeoutSeconds: 300,
   starters: [],
@@ -74,6 +76,7 @@ export function useAgentForm(options: { mode: "create" | "edit"; agentId?: strin
         visibility: agent.visibility ?? "private",
         toolApprovalMode: agent.toolApprovalMode ?? "always-ask",
         memoryScope: agent.memoryScope ?? "per-user",
+        memoryLimitMb: agent.memoryLimitMb ?? null,
         maxSteps: agent.maxSteps ?? 10,
         timeoutSeconds: agent.timeoutSeconds ?? 300,
         starters: agent.starters ?? [],
@@ -133,6 +136,7 @@ export function useAgentForm(options: { mode: "create" | "edit"; agentId?: strin
         visibility: "private",
         toolApprovalMode: form.toolApprovalMode,
         memoryScope: form.memoryScope,
+        memoryLimitMb: form.memoryLimitMb,
       }),
     onSuccess: (data: any) => {
       toast.success(t("agents.cloned", { defaultValue: "Agent cloned" }));

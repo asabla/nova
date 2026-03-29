@@ -12,6 +12,8 @@ export interface SubtaskData {
   description: string;
   step: number;
   summary?: string;
+  agentName?: string;
+  assignedModel?: string;
   status: "spawned" | "running" | "completed" | "failed";
 }
 
@@ -76,6 +78,12 @@ export function SubtaskProgress({ plan, subtasks }: SubtaskProgressProps) {
                   <span className={effectiveStatus === "completed" ? "text-muted-foreground line-through" : ""}>
                     {step.description}
                   </span>
+                  {(subtask?.agentName || subtask?.assignedModel) && (
+                    <span className="ml-1.5 text-[10px] text-text-tertiary">
+                      {subtask.agentName && `→ ${subtask.agentName}`}
+                      {subtask.assignedModel && ` (${subtask.assignedModel})`}
+                    </span>
+                  )}
                   {subtask?.summary && (
                     <p className="text-xs text-muted-foreground mt-0.5">{subtask.summary}</p>
                   )}

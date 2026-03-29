@@ -7,6 +7,8 @@ import {
   ChevronRight,
   Clock,
   SkipForward,
+  GitBranch,
+  RotateCcw,
 } from "lucide-react";
 import { clsx } from "clsx";
 import type { Plan, PlanNode, PlanNodeStatus } from "@nova/shared/types";
@@ -15,6 +17,7 @@ interface PlanDAGViewProps {
   plan: Plan;
   isRunning?: boolean;
   defaultCollapsed?: boolean;
+  onRetryStep?: (stepId: string) => void;
 }
 
 const STATUS_CONFIG: Record<PlanNodeStatus, {
@@ -31,11 +34,11 @@ const STATUS_CONFIG: Record<PlanNodeStatus, {
   skipped: { icon: SkipForward, color: "text-text-tertiary", borderColor: "border-border" },
 };
 
-function PlanNodeRow({ node, depth = 0, allNodes }: { node: PlanNode; depth?: number; allNodes: PlanNode[] }) {
+function PlanNodeRow({ node, depth = 0, allNodes, onRetryStep }: { node: PlanNode; depth?: number; allNodes: PlanNode[]; onRetryStep?: (stepId: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const config = STATUS_CONFIG[node.status];
   const StatusIcon = config.icon;
-  const hasResult = !!node.result;
+  const hasExpandableContent = !!node.result || (!!node.subPlan && node.subPlan.nodes.length > 0);
   const dependents = allNodes.filter((n) => n.dependencies.includes(node.id));
 
   return (
@@ -48,9 +51,9 @@ function PlanNodeRow({ node, depth = 0, allNodes }: { node: PlanNode; depth?: nu
       <div className={clsx("border-l-2 pl-3 py-1.5", config.borderColor)}>
         <button
           type="button"
-          onClick={() => hasResult && setExpanded(!expanded)}
+          onClick={() => hasExpandableContent && setExpanded(!expanded)}
           className="flex items-center gap-2 w-full text-left group"
-          disabled={!hasResult}
+          disabled={!hasExpandableContent}
         >
           {/* Status icon */}
           <span className="shrink-0 w-4 h-4 flex items-center justify-center">
@@ -72,6 +75,21 @@ function PlanNodeRow({ node, depth = 0, allNodes }: { node: PlanNode; depth?: nu
             {node.description}
           </span>
 
+          {/* Sub-plan badge */}
+          {node.subPlan && node.subPlan.nodes.length > 0 && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-warning bg-warning/10 px-1.5 py-0.5 rounded">
+              <GitBranch className="h-2.5 w-2.5" />
+              {node.subPlan.nodes.length} sub-tasks
+            </span>
+          )}
+
+          {/* Model label */}
+          {node.assignedModel && (
+            <span className="text-[10px] text-text-tertiary bg-muted px-1.5 py-0.5 rounded">
+              {node.assignedModel}
+            </span>
+          )}
+
           {/* Tools badge */}
           {node.tools && node.tools.length > 0 && (
             <span className="text-[10px] text-text-tertiary bg-muted px-1.5 py-0.5 rounded">
@@ -86,8 +104,20 @@ function PlanNodeRow({ node, depth = 0, allNodes }: { node: PlanNode; depth?: nu
             </span>
           )}
 
+          {/* Retry button for failed nodes */}
+          {node.status === "failed" && onRetryStep && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onRetryStep(node.id); }}
+              className="p-0.5 text-text-tertiary hover:text-primary rounded transition-colors"
+              title="Retry"
+            >
+              <RotateCcw className="h-3 w-3" />
+            </button>
+          )}
+
           {/* Expand indicator */}
-          {hasResult && (
+          {hasExpandableContent && (
             expanded ? (
               <ChevronDown className="h-3.5 w-3.5 text-text-tertiary shrink-0" />
             ) : (
@@ -110,12 +140,21 @@ function PlanNodeRow({ node, depth = 0, allNodes }: { node: PlanNode; depth?: nu
             )}
           </div>
         )}
+
+        {/* Expanded sub-plan */}
+        {expanded && node.subPlan && node.subPlan.nodes.length > 0 && (
+          <div className="mt-1 ml-4">
+            {node.subPlan.nodes.map((subNode) => (
+              <PlanNodeRow key={subNode.id} node={subNode} depth={depth + 1} allNodes={node.subPlan!.nodes} onRetryStep={onRetryStep} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-export function PlanDAGView({ plan, isRunning, defaultCollapsed = false }: PlanDAGViewProps) {
+export function PlanDAGView({ plan, isRunning, defaultCollapsed = false, onRetryStep }: PlanDAGViewProps) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
   const completedCount = plan.nodes.filter((n) => n.status === "completed").length;
@@ -165,7 +204,7 @@ export function PlanDAGView({ plan, isRunning, defaultCollapsed = false }: PlanD
                 </div>
               )}
               {layer.map((node) => (
-                <PlanNodeRow key={node.id} node={node} allNodes={plan.nodes} />
+                <PlanNodeRow key={node.id} node={node} allNodes={plan.nodes} onRetryStep={onRetryStep} />
               ))}
             </div>
           ))}

@@ -60,11 +60,12 @@ interface MessageBubbleProps {
   onRerun?: (messageId: string, modelId?: string) => void;
   onNote?: (messageId: string, content: string) => void;
   onFork?: (messageId: string) => void;
+  onRetryStep?: (stepId: string) => void;
   /** YouTube video ID from conversation context for timestamp auto-linking */
   youtubeVideoId?: string;
 }
 
-export const MessageBubble = memo(function MessageBubble({ message, artifacts, userName, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork, youtubeVideoId }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message, artifacts, userName, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork, onRetryStep, youtubeVideoId }: MessageBubbleProps) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -300,7 +301,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
                 {message.metadata.tier && (
                   <TierBadge tier={message.metadata.tier as ExecutionTier} reasoning={null} />
                 )}
-                <PlanDAGView plan={message.metadata.plan as Plan} isRunning={false} defaultCollapsed={true} />
+                <PlanDAGView plan={message.metadata.plan as Plan} isRunning={false} defaultCollapsed={true} onRetryStep={onRetryStep} />
               </div>
             )}
 

@@ -57,6 +57,10 @@ interface Tool {
   isEnabled: boolean;
   isApproved: boolean;
   registeredById?: string;
+  approvedById?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
+  tags?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -806,12 +810,14 @@ function AdminReviewTab() {
   }, [pending, allTools]);
 
   const reviewTool = useMutation({
-    mutationFn: ({ id, isApproved }: { id: string; isApproved: boolean }) =>
-      api.patch(`/api/tools/${id}`, { isApproved, isEnabled: isApproved }),
+    mutationFn: ({ id, isApproved, rejectionReason }: { id: string; isApproved: boolean; rejectionReason?: string }) =>
+      api.patch(`/api/tools/${id}`, { isApproved, isEnabled: isApproved, ...(rejectionReason ? { rejectionReason } : {}) }),
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["tools"] });
       queryClient.invalidateQueries({ queryKey: ["tools-pending"] });
       queryClient.invalidateQueries({ queryKey: ["tools-marketplace"] });
+      setRejectingToolId(null);
+      setRejectionReason("");
       toast(vars.isApproved ? t("tools.admin.approved", "Tool approved") : t("tools.admin.rejected", "Tool rejected"), "success");
     },
     onError: (err: any) => toast(err.message ?? t("tools.errors.reviewFailed", "Failed to review tool"), "error"),
@@ -828,6 +834,8 @@ function AdminReviewTab() {
   });
 
   const [detailTool, setDetailTool] = useState<Tool | null>(null);
+  const [rejectingToolId, setRejectingToolId] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
 
   if (isError) {
     return (
@@ -904,7 +912,7 @@ function AdminReviewTab() {
                     <ThumbsUp className="h-4 w-4" aria-hidden="true" />
                   </button>
                   <button
-                    onClick={() => reviewTool.mutate({ id: tool.id, isApproved: false })}
+                    onClick={() => { setRejectingToolId(tool.id); setRejectionReason(""); }}
                     className="p-1.5 text-text-tertiary hover:text-warning rounded-lg hover:bg-surface"
                     aria-label={t("tools.admin.rejectTool", "Reject")}
                     disabled={reviewTool.isPending}
@@ -924,6 +932,37 @@ function AdminReviewTab() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Rejection Reason Dialog */}
+      {rejectingToolId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setRejectingToolId(null)}>
+          <div className="bg-card border border-border rounded-xl p-6 w-full max-w-md shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-text mb-2">{t("tools.admin.rejectTitle", "Reject Tool")}</h3>
+            <p className="text-xs text-text-secondary mb-3">{t("tools.admin.rejectDescription", "Optionally provide a reason for rejection.")}</p>
+            <textarea
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              placeholder={t("tools.admin.rejectionPlaceholder", "Reason for rejection (optional)...")}
+              className="w-full h-20 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text resize-none focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <div className="flex justify-end gap-2 mt-3">
+              <button
+                onClick={() => setRejectingToolId(null)}
+                className="px-3 py-1.5 text-sm text-text-secondary hover:text-text rounded-lg hover:bg-surface"
+              >
+                {t("common.cancel", "Cancel")}
+              </button>
+              <button
+                onClick={() => reviewTool.mutate({ id: rejectingToolId, isApproved: false, rejectionReason: rejectionReason || undefined })}
+                disabled={reviewTool.isPending}
+                className="px-3 py-1.5 text-sm text-primary-foreground bg-danger hover:bg-danger/90 rounded-lg"
+              >
+                {t("tools.admin.confirmReject", "Reject")}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -204,6 +204,29 @@ memoryRoutes.post("/:agentId/memory", zValidator("json", upsertMemorySchema), as
   const agentId = c.req.param("agentId");
   const { key, value, scope, conversationId } = c.req.valid("json");
 
+  // Enforce memory size limit if configured
+  const [agent] = await db
+    .select({ memoryLimitMb: agents.memoryLimitMb })
+    .from(agents)
+    .where(eq(agents.id, agentId));
+
+  if (agent?.memoryLimitMb) {
+    const [sizeResult] = await db
+      .select({ totalBytes: sql<number>`COALESCE(SUM(octet_length(value::text)), 0)` })
+      .from(agentMemoryEntries)
+      .where(and(
+        eq(agentMemoryEntries.agentId, agentId),
+        eq(agentMemoryEntries.orgId, orgId),
+        isNull(agentMemoryEntries.deletedAt),
+      ));
+
+    const limitBytes = agent.memoryLimitMb * 1024 * 1024;
+    const newValueSize = JSON.stringify(value).length;
+    if ((sizeResult?.totalBytes ?? 0) + newValueSize > limitBytes) {
+      throw AppError.badRequest(`Memory limit of ${agent.memoryLimitMb} MB exceeded for this agent`);
+    }
+  }
+
   // Check if entry exists
   const conditions = [
     eq(agentMemoryEntries.agentId, agentId),

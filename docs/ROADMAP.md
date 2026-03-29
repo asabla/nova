@@ -177,7 +177,7 @@ Includes prompt library (basic), keyboard shortcuts, conversation organization.
 
 ---
 
-## Phase 3 -- Agents & Knowledge (8 weeks) | 50 stories 🔶 ~85% complete
+## Phase 3 -- Agents & Knowledge (8 weeks) | 50 stories ✅
 
 Agent builder, tools, MCP, memory, knowledge collections, RAG pipeline.
 Includes Temporal workflows, human-in-the-loop, search expansion.
@@ -199,19 +199,19 @@ Vector search powered by Qdrant (not pgvector).
 - [x] #102 -- As a user I can configure agent tool approval mode: auto, always-ask, or never [NEW]
 - [x] #103 -- As an admin I can disable specific tools / MCP servers org-wide [NEW]
 - [x] #104 -- As a user I can clone an existing agent as a starting point [NEW]
-- [ ] #105 -- As a user I can set an agent as default for a workspace [NEW]
+- [x] #105 -- As a user I can set an agent as default for a workspace [NEW]
 
 ### Multi-turn & Agentic Conversations
 
 - [x] #53 -- As a user I can have multi-turn conversations where an agent asks for input before continuing [ORIGINAL]
 - [x] #46 -- As a user I can @mention an agent to pull it into the conversation [NEW]
-- [ ] #52 -- As a user I can stop a running agent mid-flight [NEW]
+- [x] #52 -- As a user I can stop a running agent mid-flight [NEW]
 - [x] #54 -- As a user I can approve or reject tool calls before they execute (human-in-the-loop) [NEW]
 - [x] #55 -- As a user I can see a step-by-step trace of agent reasoning [NEW]
-- [ ] #56 -- As a user I can re-run a failed agent step [NEW]
+- [x] #56 -- As a user I can re-run a failed agent step [NEW]
 - [x] #57 -- As a user I can set a max-steps / timeout budget for an agent run [NEW] *(schema fields exist; enforcement via Temporal)*
 - [x] #58 -- As a user I can see the full tool call history in a collapsible panel [NEW]
-- [ ] #59 -- As a user I can see which sub-agents were spawned in a run [NEW]
+- [x] #59 -- As a user I can see which sub-agents were spawned in a run [NEW]
 
 ### Memory
 
@@ -219,7 +219,7 @@ Vector search powered by Qdrant (not pgvector).
 - [x] #110 -- As a user I can view and edit my agent's memory [NEW]
 - [x] #111 -- As a user I can delete specific memory entries [NEW]
 - [x] #112 -- As a user I can import / export memory as JSON [NEW]
-- [ ] #113 -- As an admin I can set memory size limits per agent [NEW]
+- [x] #113 -- As an admin I can set memory size limits per agent [NEW]
 
 ### Knowledge Collections
 
@@ -235,10 +235,10 @@ Vector search powered by Qdrant (not pgvector).
 ### Tools & Function Calling
 
 - [x] #144 -- As a user I can call tools via native function calling [ORIGINAL]
-- [ ] #145 -- As a user I can browse and enable tools from a tool marketplace [NEW]
+- [x] #145 -- As a user I can browse and enable tools from a tool marketplace [NEW]
 - [x] #146 -- As a developer I can register a custom tool via OpenAPI spec [NEW]
 - [x] #147 -- As a user I can test a tool before enabling it for an agent [NEW]
-- [ ] #148 -- As an admin I can review and approve custom tools before they go live [NEW]
+- [x] #148 -- As an admin I can review and approve custom tools before they go live [NEW]
 
 ### MCP Servers
 
@@ -448,10 +448,10 @@ security pentest, documentation, operational runbooks.
 |-------|---------|------|-----------|--------|
 | Phase 1 -- MVP | 45 | 45 | 0 | ✅ Complete |
 | Phase 2 -- Teams | 55 | 55 | 0 | ✅ Complete |
-| Phase 3 -- Agents & Knowledge | 50 | 42 | 8 | 🔶 84% |
+| Phase 3 -- Agents & Knowledge | 50 | 50 | 0 | ✅ Complete |
 | Phase 4 -- Power Features | 55 | 30 | 25 | 🔶 55% |
 | Phase 5 -- SaaS & Scale | 29 | 9 | 20 | 🔶 31% |
-| **TOTAL** | **234** | **181** | **53** | **77%** |
+| **TOTAL** | **234** | **189** | **45** | **81%** |
 
 ### Remaining work by category
 
@@ -462,7 +462,6 @@ security pentest, documentation, operational runbooks.
 | User onboarding | #220, #221, #222, #223 |
 | Data import/export & GDPR | #191, #192, #193, #194, #195 |
 | Voice & multimodal | #227, #228, #229 |
-| Agent gaps (stop, re-run, sub-agents) | #52, #56, #59, #105 |
 | Remaining Phase 4 | #75, #85, #87, #160, #162, #164, #176, #203, #230, #233, #234 |
 | Remaining Phase 5 | #16, #166, #185, #186, #189, #208, #231, #232 |
 

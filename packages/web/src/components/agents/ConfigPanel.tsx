@@ -149,6 +149,23 @@ export function ConfigPanel({ ctx }: { ctx: UseAgentFormReturn }) {
                 { value: "global", label: t("agents.memoryGlobal", { defaultValue: "Global" }) },
               ]}
             />
+            <div>
+              <label className="block text-xs text-text-secondary mb-1">
+                {t("agents.memoryLimit", { defaultValue: "Memory Limit (MB)" })}
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={1024}
+                placeholder={t("agents.memoryLimitPlaceholder", { defaultValue: "No limit" })}
+                value={form.memoryLimitMb ?? ""}
+                onChange={(e) => setField("memoryLimitMb", e.target.value ? Number(e.target.value) : null)}
+                className="w-full h-8 rounded-lg border border-border bg-surface px-2.5 text-sm text-text focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <p className="text-[10px] text-text-tertiary mt-0.5">
+                {t("agents.memoryLimitHelp", { defaultValue: "Leave blank for unlimited. Max 1024 MB." })}
+              </p>
+            </div>
           </div>
         </section>
 
