@@ -35,7 +35,7 @@ export async function collectPlatformMetrics(): Promise<{ snapshotsCreated: numb
       (SELECT count(*)::int FROM users WHERE deleted_at IS NULL) as user_count,
       (SELECT count(*)::int FROM conversations WHERE deleted_at IS NULL) as conversation_count,
       (SELECT count(*)::int FROM messages WHERE deleted_at IS NULL) as message_count,
-      (SELECT coalesce(sum((metadata->>'totalTokens')::bigint), 0) FROM messages WHERE sender_type = 'assistant' AND metadata->>'totalTokens' IS NOT NULL AND created_at >= ${todayStartISO}::timestamptz) as today_tokens,
+      (SELECT coalesce(sum(coalesce(token_count_prompt,0) + coalesce(token_count_completion,0)), 0) FROM messages WHERE sender_type = 'assistant' AND created_at >= ${todayStartISO}::timestamptz) as today_tokens,
       (SELECT count(*)::int FROM messages WHERE created_at >= ${todayStartISO}::timestamptz) as today_requests
   `) as any[];
 
@@ -107,7 +107,7 @@ export async function backfillPlatformMetrics(days: number = 90): Promise<{ snap
         (SELECT count(*)::int FROM users WHERE deleted_at IS NULL AND created_at < ${dayEndISO}::timestamptz) as user_count,
         (SELECT count(*)::int FROM conversations WHERE deleted_at IS NULL AND created_at < ${dayEndISO}::timestamptz) as conversation_count,
         (SELECT count(*)::int FROM messages WHERE created_at >= ${dayStartISO}::timestamptz AND created_at < ${dayEndISO}::timestamptz) as day_messages,
-        (SELECT coalesce(sum((metadata->>'totalTokens')::bigint), 0) FROM messages WHERE sender_type = 'assistant' AND metadata->>'totalTokens' IS NOT NULL AND created_at >= ${dayStartISO}::timestamptz AND created_at < ${dayEndISO}::timestamptz) as day_tokens
+        (SELECT coalesce(sum(coalesce(token_count_prompt,0) + coalesce(token_count_completion,0)), 0) FROM messages WHERE sender_type = 'assistant' AND created_at >= ${dayStartISO}::timestamptz AND created_at < ${dayEndISO}::timestamptz) as day_tokens
     `) as any[];
 
     if (!stats) continue;

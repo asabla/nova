@@ -44,12 +44,11 @@ adminStatsRoutes.get("/usage", async (c) => {
         WHERE org_id = ${organisations.id} AND created_at >= ${sinceDate}
       )`.mapWith(Number),
       totalTokens: sql<number>`(
-        SELECT coalesce(sum((metadata->>'totalTokens')::int), 0)
+        SELECT coalesce(sum(coalesce(token_count_prompt,0) + coalesce(token_count_completion,0)), 0)
         FROM messages
         WHERE org_id = ${organisations.id}
           AND sender_type = 'assistant'
           AND created_at >= ${sinceDate}
-          AND metadata->>'totalTokens' IS NOT NULL
       )`.mapWith(Number),
     })
     .from(organisations)

@@ -214,7 +214,7 @@ adminOrgRoutes.get("/:orgId/usage", async (c) => {
     SELECT
       (SELECT count(*) FROM conversations WHERE org_id = ${orgId} AND created_at >= ${sinceDate}) as conversations,
       (SELECT count(*) FROM messages WHERE org_id = ${orgId} AND created_at >= ${sinceDate}) as messages,
-      (SELECT coalesce(sum((metadata->>'totalTokens')::int), 0) FROM messages WHERE org_id = ${orgId} AND sender_type = 'assistant' AND created_at >= ${sinceDate} AND metadata->>'totalTokens' IS NOT NULL) as tokens
+      (SELECT coalesce(sum(coalesce(token_count_prompt,0) + coalesce(token_count_completion,0)), 0) FROM messages WHERE org_id = ${orgId} AND sender_type = 'assistant' AND created_at >= ${sinceDate}) as tokens
   `);
 
   return c.json({ since: sinceDate.toISOString(), ...usage });
