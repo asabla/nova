@@ -1,6 +1,6 @@
-import { eq, and, desc, ilike, sql, isNull } from "drizzle-orm";
+import { eq, and, desc, ilike, sql, isNull, or } from "drizzle-orm";
 import { db } from "../lib/db";
-import { agents, agentVersions } from "@nova/shared/schemas";
+import { agents, agentVersions, agentSkills, agentTools, agentMcpServers, organisations } from "@nova/shared/schemas";
 import { AppError } from "@nova/shared/utils";
 import { syncAgentUpsert, syncAgentDelete } from "../lib/qdrant-sync";
 
@@ -75,20 +75,43 @@ export const agentService = {
   },
 
   async listPublished(orgId: string, opts?: { search?: string; category?: string; limit?: number; offset?: number }) {
-    const conditions = [
-      eq(agents.orgId, orgId),
+    // Show agents published within the caller's org OR from any system org (platform marketplace)
+    const systemOrgSubquery = db.select({ id: organisations.id }).from(organisations).where(eq(organisations.isSystemOrg, true));
+
+    const conditions: any[] = [
       isNull(agents.deletedAt),
       eq(agents.isPublished, true),
+      or(
+        eq(agents.orgId, orgId),
+        sql`${agents.orgId} IN (${systemOrgSubquery})`,
+      ),
     ];
     if (opts?.search) {
       conditions.push(ilike(agents.name, `%${opts.search}%`));
     }
 
     const result = await db
-      .select()
+      .select({
+        id: agents.id,
+        orgId: agents.orgId,
+        name: agents.name,
+        description: agents.description,
+        avatarUrl: agents.avatarUrl,
+        visibility: agents.visibility,
+        isPublished: agents.isPublished,
+        currentVersion: agents.currentVersion,
+        ownerId: agents.ownerId,
+        createdAt: agents.createdAt,
+        updatedAt: agents.updatedAt,
+        // Computed: is this from the platform or the user's org?
+        source: sql<string>`CASE WHEN ${agents.orgId} = ${orgId} THEN 'org' ELSE 'platform' END`.as("source"),
+      })
       .from(agents)
       .where(and(...conditions))
-      .orderBy(desc(agents.updatedAt))
+      .orderBy(
+        sql`CASE WHEN ${agents.orgId} != ${orgId} THEN 0 ELSE 1 END`, // platform first
+        desc(agents.updatedAt),
+      )
       .limit(opts?.limit ?? 50)
       .offset(opts?.offset ?? 0);
 
@@ -98,6 +121,77 @@ export const agentService = {
       .where(and(...conditions));
 
     return { data: result, total: count };
+  },
+
+  async installFromMarketplace(agentId: string, targetOrgId: string, userId: string) {
+    // Fetch the source agent — must be published and from a system org
+    const [sourceAgent] = await db
+      .select()
+      .from(agents)
+      .where(and(
+        eq(agents.id, agentId),
+        eq(agents.isPublished, true),
+        isNull(agents.deletedAt),
+      ));
+
+    if (!sourceAgent) throw AppError.notFound("Agent not found in marketplace");
+
+    // Verify source is from a system org
+    const [sourceOrg] = await db
+      .select({ isSystemOrg: organisations.isSystemOrg })
+      .from(organisations)
+      .where(eq(organisations.id, sourceAgent.orgId));
+
+    if (!sourceOrg?.isSystemOrg && sourceAgent.orgId !== targetOrgId) {
+      throw AppError.forbidden("Can only install agents from the platform marketplace");
+    }
+
+    // Clone the agent into the target org
+    const { id: _id, orgId: _orgId, ownerId: _ownerId, createdAt: _ca, updatedAt: _ua, deletedAt: _da, isPublished: _ip, ...agentData } = sourceAgent;
+    const [clonedAgent] = await db
+      .insert(agents)
+      .values({
+        ...agentData,
+        orgId: targetOrgId,
+        ownerId: userId,
+        clonedFromAgentId: agentId,
+        isPublished: false,
+        visibility: "private",
+      })
+      .returning();
+
+    // Clone associated skills
+    const skills = await db.select().from(agentSkills).where(eq(agentSkills.agentId, agentId));
+    for (const skill of skills) {
+      await db.insert(agentSkills).values({
+        agentId: clonedAgent.id,
+        orgId: targetOrgId,
+        skillId: skill.skillId,
+      });
+    }
+
+    // Clone associated tools
+    const toolLinks = await db.select().from(agentTools).where(eq(agentTools.agentId, agentId));
+    for (const link of toolLinks) {
+      await db.insert(agentTools).values({
+        agentId: clonedAgent.id,
+        orgId: targetOrgId,
+        toolId: link.toolId,
+      });
+    }
+
+    // Clone associated MCP servers
+    const mcpLinks = await db.select().from(agentMcpServers).where(eq(agentMcpServers.agentId, agentId));
+    for (const link of mcpLinks) {
+      await db.insert(agentMcpServers).values({
+        agentId: clonedAgent.id,
+        orgId: targetOrgId,
+        mcpServerId: link.mcpServerId,
+      });
+    }
+
+    syncAgentUpsert(clonedAgent as any);
+    return clonedAgent;
   },
 
   async createVersion(orgId: string, agentId: string, data: {

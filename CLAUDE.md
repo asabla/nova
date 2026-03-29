@@ -67,6 +67,7 @@ Error handler → Security headers → CORS → Request ID → Logger → **Publ
 ### Key patterns
 
 - **Services**: Named exports of async functions, no default exports. Located in `packages/api/src/services/`
+- **Centralized agent marketplace**: A "system org" (`isSystemOrg: true` on `organisations` table) owns platform-curated agents. All orgs see these in their marketplace alongside org-local agents. Users "install" platform agents by cloning into their org via `POST /api/agents/marketplace/:id/install`. The `source` field (`"platform"` vs `"org"`) distinguishes them in API responses and the marketplace UI.
 - **Errors**: Use `AppError` from `@nova/shared/utils` — `AppError.notFound()`, `AppError.unauthorized()`, `AppError.badRequest()`
 - **Shared imports**: `import { conversations } from "@nova/shared/schema"`, `import type { User } from "@nova/shared/types"`
 - **Temporal workflows**: Orchestrate via `proxyActivities()`. Activities are side-effect functions (LLM calls, DB writes). Each worker registers its own workflows/activities. The unified `agentWorkflow` (`packages/worker-agent/src/workflows/agent.ts`) handles both chat and execution modes. It auto-summarizes conversation context when history exceeds ~25k tokens (100k chars) to stay within model limits — the middle portion is compressed to a "Previously: ..." summary while preserving system messages, the first user message, and the last 4 messages. Workflows are dispatched to specific task queues via `TASK_QUEUES` constants from `@nova/shared/constants`.

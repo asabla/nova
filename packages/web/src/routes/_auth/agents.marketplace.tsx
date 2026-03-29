@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import {
   Bot, Search, Plus, Zap, Copy, ArrowRight, RefreshCw,
   Code2, Palette, BarChart3, BookOpen, Shield, Sparkles,
-  Star, Download,
+  Star, Download, BadgeCheck,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { api } from "../../lib/api";
@@ -68,6 +68,18 @@ function AgentMarketplacePage() {
     },
     onError: () => {
       toast(t("marketplace.cloneError", "Failed to clone agent"), "error");
+    },
+  });
+
+  const installAgent = useMutation({
+    mutationFn: (agentId: string) => api.post<any>(`/api/agents/marketplace/${agentId}/install`),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["agents"] });
+      toast(t("marketplace.installSuccess", "Agent installed to your library"), "success");
+      navigate({ to: `/agents/${data.id}` });
+    },
+    onError: () => {
+      toast(t("marketplace.installError", "Failed to install agent"), "error");
     },
   });
 
@@ -183,6 +195,12 @@ function AgentMarketplacePage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-semibold text-text truncate">{agent.name}</h3>
+                      {agent.source === "platform" && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-primary">
+                          <BadgeCheck className="h-3 w-3" aria-hidden="true" />
+                          {t("marketplace.platform", "Platform")}
+                        </span>
+                      )}
                       {agent.featured && <Badge variant="primary">{t("marketplace.featured", "Featured")}</Badge>}
                     </div>
                     <p className="text-[10px] text-text-tertiary">
@@ -231,11 +249,18 @@ function AgentMarketplacePage() {
                     className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={(e) => {
                       e.stopPropagation();
-                      cloneAgent.mutate(agent.id);
+                      if (agent.source === "platform") {
+                        installAgent.mutate(agent.id);
+                      } else {
+                        cloneAgent.mutate(agent.id);
+                      }
                     }}
                   >
-                    <Copy className="h-3 w-3 mr-1" aria-hidden="true" />
-                    {t("marketplace.install", "Install")}
+                    {agent.source === "platform" ? (
+                      <><Download className="h-3 w-3 mr-1" aria-hidden="true" />{t("marketplace.install", "Install")}</>
+                    ) : (
+                      <><Copy className="h-3 w-3 mr-1" aria-hidden="true" />{t("marketplace.clone", "Clone")}</>
+                    )}
                   </Button>
                 </div>
               </div>

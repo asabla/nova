@@ -143,7 +143,9 @@ agentRoutes.get("/marketplace/browse", async (c) => {
 agentRoutes.post("/:id/publish", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
-  const agent = await agentService.update(orgId, c.req.param("id"), { isPublished: true, visibility: "org" });
+  const body = await c.req.json().catch(() => ({}));
+  const visibility = body.visibility ?? "org";
+  const agent = await agentService.update(orgId, c.req.param("id"), { isPublished: true, visibility });
   await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "agent.publish", resourceType: "agent", resourceId: c.req.param("id") });
   return c.json(agent);
 });
@@ -153,6 +155,16 @@ agentRoutes.post("/:id/unpublish", async (c) => {
   const orgId = c.get("orgId");
   const agent = await agentService.update(orgId, c.req.param("id"), { isPublished: false });
   return c.json(agent);
+});
+
+// Install a marketplace agent into the caller's org (cross-org clone from system org)
+agentRoutes.post("/marketplace/:id/install", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const agentId = c.req.param("id");
+  const clonedAgent = await agentService.installFromMarketplace(agentId, orgId, userId);
+  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "agent.install", resourceType: "agent", resourceId: clonedAgent.id, details: { sourceAgentId: agentId } });
+  return c.json(clonedAgent, 201);
 });
 
 // Create a version snapshot

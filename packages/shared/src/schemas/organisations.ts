@@ -14,6 +14,7 @@ export const organisations = pgTable("organisations", {
   billingPlan: text("billing_plan"),
   billingCustomerId: text("billing_customer_id"),
   isSaas: boolean("is_saas").notNull().default(false),
+  isSystemOrg: boolean("is_system_org").notNull().default(false),
   setupCompletedAt: timestamp("setup_completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
