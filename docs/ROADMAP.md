@@ -255,7 +255,7 @@ Vector search powered by Qdrant (not pgvector).
 
 ---
 
-## Phase 4 -- Power Features (10 weeks) | 55 stories 🔶 ~45% complete
+## Phase 4 -- Power Features (10 weeks) | 55 stories 🔶 ~78% complete
 
 Deep research, code interpreter, rich artifacts, admin panel, analytics.
 Includes integrations (Slack/Teams), voice input, model playground, batch API.
@@ -294,7 +294,7 @@ Firecracker upgrade for KVM-capable hosts; nsjail remains fallback.
 ### Models & Providers (Advanced)
 
 - [ ] #85 -- As an admin I can set a default model per group [NEW]
-- [ ] #87 -- As a user I can compare responses from two models side-by-side [NEW]
+- [x] #87 -- As a user I can compare responses from two models side-by-side [NEW]
 - [x] #88 -- As an admin I can set fallback models when primary models fail [NEW]
 - [x] #89 -- As an admin I can view model latency, error rate, and cost dashboards [NEW]
 
@@ -325,43 +325,43 @@ Firecracker upgrade for KVM-capable hosts; nsjail remains fallback.
 
 ### Admin Onboarding & Health
 
-- [ ] #203 -- As a new admin I am guided through a setup wizard on first login [GAP]
+- [x] #203 -- As a new admin I am guided through a setup wizard on first login [GAP]
 - [x] #204 -- As an admin I can view a system health dashboard [GAP]
 - [x] #205 -- As an admin I can run a diagnostic check that tests all external service connections [GAP]
 - [x] #206 -- As an admin I can see when the system was last updated and what version is running [GAP]
 
 ### Notifications (Advanced)
 
-- [ ] #162 -- As a user I receive email notifications for @mentions [NEW]
+- [x] #162 -- As a user I receive email notifications for @mentions [NEW]
 - [ ] #164 -- As a user I can receive a webhook / Slack ping when an async agent run completes [NEW]
 
 ### Error Handling & Rate Limiting UX
 
-- [ ] #197 -- As a user I am informed when I approach my rate limit or spending quota [GAP]
-- [ ] #198 -- As a user I see an estimated wait time when rate-limited [GAP]
-- [ ] #199 -- As a user I can see a system status banner when services are degraded [GAP]
-- [ ] #200 -- As a user failed messages are automatically retried with a different model (if fallback is configured) [GAP]
-- [ ] #202 -- As a user my in-progress messages are preserved if I lose connection and auto-sent when reconnected [GAP]
+- [x] #197 -- As a user I am informed when I approach my rate limit or spending quota [GAP]
+- [x] #198 -- As a user I see an estimated wait time when rate-limited [GAP]
+- [x] #199 -- As a user I can see a system status banner when services are degraded [GAP]
+- [x] #200 -- As a user failed messages are automatically retried with a different model (if fallback is configured) [GAP]
+- [x] #202 -- As a user my in-progress messages are preserved if I lose connection and auto-sent when reconnected [GAP]
 
 ### Integrations
 
 - [ ] #215 -- As an admin I can connect a Slack workspace [GAP]
 - [ ] #216 -- As an admin I can connect Microsoft Teams [GAP]
-- [ ] #219 -- As a developer the API is OpenAI-compatible (chat completions endpoint) [GAP]
+- [x] #219 -- As a developer the API is OpenAI-compatible (chat completions endpoint) [GAP]
 
 ### Voice & Multimodal Input
 
-- [ ] #227 -- As a user I can use voice input (speech-to-text) in the web UI [GAP]
-- [ ] #229 -- As a user I can send an audio recording as a message and have it transcribed [GAP]
+- [x] #227 -- As a user I can use voice input (speech-to-text) in the web UI [GAP]
+- [x] #229 -- As a user I can send an audio recording as a message and have it transcribed [GAP]
 
 ### Model Playground
 
-- [ ] #230 -- As a developer I can use a model playground to test prompts [GAP]
+- [x] #230 -- As a developer I can use a model playground to test prompts [GAP]
 
 ### Batch / Bulk Operations
 
 - [ ] #233 -- As a developer I can submit a batch of prompts via the API and receive results asynchronously [GAP]
-- [ ] #234 -- As an admin I can bulk-manage agents (enable, disable, reassign ownership) [GAP]
+- [x] #234 -- As an admin I can bulk-manage agents (enable, disable, reassign ownership) [GAP]
 
 ---
 
@@ -449,20 +449,23 @@ security pentest, documentation, operational runbooks.
 | Phase 1 -- MVP | 45 | 45 | 0 | ✅ Complete |
 | Phase 2 -- Teams | 55 | 55 | 0 | ✅ Complete |
 | Phase 3 -- Agents & Knowledge | 50 | 50 | 0 | ✅ Complete |
-| Phase 4 -- Power Features | 55 | 30 | 25 | 🔶 55% |
+| Phase 4 -- Power Features | 55 | 43 | 12 | 🔶 78% |
 | Phase 5 -- SaaS & Scale | 29 | 9 | 20 | 🔶 31% |
-| **TOTAL** | **234** | **189** | **45** | **81%** |
+| **TOTAL** | **234** | **202** | **32** | **86%** |
 
 ### Remaining work by category
 
 | Category | Remaining stories |
 |----------|-------------------|
-| Error handling & rate limiting UX | #197, #198, #199, #200, #202 |
-| Integrations (Slack/Teams/email/Drive) | #215, #216, #217, #218, #219 |
-| User onboarding | #220, #221, #222, #223 |
-| Data import/export & GDPR | #191, #192, #193, #194, #195 |
-| Voice & multimodal | #227, #228, #229 |
-| Remaining Phase 4 | #75, #85, #87, #160, #162, #164, #176, #203, #230, #233, #234 |
+| Centralized agent marketplace | New — system org architecture for cross-org agent distribution |
+| Admin features | #75 (domain rules UI), #85 (group default model), #160 (observability wiring) |
+| Notifications & integrations | #164 (webhook on completion), #215 (Slack), #216 (Teams) |
+| Security | #176 (data at rest encryption) |
+| Batch API | #233 (async batch) |
+| Integrations (Phase 5) | #217, #218 |
+| User onboarding (Phase 5) | #220, #221, #222, #223 |
+| Data import/export & GDPR (Phase 5) | #191, #192, #193, #194, #195 |
+| Voice (Phase 5) | #228 |
 | Remaining Phase 5 | #16, #166, #185, #186, #189, #208, #231, #232 |
 
 ### Verification: All 234 Stories Accounted For
