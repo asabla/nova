@@ -53,7 +53,8 @@ async function apiDelete<T = any>(path: string): Promise<{ status: number; body:
     method: "DELETE",
     headers: headers(),
   });
-  return { status: res.status, body: (await res.json()) as T };
+  const body = res.status === 204 ? (null as T) : ((await res.json()) as T);
+  return { status: res.status, body };
 }
 
 // ─── Auth ──────────────────────────────────────────
@@ -199,10 +200,10 @@ describe("Knowledge collections (e2e)", () => {
     });
     expect([200, 204]).toContain(delRes.status);
 
-    // Verify it's soft-deleted (has deletedAt set, or no longer in active list)
+    // Verify it no longer appears in the active document list
     const { body: afterBody } = await apiGet<any>(`/api/knowledge/${collectionId}/documents`);
-    const remaining = afterBody.data.find((d: any) => d.id === urlDoc.id && !d.deletedAt);
-    expect(remaining).toBeFalsy();
+    const stillPresent = afterBody.data.find((d: any) => d.id === urlDoc.id);
+    expect(stillPresent).toBeUndefined();
   });
 
   it("updates collection config (chunk size and overlap)", async () => {
