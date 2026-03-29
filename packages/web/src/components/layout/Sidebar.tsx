@@ -8,7 +8,7 @@ import {
   Settings, ShieldCheck,
   HelpCircle, Filter, Search, Microscope, Compass,
   CheckSquare, Square, FolderOpen, MessageSquare, Zap, HardDrive, Plus,
-  X, Loader2, ChevronRight, ChevronDown, Library,
+  X, Loader2, ChevronRight, ChevronDown,
 } from "lucide-react";
 import { isToday, isYesterday, isThisWeek } from "date-fns";
 import { api } from "../../lib/api";
@@ -299,20 +299,28 @@ export function Sidebar() {
           {/* + New Chat */}
           <SidebarLink icon={Plus} label={t("conversations.new", { defaultValue: "New conversation" })} to="/" exact collapsed={!sidebarOpen} />
 
-          {/* Explore */}
-          <SidebarLink icon={Compass} label={t("nav.explore", { defaultValue: "Explore" })} to="/explore" collapsed={!sidebarOpen} />
-
-          {/* Library collapsible group */}
-          <SidebarCollapsible
-            icon={Library}
-            label={t("nav.library", { defaultValue: "Library" })}
-            collapsed={!sidebarOpen}
-            routes={["/knowledge", "/files", "/agents"]}
-          >
-            <SidebarLink icon={BookOpen} label={t("nav.knowledge", { defaultValue: "Knowledge" })} to="/knowledge" indent />
-            <SidebarLink icon={HardDrive} label={t("nav.files", { defaultValue: "Files" })} to="/files" indent />
-            <SidebarLink icon={Bot} label={t("nav.agents", { defaultValue: "Agents" })} to="/agents" indent />
-          </SidebarCollapsible>
+          {/* Library section */}
+          {sidebarOpen ? (
+            <>
+              <div className="px-3 pt-3 pb-0.5">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-text-tertiary">
+                  {t("nav.library", { defaultValue: "Library" })}
+                </span>
+              </div>
+              <SidebarLink icon={Bot} label={t("nav.agents", { defaultValue: "Agents" })} to="/agents" />
+              <SidebarLink icon={BookOpen} label={t("nav.knowledge", { defaultValue: "Knowledge" })} to="/knowledge" />
+              <SidebarLink icon={HardDrive} label={t("nav.files", { defaultValue: "Files" })} to="/files" />
+              <SidebarLink icon={Compass} label={t("nav.explore", { defaultValue: "Explore" })} to="/explore" />
+            </>
+          ) : (
+            <>
+              <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mx-2 my-1.5" />
+              <SidebarLink icon={Bot} label={t("nav.agents", { defaultValue: "Agents" })} to="/agents" collapsed />
+              <SidebarLink icon={BookOpen} label={t("nav.knowledge", { defaultValue: "Knowledge" })} to="/knowledge" collapsed />
+              <SidebarLink icon={HardDrive} label={t("nav.files", { defaultValue: "Files" })} to="/files" collapsed />
+              <SidebarLink icon={Compass} label={t("nav.explore", { defaultValue: "Explore" })} to="/explore" collapsed />
+            </>
+          )}
         </div>
 
         {sidebarOpen && (
@@ -762,7 +770,7 @@ function ConversationItem({
 // SidebarLink
 // ---------------------------------------------------------------------------
 
-function SidebarLink({ icon: Icon, label, to, exact, collapsed, indent }: { icon: any; label: string; to: string; exact?: boolean; collapsed?: boolean; indent?: boolean }) {
+function SidebarLink({ icon: Icon, label, to, exact, collapsed }: { icon: any; label: string; to: string; exact?: boolean; collapsed?: boolean }) {
   const matchRoute = useMatchRoute();
   const isActive = exact
     ? matchRoute({ to, fuzzy: false }) || (to === "/" && matchRoute({ to: "/", fuzzy: false }))
@@ -792,7 +800,7 @@ function SidebarLink({ icon: Icon, label, to, exact, collapsed, indent }: { icon
       aria-current={isActive ? "page" : undefined}
       className={clsx(
         "w-full flex items-center gap-2.5 py-1.5 rounded-lg text-sm transition-all duration-150 relative no-underline",
-        indent ? "pl-8 pr-3" : "px-3",
+        "px-3",
         isActive
           ? "bg-primary/10 text-primary font-medium nav-active"
           : "text-text-secondary hover:bg-surface-tertiary hover:text-text hover:translate-x-0.5",
@@ -804,62 +812,3 @@ function SidebarLink({ icon: Icon, label, to, exact, collapsed, indent }: { icon
   );
 }
 
-// ---------------------------------------------------------------------------
-// SidebarCollapsible — collapsible nav group
-// ---------------------------------------------------------------------------
-
-function SidebarCollapsible({
-  icon: Icon,
-  label,
-  collapsed,
-  children,
-  routes,
-}: {
-  icon: any;
-  label: string;
-  collapsed?: boolean;
-  children: React.ReactNode;
-  routes: string[];
-}) {
-  const [open, setOpen] = useState(true);
-  const matchRoute = useMatchRoute();
-  const isChildActive = routes.some((r) => matchRoute({ to: r, fuzzy: true }));
-
-  if (collapsed) {
-    return (
-      <div
-        title={label}
-        className={clsx(
-          "flex items-center justify-center h-9 w-9 mx-auto rounded-lg transition-all duration-150 relative",
-          isChildActive
-            ? "bg-primary/10 text-primary"
-            : "text-text-secondary hover:bg-surface-tertiary hover:text-text",
-        )}
-      >
-        <Icon className="h-4 w-4" aria-hidden="true" />
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <button
-        onClick={() => setOpen(!open)}
-        className={clsx(
-          "w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-150",
-          isChildActive
-            ? "text-primary font-medium"
-            : "text-text-secondary hover:bg-surface-tertiary hover:text-text",
-        )}
-      >
-        <Icon className="h-4 w-4" aria-hidden="true" />
-        {label}
-        <ChevronDown
-          className={clsx("h-3 w-3 ml-auto transition-transform", !open && "-rotate-90")}
-          aria-hidden="true"
-        />
-      </button>
-      {open && <div className="space-y-0.5">{children}</div>}
-    </div>
-  );
-}
