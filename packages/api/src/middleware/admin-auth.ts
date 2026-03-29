@@ -1,16 +1,15 @@
 /**
  * Admin authentication middleware.
  * Validates that the request comes from a super-admin user.
- * Reads the Better Auth session cookie (nova_session), hashes it,
- * and looks up the session in the database.
+ * Reads the Better Auth session cookie and validates against
+ * Better Auth's session table + NOVA's users table.
  */
 
 import { createMiddleware } from "hono/factory";
-import { createHash } from "crypto";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
-import { users, sessions } from "@nova/shared/schemas";
-import { eq, and, isNull, gte } from "drizzle-orm";
+import { users } from "@nova/shared/schemas";
+import { eq, and, isNull, gte, sql } from "drizzle-orm";
 
 function parseCookies(header: string): Record<string, string> {
   const cookies: Record<string, string> = {};
@@ -25,10 +24,8 @@ export const adminAuth = createMiddleware<AppContext>(async (c, next) => {
   const cookieHeader = c.req.header("cookie") ?? "";
   const cookies = parseCookies(cookieHeader);
 
-  // Better Auth cookie name (configured in auth.ts)
   const token =
     cookies["nova_session"] ??
-    cookies["nova.session_token"] ??
     cookies["better-auth.session_token"] ??
     c.req.header("authorization")?.replace("Bearer ", "");
 
@@ -36,45 +33,36 @@ export const adminAuth = createMiddleware<AppContext>(async (c, next) => {
     return c.json({ error: "Authentication required" }, 401);
   }
 
-  // Better Auth stores sessions as SHA-256 hash of the token
-  const tokenHash = createHash("sha256").update(token).digest("hex");
-
-  // Look up session by token hash
-  const [session] = await db
-    .select({
-      sessionId: sessions.id,
-      userId: sessions.userId,
-      expiresAt: sessions.expiresAt,
-    })
-    .from(sessions)
-    .where(and(
-      eq(sessions.tokenHash, tokenHash),
-      gte(sessions.expiresAt, new Date()),
-    ));
+  // Look up session in Better Auth's session table (stores plain tokens)
+  const [session] = await db.execute(
+    sql`SELECT user_id, expires_at FROM session WHERE token = ${token} AND expires_at > NOW() LIMIT 1`
+  ) as any[];
 
   if (!session) {
     return c.json({ error: "Invalid or expired session" }, 401);
   }
 
-  // Verify user exists and is a super-admin
-  const [user] = await db
-    .select({
-      id: users.id,
-      email: users.email,
-      isSuperAdmin: users.isSuperAdmin,
-    })
-    .from(users)
-    .where(and(
-      eq(users.id, session.userId),
-      isNull(users.deletedAt),
-    ));
+  // Better Auth user_id references the "user" table, not NOVA's "users" table.
+  // Find the NOVA user by email match.
+  const [baUser] = await db.execute(
+    sql`SELECT email FROM "user" WHERE id = ${session.user_id} LIMIT 1`
+  ) as any[];
 
-  if (!user || !user.isSuperAdmin) {
+  if (!baUser) {
+    return c.json({ error: "User not found" }, 401);
+  }
+
+  // Find the NOVA user by email and check super-admin
+  const [novaUser] = await db
+    .select({ id: users.id, email: users.email, isSuperAdmin: users.isSuperAdmin })
+    .from(users)
+    .where(and(eq(users.email, baUser.email), isNull(users.deletedAt)));
+
+  if (!novaUser?.isSuperAdmin) {
     return c.json({ error: "Super-admin access required" }, 403);
   }
 
-  // Set context for downstream handlers
-  c.set("userId", user.id);
+  c.set("userId", novaUser.id);
   c.set("role", "super-admin");
 
   await next();

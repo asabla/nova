@@ -84,10 +84,9 @@ adminApp.post("/auth/login", async (c) => {
 
 // Check current session
 adminApp.get("/auth/me", async (c) => {
-  const { createHash } = await import("crypto");
   const { db: database } = await import("./lib/db");
-  const { users, sessions } = await import("@nova/shared/schemas");
-  const { eq, and, isNull, gte } = await import("drizzle-orm");
+  const { users } = await import("@nova/shared/schemas");
+  const { eq, and, isNull, sql } = await import("drizzle-orm");
 
   const cookieHeader = c.req.header("cookie") ?? "";
   const match = cookieHeader.match(/nova_session=([^;]+)/);
@@ -95,22 +94,28 @@ adminApp.get("/auth/me", async (c) => {
 
   if (!token) return c.json({ authenticated: false }, 401);
 
-  const tokenHash = createHash("sha256").update(token).digest("hex");
-  const [session] = await database
-    .select({ userId: sessions.userId })
-    .from(sessions)
-    .where(and(eq(sessions.tokenHash, tokenHash), gte(sessions.expiresAt, new Date())));
+  // Look up in Better Auth's session table (plain token, not hashed)
+  const [session] = await database.execute(
+    sql`SELECT user_id FROM session WHERE token = ${token} AND expires_at > NOW() LIMIT 1`
+  ) as any[];
 
   if (!session) return c.json({ authenticated: false }, 401);
 
-  const [user] = await database
+  // Get email from Better Auth user table, then find NOVA user
+  const [baUser] = await database.execute(
+    sql`SELECT email FROM "user" WHERE id = ${session.user_id} LIMIT 1`
+  ) as any[];
+
+  if (!baUser) return c.json({ authenticated: false }, 401);
+
+  const [novaUser] = await database
     .select({ id: users.id, email: users.email, isSuperAdmin: users.isSuperAdmin })
     .from(users)
-    .where(and(eq(users.id, session.userId), isNull(users.deletedAt)));
+    .where(and(eq(users.email, baUser.email), isNull(users.deletedAt)));
 
-  if (!user?.isSuperAdmin) return c.json({ authenticated: false }, 401);
+  if (!novaUser?.isSuperAdmin) return c.json({ authenticated: false }, 401);
 
-  return c.json({ authenticated: true, email: user.email });
+  return c.json({ authenticated: true, email: novaUser.email });
 });
 
 // Logout — clear session
