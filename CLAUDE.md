@@ -13,6 +13,7 @@ Bun workspace monorepo with 7 packages:
 - **@nova/shared** — Drizzle schemas (75 tables), types, constants, utils, skills. Exports: `./schema`, `./schemas`, `./types`, `./constants`, `./utils`, `./content`, `./skills`
 - **@nova/api** — Hono REST API on Bun runtime. Routes in `src/routes/`, services in `src/services/`, middleware in `src/middleware/`
 - **@nova/web** — React 19 + Vite + TanStack Router + TanStack Query + Zustand + Tailwind v4. Path alias `@/*` → `src/*`
+- **@nova/admin** — Separate admin portal (React 19 + Vite + TanStack Router). Completely isolated from the main web app — its own login, routes, and API client pointing to `/admin-api/*`. Dev port: 5174
 - **@nova/worker-shared** — Shared worker infrastructure (db, redis, model-client, stream-publisher, qdrant, minio, sandbox, tools). Conditional exports like `@nova/worker-shared/db`
 - **@nova/worker-agent** — Temporal agent workflows on **Node.js** (task queue: `nova-agent`). Chat execution, tool use, DAG orchestration
 - **@nova/worker-ingestion** — Temporal ingestion workflows on **Node.js** (task queue: `nova-ingestion`). Document/file/message embedding pipelines
