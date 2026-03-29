@@ -1,8 +1,8 @@
 import { Hono } from "hono";
-import { sql, desc, isNull, gte } from "drizzle-orm";
+import { sql, desc, isNull, gte, eq, and, asc } from "drizzle-orm";
 import type { AppContext } from "../../types/context";
 import { db } from "../../lib/db";
-import { organisations, users, conversations, messages } from "@nova/shared/schemas";
+import { organisations, users, conversations, messages, usageStats } from "@nova/shared/schemas";
 
 const adminStatsRoutes = new Hono<AppContext>();
 
@@ -57,6 +57,63 @@ adminStatsRoutes.get("/usage", async (c) => {
     .orderBy(desc(sql`"messageCount"`));
 
   return c.json({ since: sinceDate.toISOString(), data: usage });
+});
+
+// Platform metrics time-series (from usageStats collected by background worker)
+adminStatsRoutes.get("/daily", async (c) => {
+  const days = Math.min(Number(c.req.query("days") ?? 30), 365);
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  // Find system org (platform metrics are stored under it)
+  const [systemOrg] = await db
+    .select({ id: organisations.id })
+    .from(organisations)
+    .where(eq(organisations.isSystemOrg, true));
+
+  if (!systemOrg) {
+    return c.json({ data: [], message: "No system org found — run metrics collection first" });
+  }
+
+  const result = await db
+    .select({
+      date: usageStats.periodStart,
+      orgCount: usageStats.promptTokens,        // convention: promptTokens = org_count
+      userCount: usageStats.completionTokens,    // convention: completionTokens = user_count
+      tokens: usageStats.totalTokens,
+      messages: usageStats.requestCount,
+      conversations: usageStats.storageBytes,    // convention: storageBytes = conversation_count
+    })
+    .from(usageStats)
+    .where(and(
+      eq(usageStats.orgId, systemOrg.id),
+      eq(usageStats.period, "day"),
+      isNull(usageStats.userId),
+      isNull(usageStats.modelId),
+      gte(usageStats.periodStart, since),
+    ))
+    .orderBy(asc(usageStats.periodStart));
+
+  return c.json({ data: result });
+});
+
+// Trigger backfill (admin action)
+adminStatsRoutes.post("/backfill", async (c) => {
+  const { days } = await c.req.json().catch(() => ({ days: 90 }));
+
+  // Import and call the Temporal client to start the backfill workflow
+  try {
+    const { getTemporalClient } = await import("../../lib/temporal");
+    const client = await getTemporalClient();
+    const handle = await client.workflow.start("backfillMetricsWorkflow", {
+      taskQueue: "nova-background",
+      workflowId: `backfill-metrics-${Date.now()}`,
+      args: [{ days: Math.min(days, 365) }],
+    });
+
+    return c.json({ ok: true, workflowId: handle.workflowId, days });
+  } catch (err: any) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
 });
 
 export { adminStatsRoutes };

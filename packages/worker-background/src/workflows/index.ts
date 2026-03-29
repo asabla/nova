@@ -7,3 +7,4 @@ export { scheduledCleanupWorkflow } from "./scheduled-cleanup.js";
 export { evalWorkflow } from "./eval.js";
 export { evalAggregateWorkflow } from "./eval-aggregate.js";
 export { promptOptimizationWorkflow } from "./prompt-optimization.js";
+export { metricsCollectionWorkflow, backfillMetricsWorkflow } from "./metrics-collection.js";

@@ -5,3 +5,4 @@ export { cleanupExpiredSessions, cleanupExpiredInvitations, cleanupOrphanedFiles
 export { publishInteractionRequestActivity, publishTokenActivity, publishDoneActivity, publishTierAssessedActivity, publishPlanGeneratedActivity, publishPlanApprovedActivity, publishPlanNodeStatusActivity } from "./stream.activities";
 export { enqueueEval, runEval, checkOptimizationTrigger, computeAggregates, getOrgsWithEvalsEnabled } from "./eval.activities";
 export { analyzeLowScoringOutputs, generateImprovedPrompt, createOptimizationRun, resolveSystemPromptId } from "./prompt-optimization.activities";
+export { collectPlatformMetrics, backfillPlatformMetrics, collectHealthSnapshot } from "./metrics.activities";
