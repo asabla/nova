@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Bot } from "lucide-react";
+import { Bot, Plus, Eye, EyeOff, ArrowUpRight } from "lucide-react";
 import { adminApi } from "@/lib/api";
 
 export const Route = createFileRoute("/_admin/marketplace/agents")({
@@ -14,41 +14,106 @@ function MarketplaceAgentsPage() {
   });
 
   const agents = data?.data ?? [];
+  const published = agents.filter((a: any) => a.isPublished);
+  const drafts = agents.filter((a: any) => !a.isPublished);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-white">Marketplace Agents</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage platform-curated agents in the system org</p>
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Marketplace Agents</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>
+            Manage platform-curated agents visible to all organisations
+          </p>
+        </div>
       </div>
 
       {isLoading ? (
-        <div className="text-gray-500 text-sm animate-pulse">Loading...</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-40 rounded-xl skeleton" />)}
+        </div>
       ) : agents.length === 0 ? (
-        <div className="text-center py-16">
-          <Bot className="h-10 w-10 text-gray-600 mx-auto mb-3" />
-          <p className="text-sm text-gray-500">No agents in the system org yet</p>
-          <p className="text-xs text-gray-600 mt-1">Create agents in the system org to populate the platform marketplace</p>
+        <div className="rounded-xl border p-12 text-center" style={{ background: "var(--color-surface-raised)", borderColor: "var(--color-border-subtle)" }}>
+          <div className="inline-flex p-4 rounded-xl mb-4" style={{ background: "var(--color-accent-purple-dim)" }}>
+            <Bot className="h-8 w-8" style={{ color: "var(--color-accent-purple)" }} />
+          </div>
+          <h3 className="text-lg font-semibold mb-2" style={{ color: "var(--color-text-primary)" }}>No marketplace agents</h3>
+          <p className="text-sm max-w-md mx-auto mb-6" style={{ color: "var(--color-text-secondary)" }}>
+            Create agents in the system organisation to populate the platform marketplace. Published agents will be available to all organisations.
+          </p>
+          <p className="text-xs font-mono" style={{ color: "var(--color-text-muted)" }}>
+            Tip: Log into the main app as a system org member to create agents, then publish them here.
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {agents.map((agent: any) => (
-            <div key={agent.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Bot className="h-5 w-5 text-blue-400" />
-                <h3 className="text-sm font-semibold text-white">{agent.name}</h3>
-              </div>
-              {agent.description && <p className="text-xs text-gray-500 mb-3 line-clamp-2">{agent.description}</p>}
-              <div className="flex items-center gap-2">
-                <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${agent.isPublished ? "bg-green-500/10 text-green-400" : "bg-gray-800 text-gray-500"}`}>
-                  {agent.isPublished ? "Published" : "Draft"}
-                </span>
-                <span className="text-[10px] text-gray-600">v{agent.currentVersion ?? 1}</span>
+        <>
+          {/* Published Agents */}
+          {published.length > 0 && (
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-wider font-mono mb-3 flex items-center gap-2" style={{ color: "var(--color-text-muted)" }}>
+                <Eye className="h-3.5 w-3.5" style={{ color: "var(--color-accent-green)" }} />
+                Published ({published.length})
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {published.map((agent: any) => (
+                  <AgentCard key={agent.id} agent={agent} />
+                ))}
               </div>
             </div>
-          ))}
-        </div>
+          )}
+
+          {/* Draft Agents */}
+          {drafts.length > 0 && (
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-wider font-mono mb-3 flex items-center gap-2" style={{ color: "var(--color-text-muted)" }}>
+                <EyeOff className="h-3.5 w-3.5" />
+                Drafts ({drafts.length})
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {drafts.map((agent: any) => (
+                  <AgentCard key={agent.id} agent={agent} />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
+    </div>
+  );
+}
+
+function AgentCard({ agent }: { agent: any }) {
+  return (
+    <div
+      className="rounded-xl border p-5 group transition-all duration-150 hover:border-opacity-60"
+      style={{ background: "var(--color-surface-raised)", borderColor: "var(--color-border-subtle)" }}
+    >
+      <div className="flex items-start gap-3 mb-3">
+        <div className="p-2.5 rounded-lg" style={{ background: agent.isPublished ? "var(--color-accent-green-dim)" : "var(--color-surface-overlay)" }}>
+          <Bot className="h-5 w-5" style={{ color: agent.isPublished ? "var(--color-accent-green)" : "var(--color-text-muted)" }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-semibold truncate" style={{ color: "var(--color-text-primary)" }}>{agent.name}</h3>
+          <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--color-text-muted)" }}>v{agent.currentVersion ?? 1}</p>
+        </div>
+      </div>
+      {agent.description && (
+        <p className="text-xs line-clamp-2 mb-3" style={{ color: "var(--color-text-secondary)" }}>{agent.description}</p>
+      )}
+      <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--color-border-subtle)" }}>
+        <span
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold"
+          style={{
+            background: agent.isPublished ? "var(--color-accent-green-dim)" : "var(--color-surface-overlay)",
+            color: agent.isPublished ? "var(--color-accent-green)" : "var(--color-text-muted)",
+          }}
+        >
+          {agent.isPublished ? "Published" : "Draft"}
+        </span>
+        <span className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
+          {new Date(agent.updatedAt).toLocaleDateString()}
+        </span>
+      </div>
     </div>
   );
 }

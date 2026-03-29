@@ -1,1 +1,62 @@
 @import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+@theme {
+  --color-surface: #0a0e17;
+  --color-surface-raised: #111827;
+  --color-surface-overlay: #1a2234;
+  --color-border-subtle: #1e293b;
+  --color-border-default: #2a3548;
+  --color-border-strong: #3b4c66;
+  --color-text-primary: #e2e8f0;
+  --color-text-secondary: #8b9ab8;
+  --color-text-muted: #4b5c78;
+  --color-accent-blue: #3b82f6;
+  --color-accent-blue-dim: #1e3a5f;
+  --color-accent-green: #22c55e;
+  --color-accent-green-dim: #14532d;
+  --color-accent-amber: #f59e0b;
+  --color-accent-amber-dim: #78350f;
+  --color-accent-red: #ef4444;
+  --color-accent-red-dim: #7f1d1d;
+  --color-accent-purple: #a78bfa;
+  --color-accent-purple-dim: #3b1f7a;
+  --font-family-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-family-mono: 'IBM Plex Mono', 'Menlo', monospace;
+}
+
+body {
+  font-family: var(--font-family-sans);
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Precision scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border-default); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-border-strong); }
+
+/* Stat card shimmer effect */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--color-surface-raised) 25%, var(--color-surface-overlay) 50%, var(--color-surface-raised) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Subtle glow on focus */
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 1px var(--color-accent-blue), 0 0 8px rgba(59, 130, 246, 0.15);
+}
+
+/* Table row hover */
+.row-hover:hover {
+  background-color: rgba(30, 41, 59, 0.5);
+}
