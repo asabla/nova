@@ -103,6 +103,28 @@ adminApp.get("/auth/me", async (c) => {
   return c.json({ authenticated: true, email: user.email });
 });
 
+// Logout — clear session
+adminApp.post("/auth/logout", async (c) => {
+  const { createHash } = await import("crypto");
+  const { db: database } = await import("./lib/db");
+  const { sessions } = await import("@nova/shared/schemas");
+  const { eq } = await import("drizzle-orm");
+
+  const cookieHeader = c.req.header("cookie") ?? "";
+  const match = cookieHeader.match(/nova_session=([^;]+)/);
+  const token = match?.[1];
+
+  if (token) {
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    await database.update(sessions)
+      .set({ revokedAt: new Date() })
+      .where(eq(sessions.tokenHash, tokenHash));
+  }
+
+  c.header("Set-Cookie", "nova_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
+  return c.json({ ok: true });
+});
+
 // Apply auth to all sub-routes
 const authed = new Hono<AppContext>();
 authed.use("*", adminAuth);

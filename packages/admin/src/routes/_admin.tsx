@@ -125,8 +125,19 @@ function AdminLayout() {
         {/* Footer */}
         <div className="px-4 py-3 border-t" style={{ borderColor: "var(--color-border-subtle)" }}>
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>v1.0.0</span>
-            <button className="p-1.5 rounded hover:bg-white/5 transition-colors" style={{ color: "var(--color-text-muted)" }}>
+            <div>
+              <p className="text-[11px] font-medium truncate max-w-[120px]" style={{ color: "var(--color-text-secondary)" }}>{auth?.email}</p>
+              <span className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>v1.0.0</span>
+            </div>
+            <button
+              onClick={async () => {
+                await adminApi.post("/admin-api/auth/logout");
+                navigate({ to: "/login" });
+              }}
+              className="p-1.5 rounded hover:bg-white/5 transition-colors"
+              style={{ color: "var(--color-text-muted)" }}
+              title="Sign out"
+            >
               <LogOut className="h-3.5 w-3.5" />
             </button>
           </div>

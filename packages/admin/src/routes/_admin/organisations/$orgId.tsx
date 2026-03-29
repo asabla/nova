@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Users, Settings, BarChart3, Trash2 } from "lucide-react";
+import { ArrowLeft, Users, Settings, BarChart3, Trash2, Shield, ExternalLink, Calendar, Building2 } from "lucide-react";
 import { adminApi } from "@/lib/api";
 import { useState } from "react";
 
@@ -11,7 +11,7 @@ export const Route = createFileRoute("/_admin/organisations/$orgId")({
 function OrgDetailPage() {
   const { orgId } = Route.useParams();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"members" | "settings" | "usage">("members");
+  const [activeTab, setActiveTab] = useState<"overview" | "members" | "settings" | "usage">("overview");
 
   const { data: org, isLoading } = useQuery({
     queryKey: ["admin-org", orgId],
@@ -21,13 +21,11 @@ function OrgDetailPage() {
   const { data: members } = useQuery({
     queryKey: ["admin-org-members", orgId],
     queryFn: () => adminApi.get<{ data: any[] }>(`/admin-api/orgs/${orgId}/members`),
-    enabled: activeTab === "members",
   });
 
   const { data: usage } = useQuery({
     queryKey: ["admin-org-usage", orgId],
     queryFn: () => adminApi.get<any>(`/admin-api/orgs/${orgId}/usage`),
-    enabled: activeTab === "usage",
   });
 
   const updateOrg = useMutation({
@@ -43,103 +41,173 @@ function OrgDetailPage() {
     },
   });
 
-  if (isLoading) return <div className="text-gray-500">Loading...</div>;
-  if (!org) return <div className="text-gray-500">Organisation not found</div>;
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-8 w-48 rounded skeleton" />
+        <div className="h-32 rounded-xl skeleton" />
+      </div>
+    );
+  }
+  if (!org) return <div style={{ color: "var(--color-text-muted)" }}>Organisation not found</div>;
 
   const tabs = [
-    { id: "members" as const, icon: Users, label: "Members" },
-    { id: "settings" as const, icon: Settings, label: "Settings" },
+    { id: "overview" as const, icon: Building2, label: "Overview" },
+    { id: "members" as const, icon: Users, label: `Members (${members?.data?.length ?? 0})` },
     { id: "usage" as const, icon: BarChart3, label: "Usage" },
+    { id: "settings" as const, icon: Settings, label: "Settings" },
   ];
+
+  const memberList = members?.data ?? [];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Link to="/organisations" className="text-gray-500 hover:text-gray-300">
+      {/* Header */}
+      <div className="flex items-start gap-4">
+        <Link to="/organisations" className="mt-1 p-1 rounded hover:bg-white/5 transition-colors" style={{ color: "var(--color-text-muted)" }}>
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <div>
-          <h1 className="text-xl font-bold text-white">{org.name}</h1>
-          <p className="text-sm text-gray-500">{org.slug} · {org.billingPlan ?? "free"} plan</p>
+        <div className="flex-1">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--color-text-primary)" }}>{org.name}</h1>
+            {org.isSystemOrg && (
+              <span className="px-2 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--color-accent-blue-dim)", color: "var(--color-accent-blue)" }}>System Org</span>
+            )}
+          </div>
+          <div className="flex items-center gap-4 mt-1.5">
+            <span className="text-sm font-mono" style={{ color: "var(--color-text-muted)" }}>{org.slug}</span>
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium" style={{ background: "var(--color-surface-overlay)", color: "var(--color-text-secondary)" }}>
+              {org.billingPlan ?? "free"}
+            </span>
+            <span className="flex items-center gap-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
+              <Calendar className="h-3 w-3" />
+              Created {new Date(org.createdAt).toLocaleDateString()}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-800">
+      <div className="flex gap-1 border-b" style={{ borderColor: "var(--color-border-subtle)" }}>
         {tabs.map(({ id, icon: Icon, label }) => (
           <button
             key={id}
             onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === id ? "border-blue-500 text-blue-400" : "border-transparent text-gray-500 hover:text-gray-300"
-            }`}
+            className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors"
+            style={{
+              borderColor: activeTab === id ? "var(--color-accent-blue)" : "transparent",
+              color: activeTab === id ? "var(--color-accent-blue)" : "var(--color-text-muted)",
+            }}
           >
             <Icon className="h-4 w-4" /> {label}
           </button>
         ))}
       </div>
 
+      {/* Overview Tab */}
+      {activeTab === "overview" && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded-xl border p-5" style={{ background: "var(--color-surface-raised)", borderColor: "var(--color-border-subtle)" }}>
+            <p className="text-[11px] font-semibold uppercase tracking-wider font-mono" style={{ color: "var(--color-text-muted)" }}>Members</p>
+            <p className="text-3xl font-bold mt-2" style={{ color: "var(--color-text-primary)" }}>{memberList.length}</p>
+          </div>
+          <div className="rounded-xl border p-5" style={{ background: "var(--color-surface-raised)", borderColor: "var(--color-border-subtle)" }}>
+            <p className="text-[11px] font-semibold uppercase tracking-wider font-mono" style={{ color: "var(--color-text-muted)" }}>Messages (30d)</p>
+            <p className="text-3xl font-bold mt-2" style={{ color: "var(--color-text-primary)" }}>{Number(usage?.messages ?? 0).toLocaleString()}</p>
+          </div>
+          <div className="rounded-xl border p-5" style={{ background: "var(--color-surface-raised)", borderColor: "var(--color-border-subtle)" }}>
+            <p className="text-[11px] font-semibold uppercase tracking-wider font-mono" style={{ color: "var(--color-text-muted)" }}>Tokens (30d)</p>
+            <p className="text-3xl font-bold mt-2" style={{ color: "var(--color-text-primary)" }}>{Number(usage?.tokens ?? 0).toLocaleString()}</p>
+          </div>
+
+          {/* Org Settings Summary */}
+          {org.settings && org.settings.length > 0 && (
+            <div className="col-span-full rounded-xl border p-5" style={{ background: "var(--color-surface-raised)", borderColor: "var(--color-border-subtle)" }}>
+              <h3 className="text-xs font-semibold uppercase tracking-wider font-mono mb-3" style={{ color: "var(--color-text-muted)" }}>Configuration</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {org.settings.slice(0, 8).map((s: any) => (
+                  <div key={s.key} className="text-xs">
+                    <span className="font-mono" style={{ color: "var(--color-text-muted)" }}>{s.key}</span>
+                    <p className="font-medium mt-0.5" style={{ color: "var(--color-text-secondary)" }}>{s.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Members Tab */}
       {activeTab === "members" && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-800">
-                <th className="text-left px-4 py-3 text-xs text-gray-500 font-medium">User</th>
-                <th className="text-left px-4 py-3 text-xs text-gray-500 font-medium">Role</th>
-                <th className="text-left px-4 py-3 text-xs text-gray-500 font-medium">Joined</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(members?.data ?? []).map((m: any) => (
-                <tr key={m.userId} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                  <td className="px-4 py-3">
-                    <p className="text-white font-medium">{m.displayName}</p>
-                    <p className="text-[10px] text-gray-500">{m.email}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-800 text-gray-400">{m.role}</span>
-                    {m.isSuperAdmin && <span className="ml-1 px-1.5 py-0.5 text-[10px] font-medium bg-red-500/10 text-red-400 rounded">Super</span>}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{new Date(m.createdAt).toLocaleDateString()}</td>
+        <div className="rounded-xl border overflow-hidden" style={{ background: "var(--color-surface-raised)", borderColor: "var(--color-border-subtle)" }}>
+          {memberList.length === 0 ? (
+            <div className="p-12 text-center">
+              <Users className="h-8 w-8 mx-auto mb-3" style={{ color: "var(--color-text-muted)" }} />
+              <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>No members in this organisation</p>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
+                  {["User", "Role", "Joined"].map((h) => (
+                    <th key={h} className="text-left px-5 py-3 text-[10px] font-semibold uppercase tracking-wider font-mono" style={{ color: "var(--color-text-muted)" }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {memberList.map((m: any) => (
+                  <tr key={m.userId} className="row-hover transition-colors" style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
+                    <td className="px-5 py-3">
+                      <p className="font-medium" style={{ color: "var(--color-text-primary)" }}>{m.displayName}</p>
+                      <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--color-text-muted)" }}>{m.email}</p>
+                    </td>
+                    <td className="px-5 py-3">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--color-surface-overlay)", color: "var(--color-text-secondary)" }}>
+                        {m.role}
+                      </span>
+                      {m.isSuperAdmin && (
+                        <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--color-accent-red-dim)", color: "var(--color-accent-red)" }}>
+                          <Shield className="h-2.5 w-2.5" /> Super
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
+                      {new Date(m.createdAt).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* Usage Tab */}
+      {activeTab === "usage" && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <UsageStat label="Conversations" value={usage?.conversations} period="30d" color="var(--color-accent-blue)" />
+          <UsageStat label="Messages" value={usage?.messages} period="30d" color="var(--color-accent-green)" />
+          <UsageStat label="Tokens" value={usage?.tokens} period="30d" color="var(--color-accent-amber)" />
         </div>
       )}
 
       {/* Settings Tab */}
       {activeTab === "settings" && (
         <div className="space-y-4">
-          <OrgSettingsForm org={org} onSave={(data: any) => updateOrg.mutate(data)} />
-          <div className="bg-gray-900 border border-red-900/50 rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-red-400 mb-2">Danger Zone</h3>
-            <p className="text-xs text-gray-500 mb-3">Deleting an organisation is irreversible. All data will be soft-deleted.</p>
+          <OrgSettingsForm org={org} onSave={(data: any) => updateOrg.mutate(data)} isPending={updateOrg.isPending} />
+
+          <div className="rounded-xl border p-5" style={{ background: "var(--color-surface-raised)", borderColor: "rgba(239, 68, 68, 0.2)" }}>
+            <h3 className="text-sm font-semibold mb-2" style={{ color: "var(--color-accent-red)" }}>Danger Zone</h3>
+            <p className="text-xs mb-4" style={{ color: "var(--color-text-secondary)" }}>
+              Deleting an organisation will soft-delete all associated data. This cannot be easily undone.
+            </p>
             <button
               onClick={() => { if (confirm(`Delete "${org.name}"? This cannot be undone.`)) deleteOrg.mutate(); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+              style={{ background: "var(--color-accent-red)" }}
             >
               <Trash2 className="h-3.5 w-3.5" /> Delete Organisation
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Usage Tab */}
-      {activeTab === "usage" && usage && (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Conversations (30d)</p>
-            <p className="text-2xl font-bold text-white">{Number(usage.conversations).toLocaleString()}</p>
-          </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Messages (30d)</p>
-            <p className="text-2xl font-bold text-white">{Number(usage.messages).toLocaleString()}</p>
-          </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-            <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Tokens (30d)</p>
-            <p className="text-2xl font-bold text-white">{Number(usage.tokens).toLocaleString()}</p>
           </div>
         </div>
       )}
@@ -147,34 +215,56 @@ function OrgDetailPage() {
   );
 }
 
-function OrgSettingsForm({ org, onSave }: { org: any; onSave: (data: any) => void }) {
+function UsageStat({ label, value, period, color }: { label: string; value: any; period: string; color: string }) {
+  return (
+    <div className="rounded-xl border p-5" style={{ background: "var(--color-surface-raised)", borderColor: "var(--color-border-subtle)" }}>
+      <p className="text-[11px] font-semibold uppercase tracking-wider font-mono" style={{ color: "var(--color-text-muted)" }}>{label}</p>
+      <p className="text-3xl font-bold mt-2 tracking-tight" style={{ color: "var(--color-text-primary)" }}>
+        {Number(value ?? 0).toLocaleString()}
+      </p>
+      <p className="text-[11px] mt-1" style={{ color }}>Last {period}</p>
+    </div>
+  );
+}
+
+function OrgSettingsForm({ org, onSave, isPending }: { org: any; onSave: (data: any) => void; isPending: boolean }) {
   const [name, setName] = useState(org.name);
   const [slug, setSlug] = useState(org.slug);
   const [plan, setPlan] = useState(org.billingPlan ?? "free");
+  const [domain, setDomain] = useState(org.domain ?? "");
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-3">
-      <h3 className="text-sm font-semibold text-white">Organisation Settings</h3>
-      <div className="grid grid-cols-2 gap-3">
+    <div className="rounded-xl border p-5 space-y-4" style={{ background: "var(--color-surface-raised)", borderColor: "var(--color-border-subtle)" }}>
+      <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Organisation Settings</h3>
+      <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} className="w-full h-9 rounded-lg bg-gray-800 border border-gray-700 px-3 text-sm text-white" />
+          <label className="block text-[11px] font-semibold uppercase tracking-wider font-mono mb-1.5" style={{ color: "var(--color-text-muted)" }}>Name</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} className="w-full h-10 rounded-lg border px-3 text-sm" style={{ background: "var(--color-surface-overlay)", borderColor: "var(--color-border-default)", color: "var(--color-text-primary)" }} />
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Slug</label>
-          <input value={slug} onChange={(e) => setSlug(e.target.value)} className="w-full h-9 rounded-lg bg-gray-800 border border-gray-700 px-3 text-sm text-white" />
+          <label className="block text-[11px] font-semibold uppercase tracking-wider font-mono mb-1.5" style={{ color: "var(--color-text-muted)" }}>Slug</label>
+          <input value={slug} onChange={(e) => setSlug(e.target.value)} className="w-full h-10 rounded-lg border px-3 text-sm font-mono" style={{ background: "var(--color-surface-overlay)", borderColor: "var(--color-border-default)", color: "var(--color-text-primary)" }} />
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Plan</label>
-          <select value={plan} onChange={(e) => setPlan(e.target.value)} className="w-full h-9 rounded-lg bg-gray-800 border border-gray-700 px-3 text-sm text-white">
+          <label className="block text-[11px] font-semibold uppercase tracking-wider font-mono mb-1.5" style={{ color: "var(--color-text-muted)" }}>Billing Plan</label>
+          <select value={plan} onChange={(e) => setPlan(e.target.value)} className="w-full h-10 rounded-lg border px-3 text-sm" style={{ background: "var(--color-surface-overlay)", borderColor: "var(--color-border-default)", color: "var(--color-text-primary)" }}>
             <option value="free">Free</option>
             <option value="team">Team</option>
             <option value="enterprise">Enterprise</option>
           </select>
         </div>
+        <div>
+          <label className="block text-[11px] font-semibold uppercase tracking-wider font-mono mb-1.5" style={{ color: "var(--color-text-muted)" }}>Custom Domain</label>
+          <input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="chat.example.com" className="w-full h-10 rounded-lg border px-3 text-sm font-mono" style={{ background: "var(--color-surface-overlay)", borderColor: "var(--color-border-default)", color: "var(--color-text-primary)" }} />
+        </div>
       </div>
-      <button onClick={() => onSave({ name, slug, billingPlan: plan })} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg">
-        Save Changes
+      <button
+        onClick={() => onSave({ name, slug, billingPlan: plan, domain: domain || null })}
+        disabled={isPending}
+        className="px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50 transition-colors"
+        style={{ background: "var(--color-accent-blue)" }}
+      >
+        {isPending ? "Saving..." : "Save Changes"}
       </button>
     </div>
   );
