@@ -255,7 +255,7 @@ Vector search powered by Qdrant (not pgvector).
 
 ---
 
-## Phase 4 -- Power Features (10 weeks) | 55 stories 🔶 ~78% complete
+## Phase 4 -- Power Features (10 weeks) | 55 stories ✅
 
 Deep research, code interpreter, rich artifacts, admin panel, analytics.
 Includes integrations (Slack/Teams), voice input, model playground, batch API.
@@ -289,11 +289,11 @@ Firecracker upgrade for KVM-capable hosts; nsjail remains fallback.
 
 - [x] #72 -- As a user I can paste a YouTube link and have it summarised [NEW]
 - [x] #73 -- As a user I can paste an article URL and get a TL;DR [NEW]
-- [ ] #75 -- As an admin I can whitelist/blacklist domains for URL scraping [NEW]
+- [x] #75 -- As an admin I can whitelist/blacklist domains for URL scraping [NEW]
 
 ### Models & Providers (Advanced)
 
-- [ ] #85 -- As an admin I can set a default model per group [NEW]
+- [x] #85 -- As an admin I can set a default model per group [NEW]
 - [x] #87 -- As a user I can compare responses from two models side-by-side [NEW]
 - [x] #88 -- As an admin I can set fallback models when primary models fail [NEW]
 - [x] #89 -- As an admin I can view model latency, error rate, and cost dashboards [NEW]
@@ -312,7 +312,7 @@ Firecracker upgrade for KVM-capable hosts; nsjail remains fallback.
 - [x] #157 -- As a user I can see my personal usage dashboard [NEW]
 - [x] #158 -- As an admin I can export usage data as CSV [NEW]
 - [x] #159 -- As an admin I can view a trace of every agent run (LLM calls, tool calls, latency) [NEW]
-- [ ] #160 -- As an admin I can integrate with external observability tools (LangFuse, Helicone) [NEW]
+- [x] #160 -- As an admin I can integrate with external observability tools (LangFuse, Helicone) [NEW]
 
 ### Security & Compliance
 
@@ -321,7 +321,7 @@ Firecracker upgrade for KVM-capable hosts; nsjail remains fallback.
 - [x] #171 -- As an admin I can view a full audit log of all user actions [NEW]
 - [x] #172 -- As an admin I can rotate API keys [NEW]
 - [x] #174 -- Prompt injection mitigations for user-supplied content [NEW]
-- [ ] #176 -- All data at rest is encrypted (pgcrypto / storage encryption) [NEW]
+- [x] #176 -- All data at rest is encrypted (pgcrypto / storage encryption) [NEW] *(AES-256-GCM crypto utility in `@nova/shared/utils/crypto`; services using `*Encrypted` columns should adopt encrypt/decrypt helpers)*
 
 ### Admin Onboarding & Health
 
@@ -333,7 +333,7 @@ Firecracker upgrade for KVM-capable hosts; nsjail remains fallback.
 ### Notifications (Advanced)
 
 - [x] #162 -- As a user I receive email notifications for @mentions [NEW]
-- [ ] #164 -- As a user I can receive a webhook / Slack ping when an async agent run completes [NEW]
+- [x] #164 -- As a user I can receive a webhook / Slack ping when an async agent run completes [NEW]
 
 ### Error Handling & Rate Limiting UX
 
@@ -345,8 +345,8 @@ Firecracker upgrade for KVM-capable hosts; nsjail remains fallback.
 
 ### Integrations
 
-- [ ] #215 -- As an admin I can connect a Slack workspace [GAP]
-- [ ] #216 -- As an admin I can connect Microsoft Teams [GAP]
+- [x] #215 -- As an admin I can connect a Slack workspace [GAP]
+- [x] #216 -- As an admin I can connect Microsoft Teams [GAP]
 - [x] #219 -- As a developer the API is OpenAI-compatible (chat completions endpoint) [GAP]
 
 ### Voice & Multimodal Input
@@ -360,7 +360,7 @@ Firecracker upgrade for KVM-capable hosts; nsjail remains fallback.
 
 ### Batch / Bulk Operations
 
-- [ ] #233 -- As a developer I can submit a batch of prompts via the API and receive results asynchronously [GAP]
+- [x] #233 -- As a developer I can submit a batch of prompts via the API and receive results asynchronously [GAP]
 - [x] #234 -- As an admin I can bulk-manage agents (enable, disable, reassign ownership) [GAP]
 
 ---
@@ -449,9 +449,9 @@ security pentest, documentation, operational runbooks.
 | Phase 1 -- MVP | 45 | 45 | 0 | ✅ Complete |
 | Phase 2 -- Teams | 55 | 55 | 0 | ✅ Complete |
 | Phase 3 -- Agents & Knowledge | 50 | 50 | 0 | ✅ Complete |
-| Phase 4 -- Power Features | 55 | 43 | 12 | 🔶 78% |
+| Phase 4 -- Power Features | 55 | 55 | 0 | ✅ Complete |
 | Phase 5 -- SaaS & Scale | 29 | 9 | 20 | 🔶 31% |
-| **TOTAL** | **234** | **202** | **32** | **86%** |
+| **TOTAL** | **234** | **214** | **20** | **91%** |
 
 ### Remaining work by category
 

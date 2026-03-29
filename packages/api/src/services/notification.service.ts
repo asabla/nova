@@ -3,6 +3,8 @@ import { eq, and, isNull } from "drizzle-orm";
 import { notifications, notificationPreferences, users } from "@nova/shared/schemas";
 import { sendToUser } from "../lib/ws";
 import { sendEmail, buildNotificationEmail } from "../lib/email";
+import { sendSlackMessage } from "../lib/slack";
+import { sendTeamsMessage } from "../lib/teams";
 import { env } from "../lib/env";
 
 interface NotificationPrefs {
@@ -231,6 +233,11 @@ export const notificationService = {
         timestamp: new Date().toISOString(),
       });
     }
+
+    // Slack/Teams notifications (fire-and-forget)
+    const notifMessage = `Agent "${agentName}" has completed its run.`;
+    sendSlackMessage(orgId, notifMessage).catch(() => {});
+    sendTeamsMessage(orgId, notifMessage, { title: "Agent Complete" }).catch(() => {});
 
     return this.create({
       orgId,

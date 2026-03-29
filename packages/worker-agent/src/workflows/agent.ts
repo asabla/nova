@@ -334,6 +334,12 @@ const { resolveWorkflowPrompts } = proxyActivities<typeof promptResolutionActivi
   retry: { maximumAttempts: 2 },
 });
 
+import type * as notificationActivities from "../activities/notification.activities";
+const { notifyAgentCompleteActivity } = proxyActivities<typeof notificationActivities>({
+  startToCloseTimeout: "15 seconds",
+  retry: { maximumAttempts: 2 },
+});
+
 // ---------------------------------------------------------------------------
 // Signals & Queries
 // ---------------------------------------------------------------------------
@@ -575,6 +581,20 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
       });
     } catch {
       // Non-critical: don't fail the workflow if eval dispatch fails
+    }
+  }
+
+  // Notify user that agent run completed (in-app + Slack/Teams)
+  if (finalStatus === "completed" && input.userId) {
+    try {
+      await notifyAgentCompleteActivity({
+        orgId: input.orgId,
+        userId: input.userId,
+        agentName: agent?.name ?? "Agent",
+        conversationId: input.conversationId,
+      });
+    } catch {
+      // Non-critical
     }
   }
 

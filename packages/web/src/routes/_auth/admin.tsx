@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, Link, redirect, useMatchRoute, useNavigate } f
 import { useTranslation } from "react-i18next";
 import {
   Users, BarChart3, Shield, Settings, Activity, Heart, Gauge, AlertTriangle,
-  Database, CreditCard, Palette, Link2, FileSearch, UserCog, Sparkles,
+  Database, CreditCard, Palette, Link2, FileSearch, UserCog, Sparkles, Globe,
 } from "lucide-react";
 import { useAuthStore } from "../../stores/auth.store";
 import { clsx } from "clsx";
@@ -59,6 +59,7 @@ const tabGroupDefs: TabGroupDef[] = [
     tabs: [
       { to: "/admin/security", icon: Shield, label: "admin.security" },
       { to: "/admin/sso", icon: Shield, label: "admin.sso" },
+      { to: "/admin/domains", icon: Globe, label: "admin.domains" },
     ],
   },
   {

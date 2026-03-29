@@ -53,6 +53,7 @@ const createGroupSchema = z.object({
   description: z.string().max(2000).optional(),
   ssoGroupId: z.string().optional(),
   modelAccess: z.array(z.string()).optional(),
+  defaultModelId: z.string().uuid().nullable().optional(),
   monthlyTokenLimit: z.number().int().positive().optional(),
   monthlyCostLimitCents: z.number().int().positive().optional(),
   storageQuotaMb: z.number().int().positive().optional(),

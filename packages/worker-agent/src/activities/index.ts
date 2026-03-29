@@ -11,3 +11,4 @@ export { persistResearchResult, persistRefinementResult, updateResearchStatus, p
 export { proxyWorkerActivity } from "./proxy-worker.activities";
 export { resolveWorkerForAgent } from "./resolve-worker.activities";
 export { resolveWorkflowPrompts, resolvePromptBySlug } from "./prompt-resolution.activities";
+export { notifyAgentCompleteActivity } from "./notification.activities";

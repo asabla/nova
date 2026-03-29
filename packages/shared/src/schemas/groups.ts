@@ -11,6 +11,7 @@ export const groups = pgTable("groups", {
   description: text("description"),
   ssoGroupId: text("sso_group_id"),
   modelAccess: jsonb("model_access"),
+  defaultModelId: uuid("default_model_id"),
   monthlyTokenLimit: bigint("monthly_token_limit", { mode: "number" }),
   monthlyCostLimitCents: integer("monthly_cost_limit_cents"),
   storageQuotaMb: integer("storage_quota_mb"),
