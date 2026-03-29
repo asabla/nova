@@ -1,9 +1,11 @@
-import { createFileRoute, Outlet, Link, useMatchRoute } from "@tanstack/react-router";
+import { createFileRoute, Outlet, Link, useMatchRoute, useNavigate, redirect } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard, Building2, Users, Server, Settings, FileSearch, Heart, Store,
   LogOut, ChevronRight,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { adminApi } from "@/lib/api";
 
 export const Route = createFileRoute("/_admin")({
   component: AdminLayout,
@@ -42,6 +44,29 @@ const navSections = [
 
 function AdminLayout() {
   const matchRoute = useMatchRoute();
+  const navigate = useNavigate();
+
+  const { data: auth, isLoading: authLoading } = useQuery({
+    queryKey: ["admin-auth"],
+    queryFn: () => adminApi.get<{ authenticated: boolean; email?: string }>("/admin-api/auth/me"),
+    retry: false,
+  });
+
+  if (authLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center" style={{ background: "var(--color-surface)" }}>
+        <div className="text-center">
+          <div className="h-8 w-8 rounded-lg mx-auto mb-3 animate-pulse" style={{ background: "var(--color-accent-blue-dim)" }} />
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!auth?.authenticated) {
+    navigate({ to: "/login" });
+    return null;
+  }
 
   return (
     <div className="flex h-screen" style={{ background: "var(--color-surface)" }}>
