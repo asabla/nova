@@ -211,7 +211,7 @@ Vector search powered by Qdrant (not pgvector).
 - [x] #56 -- As a user I can re-run a failed agent step [NEW]
 - [x] #57 -- As a user I can set a max-steps / timeout budget for an agent run [NEW] *(schema fields exist; enforcement via Temporal)*
 - [x] #58 -- As a user I can see the full tool call history in a collapsible panel [NEW]
-- [x] #59 -- As a user I can see which sub-agents were spawned in a run [NEW]
+- [x] #59 -- As a user I can see which sub-agents were spawned in a run [NEW] *(UI ready: sub-task badges, model labels, recursive sub-plan rendering in PlanDAGView. Backend gap: `generateDAGPlan` doesn't populate `assignedModel` on nodes, and `executeNodesParallel` doesn't attach `subPlan` data back to plan nodes — wire these up to make the UI elements visible in practice)*
 
 ### Memory
 
