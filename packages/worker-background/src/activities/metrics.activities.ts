@@ -26,6 +26,7 @@ export async function collectPlatformMetrics(): Promise<{ snapshotsCreated: numb
   const platformOrgId = systemOrg.id;
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayStartISO = todayStart.toISOString();
 
   // Aggregate current platform stats
   const [stats] = await db.execute(sql`
@@ -34,8 +35,8 @@ export async function collectPlatformMetrics(): Promise<{ snapshotsCreated: numb
       (SELECT count(*)::int FROM users WHERE deleted_at IS NULL) as user_count,
       (SELECT count(*)::int FROM conversations WHERE deleted_at IS NULL) as conversation_count,
       (SELECT count(*)::int FROM messages WHERE deleted_at IS NULL) as message_count,
-      (SELECT coalesce(sum((metadata->>'totalTokens')::bigint), 0) FROM messages WHERE sender_type = 'assistant' AND metadata->>'totalTokens' IS NOT NULL AND created_at >= ${todayStart}) as today_tokens,
-      (SELECT count(*)::int FROM messages WHERE created_at >= ${todayStart}) as today_requests
+      (SELECT coalesce(sum((metadata->>'totalTokens')::bigint), 0) FROM messages WHERE sender_type = 'assistant' AND metadata->>'totalTokens' IS NOT NULL AND created_at >= ${todayStartISO}::timestamptz) as today_tokens,
+      (SELECT count(*)::int FROM messages WHERE created_at >= ${todayStartISO}::timestamptz) as today_requests
   `) as any[];
 
   if (!stats) return { snapshotsCreated: 0 };
@@ -97,14 +98,16 @@ export async function backfillPlatformMetrics(days: number = 90): Promise<{ snap
     const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
     const dayEnd = new Date(dayStart);
     dayEnd.setDate(dayEnd.getDate() + 1);
+    const dayStartISO = dayStart.toISOString();
+    const dayEndISO = dayEnd.toISOString();
 
     const [stats] = await db.execute(sql`
       SELECT
-        (SELECT count(*)::int FROM organisations WHERE deleted_at IS NULL AND created_at < ${dayEnd}) as org_count,
-        (SELECT count(*)::int FROM users WHERE deleted_at IS NULL AND created_at < ${dayEnd}) as user_count,
-        (SELECT count(*)::int FROM conversations WHERE deleted_at IS NULL AND created_at < ${dayEnd}) as conversation_count,
-        (SELECT count(*)::int FROM messages WHERE created_at >= ${dayStart} AND created_at < ${dayEnd}) as day_messages,
-        (SELECT coalesce(sum((metadata->>'totalTokens')::bigint), 0) FROM messages WHERE sender_type = 'assistant' AND metadata->>'totalTokens' IS NOT NULL AND created_at >= ${dayStart} AND created_at < ${dayEnd}) as day_tokens
+        (SELECT count(*)::int FROM organisations WHERE deleted_at IS NULL AND created_at < ${dayEndISO}::timestamptz) as org_count,
+        (SELECT count(*)::int FROM users WHERE deleted_at IS NULL AND created_at < ${dayEndISO}::timestamptz) as user_count,
+        (SELECT count(*)::int FROM conversations WHERE deleted_at IS NULL AND created_at < ${dayEndISO}::timestamptz) as conversation_count,
+        (SELECT count(*)::int FROM messages WHERE created_at >= ${dayStartISO}::timestamptz AND created_at < ${dayEndISO}::timestamptz) as day_messages,
+        (SELECT coalesce(sum((metadata->>'totalTokens')::bigint), 0) FROM messages WHERE sender_type = 'assistant' AND metadata->>'totalTokens' IS NOT NULL AND created_at >= ${dayStartISO}::timestamptz AND created_at < ${dayEndISO}::timestamptz) as day_tokens
     `) as any[];
 
     if (!stats) continue;
