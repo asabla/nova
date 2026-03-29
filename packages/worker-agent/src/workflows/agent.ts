@@ -590,7 +590,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
       await notifyAgentCompleteActivity({
         orgId: input.orgId,
         userId: input.userId,
-        agentName: agent?.name ?? "Agent",
+        agentName: input.agentId ? `Agent ${input.agentId.slice(0, 8)}` : "Agent",
         conversationId: input.conversationId,
       });
     } catch {

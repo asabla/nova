@@ -1,4 +1,4 @@
-import { getDb } from "@nova/worker-shared/db";
+import { db } from "@nova/worker-shared/db";
 import { notifications, notificationPreferences, users, integrations } from "@nova/shared/schemas";
 import { eq, and, isNull } from "drizzle-orm";
 
@@ -8,7 +8,6 @@ export async function notifyAgentCompleteActivity(input: {
   agentName: string;
   conversationId: string;
 }): Promise<void> {
-  const db = getDb();
   const { orgId, userId, agentName, conversationId } = input;
 
   // Create in-app notification
