@@ -1,4 +1,5 @@
 import { app } from "./app";
+import { adminApp } from "./admin-app";
 import { env } from "./lib/env";
 import { ensureBucket } from "./lib/minio";
 import { ensureAllCollections } from "./lib/qdrant";
@@ -22,6 +23,11 @@ Bun.serve<WSData>({
       });
       if (upgraded) return undefined;
       return new Response("WebSocket upgrade failed", { status: 400 });
+    }
+
+    // Route admin API requests to the separate admin app
+    if (url.pathname.startsWith("/admin-api")) {
+      return adminApp.fetch(req, server);
     }
 
     return app.fetch(req, server);
