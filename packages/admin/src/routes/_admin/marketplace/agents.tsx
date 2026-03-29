@@ -1,11 +1,32 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useMatchRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Bot, Plus, Eye, EyeOff, ArrowUpRight } from "lucide-react";
+import { Bot, Plus, Eye, EyeOff, ArrowUpRight, FileText } from "lucide-react";
 import { adminApi } from "@/lib/api";
 
 export const Route = createFileRoute("/_admin/marketplace/agents")({
   component: MarketplaceAgentsPage,
 });
+
+function MarketplaceSubnav() {
+  return (
+    <div className="flex gap-1 mb-6 border-b" style={{ borderColor: "var(--color-border-subtle)" }}>
+      <Link
+        to="/marketplace/agents"
+        className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2"
+        style={{ borderColor: "var(--color-accent-blue)", color: "var(--color-accent-blue)" }}
+      >
+        <Bot className="h-4 w-4" /> Agents
+      </Link>
+      <Link
+        to="/marketplace/templates"
+        className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 border-transparent transition-colors"
+        style={{ color: "var(--color-text-muted)" }}
+      >
+        <FileText className="h-4 w-4" /> Templates
+      </Link>
+    </div>
+  );
+}
 
 function MarketplaceAgentsPage() {
   const { data, isLoading } = useQuery({
@@ -27,6 +48,8 @@ function MarketplaceAgentsPage() {
           </p>
         </div>
       </div>
+
+      <MarketplaceSubnav />
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

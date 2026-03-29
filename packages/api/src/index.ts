@@ -27,7 +27,6 @@ Bun.serve<WSData>({
 
     // Route admin API requests to the separate admin app
     if (url.pathname.startsWith("/admin-api")) {
-      console.log(`[admin-api] Routing: ${req.method} ${url.pathname}`);
       return adminApp.fetch(req);
     }
 

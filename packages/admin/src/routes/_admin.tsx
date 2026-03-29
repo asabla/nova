@@ -29,7 +29,7 @@ const navSections = [
   {
     label: "Platform",
     items: [
-      { to: "/marketplace", icon: Store, label: "Marketplace" },
+      { to: "/marketplace/agents", icon: Store, label: "Marketplace" },
       { to: "/providers", icon: Server, label: "Model Providers" },
       { to: "/settings", icon: Settings, label: "Settings" },
     ],

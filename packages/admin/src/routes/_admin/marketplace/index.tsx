@@ -1,7 +1,14 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useMatchRoute } from "@tanstack/react-router";
+import { Bot, FileText } from "lucide-react";
 
 export const Route = createFileRoute("/_admin/marketplace/")({
-  beforeLoad: () => {
-    throw redirect({ to: "/marketplace/agents" });
-  },
+  component: MarketplaceLayout,
 });
+
+function MarketplaceLayout() {
+  const matchRoute = useMatchRoute();
+  const isAgents = !!matchRoute({ to: "/marketplace/agents", fuzzy: true });
+
+  // Default to showing agents content inline if no sub-route matched
+  return null;
+}

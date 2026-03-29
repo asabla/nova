@@ -33,11 +33,8 @@ export const adminAuth = createMiddleware<AppContext>(async (c, next) => {
     c.req.header("authorization")?.replace("Bearer ", "");
 
   if (!token) {
-    console.log("[admin-auth] No session token found. Cookies:", Object.keys(cookies).join(", ") || "(none)");
     return c.json({ error: "Authentication required" }, 401);
   }
-
-  console.log("[admin-auth] Token found from cookie, length:", token.length);
 
   // Better Auth stores sessions as SHA-256 hash of the token
   const tokenHash = createHash("sha256").update(token).digest("hex");
@@ -56,7 +53,6 @@ export const adminAuth = createMiddleware<AppContext>(async (c, next) => {
     ));
 
   if (!session) {
-    console.log("[admin-auth] No session found for token hash:", tokenHash.slice(0, 12) + "...");
     return c.json({ error: "Invalid or expired session" }, 401);
   }
 

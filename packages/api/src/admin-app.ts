@@ -35,39 +35,49 @@ adminApp.get("/health", (c) => c.json({ status: "ok", service: "admin-api" }));
 
 // Admin login — creates a session for super-admin users
 adminApp.post("/auth/login", async (c) => {
-  const { createHash, randomBytes } = await import("crypto");
   const { db: database } = await import("./lib/db");
-  const { users, sessions } = await import("@nova/shared/schemas");
+  const { users } = await import("@nova/shared/schemas");
   const { eq, and, isNull } = await import("drizzle-orm");
+  const { env: appEnv } = await import("./lib/env");
 
   const { email, password } = await c.req.json();
-  if (!email) return c.json({ error: "Email required" }, 400);
+  if (!email || !password) return c.json({ error: "Email and password required" }, 400);
 
-  // Find the user
+  // Verify credentials via Better Auth's sign-in endpoint (internal call)
+  const apiUrl = `http://localhost:${appEnv.PORT}`;
+  const authResp = await fetch(`${apiUrl}/api/auth/sign-in/email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+
+  if (!authResp.ok) {
+    return c.json({ error: "Invalid email or password" }, 401);
+  }
+
+  // Extract the session cookie set by Better Auth
+  const setCookieHeaders = authResp.headers.getSetCookie?.() ?? [];
+  const sessionCookie = setCookieHeaders.find((h) => h.startsWith("nova_session="));
+  const token = sessionCookie?.match(/nova_session=([^;]+)/)?.[1];
+
+  if (!token) {
+    return c.json({ error: "Authentication failed — no session created" }, 401);
+  }
+
+  // Verify user is a super-admin
   const [user] = await database
-    .select()
+    .select({ id: users.id, email: users.email, isSuperAdmin: users.isSuperAdmin })
     .from(users)
     .where(and(eq(users.email, email), isNull(users.deletedAt)));
 
-  if (!user || !user.isSuperAdmin) {
-    return c.json({ error: "Invalid credentials or not a super-admin" }, 401);
+  if (!user?.isSuperAdmin) {
+    return c.json({ error: "Super-admin access required" }, 403);
   }
 
-  // Create a session token
-  const token = randomBytes(32).toString("hex");
-  const tokenHash = createHash("sha256").update(token).digest("hex");
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-  await database.insert(sessions).values({
-    userId: user.id,
-    tokenHash,
-    expiresAt,
-    userAgent: c.req.header("user-agent") ?? "admin-portal",
-    ipAddress: c.req.header("x-real-ip") ?? c.req.header("x-forwarded-for") ?? "unknown",
-  });
-
-  // Set the session cookie
-  c.header("Set-Cookie", `nova_session=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`);
+  // Forward the session cookie to the admin portal
+  if (sessionCookie) {
+    c.header("Set-Cookie", sessionCookie);
+  }
 
   return c.json({ ok: true, email: user.email });
 });
