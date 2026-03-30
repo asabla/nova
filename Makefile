@@ -20,12 +20,12 @@ help: ## Show this help
 # ──────────────────────────────────────────────
 # Quick start
 # ──────────────────────────────────────────────
-setup: ## Start infra, wait for postgres, run migrations, and seed
+setup: ## Start infra, push schema, and seed
 	$(COMPOSE) up -d $(INFRA)
 	@echo "Waiting for postgres to be healthy..."
 	@until $(COMPOSE) exec -T postgres pg_isready -U nova > /dev/null 2>&1; do sleep 1; done
-	@echo "Postgres ready. Running migrations..."
-	bun run db:migrate
+	@echo "Postgres ready. Pushing schema..."
+	bun run db:push
 	@echo "Seeding database..."
 	bun run --filter @nova/api db:seed
 	@echo "Done! Run 'make dev' for local dev or 'make deploy' for Docker."
@@ -135,3 +135,5 @@ clean: down ## Stop everything and remove containers
 
 clean-volumes: down ## Stop everything and remove containers + volumes (⚠ destroys data)
 	$(COMPOSE) down -v
+
+reset: clean-volumes setup ## Full reset: wipe data, rebuild, re-seed

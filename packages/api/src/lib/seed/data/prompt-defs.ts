@@ -1,0 +1,42 @@
+export const promptDefs = [
+  {
+    name: "Code Review",
+    description: "Thorough code review with actionable feedback",
+    category: "development",
+    content: "Review the following code. Focus on:\n- Bugs and edge cases\n- Performance concerns\n- Security vulnerabilities\n- Readability and maintainability\n\nProvide specific, actionable suggestions with code examples where appropriate.\n\n```{{language}}\n{{code}}\n```",
+    variables: [{ name: "language", description: "Programming language" }, { name: "code", description: "Code to review" }],
+    systemPrompt: "You are a senior software engineer performing a thorough code review. Be direct, specific, and constructive.",
+  },
+  {
+    name: "Explain Like I'm 5",
+    description: "Break down complex topics into simple explanations",
+    category: "education",
+    content: "Explain the following topic in simple terms that anyone could understand. Use analogies and everyday examples.\n\nTopic: {{topic}}",
+    variables: [{ name: "topic", description: "The topic to explain" }],
+    systemPrompt: "You explain complex topics using simple language, relatable analogies, and short sentences. Avoid jargon.",
+  },
+  {
+    name: "Technical Architecture",
+    description: "Design system architecture for a given problem",
+    category: "development",
+    content: "Design a technical architecture for the following requirement:\n\n{{requirement}}\n\nInclude:\n- High-level component diagram (describe in text)\n- Data flow\n- Technology choices with rationale\n- Scalability considerations\n- Potential failure points and mitigations",
+    variables: [{ name: "requirement", description: "System requirement or problem statement" }],
+    systemPrompt: "You are a principal architect with deep experience in distributed systems. Be opinionated about technology choices and justify your decisions.",
+  },
+  {
+    name: "Meeting Summary",
+    description: "Summarize meeting notes into structured action items",
+    category: "productivity",
+    content: "Summarize the following meeting notes into:\n1. Key decisions made\n2. Action items (with owners if mentioned)\n3. Open questions\n4. Next steps\n\nMeeting notes:\n{{notes}}",
+    variables: [{ name: "notes", description: "Raw meeting notes or transcript" }],
+    systemPrompt: "You distill unstructured meeting notes into clear, concise summaries. Focus on what was decided and what needs to happen next.",
+  },
+  {
+    name: "SQL Query Builder",
+    description: "Generate SQL queries from natural language descriptions",
+    category: "development",
+    content: "Write a SQL query for the following request:\n\n{{request}}\n\nDatabase schema:\n{{schema}}\n\nUse PostgreSQL syntax. Include comments explaining the query logic.",
+    variables: [{ name: "request", description: "What the query should do" }, { name: "schema", description: "Relevant table definitions" }],
+    systemPrompt: "You are a database expert. Write clean, performant SQL. Prefer CTEs over subqueries. Always consider index usage.",
+  },
+];

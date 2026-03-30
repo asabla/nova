@@ -1,1 +1,0 @@
-ALTER TABLE "organisations" ADD COLUMN "is_system_org" boolean DEFAULT false NOT NULL;

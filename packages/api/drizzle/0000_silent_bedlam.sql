@@ -20,6 +20,7 @@ CREATE TABLE "organisations" (
 	"billing_plan" text,
 	"billing_customer_id" text,
 	"is_saas" boolean DEFAULT false NOT NULL,
+	"is_system_org" boolean DEFAULT false NOT NULL,
 	"setup_completed_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -109,38 +110,11 @@ CREATE TABLE "groups" (
 	"description" text,
 	"sso_group_id" text,
 	"model_access" jsonb,
+	"default_model_id" uuid,
 	"monthly_token_limit" bigint,
 	"monthly_cost_limit_cents" integer,
 	"storage_quota_mb" integer,
 	"data_retention_days" integer,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"deleted_at" timestamp with time zone
-);
---> statement-breakpoint
-CREATE TABLE "workspace_memberships" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"workspace_id" uuid NOT NULL,
-	"user_id" uuid,
-	"group_id" uuid,
-	"org_id" uuid NOT NULL,
-	"role" text DEFAULT 'member' NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"deleted_at" timestamp with time zone
-);
---> statement-breakpoint
-CREATE TABLE "workspaces" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"org_id" uuid NOT NULL,
-	"name" text NOT NULL,
-	"description" text,
-	"owner_id" uuid NOT NULL,
-	"default_agent_id" uuid,
-	"default_model_id" uuid,
-	"default_system_prompt" text,
-	"knowledge_collection_id" uuid,
-	"is_archived" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"deleted_at" timestamp with time zone
@@ -152,9 +126,19 @@ CREATE TABLE "conversation_folders" (
 	"user_id" uuid NOT NULL,
 	"name" text NOT NULL,
 	"parent_folder_id" uuid,
+	"default_agent_id" uuid,
 	"sort_order" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"deleted_at" timestamp with time zone
+);
+--> statement-breakpoint
+CREATE TABLE "conversation_knowledge_collections" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"conversation_id" uuid NOT NULL,
+	"knowledge_collection_id" uuid NOT NULL,
+	"org_id" uuid NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"deleted_at" timestamp with time zone
 );
 --> statement-breakpoint
@@ -194,7 +178,6 @@ CREATE TABLE "conversation_tags" (
 CREATE TABLE "conversations" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
-	"workspace_id" uuid,
 	"owner_id" uuid NOT NULL,
 	"title" text,
 	"visibility" text DEFAULT 'private' NOT NULL,
@@ -290,7 +273,6 @@ CREATE TABLE "files" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
 	"user_id" uuid NOT NULL,
-	"workspace_id" uuid,
 	"filename" text NOT NULL,
 	"content_type" text NOT NULL,
 	"size_bytes" bigint NOT NULL,
@@ -312,6 +294,7 @@ CREATE TABLE "model_providers" (
 	"api_base_url" text,
 	"api_key_encrypted" text,
 	"litellm_params" jsonb,
+	"provider_params" jsonb,
 	"is_enabled" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -328,6 +311,7 @@ CREATE TABLE "models" (
 	"context_window" integer,
 	"cost_per_prompt_token_cents" numeric(10, 6),
 	"cost_per_completion_token_cents" numeric(10, 6),
+	"model_params" jsonb,
 	"is_default" boolean DEFAULT false NOT NULL,
 	"is_fallback" boolean DEFAULT false NOT NULL,
 	"fallback_order" integer,
@@ -383,6 +367,15 @@ CREATE TABLE "agent_skills" (
 	"deleted_at" timestamp with time zone
 );
 --> statement-breakpoint
+CREATE TABLE "agent_starter_templates" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"agent_id" uuid NOT NULL,
+	"prompt_template_id" uuid NOT NULL,
+	"org_id" uuid NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "agent_tools" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"agent_id" uuid NOT NULL,
@@ -425,12 +418,16 @@ CREATE TABLE "agents" (
 	"is_published" boolean DEFAULT false NOT NULL,
 	"tool_approval_mode" text DEFAULT 'always-ask' NOT NULL,
 	"memory_scope" text DEFAULT 'per-user' NOT NULL,
+	"memory_limit_mb" integer,
 	"max_steps" integer,
 	"timeout_seconds" integer,
 	"webhook_url" text,
 	"cron_schedule" text,
 	"is_enabled" boolean DEFAULT true NOT NULL,
+	"builtin_tools" jsonb,
+	"starters" jsonb,
 	"cloned_from_agent_id" uuid,
+	"custom_worker_id" uuid,
 	"current_version" integer DEFAULT 1 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -444,7 +441,6 @@ CREATE TABLE "knowledge_chunks" (
 	"org_id" uuid NOT NULL,
 	"chunk_index" integer NOT NULL,
 	"content" text NOT NULL,
-	"embedding" text,
 	"token_count" integer,
 	"metadata" jsonb,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -463,6 +459,7 @@ CREATE TABLE "knowledge_collections" (
 	"embedding_model" text,
 	"chunk_size" integer DEFAULT 512 NOT NULL,
 	"chunk_overlap" integer DEFAULT 64 NOT NULL,
+	"source" text DEFAULT 'manual' NOT NULL,
 	"version" integer DEFAULT 1 NOT NULL,
 	"last_indexed_at" timestamp with time zone,
 	"status" text DEFAULT 'pending' NOT NULL,
@@ -471,21 +468,71 @@ CREATE TABLE "knowledge_collections" (
 	"deleted_at" timestamp with time zone
 );
 --> statement-breakpoint
+CREATE TABLE "knowledge_connectors" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"org_id" uuid NOT NULL,
+	"knowledge_collection_id" uuid NOT NULL,
+	"created_by" uuid NOT NULL,
+	"provider" text NOT NULL,
+	"tenant_id" text NOT NULL,
+	"client_id" text NOT NULL,
+	"client_secret_encrypted" text NOT NULL,
+	"resource_id" text NOT NULL,
+	"resource_path" text,
+	"resource_name" text,
+	"sync_enabled" boolean DEFAULT true NOT NULL,
+	"sync_interval_minutes" integer DEFAULT 360 NOT NULL,
+	"folder_filter" text,
+	"file_type_filter" jsonb,
+	"last_sync_at" timestamp with time zone,
+	"last_sync_status" text DEFAULT 'pending' NOT NULL,
+	"last_sync_error" text,
+	"delta_cursor" text,
+	"synced_document_count" integer DEFAULT 0 NOT NULL,
+	"metadata" jsonb,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"deleted_at" timestamp with time zone
+);
+--> statement-breakpoint
+CREATE TABLE "knowledge_document_tag_assignments" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"knowledge_document_id" uuid NOT NULL,
+	"knowledge_tag_id" uuid NOT NULL,
+	"org_id" uuid NOT NULL,
+	"source" text DEFAULT 'manual' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "knowledge_documents" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"knowledge_collection_id" uuid NOT NULL,
 	"org_id" uuid NOT NULL,
 	"file_id" uuid,
+	"connector_id" uuid,
+	"external_id" text,
 	"source_url" text,
 	"title" text,
 	"content" text,
 	"status" text DEFAULT 'pending' NOT NULL,
+	"metadata" jsonb,
+	"summary" text,
 	"error_message" text,
 	"token_count" integer,
 	"chunk_count" integer,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"deleted_at" timestamp with time zone
+);
+--> statement-breakpoint
+CREATE TABLE "knowledge_tags" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"org_id" uuid NOT NULL,
+	"name" text NOT NULL,
+	"color" text,
+	"source" text DEFAULT 'manual' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "tool_calls" (
@@ -532,6 +579,10 @@ CREATE TABLE "tools" (
 	"is_approved" boolean DEFAULT false NOT NULL,
 	"is_enabled" boolean DEFAULT true NOT NULL,
 	"registered_by_id" uuid NOT NULL,
+	"approved_by_id" uuid,
+	"approved_at" timestamp with time zone,
+	"rejection_reason" text,
+	"tags" jsonb,
 	"current_version" integer DEFAULT 1 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -636,6 +687,11 @@ CREATE TABLE "prompt_templates" (
 	"first_message" text,
 	"category" text,
 	"tags" jsonb,
+	"inputs" jsonb,
+	"icon" text,
+	"color" text,
+	"bg_color" text,
+	"is_system" boolean DEFAULT false NOT NULL,
 	"visibility" text DEFAULT 'private' NOT NULL,
 	"is_approved" boolean DEFAULT false NOT NULL,
 	"current_version" integer DEFAULT 1 NOT NULL,
@@ -665,7 +721,8 @@ CREATE TABLE "usage_stats" (
 	"storage_bytes" bigint,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"deleted_at" timestamp with time zone
+	"deleted_at" timestamp with time zone,
+	CONSTRAINT "uq_usage_stats_daily" UNIQUE NULLS NOT DISTINCT("org_id","user_id","group_id","model_id","period","period_start")
 );
 --> statement-breakpoint
 CREATE TABLE "audit_logs" (
@@ -888,6 +945,19 @@ CREATE TABLE "rate_limit_rules" (
 	"deleted_at" timestamp with time zone
 );
 --> statement-breakpoint
+CREATE TABLE "research_report_versions" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"report_id" uuid NOT NULL,
+	"version" integer NOT NULL,
+	"refinement_prompt" text,
+	"parent_version_id" uuid,
+	"report_content" text,
+	"sources" jsonb,
+	"status" text DEFAULT 'running' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "research_reports" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"org_id" uuid NOT NULL,
@@ -895,10 +965,12 @@ CREATE TABLE "research_reports" (
 	"workflow_id" uuid NOT NULL,
 	"user_id" uuid NOT NULL,
 	"query" text NOT NULL,
+	"title" text,
 	"config" jsonb,
 	"report_content" text,
 	"sources" jsonb,
 	"status" text DEFAULT 'running' NOT NULL,
+	"current_version" integer DEFAULT 1 NOT NULL,
 	"file_id" uuid,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -926,6 +998,154 @@ CREATE TABLE "user_keyboard_shortcuts" (
 	"deleted_at" timestamp with time zone
 );
 --> statement-breakpoint
+CREATE TABLE "agent_tasks" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"workflow_id" text NOT NULL,
+	"org_id" uuid NOT NULL,
+	"parent_task_id" uuid,
+	"step_number" integer NOT NULL,
+	"description" text NOT NULL,
+	"status" text DEFAULT 'pending' NOT NULL,
+	"parallel_group" integer,
+	"tools_used" jsonb,
+	"result" jsonb,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "agent_memory_vectors" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"agent_id" uuid NOT NULL,
+	"org_id" uuid NOT NULL,
+	"user_id" uuid,
+	"scope" text DEFAULT 'global' NOT NULL,
+	"content" text NOT NULL,
+	"metadata" jsonb,
+	"source_type" text,
+	"source_id" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"deleted_at" timestamp with time zone
+);
+--> statement-breakpoint
+CREATE TABLE "custom_workers" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"org_id" uuid NOT NULL,
+	"name" text NOT NULL,
+	"description" text,
+	"url" text NOT NULL,
+	"workflow_types" jsonb DEFAULT '["agent"]'::jsonb NOT NULL,
+	"auth_type" text DEFAULT 'hmac' NOT NULL,
+	"auth_secret_encrypted" text,
+	"is_builtin" boolean DEFAULT false NOT NULL,
+	"is_enabled" boolean DEFAULT true NOT NULL,
+	"health_status" text DEFAULT 'unknown',
+	"last_health_check_at" timestamp with time zone,
+	"timeout_seconds" integer DEFAULT 300 NOT NULL,
+	"fallback_to_builtin" boolean DEFAULT true NOT NULL,
+	"registered_by_id" uuid NOT NULL,
+	"config" jsonb DEFAULT '{}'::jsonb,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"deleted_at" timestamp with time zone
+);
+--> statement-breakpoint
+CREATE TABLE "eval_aggregates" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"org_id" uuid NOT NULL,
+	"eval_type" text NOT NULL,
+	"period" text NOT NULL,
+	"period_start" timestamp with time zone NOT NULL,
+	"avg_score" numeric(5, 4),
+	"median_score" numeric(5, 4),
+	"eval_count" integer DEFAULT 0 NOT NULL,
+	"thumbs_up_count" integer DEFAULT 0 NOT NULL,
+	"thumbs_down_count" integer DEFAULT 0 NOT NULL,
+	"dimension_scores" jsonb,
+	"prompt_version_id" uuid,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "uq_eval_aggregates" UNIQUE NULLS NOT DISTINCT("org_id","eval_type","period","period_start","prompt_version_id")
+);
+--> statement-breakpoint
+CREATE TABLE "eval_dimensions" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"org_id" uuid NOT NULL,
+	"eval_type" text NOT NULL,
+	"name" text NOT NULL,
+	"description" text NOT NULL,
+	"weight" numeric(3, 2) NOT NULL,
+	"is_enabled" boolean DEFAULT true NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"deleted_at" timestamp with time zone
+);
+--> statement-breakpoint
+CREATE TABLE "eval_runs" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"org_id" uuid NOT NULL,
+	"message_id" uuid NOT NULL,
+	"conversation_id" uuid NOT NULL,
+	"eval_type" text NOT NULL,
+	"execution_tier" text,
+	"scores" jsonb,
+	"overall_score" numeric(5, 4),
+	"reasoning" text,
+	"judge_model" text,
+	"prompt_version_id" uuid,
+	"input_tokens" integer,
+	"output_tokens" integer,
+	"cost_cents" integer,
+	"duration_ms" integer,
+	"status" text DEFAULT 'pending' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "prompt_optimization_runs" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"org_id" uuid NOT NULL,
+	"system_prompt_id" uuid NOT NULL,
+	"trigger_reason" text NOT NULL,
+	"trigger_data" jsonb,
+	"low_scoring_message_ids" jsonb,
+	"analysis_reasoning" text,
+	"proposed_version_id" uuid,
+	"status" text DEFAULT 'analyzing' NOT NULL,
+	"model" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "system_prompt_versions" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"system_prompt_id" uuid NOT NULL,
+	"org_id" uuid NOT NULL,
+	"version" integer NOT NULL,
+	"content" text NOT NULL,
+	"generated_by" text DEFAULT 'human' NOT NULL,
+	"generation_context" jsonb,
+	"status" text DEFAULT 'draft' NOT NULL,
+	"traffic_pct" integer DEFAULT 0 NOT NULL,
+	"eval_count" integer DEFAULT 0 NOT NULL,
+	"avg_score" numeric(5, 4),
+	"approved_by_id" uuid,
+	"approved_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "system_prompts" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"org_id" uuid NOT NULL,
+	"slug" text NOT NULL,
+	"name" text NOT NULL,
+	"description" text,
+	"active_version_id" uuid,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"deleted_at" timestamp with time zone
+);
+--> statement-breakpoint
 ALTER TABLE "org_settings" ADD CONSTRAINT "org_settings_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "magic_link_tokens" ADD CONSTRAINT "magic_link_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "mfa_credentials" ADD CONSTRAINT "mfa_credentials_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -936,15 +1156,12 @@ ALTER TABLE "group_memberships" ADD CONSTRAINT "group_memberships_group_id_group
 ALTER TABLE "group_memberships" ADD CONSTRAINT "group_memberships_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "group_memberships" ADD CONSTRAINT "group_memberships_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "groups" ADD CONSTRAINT "groups_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "workspace_memberships" ADD CONSTRAINT "workspace_memberships_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "workspace_memberships" ADD CONSTRAINT "workspace_memberships_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "workspace_memberships" ADD CONSTRAINT "workspace_memberships_group_id_groups_id_fk" FOREIGN KEY ("group_id") REFERENCES "public"."groups"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "workspace_memberships" ADD CONSTRAINT "workspace_memberships_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "workspaces" ADD CONSTRAINT "workspaces_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "workspaces" ADD CONSTRAINT "workspaces_owner_id_users_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "workspaces" ADD CONSTRAINT "workspaces_knowledge_collection_id_knowledge_collections_id_fk" FOREIGN KEY ("knowledge_collection_id") REFERENCES "public"."knowledge_collections"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "conversation_folders" ADD CONSTRAINT "conversation_folders_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "conversation_folders" ADD CONSTRAINT "conversation_folders_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "conversation_folders" ADD CONSTRAINT "conversation_folders_default_agent_id_agents_id_fk" FOREIGN KEY ("default_agent_id") REFERENCES "public"."agents"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "conversation_knowledge_collections" ADD CONSTRAINT "conversation_knowledge_collections_conversation_id_conversations_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."conversations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "conversation_knowledge_collections" ADD CONSTRAINT "conversation_knowledge_collections_knowledge_collection_id_knowledge_collections_id_fk" FOREIGN KEY ("knowledge_collection_id") REFERENCES "public"."knowledge_collections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "conversation_knowledge_collections" ADD CONSTRAINT "conversation_knowledge_collections_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "conversation_participants" ADD CONSTRAINT "conversation_participants_conversation_id_conversations_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."conversations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "conversation_participants" ADD CONSTRAINT "conversation_participants_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "conversation_participants" ADD CONSTRAINT "conversation_participants_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -955,7 +1172,6 @@ ALTER TABLE "conversation_tag_assignments" ADD CONSTRAINT "conversation_tag_assi
 ALTER TABLE "conversation_tags" ADD CONSTRAINT "conversation_tags_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "conversation_tags" ADD CONSTRAINT "conversation_tags_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "conversations" ADD CONSTRAINT "conversations_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "conversations" ADD CONSTRAINT "conversations_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "conversations" ADD CONSTRAINT "conversations_owner_id_users_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "message_attachments" ADD CONSTRAINT "message_attachments_message_id_messages_id_fk" FOREIGN KEY ("message_id") REFERENCES "public"."messages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "message_attachments" ADD CONSTRAINT "message_attachments_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -972,7 +1188,6 @@ ALTER TABLE "file_chunks" ADD CONSTRAINT "file_chunks_file_id_files_id_fk" FOREI
 ALTER TABLE "file_chunks" ADD CONSTRAINT "file_chunks_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "files" ADD CONSTRAINT "files_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "files" ADD CONSTRAINT "files_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "files" ADD CONSTRAINT "files_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "model_providers" ADD CONSTRAINT "model_providers_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "models" ADD CONSTRAINT "models_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "models" ADD CONSTRAINT "models_model_provider_id_model_providers_id_fk" FOREIGN KEY ("model_provider_id") REFERENCES "public"."model_providers"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -986,19 +1201,31 @@ ALTER TABLE "agent_memory_entries" ADD CONSTRAINT "agent_memory_entries_user_id_
 ALTER TABLE "agent_memory_entries" ADD CONSTRAINT "agent_memory_entries_conversation_id_conversations_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."conversations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "agent_skills" ADD CONSTRAINT "agent_skills_agent_id_agents_id_fk" FOREIGN KEY ("agent_id") REFERENCES "public"."agents"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "agent_skills" ADD CONSTRAINT "agent_skills_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "agent_starter_templates" ADD CONSTRAINT "agent_starter_templates_agent_id_agents_id_fk" FOREIGN KEY ("agent_id") REFERENCES "public"."agents"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "agent_starter_templates" ADD CONSTRAINT "agent_starter_templates_prompt_template_id_prompt_templates_id_fk" FOREIGN KEY ("prompt_template_id") REFERENCES "public"."prompt_templates"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "agent_starter_templates" ADD CONSTRAINT "agent_starter_templates_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "agent_tools" ADD CONSTRAINT "agent_tools_agent_id_agents_id_fk" FOREIGN KEY ("agent_id") REFERENCES "public"."agents"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "agent_tools" ADD CONSTRAINT "agent_tools_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "agent_versions" ADD CONSTRAINT "agent_versions_agent_id_agents_id_fk" FOREIGN KEY ("agent_id") REFERENCES "public"."agents"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "agent_versions" ADD CONSTRAINT "agent_versions_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "agents" ADD CONSTRAINT "agents_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "agents" ADD CONSTRAINT "agents_owner_id_users_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "agents" ADD CONSTRAINT "agents_custom_worker_id_custom_workers_id_fk" FOREIGN KEY ("custom_worker_id") REFERENCES "public"."custom_workers"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "knowledge_chunks" ADD CONSTRAINT "knowledge_chunks_knowledge_document_id_knowledge_documents_id_fk" FOREIGN KEY ("knowledge_document_id") REFERENCES "public"."knowledge_documents"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "knowledge_chunks" ADD CONSTRAINT "knowledge_chunks_knowledge_collection_id_knowledge_collections_id_fk" FOREIGN KEY ("knowledge_collection_id") REFERENCES "public"."knowledge_collections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "knowledge_chunks" ADD CONSTRAINT "knowledge_chunks_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "knowledge_collections" ADD CONSTRAINT "knowledge_collections_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "knowledge_collections" ADD CONSTRAINT "knowledge_collections_owner_id_users_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "knowledge_connectors" ADD CONSTRAINT "knowledge_connectors_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "knowledge_connectors" ADD CONSTRAINT "knowledge_connectors_knowledge_collection_id_knowledge_collections_id_fk" FOREIGN KEY ("knowledge_collection_id") REFERENCES "public"."knowledge_collections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "knowledge_connectors" ADD CONSTRAINT "knowledge_connectors_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "knowledge_document_tag_assignments" ADD CONSTRAINT "knowledge_document_tag_assignments_knowledge_document_id_knowledge_documents_id_fk" FOREIGN KEY ("knowledge_document_id") REFERENCES "public"."knowledge_documents"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "knowledge_document_tag_assignments" ADD CONSTRAINT "knowledge_document_tag_assignments_knowledge_tag_id_knowledge_tags_id_fk" FOREIGN KEY ("knowledge_tag_id") REFERENCES "public"."knowledge_tags"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "knowledge_document_tag_assignments" ADD CONSTRAINT "knowledge_document_tag_assignments_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "knowledge_documents" ADD CONSTRAINT "knowledge_documents_knowledge_collection_id_knowledge_collections_id_fk" FOREIGN KEY ("knowledge_collection_id") REFERENCES "public"."knowledge_collections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "knowledge_documents" ADD CONSTRAINT "knowledge_documents_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "knowledge_documents" ADD CONSTRAINT "knowledge_documents_connector_id_knowledge_connectors_id_fk" FOREIGN KEY ("connector_id") REFERENCES "public"."knowledge_connectors"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "knowledge_tags" ADD CONSTRAINT "knowledge_tags_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tool_calls" ADD CONSTRAINT "tool_calls_message_id_messages_id_fk" FOREIGN KEY ("message_id") REFERENCES "public"."messages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tool_calls" ADD CONSTRAINT "tool_calls_conversation_id_conversations_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."conversations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tool_calls" ADD CONSTRAINT "tool_calls_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -1008,6 +1235,7 @@ ALTER TABLE "tool_versions" ADD CONSTRAINT "tool_versions_tool_id_tools_id_fk" F
 ALTER TABLE "tool_versions" ADD CONSTRAINT "tool_versions_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tools" ADD CONSTRAINT "tools_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "tools" ADD CONSTRAINT "tools_registered_by_id_users_id_fk" FOREIGN KEY ("registered_by_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tools" ADD CONSTRAINT "tools_approved_by_id_users_id_fk" FOREIGN KEY ("approved_by_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "mcp_server_whitelist" ADD CONSTRAINT "mcp_server_whitelist_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "mcp_server_whitelist" ADD CONSTRAINT "mcp_server_whitelist_created_by_id_users_id_fk" FOREIGN KEY ("created_by_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "mcp_servers" ADD CONSTRAINT "mcp_servers_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -1055,12 +1283,33 @@ ALTER TABLE "domain_rules" ADD CONSTRAINT "domain_rules_created_by_id_users_id_f
 ALTER TABLE "integrations" ADD CONSTRAINT "integrations_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "integrations" ADD CONSTRAINT "integrations_configured_by_id_users_id_fk" FOREIGN KEY ("configured_by_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "rate_limit_rules" ADD CONSTRAINT "rate_limit_rules_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "research_report_versions" ADD CONSTRAINT "research_report_versions_report_id_research_reports_id_fk" FOREIGN KEY ("report_id") REFERENCES "public"."research_reports"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "research_reports" ADD CONSTRAINT "research_reports_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "research_reports" ADD CONSTRAINT "research_reports_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "research_reports" ADD CONSTRAINT "research_reports_file_id_files_id_fk" FOREIGN KEY ("file_id") REFERENCES "public"."files"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "system_health_checks" ADD CONSTRAINT "system_health_checks_checked_by_id_users_id_fk" FOREIGN KEY ("checked_by_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_keyboard_shortcuts" ADD CONSTRAINT "user_keyboard_shortcuts_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_keyboard_shortcuts" ADD CONSTRAINT "user_keyboard_shortcuts_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "agent_tasks" ADD CONSTRAINT "agent_tasks_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "agent_memory_vectors" ADD CONSTRAINT "agent_memory_vectors_agent_id_agents_id_fk" FOREIGN KEY ("agent_id") REFERENCES "public"."agents"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "agent_memory_vectors" ADD CONSTRAINT "agent_memory_vectors_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "agent_memory_vectors" ADD CONSTRAINT "agent_memory_vectors_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "custom_workers" ADD CONSTRAINT "custom_workers_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "custom_workers" ADD CONSTRAINT "custom_workers_registered_by_id_users_id_fk" FOREIGN KEY ("registered_by_id") REFERENCES "public"."users"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "eval_aggregates" ADD CONSTRAINT "eval_aggregates_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "eval_aggregates" ADD CONSTRAINT "eval_aggregates_prompt_version_id_system_prompt_versions_id_fk" FOREIGN KEY ("prompt_version_id") REFERENCES "public"."system_prompt_versions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "eval_dimensions" ADD CONSTRAINT "eval_dimensions_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "eval_runs" ADD CONSTRAINT "eval_runs_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "eval_runs" ADD CONSTRAINT "eval_runs_message_id_messages_id_fk" FOREIGN KEY ("message_id") REFERENCES "public"."messages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "eval_runs" ADD CONSTRAINT "eval_runs_conversation_id_conversations_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."conversations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "eval_runs" ADD CONSTRAINT "eval_runs_prompt_version_id_system_prompt_versions_id_fk" FOREIGN KEY ("prompt_version_id") REFERENCES "public"."system_prompt_versions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "prompt_optimization_runs" ADD CONSTRAINT "prompt_optimization_runs_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "prompt_optimization_runs" ADD CONSTRAINT "prompt_optimization_runs_system_prompt_id_system_prompts_id_fk" FOREIGN KEY ("system_prompt_id") REFERENCES "public"."system_prompts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "prompt_optimization_runs" ADD CONSTRAINT "prompt_optimization_runs_proposed_version_id_system_prompt_versions_id_fk" FOREIGN KEY ("proposed_version_id") REFERENCES "public"."system_prompt_versions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "system_prompt_versions" ADD CONSTRAINT "system_prompt_versions_system_prompt_id_system_prompts_id_fk" FOREIGN KEY ("system_prompt_id") REFERENCES "public"."system_prompts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "system_prompt_versions" ADD CONSTRAINT "system_prompt_versions_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "system_prompt_versions" ADD CONSTRAINT "system_prompt_versions_approved_by_id_users_id_fk" FOREIGN KEY ("approved_by_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "system_prompts" ADD CONSTRAINT "system_prompts_org_id_organisations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "idx_org_settings_org_key" ON "org_settings" USING btree ("org_id","key");--> statement-breakpoint
 CREATE UNIQUE INDEX "idx_organisations_slug" ON "organisations" USING btree ("slug");--> statement-breakpoint
 CREATE UNIQUE INDEX "idx_organisations_domain" ON "organisations" USING btree ("domain");--> statement-breakpoint
@@ -1070,6 +1319,7 @@ CREATE INDEX "idx_magic_link_tokens_user_id" ON "magic_link_tokens" USING btree 
 CREATE INDEX "idx_mfa_credentials_user_id" ON "mfa_credentials" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "idx_sessions_token_hash" ON "sessions" USING btree ("token_hash");--> statement-breakpoint
 CREATE INDEX "idx_sessions_user_id" ON "sessions" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "idx_sessions_expires_at" ON "sessions" USING btree ("expires_at");--> statement-breakpoint
 CREATE UNIQUE INDEX "idx_user_profiles_user_org" ON "user_profiles" USING btree ("user_id","org_id");--> statement-breakpoint
 CREATE INDEX "idx_user_profiles_org_id" ON "user_profiles" USING btree ("org_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "idx_users_email" ON "users" USING btree ("email");--> statement-breakpoint
@@ -1080,19 +1330,20 @@ CREATE INDEX "idx_group_memberships_org_id" ON "group_memberships" USING btree (
 CREATE INDEX "idx_group_memberships_user_id" ON "group_memberships" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "idx_groups_org_id" ON "groups" USING btree ("org_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "idx_groups_org_name" ON "groups" USING btree ("org_id","name");--> statement-breakpoint
-CREATE INDEX "idx_workspace_memberships_org_id" ON "workspace_memberships" USING btree ("org_id");--> statement-breakpoint
-CREATE INDEX "idx_workspaces_org_id" ON "workspaces" USING btree ("org_id");--> statement-breakpoint
-CREATE INDEX "idx_workspaces_owner_id" ON "workspaces" USING btree ("owner_id");--> statement-breakpoint
 CREATE INDEX "idx_conversation_folders_org_user" ON "conversation_folders" USING btree ("org_id","user_id");--> statement-breakpoint
+CREATE INDEX "idx_conv_knowledge_collections_conv" ON "conversation_knowledge_collections" USING btree ("conversation_id");--> statement-breakpoint
+CREATE INDEX "idx_conv_knowledge_collections_org" ON "conversation_knowledge_collections" USING btree ("org_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_conv_knowledge_collections_conv_coll" ON "conversation_knowledge_collections" USING btree ("conversation_id","knowledge_collection_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "idx_conversation_participants_conv_user" ON "conversation_participants" USING btree ("conversation_id","user_id");--> statement-breakpoint
 CREATE INDEX "idx_conversation_participants_org_id" ON "conversation_participants" USING btree ("org_id");--> statement-breakpoint
 CREATE INDEX "idx_conversation_tag_assignments_conv" ON "conversation_tag_assignments" USING btree ("conversation_id");--> statement-breakpoint
 CREATE INDEX "idx_conversation_tag_assignments_org" ON "conversation_tag_assignments" USING btree ("org_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "idx_conversation_tags_org_user_name" ON "conversation_tags" USING btree ("org_id","user_id","name");--> statement-breakpoint
 CREATE INDEX "idx_conversations_org_owner" ON "conversations" USING btree ("org_id","owner_id");--> statement-breakpoint
-CREATE INDEX "idx_conversations_workspace" ON "conversations" USING btree ("workspace_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "idx_conversations_share_token" ON "conversations" USING btree ("public_share_token");--> statement-breakpoint
 CREATE INDEX "idx_conversations_org_active" ON "conversations" USING btree ("org_id");--> statement-breakpoint
+CREATE INDEX "idx_conversations_org_deleted" ON "conversations" USING btree ("org_id","deleted_at");--> statement-breakpoint
+CREATE INDEX "idx_conversations_org_archived" ON "conversations" USING btree ("org_id","is_archived","updated_at");--> statement-breakpoint
 CREATE INDEX "idx_message_attachments_message_id" ON "message_attachments" USING btree ("message_id");--> statement-breakpoint
 CREATE INDEX "idx_message_attachments_org_id" ON "message_attachments" USING btree ("org_id");--> statement-breakpoint
 CREATE INDEX "idx_message_notes_message_user" ON "message_notes" USING btree ("message_id","user_id");--> statement-breakpoint
@@ -1106,9 +1357,10 @@ CREATE INDEX "idx_messages_active" ON "messages" USING btree ("conversation_id",
 CREATE INDEX "idx_file_chunks_file_index" ON "file_chunks" USING btree ("file_id","chunk_index");--> statement-breakpoint
 CREATE INDEX "idx_file_chunks_org_id" ON "file_chunks" USING btree ("org_id");--> statement-breakpoint
 CREATE INDEX "idx_files_org_user" ON "files" USING btree ("org_id","user_id");--> statement-breakpoint
-CREATE INDEX "idx_files_workspace" ON "files" USING btree ("workspace_id");--> statement-breakpoint
 CREATE INDEX "idx_files_org_active" ON "files" USING btree ("org_id");--> statement-breakpoint
+CREATE INDEX "idx_files_orphan_cleanup" ON "files" USING btree ("size_bytes","created_at");--> statement-breakpoint
 CREATE INDEX "idx_model_providers_org_id" ON "model_providers" USING btree ("org_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_model_providers_org_name" ON "model_providers" USING btree ("org_id","name");--> statement-breakpoint
 CREATE INDEX "idx_models_org_id" ON "models" USING btree ("org_id");--> statement-breakpoint
 CREATE INDEX "idx_models_provider" ON "models" USING btree ("model_provider_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "idx_models_org_external_id" ON "models" USING btree ("org_id","model_id_external");--> statement-breakpoint
@@ -1119,6 +1371,8 @@ CREATE INDEX "idx_agent_memory_agent_scope" ON "agent_memory_entries" USING btre
 CREATE INDEX "idx_agent_memory_org_id" ON "agent_memory_entries" USING btree ("org_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "idx_agent_skills_agent_skill" ON "agent_skills" USING btree ("agent_id","skill_name");--> statement-breakpoint
 CREATE INDEX "idx_agent_skills_org_id" ON "agent_skills" USING btree ("org_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_agent_starter_templates_agent_template" ON "agent_starter_templates" USING btree ("agent_id","prompt_template_id");--> statement-breakpoint
+CREATE INDEX "idx_agent_starter_templates_org_id" ON "agent_starter_templates" USING btree ("org_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "idx_agent_tools_agent_tool" ON "agent_tools" USING btree ("agent_id","tool_id");--> statement-breakpoint
 CREATE INDEX "idx_agent_tools_org_id" ON "agent_tools" USING btree ("org_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "idx_agent_versions_agent_version" ON "agent_versions" USING btree ("agent_id","version");--> statement-breakpoint
@@ -1126,13 +1380,22 @@ CREATE INDEX "idx_agent_versions_org_id" ON "agent_versions" USING btree ("org_i
 CREATE INDEX "idx_agents_org_id" ON "agents" USING btree ("org_id");--> statement-breakpoint
 CREATE INDEX "idx_agents_owner_id" ON "agents" USING btree ("owner_id");--> statement-breakpoint
 CREATE INDEX "idx_agents_org_active" ON "agents" USING btree ("org_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_agents_org_name" ON "agents" USING btree ("org_id","name");--> statement-breakpoint
 CREATE INDEX "idx_knowledge_chunks_document_index" ON "knowledge_chunks" USING btree ("knowledge_document_id","chunk_index");--> statement-breakpoint
 CREATE INDEX "idx_knowledge_chunks_collection" ON "knowledge_chunks" USING btree ("knowledge_collection_id");--> statement-breakpoint
 CREATE INDEX "idx_knowledge_chunks_org_id" ON "knowledge_chunks" USING btree ("org_id");--> statement-breakpoint
 CREATE INDEX "idx_knowledge_collections_org_owner" ON "knowledge_collections" USING btree ("org_id","owner_id");--> statement-breakpoint
 CREATE INDEX "idx_knowledge_collections_org_active" ON "knowledge_collections" USING btree ("org_id");--> statement-breakpoint
+CREATE INDEX "idx_knowledge_connectors_org" ON "knowledge_connectors" USING btree ("org_id");--> statement-breakpoint
+CREATE INDEX "idx_knowledge_connectors_collection" ON "knowledge_connectors" USING btree ("knowledge_collection_id");--> statement-breakpoint
+CREATE INDEX "idx_knowledge_connectors_sync" ON "knowledge_connectors" USING btree ("sync_enabled","last_sync_at");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_knowledge_doc_tag_unique" ON "knowledge_document_tag_assignments" USING btree ("knowledge_document_id","knowledge_tag_id");--> statement-breakpoint
+CREATE INDEX "idx_knowledge_doc_tag_doc" ON "knowledge_document_tag_assignments" USING btree ("knowledge_document_id");--> statement-breakpoint
+CREATE INDEX "idx_knowledge_doc_tag_tag" ON "knowledge_document_tag_assignments" USING btree ("knowledge_tag_id");--> statement-breakpoint
 CREATE INDEX "idx_knowledge_documents_collection" ON "knowledge_documents" USING btree ("knowledge_collection_id");--> statement-breakpoint
 CREATE INDEX "idx_knowledge_documents_org_id" ON "knowledge_documents" USING btree ("org_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_knowledge_documents_connector_external" ON "knowledge_documents" USING btree ("connector_id","external_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_knowledge_tags_org_name" ON "knowledge_tags" USING btree ("org_id","name");--> statement-breakpoint
 CREATE INDEX "idx_tool_calls_message_id" ON "tool_calls" USING btree ("message_id");--> statement-breakpoint
 CREATE INDEX "idx_tool_calls_conversation_id" ON "tool_calls" USING btree ("conversation_id");--> statement-breakpoint
 CREATE INDEX "idx_tool_calls_org_id" ON "tool_calls" USING btree ("org_id");--> statement-breakpoint
@@ -1152,9 +1415,10 @@ CREATE INDEX "idx_notifications_org_id" ON "notifications" USING btree ("org_id"
 CREATE INDEX "idx_prompt_template_versions_org_id" ON "prompt_template_versions" USING btree ("org_id");--> statement-breakpoint
 CREATE INDEX "idx_prompt_templates_org_id" ON "prompt_templates" USING btree ("org_id");--> statement-breakpoint
 CREATE INDEX "idx_prompt_templates_owner_id" ON "prompt_templates" USING btree ("owner_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_prompt_templates_org_name" ON "prompt_templates" USING btree ("org_id","name");--> statement-breakpoint
 CREATE INDEX "idx_usage_stats_org_period" ON "usage_stats" USING btree ("org_id","period","period_start");--> statement-breakpoint
 CREATE INDEX "idx_usage_stats_user_period" ON "usage_stats" USING btree ("user_id","period");--> statement-breakpoint
-CREATE INDEX "idx_audit_logs_org_created" ON "audit_logs" USING btree ("org_id");--> statement-breakpoint
+CREATE INDEX "idx_audit_logs_org_created" ON "audit_logs" USING btree ("org_id","created_at");--> statement-breakpoint
 CREATE INDEX "idx_audit_logs_actor_id" ON "audit_logs" USING btree ("actor_id");--> statement-breakpoint
 CREATE INDEX "idx_audit_logs_resource" ON "audit_logs" USING btree ("resource_type","resource_id");--> statement-breakpoint
 CREATE INDEX "idx_audit_logs_action" ON "audit_logs" USING btree ("action");--> statement-breakpoint
@@ -1173,6 +1437,7 @@ CREATE INDEX "idx_artifacts_org_id" ON "artifacts" USING btree ("org_id");--> st
 CREATE INDEX "idx_invitations_org_id" ON "invitations" USING btree ("org_id");--> statement-breakpoint
 CREATE INDEX "idx_invitations_token_hash" ON "invitations" USING btree ("token_hash");--> statement-breakpoint
 CREATE INDEX "idx_invitations_email" ON "invitations" USING btree ("email");--> statement-breakpoint
+CREATE INDEX "idx_invitations_expires_at" ON "invitations" USING btree ("expires_at");--> statement-breakpoint
 CREATE INDEX "idx_content_filters_org_id" ON "content_filters" USING btree ("org_id");--> statement-breakpoint
 CREATE INDEX "idx_data_jobs_org_user" ON "data_jobs" USING btree ("org_id","user_id");--> statement-breakpoint
 CREATE INDEX "idx_dlp_rules_org_id" ON "dlp_rules" USING btree ("org_id");--> statement-breakpoint
@@ -1180,5 +1445,29 @@ CREATE INDEX "idx_domain_rules_org_id" ON "domain_rules" USING btree ("org_id");
 CREATE INDEX "idx_domain_rules_org_domain" ON "domain_rules" USING btree ("org_id","domain");--> statement-breakpoint
 CREATE INDEX "idx_integrations_org_id" ON "integrations" USING btree ("org_id");--> statement-breakpoint
 CREATE INDEX "idx_rate_limit_rules_org_scope" ON "rate_limit_rules" USING btree ("org_id","scope");--> statement-breakpoint
+CREATE INDEX "idx_report_versions_report_id" ON "research_report_versions" USING btree ("report_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_report_versions_report_version" ON "research_report_versions" USING btree ("report_id","version");--> statement-breakpoint
 CREATE INDEX "idx_research_reports_org_id" ON "research_reports" USING btree ("org_id");--> statement-breakpoint
-CREATE INDEX "idx_system_health_checks_service_created" ON "system_health_checks" USING btree ("service");
+CREATE INDEX "idx_system_health_checks_service_created" ON "system_health_checks" USING btree ("service");--> statement-breakpoint
+CREATE INDEX "idx_agent_tasks_workflow_id" ON "agent_tasks" USING btree ("workflow_id");--> statement-breakpoint
+CREATE INDEX "idx_agent_tasks_org_id" ON "agent_tasks" USING btree ("org_id");--> statement-breakpoint
+CREATE INDEX "idx_agent_tasks_parent_task_id" ON "agent_tasks" USING btree ("parent_task_id");--> statement-breakpoint
+CREATE INDEX "idx_agent_memory_vectors_agent_id" ON "agent_memory_vectors" USING btree ("agent_id");--> statement-breakpoint
+CREATE INDEX "idx_agent_memory_vectors_org_id" ON "agent_memory_vectors" USING btree ("org_id");--> statement-breakpoint
+CREATE INDEX "idx_agent_memory_vectors_user_id" ON "agent_memory_vectors" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "idx_custom_workers_org_id" ON "custom_workers" USING btree ("org_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_custom_workers_org_name" ON "custom_workers" USING btree ("org_id","name");--> statement-breakpoint
+CREATE INDEX "idx_eval_aggregates_org_type_period" ON "eval_aggregates" USING btree ("org_id","eval_type","period");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_eval_dimensions_org_type_name" ON "eval_dimensions" USING btree ("org_id","eval_type","name");--> statement-breakpoint
+CREATE INDEX "idx_eval_dimensions_org_type" ON "eval_dimensions" USING btree ("org_id","eval_type");--> statement-breakpoint
+CREATE INDEX "idx_eval_runs_org_type_created" ON "eval_runs" USING btree ("org_id","eval_type","created_at");--> statement-breakpoint
+CREATE INDEX "idx_eval_runs_message_id" ON "eval_runs" USING btree ("message_id");--> statement-breakpoint
+CREATE INDEX "idx_eval_runs_prompt_version" ON "eval_runs" USING btree ("prompt_version_id");--> statement-breakpoint
+CREATE INDEX "idx_eval_runs_org_status" ON "eval_runs" USING btree ("org_id","status");--> statement-breakpoint
+CREATE INDEX "idx_prompt_optimization_runs_org_prompt" ON "prompt_optimization_runs" USING btree ("org_id","system_prompt_id");--> statement-breakpoint
+CREATE INDEX "idx_prompt_optimization_runs_status" ON "prompt_optimization_runs" USING btree ("org_id","status");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_system_prompt_versions_prompt_version" ON "system_prompt_versions" USING btree ("system_prompt_id","version");--> statement-breakpoint
+CREATE INDEX "idx_system_prompt_versions_org_id" ON "system_prompt_versions" USING btree ("org_id");--> statement-breakpoint
+CREATE INDEX "idx_system_prompt_versions_status" ON "system_prompt_versions" USING btree ("org_id","status");--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_system_prompts_org_slug" ON "system_prompts" USING btree ("org_id","slug");--> statement-breakpoint
+CREATE INDEX "idx_system_prompts_org_id" ON "system_prompts" USING btree ("org_id");
