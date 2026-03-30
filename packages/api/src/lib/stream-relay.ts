@@ -1,4 +1,5 @@
 import { redis, redisSub } from "./redis";
+import { logger } from "./logger";
 
 interface RelayOptions {
   timeoutMs?: number;
@@ -24,7 +25,7 @@ export async function relayRedisToSSE(
       if (settled) return;
       settled = true;
       cleanup();
-      console.log(`[relay] TIMEOUT after ${timeoutMs}ms, ${messageCount} messages received, ${accumulatedContent.length} chars`);
+      logger.info({ timeoutMs, messageCount, accumulatedChars: accumulatedContent.length }, "[relay] TIMEOUT");
       stream.writeSSE({
         event: "error",
         data: JSON.stringify({ message: "Tool execution timed out", code: "relay_timeout" }),
@@ -41,7 +42,7 @@ export async function relayRedisToSSE(
 
       try {
         const data = JSON.parse(message);
-        console.log(`[relay] msg #${messageCount} type=${data.type} channel=${channel.slice(-12)} accLen=${accumulatedContent.length}`);
+        logger.debug({ msgNum: messageCount, type: data.type, channel: channel.slice(-12), accLen: accumulatedContent.length }, "[relay] message received");
 
         switch (data.type) {
           case "token":
@@ -120,14 +121,14 @@ export async function relayRedisToSSE(
             break;
 
           case "error":
-            console.log(`[relay] ERROR received: ${data.message}, accumulated ${accumulatedContent.length} chars`);
+            logger.error({ message: data.message, accumulatedChars: accumulatedContent.length }, "[relay] ERROR received");
             if (settled) return;
             settled = true;
             cleanup();
             stream.writeSSE({
               event: "error",
               data: JSON.stringify({ message: data.message, code: "tool_error" }),
-            }).catch(() => {}).then(() => resolve({
+            }).catch((err) => logger.debug({ err }, "[relay] final SSE write failed (client disconnected)")).then(() => resolve({
               content: accumulatedContent,
               usage: {},
             }));
@@ -141,13 +142,13 @@ export async function relayRedisToSSE(
     const cleanup = () => {
       clearTimeout(timeout);
       redisSub.off("message", handler);
-      redisSub.unsubscribe(channelId).catch(() => {});
+      redisSub.unsubscribe(channelId).catch((err) => logger.debug({ err, channelId }, "[relay] unsubscribe failed"));
     };
 
     // Attach handler before subscribing to avoid missing messages
     redisSub.on("message", handler);
     redisSub.subscribe(channelId).then(() => {
-      console.log(`[relay] subscribed to ${channelId.slice(-12)}, timeout=${timeoutMs}ms`);
+      logger.info({ channel: channelId.slice(-12), timeoutMs }, "[relay] subscribed");
     }).catch((err) => {
       settled = true;
       clearTimeout(timeout);
@@ -214,7 +215,7 @@ export async function relayResearchToSSE(
             stream.writeSSE({
               event: "research.done",
               data: JSON.stringify({ reportId: data.reportId, sourcesCount: data.sourcesCount }),
-            }).catch(() => {}).then(() => resolve());
+            }).catch((err) => logger.debug({ err }, "[relay] final SSE write failed (client disconnected)")).then(() => resolve());
             break;
 
           case "research.error":
@@ -224,7 +225,7 @@ export async function relayResearchToSSE(
             stream.writeSSE({
               event: "research.error",
               data: JSON.stringify({ message: data.message }),
-            }).catch(() => {}).then(() => resolve());
+            }).catch((err) => logger.debug({ err }, "[relay] final SSE write failed (client disconnected)")).then(() => resolve());
             break;
 
           // Agent-style events (from agentic research workflow)
@@ -279,7 +280,7 @@ export async function relayResearchToSSE(
             stream.writeSSE({
               event: "research.done",
               data: JSON.stringify({ reportId: channelId.replace("research:", ""), sourcesCount: 0 }),
-            }).catch(() => {}).then(() => resolve());
+            }).catch((err) => logger.debug({ err }, "[relay] final SSE write failed (client disconnected)")).then(() => resolve());
             break;
 
           case "error":
@@ -289,7 +290,7 @@ export async function relayResearchToSSE(
             stream.writeSSE({
               event: "research.error",
               data: JSON.stringify({ message: data.message }),
-            }).catch(() => {}).then(() => resolve());
+            }).catch((err) => logger.debug({ err }, "[relay] final SSE write failed (client disconnected)")).then(() => resolve());
             break;
         }
       } catch {
@@ -300,13 +301,13 @@ export async function relayResearchToSSE(
     const cleanup = () => {
       clearTimeout(timeout);
       redisSub.off("message", handler);
-      redisSub.unsubscribe(channelId).catch(() => {});
+      redisSub.unsubscribe(channelId).catch((err) => logger.debug({ err, channelId }, "[relay] unsubscribe failed"));
     };
 
     // Attach handler before subscribing to avoid missing messages
     redisSub.on("message", handler);
     redisSub.subscribe(channelId).then(() => {
-      console.log(`[relay-research] subscribed to ${channelId.slice(-12)}, timeout=${timeoutMs}ms`);
+      logger.info({ channel: channelId.slice(-12), timeoutMs }, "[relay-research] subscribed");
     }).catch((err) => {
       settled = true;
       clearTimeout(timeout);
@@ -377,7 +378,7 @@ export async function relayRedisToSSEWithCatchup(
           stream.writeSSE({
             event: "done",
             data: JSON.stringify({ content: data.content, usage: data.usage }),
-          }).catch(() => {}).then(() => resolve());
+          }).catch((err) => logger.debug({ err }, "[relay] final SSE write failed (client disconnected)")).then(() => resolve());
           return;
         }
         if (data.type === "error") {
@@ -387,7 +388,7 @@ export async function relayRedisToSSEWithCatchup(
           stream.writeSSE({
             event: "error",
             data: JSON.stringify({ message: data.message, code: "tool_error" }),
-          }).catch(() => {}).then(() => resolve());
+          }).catch((err) => logger.debug({ err }, "[relay] final SSE write failed (client disconnected)")).then(() => resolve());
           return;
         }
         forwardEvent(message);
@@ -399,13 +400,13 @@ export async function relayRedisToSSEWithCatchup(
     const cleanup = () => {
       clearTimeout(timeout);
       redisSub.off("message", handler);
-      redisSub.unsubscribe(channelId).catch(() => {});
+      redisSub.unsubscribe(channelId).catch((err) => logger.debug({ err, channelId }, "[relay] unsubscribe failed"));
     };
 
     // 1. Subscribe to pub/sub first (events queued until replay is done)
     redisSub.on("message", handler);
     redisSub.subscribe(channelId).then(async () => {
-      console.log(`[relay-reconnect] subscribed to ${channelId.slice(-12)}, timeout=${timeoutMs}ms`);
+      logger.info({ channel: channelId.slice(-12), timeoutMs }, "[relay-reconnect] subscribed");
 
       // 2. Read all buffered events from the Redis list
       const events = await redis.lrange(eventsKey, 0, -1);
@@ -444,7 +445,7 @@ export async function relayRedisToSSEWithCatchup(
             stream.writeSSE({
               event: "done",
               data: JSON.stringify({ content: data.content, usage: data.usage }),
-            }).catch(() => {}).then(() => resolve());
+            }).catch((err) => logger.debug({ err }, "[relay] final SSE write failed (client disconnected)")).then(() => resolve());
             return;
           }
           if (data.type === "error") {
@@ -453,7 +454,7 @@ export async function relayRedisToSSEWithCatchup(
             stream.writeSSE({
               event: "error",
               data: JSON.stringify({ message: data.message, code: "tool_error" }),
-            }).catch(() => {}).then(() => resolve());
+            }).catch((err) => logger.debug({ err }, "[relay] final SSE write failed (client disconnected)")).then(() => resolve());
             return;
           }
           // Other events: these were published between lrange and now.
@@ -471,7 +472,7 @@ export async function relayRedisToSSEWithCatchup(
         await stream.writeSSE({
           event: "done",
           data: JSON.stringify({ content: "", usage: {} }),
-        }).catch(() => {});
+        }).catch((err) => logger.debug({ err }, "[relay] final SSE write failed (client disconnected)"));
         resolve();
       }
     }).catch((err) => {
