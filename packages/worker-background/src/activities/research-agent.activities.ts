@@ -8,6 +8,7 @@ import { getModelParams } from "@nova/worker-shared/models";
 import { createReasoningModel } from "@nova/worker-shared/reasoning-model";
 import { db } from "@nova/worker-shared/db";
 import { researchReports } from "@nova/shared/schemas";
+import { logger } from "@nova/worker-shared/logger";
 import {
   publishToken,
   publishToolStatus,
@@ -375,9 +376,7 @@ Begin by planning your research approach, then iterate through gather → analyz
     try {
       await stream.completed;
     } catch (err) {
-      console.warn(
-        `[research-agent] stream.completed rejected: ${err instanceof Error ? err.message : err}`,
-      );
+      logger.warn({ err: err instanceof Error ? err.message : err }, "[research-agent] stream.completed rejected");
     }
 
     const usage = (stream as any).state?.usage;
@@ -404,11 +403,9 @@ Begin by planning your research approach, then iterate through gather → analyz
       errMsg.includes("Max turns") || err?.constructor?.name === "MaxTurnsExceededError";
 
     if (isMaxTurns) {
-      console.warn(
-        `[research-agent] max turns reached: ${errMsg}, accumulated ${fullContent.length} chars`,
-      );
+      logger.warn({ err: errMsg, contentLength: fullContent.length }, "[research-agent] max turns reached");
     } else {
-      console.error(`[research-agent] error: ${errMsg}`);
+      logger.error({ err: errMsg }, "[research-agent] error");
       await publishResearchError(ch, errMsg);
       throw err;
     }

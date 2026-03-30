@@ -19,6 +19,7 @@ import {
   type RepoProvider,
 } from "../lib/git-utils";
 import { chunkCodeFile } from "../lib/code-chunker";
+import { logger } from "@nova/worker-shared/logger";
 
 interface EmbeddedChunk extends ContentChunk {
   embedding: number[] | null;
@@ -213,7 +214,7 @@ async function processFiles(
         await processRepoFile(file, input, embeddingModel);
         syncedCount++;
       } catch (err: unknown) {
-        console.warn(`[repo-sync] Failed to process ${file.relativePath}:`, err);
+        logger.warn({ err, filePath: file.relativePath }, "[repo-sync] Failed to process file");
       }
     }
   }
@@ -297,7 +298,7 @@ async function embedChunks(
         results.push({ ...batch[item.index], embedding: isZero ? null : item.embedding });
       }
     } catch (err: unknown) {
-      console.warn("[repo-sync] Embedding API error, skipping batch:", err);
+      logger.warn({ err }, "[repo-sync] Embedding API error, skipping batch");
       results.push(...batch.map((c) => ({ ...c, embedding: null })));
     }
   }
@@ -315,7 +316,7 @@ async function persistRepoChunks(
   await db.delete(knowledgeChunks).where(eq(knowledgeChunks.knowledgeDocumentId, documentId));
   await deletePointsByFilter(COLLECTIONS.KNOWLEDGE_CHUNKS, {
     must: [{ key: "documentId", match: { value: documentId } }],
-  }).catch((err: unknown) => console.warn("[qdrant] Failed to delete old chunks:", err));
+  }).catch((err: unknown) => logger.warn({ err }, "[qdrant] Failed to delete old chunks"));
 
   const qdrantPoints: Array<{
     id: string;
@@ -363,7 +364,7 @@ async function persistRepoChunks(
 
   if (qdrantPoints.length > 0) {
     await upsertPoints(COLLECTIONS.KNOWLEDGE_CHUNKS, qdrantPoints).catch((err: unknown) =>
-      console.warn("[qdrant] Failed to upsert repo chunks:", err),
+      logger.warn({ err }, "[qdrant] Failed to upsert repo chunks"),
     );
   }
 }
@@ -447,6 +448,6 @@ async function removeDocumentByPath(
       ],
     });
   } catch (err: unknown) {
-    console.warn(`[repo-sync] Failed to delete vectors for ${filePath}:`, err);
+    logger.warn({ err, filePath }, "[repo-sync] Failed to delete vectors");
   }
 }

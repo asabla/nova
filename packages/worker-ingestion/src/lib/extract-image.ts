@@ -1,5 +1,6 @@
 import { openai } from "@nova/worker-shared/litellm";
 import { getVisionModel, buildChatParams } from "@nova/worker-shared/models";
+import { logger } from "@nova/worker-shared/logger";
 
 interface ImageMetadata {
   width?: number;
@@ -120,7 +121,7 @@ async function ocrImage(buffer: Buffer): Promise<string> {
       await worker.terminate();
     }
   } catch (err) {
-    console.warn("[IMAGE] OCR failed, continuing without:", err);
+    logger.warn({ err }, "[IMAGE] OCR failed, continuing without");
     return "";
   }
 }

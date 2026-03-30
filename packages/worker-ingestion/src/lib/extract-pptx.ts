@@ -1,6 +1,7 @@
 import { openai } from "@nova/worker-shared/litellm";
 import { env } from "@nova/worker-shared/env";
 import { getVisionModel, buildChatParams } from "@nova/worker-shared/models";
+import { logger } from "@nova/worker-shared/logger";
 import { executeSandboxCode } from "../activities/sandbox.activities";
 
 const MAX_SLIDES = 50;
@@ -154,7 +155,7 @@ async function describeSlideWithVision(
 
     return response.choices[0]?.message?.content ?? "";
   } catch (err) {
-    console.warn(`[PPTX] Vision description failed for slide ${slideIndex + 1}:`, err);
+    logger.warn({ err, slideIndex: slideIndex + 1 }, "[PPTX] Vision description failed for slide");
     return "";
   }
 }

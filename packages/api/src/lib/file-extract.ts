@@ -1,6 +1,7 @@
 import { getObjectBuffer } from "./minio";
 import { extractFromHtml } from "@nova/shared/content";
 import { decodeBuffer } from "@nova/shared/utils";
+import { logger } from "./logger";
 
 let _pdfParse: ((buf: Buffer) => Promise<{ text: string }>) | null = null;
 
@@ -175,7 +176,7 @@ export async function extractFileContent(
 
     return text.trim();
   } catch (err) {
-    console.warn("Failed to extract file content:", storagePath, err);
+    logger.warn({ err, storagePath }, "Failed to extract file content");
     return null;
   }
 }

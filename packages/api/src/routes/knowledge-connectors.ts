@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import type { AppContext } from "../types/context";
+import { logger } from "../lib/logger";
 import { knowledgeConnectorService } from "../services/knowledge-connector.service";
 import { writeAuditLog } from "../services/audit.service";
 import { redis } from "../lib/redis";
@@ -115,7 +116,7 @@ knowledgeConnectorRoutes.post("/:collectionId/connectors", async (c) => {
 
   // Auto-trigger initial sync
   knowledgeConnectorService.triggerSync(orgId, connector.id).catch((err) =>
-    console.error("[connector] Failed to auto-trigger initial sync:", err),
+    logger.error({ err }, "[connector] Failed to auto-trigger initial sync"),
   );
 
   return c.json(connector, 201);

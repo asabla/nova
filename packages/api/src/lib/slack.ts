@@ -6,6 +6,7 @@
 import { db } from "./db";
 import { integrations } from "@nova/shared/schemas";
 import { eq, and, isNull } from "drizzle-orm";
+import { logger } from "./logger";
 
 export async function sendSlackMessage(orgId: string, message: string, opts?: { channel?: string }): Promise<boolean> {
   const [integration] = await db
@@ -41,7 +42,7 @@ export async function sendSlackMessage(orgId: string, message: string, opts?: { 
 
     return resp.ok;
   } catch {
-    console.warn(`[SLACK] Failed to send message to org ${orgId}`);
+    logger.warn({ orgId }, "[SLACK] Failed to send message");
     return false;
   }
 }

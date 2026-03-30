@@ -1,10 +1,11 @@
 import type { ErrorHandler } from "hono";
 import { AppError } from "@nova/shared/utils";
 import { env } from "../lib/env";
+import { logger } from "../lib/logger";
 
 export const errorHandler: ErrorHandler = (err, c) => {
   const requestId = c.get("requestId") ?? "unknown";
-  console.error(`[${requestId}] ${err.message}`, err.stack);
+  logger.error({ err, requestId }, err.message);
 
   if (err instanceof AppError) {
     return c.json(

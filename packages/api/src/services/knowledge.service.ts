@@ -1,6 +1,7 @@
 import { eq, and, desc, isNull, ilike, sql, inArray } from "drizzle-orm";
 import { TASK_QUEUES } from "@nova/shared/constants";
 import { db } from "../lib/db";
+import { logger } from "../lib/logger";
 import { knowledgeCollections, knowledgeDocuments, knowledgeChunks, knowledgeTags, knowledgeDocumentTagAssignments } from "@nova/shared/schemas";
 import { auditLogs } from "@nova/shared/schema";
 import { AppError } from "@nova/shared/utils";
@@ -311,7 +312,7 @@ export const knowledgeService = {
             .filter(Boolean) as any[];
         }
       } catch (err) {
-        console.warn("[knowledge] Qdrant search failed, falling back to pg_trgm:", err);
+        logger.warn({ err }, "[knowledge] Qdrant search failed, falling back to pg_trgm");
       }
     }
 
@@ -537,6 +538,6 @@ export async function triggerDocumentIngestion(
       }],
     });
   } catch (err) {
-    console.error(`[knowledge] Failed to start ingestion workflow for doc ${doc.id}:`, err);
+    logger.error({ err, docId: doc.id }, "[knowledge] Failed to start ingestion workflow");
   }
 }

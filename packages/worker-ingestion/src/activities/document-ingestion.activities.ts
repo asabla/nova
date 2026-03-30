@@ -24,6 +24,7 @@ import {
 import { upsertPoints, deletePointsByFilter, COLLECTIONS } from "@nova/worker-shared/qdrant";
 import { chunkCodeFile } from "../lib/code-chunker";
 import { CODE_FILE_EXTENSIONS } from "@nova/shared/constants";
+import { logger } from "@nova/worker-shared/logger";
 
 async function getMinioClient() {
   const { Client: MinioClient } = await import("minio");
@@ -85,9 +86,9 @@ async function extractPdfText(fileBuffer: Buffer): Promise<string> {
     if (text.trim().length >= PDF_MIN_TEXT_LENGTH && !isLikelyGarbledText(text)) {
       return text;
     }
-    console.warn("[PDF] unpdf returned garbled or insufficient text, trying OCR fallback");
+    logger.warn("[PDF] unpdf returned garbled or insufficient text, trying OCR fallback");
   } catch (err) {
-    console.warn("[PDF] unpdf extraction failed, trying OCR fallback:", err);
+    logger.warn({ err }, "[PDF] unpdf extraction failed, trying OCR fallback");
   }
 
   // 2. Fallback: render pages with mupdf → OCR with tesseract.js
@@ -121,7 +122,7 @@ async function extractPdfText(fileBuffer: Buffer): Promise<string> {
 
   const fullText = pageTexts.join("\n\n");
   if (fullText.trim().length === 0) {
-    console.warn("[PDF] OCR also returned no text (image-only PDF with no recognizable text)");
+    logger.warn("[PDF] OCR also returned no text (image-only PDF with no recognizable text)");
   }
   return fullText;
 }
@@ -362,7 +363,7 @@ async function embedChunks(
         results.push({ ...batch[item.index], embedding: isZero ? null : item.embedding });
       }
     } catch (err) {
-      console.warn(`[EMBED] Embedding API error, skipping batch:`, err);
+      logger.warn({ err }, "[EMBED] Embedding API error, skipping batch");
       results.push(...batch.map((c) => ({ ...c, embedding: null })));
     }
   }
@@ -385,7 +386,7 @@ async function persistChunks(
   await db.delete(knowledgeChunks).where(eq(knowledgeChunks.knowledgeDocumentId, documentId));
   await deletePointsByFilter(COLLECTIONS.KNOWLEDGE_CHUNKS, {
     must: [{ key: "documentId", match: { value: documentId } }],
-  }).catch((err) => console.warn("[qdrant] Failed to delete old chunks:", err));
+  }).catch((err) => logger.warn({ err }, "[qdrant] Failed to delete old chunks"));
 
   const qdrantPoints: Array<{ id: string; vector?: number[]; payload: Record<string, unknown> }> = [];
 
@@ -431,7 +432,7 @@ async function persistChunks(
   // Upsert to Qdrant
   if (qdrantPoints.length > 0) {
     await upsertPoints(COLLECTIONS.KNOWLEDGE_CHUNKS, qdrantPoints).catch((err) =>
-      console.warn("[qdrant] Failed to upsert knowledge chunks:", err),
+      logger.warn({ err }, "[qdrant] Failed to upsert knowledge chunks"),
     );
   }
 
@@ -502,7 +503,7 @@ ${snippet}`;
       category: parsed.category ?? "",
     };
   } catch (err) {
-    console.warn("[ENRICH] LLM enrichment failed, continuing without:", err);
+    logger.warn({ err }, "[ENRICH] LLM enrichment failed, continuing without");
     return null;
   }
 }

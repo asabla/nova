@@ -1,5 +1,6 @@
 import { QdrantClient } from "@qdrant/js-client-rest";
 import { env } from "./env";
+import { logger } from "./logger";
 
 // ── Collection names ───────────────────────────────────────────────
 export const COLLECTIONS = {
@@ -137,11 +138,11 @@ export async function ensureAllCollections(): Promise<void> {
     try {
       await ensureCollection(name, config);
     } catch (err) {
-      console.error(`[qdrant] Failed to ensure collection ${name}:`, err);
+      logger.error({ err, collection: name }, "[qdrant] Failed to ensure collection");
     }
   }
 
-  console.log("[qdrant] All collections ensured");
+  logger.info("[qdrant] All collections ensured");
 }
 
 // ── Batch operations ───────────────────────────────────────────────
@@ -183,8 +184,9 @@ export async function upsertPoints(collection: string, points: QdrantPoint[]): P
           wait: true,
           payload: p.payload,
           points: [p.id],
-        }).catch(() => {
+        }).catch((err) => {
           // Point doesn't exist yet — embedding workflow will create it later
+          logger.debug({ err, collection, pointId: p.id }, "[qdrant] setPayload skipped (point not yet created)");
         });
       }
     } else {

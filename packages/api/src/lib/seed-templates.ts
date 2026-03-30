@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { promptTemplates } from "@nova/shared/schemas";
+import { logger } from "./logger";
 
 // ---------------------------------------------------------------------------
 // Template input types (mirrors the frontend TemplateInput interface)
@@ -1695,5 +1696,5 @@ export async function seedExploreTemplates(orgId: string, userId: string): Promi
       });
   }
 
-  console.log(`[seed] Upserted ${templates.length} explore templates for org ${orgId}`);
+  logger.info({ count: templates.length, orgId }, "[seed] Upserted explore templates");
 }

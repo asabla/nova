@@ -6,6 +6,7 @@
 import { db } from "./db";
 import { integrations } from "@nova/shared/schemas";
 import { eq, and, isNull } from "drizzle-orm";
+import { logger } from "./logger";
 
 export async function sendTeamsMessage(orgId: string, message: string, opts?: { title?: string }): Promise<boolean> {
   const [integration] = await db
@@ -60,7 +61,7 @@ export async function sendTeamsMessage(orgId: string, message: string, opts?: { 
 
     return resp.ok;
   } catch {
-    console.warn(`[TEAMS] Failed to send message to org ${orgId}`);
+    logger.warn({ orgId }, "[TEAMS] Failed to send message");
     return false;
   }
 }

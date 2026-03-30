@@ -8,6 +8,7 @@ import { writeAuditLog } from "../services/audit.service";
 import { db } from "../lib/db";
 import { dataJobs } from "@nova/shared/schemas";
 import { AppError } from "@nova/shared/utils";
+import { logger } from "../lib/logger";
 
 const batchRoutes = new Hono<AppContext>();
 
@@ -96,7 +97,7 @@ batchRoutes.post("/async", zValidator("json", batchRequestSchema), async (c) => 
   }).returning();
 
   // Process in background (non-blocking)
-  processBatchAsync(job.id, orgId, requests, webhookUrl).catch(console.error);
+  processBatchAsync(job.id, orgId, requests, webhookUrl).catch((err) => logger.error({ err }, "[batch] async processing failed"));
 
   return c.json({ batchId: job.id, status: "pending", requestCount: requests.length }, 202);
 });

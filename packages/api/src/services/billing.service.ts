@@ -2,6 +2,7 @@ import { db } from "../lib/db";
 import { orgSettings } from "@nova/shared/schemas";
 import { eq, and } from "drizzle-orm";
 import { orgService } from "./org.service";
+import { logger } from "../lib/logger";
 
 /**
  * Billing service for Stripe integration (Story #16).
@@ -190,19 +191,96 @@ export async function handleStripeWebhook(body: string, signature: string) {
         const orgs = await db.select().from(orgSettings)
           .where(and(eq(orgSettings.key, "stripe_customer_id")));
         // In production this would query the orgs table
-        console.log(`[billing] Subscription ${status} for customer ${customerId}`);
+        logger.info({ status, customerId }, "[billing] Subscription status changed");
       }
       break;
     }
 
     case "invoice.payment_failed": {
       const invoice = event.data.object;
-      console.warn(`[billing] Payment failed for customer ${invoice.customer}`);
+      logger.warn({ customerId: invoice.customer }, "[billing] Payment failed");
       break;
     }
   }
 
   return { received: true };
+}
+
+export async function getPaymentMethod(orgId: string) {
+  const org = await orgService.get(orgId);
+  const customerId = (org as any).billingCustomerId;
+
+  if (!stripeEnabled || !customerId) {
+    return null;
+  }
+
+  try {
+    const customer = await stripeRequest(`/customers/${customerId}`) as {
+      invoice_settings?: { default_payment_method?: string };
+    };
+
+    const pmId = customer.invoice_settings?.default_payment_method;
+    if (!pmId) return null;
+
+    const pm = await stripeRequest(`/payment_methods/${pmId}`) as {
+      id: string;
+      type: string;
+      card?: { brand: string; last4: string; exp_month: number; exp_year: number };
+    };
+
+    if (!pm.card) return null;
+
+    return {
+      id: pm.id,
+      brand: pm.card.brand,
+      last4: pm.card.last4,
+      expMonth: pm.card.exp_month,
+      expYear: pm.card.exp_year,
+    };
+  } catch (err) {
+    logger.warn({ err, orgId, customerId }, "[billing] Failed to fetch payment method");
+    return null;
+  }
+}
+
+export async function getInvoices(orgId: string, limit = 10) {
+  const org = await orgService.get(orgId);
+  const customerId = (org as any).billingCustomerId;
+
+  if (!stripeEnabled || !customerId) {
+    return [];
+  }
+
+  try {
+    const result = await stripeRequest(
+      `/invoices?customer=${customerId}&limit=${limit}&status=paid`,
+    ) as {
+      data: Array<{
+        id: string;
+        number: string;
+        amount_paid: number;
+        currency: string;
+        status: string;
+        created: number;
+        hosted_invoice_url: string;
+        invoice_pdf: string;
+      }>;
+    };
+
+    return result.data.map((inv) => ({
+      id: inv.id,
+      number: inv.number,
+      amountCents: inv.amount_paid,
+      currency: inv.currency,
+      status: inv.status,
+      date: new Date(inv.created * 1000).toISOString(),
+      url: inv.hosted_invoice_url,
+      pdfUrl: inv.invoice_pdf,
+    }));
+  } catch (err) {
+    logger.warn({ err, orgId, customerId }, "[billing] Failed to fetch invoices");
+    return [];
+  }
 }
 
 export async function getBillingStatus(orgId: string) {
@@ -231,5 +309,7 @@ export const billingService = {
   createBillingPortalSession,
   handleStripeWebhook,
   getBillingStatus,
+  getPaymentMethod,
+  getInvoices,
   PLANS,
 };

@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { logger } from "./logger";
 
 // ── Types ──
 
@@ -135,7 +136,7 @@ async function fetchMetadataViaApi(videoId: string, apiKey: string): Promise<You
   const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
 
   if (!res.ok) {
-    console.warn(`[YouTube] Data API returned ${res.status}, falling back to page scraping`);
+    logger.warn({ status: res.status }, "[YouTube] Data API returned error, falling back to page scraping");
     return fetchMetadataViaPage(videoId);
   }
 

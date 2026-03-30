@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 import { mkdtemp, rm, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { logger } from "@nova/worker-shared/logger";
 
 const execFile = promisify(execFileCb);
 
@@ -550,7 +551,7 @@ export async function cleanupClone(repoPath: string): Promise<void> {
   try {
     await rm(repoPath, { recursive: true, force: true });
   } catch (err: unknown) {
-    console.warn(`[git] Failed to cleanup clone at ${repoPath}:`, err);
+    logger.warn({ err, repoPath }, "[git] Failed to cleanup clone");
   }
 }
 

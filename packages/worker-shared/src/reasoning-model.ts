@@ -1,5 +1,6 @@
 import type { Model } from "@openai/agents-core";
 import type OpenAI from "openai";
+import { logger } from "./logger";
 
 /**
  * Creates an Agent SDK Model that strips unsupported params from API requests.
@@ -41,7 +42,7 @@ export function wrapClientWithParamFilter(client: OpenAI, dropParams: string[]):
     for (const p of paramSet) {
       delete cleaned[p];
     }
-    console.log(`[reasoning-model] API params: model=${cleaned.model} max_completion_tokens=${cleaned.max_completion_tokens} dropped=[${dropParams.join(",")}]`);
+    logger.info({ model: cleaned.model, maxCompletionTokens: cleaned.max_completion_tokens, dropped: dropParams }, "[reasoning-model] API params");
     return originalCreate(cleaned, ...rest);
   };
 

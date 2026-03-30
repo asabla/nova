@@ -5,6 +5,7 @@ import { openai } from "@nova/worker-shared/litellm";
 import { getDefaultChatModel, buildChatParams } from "@nova/worker-shared/models";
 import { researchReports } from "@nova/shared/schemas";
 import { extractFromHtml } from "@nova/shared/content";
+import { logger } from "@nova/worker-shared/logger";
 
 export async function searchWeb(query: string, iteration: number): Promise<{ url: string; title: string }[]> {
   Context.current().heartbeat(`Search iteration ${iteration + 1}`);
@@ -14,20 +15,20 @@ export async function searchWeb(query: string, iteration: number): Promise<{ url
   if (searxngUrl) {
     try {
       const url = `${searxngUrl}/search?q=${encodeURIComponent(query)}&format=json&categories=general&pageno=${iteration + 1}`;
-      console.log(`[RESEARCH] SearxNG search: ${url}`);
+      logger.info({ url }, "[RESEARCH] SearxNG search");
       const resp = await fetch(url, { signal: AbortSignal.timeout(10_000) });
       if (resp.ok) {
         const data = await resp.json() as { results: { url: string; title: string }[] };
         const results = (data.results ?? []).slice(0, 10).map((r) => ({ url: r.url, title: r.title }));
-        console.log(`[RESEARCH] SearxNG returned ${results.length} results`);
+        logger.info({ resultCount: results.length }, "[RESEARCH] SearxNG returned results");
         return results;
       }
-      console.warn(`[RESEARCH] SearxNG returned ${resp.status}`);
+      logger.warn({ status: resp.status }, "[RESEARCH] SearxNG returned error status");
     } catch (err) {
-      console.warn(`[RESEARCH] SearxNG failed, falling back to DuckDuckGo:`, (err as Error).message);
+      logger.warn({ err: (err as Error).message }, "[RESEARCH] SearxNG failed, falling back to DuckDuckGo");
     }
   } else {
-    console.warn("[RESEARCH] SEARXNG_URL not set, using DuckDuckGo fallback");
+    logger.warn("[RESEARCH] SEARXNG_URL not set, using DuckDuckGo fallback");
   }
 
   // Fallback: DuckDuckGo Lite (plain HTML, more bot-friendly than html.duckduckgo.com)

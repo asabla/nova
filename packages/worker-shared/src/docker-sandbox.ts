@@ -2,6 +2,7 @@ import { request } from "node:http";
 import { existsSync } from "node:fs";
 import { env } from "./env";
 import { createTar, extractTar, type TarEntry } from "./tar";
+import { logger } from "./logger";
 
 // ── Types ────────────────────────────────────────────────
 
@@ -346,7 +347,7 @@ export async function sandboxExecute(params: SandboxExecuteParams): Promise<Sand
       exitCode = waitResult.StatusCode ?? -1;
     } catch {
       timedOut = true;
-      await dockerRequest("POST", `/containers/${containerId}/kill`).catch(() => {});
+      await dockerRequest("POST", `/containers/${containerId}/kill`).catch((err) => logger.debug({ err, containerId }, "[sandbox] kill timed-out container failed"));
     }
 
     // Collect logs (stdout and stderr separately)
@@ -381,7 +382,7 @@ export async function sandboxExecute(params: SandboxExecuteParams): Promise<Sand
       outputFiles,
     };
   } finally {
-    await dockerRequest("DELETE", `/containers/${containerId}?force=1`).catch(() => {});
+    await dockerRequest("DELETE", `/containers/${containerId}?force=1`).catch((err) => logger.debug({ err, containerId }, "[sandbox] container cleanup failed"));
   }
 }
 

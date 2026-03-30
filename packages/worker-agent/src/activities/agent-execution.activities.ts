@@ -3,6 +3,7 @@ import { db } from "@nova/worker-shared/db";
 import { openai } from "@nova/worker-shared/litellm";
 import { getDefaultChatModel, buildChatParams } from "@nova/worker-shared/models";
 import { agents, agentMemoryEntries, conversations, messages } from "@nova/shared/schemas";
+import { logger } from "@nova/worker-shared/logger";
 
 export async function getAgentConfig(orgId: string, agentId: string) {
   const [agent] = await db.select().from(agents)
@@ -597,7 +598,7 @@ export async function notifyAgentCompletion(
         signal: AbortSignal.timeout(10_000),
       });
     } catch (err) {
-      console.error(`[agent-webhook] Failed to notify ${webhookUrl}:`, err);
+      logger.error({ err, webhookUrl }, "[agent-webhook] Failed to notify");
     }
   }
 }

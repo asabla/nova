@@ -3,6 +3,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import { notifications, notificationPreferences, users } from "@nova/shared/schemas";
 import { sendToUser } from "../lib/ws";
 import { sendEmail, buildNotificationEmail } from "../lib/email";
+import { logger } from "../lib/logger";
 import { sendSlackMessage } from "../lib/slack";
 import { sendTeamsMessage } from "../lib/teams";
 import { env } from "../lib/env";
@@ -124,7 +125,7 @@ async function sendWebhook(url: string, payload: Record<string, unknown>): Promi
       signal: AbortSignal.timeout(10_000),
     });
   } catch {
-    console.warn(`[WEBHOOK] Failed to deliver to ${url}`);
+    logger.warn({ url }, "[WEBHOOK] Failed to deliver");
   }
 }
 
@@ -236,8 +237,8 @@ export const notificationService = {
 
     // Slack/Teams notifications (fire-and-forget)
     const notifMessage = `Agent "${agentName}" has completed its run.`;
-    sendSlackMessage(orgId, notifMessage).catch(() => {});
-    sendTeamsMessage(orgId, notifMessage, { title: "Agent Complete" }).catch(() => {});
+    sendSlackMessage(orgId, notifMessage).catch((err) => logger.warn({ err, orgId }, "[notify] Slack notification failed"));
+    sendTeamsMessage(orgId, notifMessage, { title: "Agent Complete" }).catch((err) => logger.warn({ err, orgId }, "[notify] Teams notification failed"));
 
     return this.create({
       orgId,

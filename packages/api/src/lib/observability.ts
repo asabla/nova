@@ -1,4 +1,5 @@
 import { env } from "./env";
+import { logger } from "./logger";
 
 /**
  * LangFuse / Helicone observability integration (Story #160).
@@ -38,7 +39,7 @@ function scheduleFlush() {
   if (flushTimer) return;
   flushTimer = setTimeout(() => {
     flushTimer = null;
-    flushEvents().catch(console.error);
+    flushEvents().catch((err) => logger.error({ err }, "[observability] flush failed"));
   }, FLUSH_INTERVAL_MS);
 }
 
@@ -77,7 +78,7 @@ async function flushEvents() {
       signal: AbortSignal.timeout(10_000),
     });
   } catch (err) {
-    console.error("[observability] Failed to flush to LangFuse:", err);
+    logger.error({ err }, "[observability] Failed to flush to LangFuse");
     // Re-queue events that failed to send (up to limit)
     if (eventBuffer.length < MAX_BUFFER_SIZE * 2) {
       eventBuffer.unshift(...events);
@@ -92,7 +93,7 @@ export function recordTrace(event: TraceEvent) {
   if (!langfuseEnabled) return;
   eventBuffer.push(event);
   if (eventBuffer.length >= MAX_BUFFER_SIZE) {
-    flushEvents().catch(console.error);
+    flushEvents().catch((err) => logger.error({ err }, "[observability] flush failed"));
   } else {
     scheduleFlush();
   }

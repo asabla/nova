@@ -3,6 +3,7 @@ import { sandboxExecute } from "./docker-sandbox";
 import { openai } from "./litellm";
 import { getVisionModel } from "./models";
 import { env } from "./env";
+import { logger } from "./logger";
 
 const VISUAL_EXTENSIONS = new Set([
   ".png",
@@ -52,7 +53,7 @@ async function renderToScreenshot(file: SandboxFile): Promise<Buffer | null> {
     const screenshot = result.outputFiles.find((f) => f.name === "screenshot.png");
     return screenshot?.data ?? null;
   } catch (err) {
-    console.warn(`[vision-verify] Screenshot conversion failed for ${file.name}:`, err);
+    logger.warn({ err, file: file.name }, "[vision-verify] Screenshot conversion failed");
     return null;
   }
 }
@@ -134,7 +135,7 @@ export async function verifyVisualOutputs(
 
         return { name: file.name, description };
       } catch (err) {
-        console.warn(`[vision-verify] Failed to verify ${file.name}:`, err);
+        logger.warn({ err, file: file.name }, "[vision-verify] Failed to verify");
         return null;
       }
     }),

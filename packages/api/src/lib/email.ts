@@ -1,4 +1,5 @@
 import { env } from "./env";
+import { logger } from "./logger";
 
 interface EmailOptions {
   to: string;
@@ -11,8 +12,8 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   const provider = env.EMAIL_PROVIDER ?? "console";
 
   if (provider === "console" || !env.SMTP_HOST) {
-    console.log(`[EMAIL] To: ${options.to} | Subject: ${options.subject}`);
-    console.log(`[EMAIL] Body: ${options.text ?? options.html.slice(0, 200)}`);
+    logger.info({ to: options.to, subject: options.subject }, "[EMAIL] console provider");
+    logger.info({ body: options.text ?? options.html.slice(0, 200) }, "[EMAIL] body");
     return true;
   }
 
@@ -39,7 +40,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     try {
       return await sendViaSMTP(options);
     } catch (err) {
-      console.error("[EMAIL/SMTP] Failed to send:", err);
+      logger.error({ err }, "[EMAIL/SMTP] Failed to send");
       return false;
     }
   }
@@ -161,7 +162,7 @@ async function sendViaSMTP(options: EmailOptions): Promise<boolean> {
     const timeout = setTimeout(() => {
       if (!resolved) {
         resolved = true;
-        console.error("[EMAIL/SMTP] Connection timeout");
+        logger.error("[EMAIL/SMTP] Connection timeout");
         resolve(false);
       }
     }, 15_000);
@@ -175,7 +176,7 @@ async function sendViaSMTP(options: EmailOptions): Promise<boolean> {
           const code = parseInt(response.slice(0, 3), 10);
 
           if (code >= 400) {
-            console.error(`[EMAIL/SMTP] Error: ${response.trim()}`);
+            logger.error({ response: response.trim() }, "[EMAIL/SMTP] Error");
             if (!resolved) {
               resolved = true;
               clearTimeout(timeout);
@@ -200,7 +201,7 @@ async function sendViaSMTP(options: EmailOptions): Promise<boolean> {
           }
         },
         error(_socket, error) {
-          console.error("[EMAIL/SMTP] Socket error:", error);
+          logger.error({ err: error }, "[EMAIL/SMTP] Socket error");
           if (!resolved) {
             resolved = true;
             clearTimeout(timeout);
@@ -219,7 +220,7 @@ async function sendViaSMTP(options: EmailOptions): Promise<boolean> {
         },
       },
     }).catch((err) => {
-      console.error("[EMAIL/SMTP] Connect error:", err);
+      logger.error({ err }, "[EMAIL/SMTP] Connect error");
       clearTimeout(timeout);
       if (!resolved) {
         resolved = true;

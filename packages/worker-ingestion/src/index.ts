@@ -4,6 +4,7 @@ import * as activities from "./activities";
 import { env } from "@nova/worker-shared/env";
 import { closeDb } from "@nova/worker-shared/db";
 import { closeRedis } from "@nova/worker-shared/redis";
+import { logger } from "@nova/worker-shared/logger";
 
 const TASK_QUEUE = "nova-ingestion";
 const DEPLOYMENT_NAME = "nova-worker-ingestion";
@@ -31,11 +32,11 @@ async function run() {
     },
   });
 
-  console.log(`Temporal worker started on task queue: ${TASK_QUEUE}`);
+  logger.info({ taskQueue: TASK_QUEUE }, "Temporal worker started");
 
   // Graceful shutdown
   const shutdown = async () => {
-    console.log("Shutting down ingestion worker...");
+    logger.info("Shutting down ingestion worker...");
     worker.shutdown();
     await closeDb();
     await closeRedis();
@@ -58,25 +59,25 @@ async function run() {
           deploymentName: DEPLOYMENT_NAME,
           buildId: env.WORKER_BUILD_ID,
         });
-        console.log(`Deployment version ${DEPLOYMENT_NAME}:${env.WORKER_BUILD_ID} set as current`);
+        logger.info({ deploymentName: DEPLOYMENT_NAME, buildId: env.WORKER_BUILD_ID }, "Deployment version set as current");
         await clientConn.close();
         return;
       } catch (err) {
         if (i < retries - 1) {
-          console.warn(`Failed to set deployment version (attempt ${i + 1}/${retries}), retrying...`);
+          logger.warn({ attempt: i + 1, retries }, "Failed to set deployment version, retrying...");
         } else {
-          console.warn("Failed to set deployment version after all retries:", err);
+          logger.warn({ err }, "Failed to set deployment version after all retries");
         }
       }
     }
   };
 
-  setDeploymentVersion().catch(() => {});
+  setDeploymentVersion().catch((err) => logger.error({ err }, "deployment version setup failed completely"));
 
   await runPromise;
 }
 
 run().catch((err) => {
-  console.error("Ingestion worker failed:", err);
+  logger.error({ err }, "Ingestion worker failed");
   process.exit(1);
 });

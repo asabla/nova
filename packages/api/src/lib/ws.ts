@@ -1,5 +1,6 @@
 import type { ServerWebSocket } from "bun";
 import { redisSub, redisPub } from "./redis";
+import { logger } from "./logger";
 
 export interface WSData {
   userId: string;
@@ -81,7 +82,7 @@ export function broadcastToOrg(orgId: string, event: Record<string, unknown>, ex
 // Subscribe to Redis pub/sub for cross-instance messaging
 export function initWsPubSub() {
   redisSub.subscribe("ws:broadcast", (err) => {
-    if (err) console.error("Redis subscribe error:", err);
+    if (err) logger.error({ err }, "Redis subscribe error");
   });
 
   redisSub.on("message", (channel, message) => {

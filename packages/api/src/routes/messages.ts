@@ -3,6 +3,7 @@ import { zValidator } from "../lib/validator";
 import { z } from "zod";
 import { streamSSE } from "hono/streaming";
 import type { AppContext } from "../types/context";
+import { logger } from "../lib/logger";
 import * as messageService from "../services/message.service";
 import * as conversationService from "../services/conversation.service";
 import { streamChatCompletion, chatCompletion } from "../lib/litellm";
@@ -172,7 +173,7 @@ messagesRouter.post("/:conversationId/messages", zValidator("json", sendMessageS
   // Process @mentions: create notifications for mentioned users, handle agent mentions.
   // Fire-and-forget to avoid blocking the response.
   processMentions(orgId, userId, conversationId, data.content).catch((err) => {
-    console.error("[mentions] Failed to process mentions:", err);
+    logger.error({ err }, "[mentions] Failed to process mentions");
   });
 
   return c.json(userMessage, 201);
@@ -697,7 +698,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         }
         // Everything else → undefined (deferred to workflow LLM assessor)
 
-        console.log(`[stream] tier pre-assessment: ${assessedTier ?? "deferred-to-llm"} msgLen=${msgLen} hasPrior=${hasPriorContext}`);
+        logger.info({ assessedTier: assessedTier ?? "deferred-to-llm", msgLen, hasPriorContext }, "[stream] tier pre-assessment");
       }
 
       // When tools are enabled, always dispatch to Temporal workflow.
@@ -801,7 +802,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         try {
           relayResult = await relayPromise;
         } catch (relayErr) {
-          console.error("[stream] relay error:", relayErr);
+          logger.error({ err: relayErr }, "[stream] relay error");
         }
         const totalContent = stripThinkBlocks(relayResult?.content ?? "");
 
@@ -809,12 +810,12 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         let wfTier: string | undefined;
         let wfPlanSummary: Record<string, unknown> | undefined;
         try {
-          console.log(`[stream] fetching workflow result for ${temporalWorkflowId}...`);
+          logger.info({ temporalWorkflowId }, "[stream] fetching workflow result");
           const handle = client.workflow.getHandle(temporalWorkflowId);
           const wfResult = await handle.result();
           toolCallRecords = (wfResult as any)?.toolCallRecords ?? [];
           wfTier = (wfResult as any)?.tier;
-          console.log(`[stream] workflow result: tier=${wfTier}, toolCallRecords=${toolCallRecords.length}, status=${(wfResult as any)?.status}`);
+          logger.info({ tier: wfTier, toolCallRecords: toolCallRecords.length, status: (wfResult as any)?.status }, "[stream] workflow result");
           const wfPlan = (wfResult as any)?.plan;
           if (wfPlan) {
             wfPlanSummary = {
@@ -827,7 +828,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
             };
           }
         } catch (wfErr) {
-          console.warn("[stream] Failed to retrieve workflow result (may still be running):", wfErr);
+          logger.warn({ err: wfErr }, "[stream] Failed to retrieve workflow result (may still be running)");
         }
 
         const toolSummary = toolCallRecords.length > 0
@@ -839,7 +840,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         const usageCompletionTokens = relayResult?.usage?.completion_tokens ?? 0;
         const latencyMs = Date.now() - startTime;
         let costCents = 0;
-        try { costCents = await calculateCostCents(resolvedModelId, usagePromptTokens, usageCompletionTokens); } catch {}
+        try { costCents = await calculateCostCents(resolvedModelId, usagePromptTokens, usageCompletionTokens); } catch (err) { logger.warn({ err, modelId: resolvedModelId }, "[stream] cost calculation failed"); }
 
         // Complete the message — this must succeed even if the client disconnected
         try {
@@ -851,7 +852,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
             metadata: { latencyMs, model: body.model, smartRouted: true, toolSummary, tier: wfTier ?? assessedTier, plan: wfPlanSummary },
           });
         } catch (completeErr) {
-          console.error("[stream] Failed to complete streaming message:", completeErr);
+          logger.error({ err: completeErr }, "[stream] Failed to complete streaming message");
         }
 
         // Record usage analytics
@@ -865,7 +866,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
             latencyMs,
           });
         } catch (analyticsErr) {
-          console.error("[stream] Failed to record usage analytics:", analyticsErr);
+          logger.error({ err: analyticsErr }, "[stream] Failed to record usage analytics");
         }
 
         if (toolCallRecords.length > 0) {
@@ -877,7 +878,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
                 status: r.error ? "error" : "completed", errorMessage: r.error ?? null, durationMs: r.durationMs,
               })),
             );
-          } catch (dbErr) { console.error("[planned-chat] Failed to persist tool calls:", dbErr); }
+          } catch (dbErr) { logger.error({ err: dbErr }, "[planned-chat] Failed to persist tool calls"); }
 
           // Extract output files from code_execute results and attach to message
           try {
@@ -905,7 +906,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
                       metadata: { sourceType: "sandbox" },
                     });
                   } catch (artifactErr) {
-                    console.error("[planned-chat] Failed to create excalidraw artifact:", artifactErr);
+                    logger.error({ err: artifactErr }, "[planned-chat] Failed to create excalidraw artifact");
                   }
                   continue;
                 }
@@ -936,7 +937,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
               }
             }
           } catch (fileErr) {
-            console.error("[planned-chat] Failed to persist output files:", fileErr);
+            logger.error({ err: fileErr }, "[planned-chat] Failed to persist output files");
           }
 
           // Extract generated images from image_generate results and attach to message
@@ -970,7 +971,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
               });
             }
           } catch (imgErr) {
-            console.error("[planned-chat] Failed to persist generated images:", imgErr);
+            logger.error({ err: imgErr }, "[planned-chat] Failed to persist generated images");
           }
         }
 
@@ -987,7 +988,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
               await stream.writeSSE({ event: "title_generated", data: JSON.stringify({ title }) });
             }
           } catch (e) {
-            console.error("[stream] title generation failed:", e);
+            logger.error({ err: e }, "[stream] title generation failed");
           }
           try {
             const tagNames = await conversationService.generateConversationTags(titleMsgs, orgId);
@@ -996,7 +997,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
               await stream.writeSSE({ event: "tags_generated", data: JSON.stringify({ tags }) });
             }
           } catch (e) {
-            console.error("[stream] tag generation failed:", e);
+            logger.error({ err: e }, "[stream] tag generation failed");
           }
         }
 
@@ -1046,7 +1047,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
 
       fullContent = stripThinkBlocks(fullContent);
       let costCents = 0;
-      try { costCents = await calculateCostCents(resolvedModelId, promptTokens, completionTokens); } catch {}
+      try { costCents = await calculateCostCents(resolvedModelId, promptTokens, completionTokens); } catch (err) { logger.warn({ err, modelId: resolvedModelId }, "[stream] cost calculation failed"); }
 
       const assistantMessage = await messageService.createMessage(orgId, {
         conversationId,
@@ -1070,7 +1071,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
           latencyMs,
         });
       } catch (analyticsErr) {
-        console.error("[stream] Failed to record usage analytics:", analyticsErr);
+        logger.error({ err: analyticsErr }, "[stream] Failed to record usage analytics");
       }
 
       // Auto-generate title for untitled conversations
@@ -1086,7 +1087,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
             await stream.writeSSE({ event: "title_generated", data: JSON.stringify({ title }) });
           }
         } catch (e) {
-          console.error("[stream] title generation failed:", e);
+          logger.error({ err: e }, "[stream] title generation failed");
         }
         try {
           const tagNames = await conversationService.generateConversationTags(titleMsgs, orgId);
@@ -1095,7 +1096,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
             await stream.writeSSE({ event: "tags_generated", data: JSON.stringify({ tags }) });
           }
         } catch (e) {
-          console.error("[stream] tag generation failed:", e);
+          logger.error({ err: e }, "[stream] tag generation failed");
         }
       }
 
@@ -1109,7 +1110,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         }),
       });
     } catch (err) {
-      console.error("[stream] outer error:", err);
+      logger.error({ err }, "[stream] outer error");
       await stream.writeSSE({
         event: "error",
         data: JSON.stringify({ message: "Stream error", code: "stream_error" }),
@@ -1259,7 +1260,7 @@ messagesRouter.post("/:conversationId/messages/:messageId/replay", zValidator("j
   const replayPromptTokens = data.usage?.prompt_tokens ?? 0;
   const replayCompletionTokens = data.usage?.completion_tokens ?? 0;
   let replayCostCents = 0;
-  try { replayCostCents = await calculateCostCents(replayConversation.modelId, replayPromptTokens, replayCompletionTokens); } catch {}
+  try { replayCostCents = await calculateCostCents(replayConversation.modelId, replayPromptTokens, replayCompletionTokens); } catch (err) { logger.warn({ err, modelId: replayConversation.modelId }, "[replay] cost calculation failed"); }
 
   // Save as a new assistant message
   const replayMessage = await messageService.createMessage(orgId, {
@@ -1283,7 +1284,7 @@ messagesRouter.post("/:conversationId/messages/:messageId/replay", zValidator("j
       costCents: replayCostCents,
     });
   } catch (analyticsErr) {
-    console.error("[replay] Failed to record usage analytics:", analyticsErr);
+    logger.error({ err: analyticsErr }, "[replay] Failed to record usage analytics");
   }
 
   return c.json(replayMessage, 201);
@@ -1354,7 +1355,7 @@ messagesRouter.get("/:conversationId/messages/stream/reconnect", async (c) => {
     try {
       await relayRedisToSSEWithCatchup(stream, channelId, { timeoutMs: 600_000 });
     } catch (err) {
-      console.error("[reconnect] relay error:", err);
+      logger.error({ err }, "[reconnect] relay error");
       await stream.writeSSE({
         event: "error",
         data: JSON.stringify({ message: "Reconnect failed", code: "reconnect_error" }),

@@ -4,6 +4,7 @@ import { getObjectBuffer, putObjectBuffer } from "@nova/worker-shared/minio";
 import { env } from "@nova/worker-shared/env";
 import { db } from "@nova/worker-shared/db";
 import { sandboxExecutions } from "@nova/shared/schemas";
+import { logger } from "@nova/worker-shared/logger";
 
 export interface SandboxOutputFile {
   name: string;
@@ -90,7 +91,7 @@ export async function executeSandboxCode(params: {
       sandboxBackend: "docker",
     });
   } catch (err) {
-    console.error("[sandbox] Failed to record execution:", err);
+    logger.error({ err }, "[sandbox] Failed to record execution");
   }
 
   return {

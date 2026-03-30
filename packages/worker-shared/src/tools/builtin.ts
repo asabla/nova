@@ -14,6 +14,7 @@ import { openai } from "../litellm";
 import { getDefaultChatModel, getDefaultEmbeddingModel } from "../models";
 import { COLLECTIONS, searchVector, scrollFullText, scrollFiltered } from "../qdrant";
 import { createImageGenerateTool } from "./image-generate";
+import { logger } from "../logger";
 
 /**
  * Built-in tools extracted from agent-execution.activities.ts,
@@ -349,7 +350,7 @@ export const codeExecuteTool = tool({
           visualVerification = await verifyVisualOutputs(visualFiles, { maxFiles: 3 });
         }
       } catch (err) {
-        console.warn("[code_execute] Vision verification failed:", err);
+        logger.warn({ err }, "[code_execute] Vision verification failed");
       }
     }
 
@@ -442,7 +443,7 @@ export function createSearchWorkspaceTool(orgId: string) {
 
       const shouldSearch = (t: string) => type === "all" || type === t;
 
-      console.log(`[search_workspace] query="${query}" type=${type} mode=${mode} limit=${limit} dateFrom=${dateFrom} dateTo=${dateTo} orgId=${orgId}`);
+      logger.info({ query, type, mode, limit, dateFrom, dateTo, orgId }, "[search_workspace] executing search");
 
       // Use date-only browsing when query is empty
       const hasQuery = query.trim().length > 0;
@@ -452,15 +453,15 @@ export function createSearchWorkspaceTool(orgId: string) {
       if (mode === "semantic" && hasQuery) {
         try {
           const embeddingModel = process.env.EMBEDDING_MODEL ?? await getDefaultEmbeddingModel();
-          console.log(`[search_workspace] generating embedding with model=${embeddingModel}`);
+          logger.info({ embeddingModel }, "[search_workspace] generating embedding");
           const resp = await openai.embeddings.create({
             model: embeddingModel,
             input: query.slice(0, 8000),
           });
           queryEmbedding = resp.data[0]?.embedding ?? null;
-          console.log(`[search_workspace] embedding generated: ${queryEmbedding ? queryEmbedding.length + ' dims' : 'null'}`);
+          logger.info({ dims: queryEmbedding ? queryEmbedding.length : null }, "[search_workspace] embedding generated");
         } catch (err) {
-          console.error(`[search_workspace] embedding failed:`, err instanceof Error ? err.message : err);
+          logger.error({ err: err instanceof Error ? err.message : err }, "[search_workspace] embedding failed");
           // Fall back to keyword if embedding fails
         }
       }
@@ -480,7 +481,7 @@ export function createSearchWorkspaceTool(orgId: string) {
             createdAt: p.payload.createdAt,
           }));
         } catch (err) {
-          console.error(`[search_workspace] conversations search failed:`, err instanceof Error ? err.message : err);
+          logger.error({ err: err instanceof Error ? err.message : err }, "[search_workspace] conversations search failed");
           results.conversations = [];
         }
       }
@@ -528,7 +529,7 @@ export function createSearchWorkspaceTool(orgId: string) {
             }));
           }
         } catch (err) {
-          console.error(`[search_workspace] messages search failed:`, err instanceof Error ? err.message : err);
+          logger.error({ err: err instanceof Error ? err.message : err }, "[search_workspace] messages search failed");
           results.messages = [];
         }
       }
@@ -554,7 +555,7 @@ export function createSearchWorkspaceTool(orgId: string) {
           }
           results.knowledge = docs.slice(0, limit);
         } catch (err) {
-          console.error(`[search_workspace] knowledge search failed:`, err instanceof Error ? err.message : err);
+          logger.error({ err: err instanceof Error ? err.message : err }, "[search_workspace] knowledge search failed");
           results.knowledge = [];
         }
 
@@ -575,7 +576,7 @@ export function createSearchWorkspaceTool(orgId: string) {
               ...(r.payload.chapterTitle ? { chapterTitle: r.payload.chapterTitle } : {}),
             }));
           } catch (err) {
-            console.error(`[search_workspace] knowledge chunks search failed:`, err instanceof Error ? err.message : err);
+            logger.error({ err: err instanceof Error ? err.message : err }, "[search_workspace] knowledge chunks search failed");
             results.knowledgeChunks = [];
           }
         }
@@ -592,7 +593,7 @@ export function createSearchWorkspaceTool(orgId: string) {
             filename: p.payload.filename,
           }));
         } catch (err) {
-          console.error(`[search_workspace] files search failed:`, err instanceof Error ? err.message : err);
+          logger.error({ err: err instanceof Error ? err.message : err }, "[search_workspace] files search failed");
           results.files = [];
         }
 
@@ -609,7 +610,7 @@ export function createSearchWorkspaceTool(orgId: string) {
               score: r.score,
             }));
           } catch (err) {
-            console.error(`[search_workspace] file chunks search failed:`, err instanceof Error ? err.message : err);
+            logger.error({ err: err instanceof Error ? err.message : err }, "[search_workspace] file chunks search failed");
             results.fileChunks = [];
           }
         }
@@ -617,7 +618,7 @@ export function createSearchWorkspaceTool(orgId: string) {
 
       const total = Object.values(results).reduce((sum, arr) => sum + (arr as unknown[]).length, 0);
       const breakdown = Object.entries(results).map(([k, v]) => `${k}:${(v as unknown[]).length}`).join(" ");
-      console.log(`[search_workspace] done: total=${total} ${breakdown}`);
+      logger.info({ total, breakdown }, "[search_workspace] done");
       return { query, mode: queryEmbedding ? "semantic" : "keyword", total, results };
     },
   });

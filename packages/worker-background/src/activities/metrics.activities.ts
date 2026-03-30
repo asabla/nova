@@ -6,6 +6,7 @@
 import { db } from "@nova/worker-shared/db";
 import { usageStats, organisations } from "@nova/shared/schemas";
 import { eq, sql, and } from "drizzle-orm";
+import { logger } from "@nova/worker-shared/logger";
 
 /**
  * Collect platform-wide metrics and store as daily snapshots.
@@ -19,7 +20,7 @@ export async function collectPlatformMetrics(): Promise<{ snapshotsCreated: numb
     .where(eq(organisations.isSystemOrg, true));
 
   if (!systemOrg) {
-    console.warn("[metrics] No system org found — skipping platform metrics collection");
+    logger.warn("[metrics] No system org found — skipping platform metrics collection");
     return { snapshotsCreated: 0 };
   }
 

@@ -4,9 +4,10 @@
  * Errors are logged but never block the API response.
  */
 import { COLLECTIONS, upsertPoints, deletePoints, deletePointsByFilter } from "./qdrant";
+import { logger } from "./logger";
 
 function fireAndForget(fn: () => Promise<void>): void {
-  fn().catch((err) => console.error("[qdrant-sync]", err));
+  fn().catch((err) => logger.error({ err }, "[qdrant-sync] fire-and-forget failed"));
 }
 
 function isoOrNull(d: Date | string | null | undefined): string | null {

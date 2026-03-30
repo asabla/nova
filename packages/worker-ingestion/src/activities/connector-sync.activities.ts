@@ -8,6 +8,7 @@ import {
   knowledgeCollections,
 } from "@nova/shared/schemas";
 import { files } from "@nova/shared/schema";
+import { logger } from "@nova/worker-shared/logger";
 import {
   getAppToken,
   getDriveItemsDelta,
@@ -406,7 +407,7 @@ async function removeDocumentByExternalId(
       ],
     });
   } catch (err) {
-    console.warn(`Failed to delete Qdrant vectors for document ${doc.id}:`, err);
+    logger.warn({ err, documentId: doc.id }, "Failed to delete Qdrant vectors for document");
   }
 }
 

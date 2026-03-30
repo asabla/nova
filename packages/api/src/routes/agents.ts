@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { eq, and, asc } from "drizzle-orm";
 import type { AppContext } from "../types/context";
+import { logger } from "../lib/logger";
 import { agentService } from "../services/agent.service";
 import { writeAuditLog } from "../services/audit.service";
 import { parsePagination, AppError } from "@nova/shared/utils";
@@ -71,7 +72,7 @@ agentRoutes.patch("/:id", async (c) => {
   const rawBody = await c.req.json();
   const result = updateAgentSchema.safeParse(rawBody);
   if (!result.success) {
-    console.error("[agents PATCH] Validation failed:", JSON.stringify(result.error.issues));
+    logger.error({ issues: result.error.issues }, "[agents PATCH] Validation failed");
     return c.json({ error: "Validation failed", issues: result.error.issues }, 400);
   }
   // Convert empty strings to null for UUID fields (Postgres rejects "" for uuid)

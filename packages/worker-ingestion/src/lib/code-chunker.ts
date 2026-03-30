@@ -3,6 +3,7 @@ import type { ContentChunk, ChunkMetadata, ChunkOptions } from "@nova/shared/con
 import { chunkContent } from "@nova/shared/content";
 import { getLanguageForExtension, createParser } from "./tree-sitter-languages";
 import { extname } from "node:path";
+import { logger } from "@nova/worker-shared/logger";
 
 const CODE_CHUNK_DEFAULTS: Required<ChunkOptions> = {
   maxChunkSize: 2000,
@@ -263,7 +264,7 @@ export async function chunkCodeFile(
     }
     tree = parser.parse(content);
   } catch (err) {
-    console.warn(`[code-chunker] tree-sitter parse failed for ${filename}:`, err);
+    logger.warn({ err, filename }, "[code-chunker] tree-sitter parse failed");
     return chunkAsText(content, filePath, opts);
   }
 

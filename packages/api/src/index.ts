@@ -1,13 +1,14 @@
 import { app } from "./app";
 import { adminApp } from "./admin-app";
 import { env } from "./lib/env";
+import { logger } from "./lib/logger";
 import { ensureBucket } from "./lib/minio";
 import { ensureAllCollections } from "./lib/qdrant";
 import { handleWsUpgrade, handleWsClose, handleWsMessage, initWsPubSub, type WSData } from "./lib/ws";
 
 await ensureBucket();
 initWsPubSub();
-ensureAllCollections().catch((err) => console.error("[startup] Qdrant collection setup failed:", err));
+ensureAllCollections().catch((err) => logger.error({ err }, "[startup] Qdrant collection setup failed"));
 
 Bun.serve<WSData>({
   fetch(req, server) {
@@ -47,4 +48,4 @@ Bun.serve<WSData>({
   idleTimeout: 0,
 });
 
-console.log(`NOVA API server running on port ${env.PORT}`);
+logger.info({ port: env.PORT }, "NOVA API server running");

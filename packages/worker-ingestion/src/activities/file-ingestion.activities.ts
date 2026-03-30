@@ -8,6 +8,7 @@ import { chunkContent } from "@nova/shared/content";
 import { decodeBuffer, stripNullBytes } from "@nova/shared/utils";
 import { upsertPoints, deletePointsByFilter, COLLECTIONS } from "@nova/worker-shared/qdrant";
 import { getDefaultEmbeddingModel } from "@nova/worker-shared/models";
+import { logger } from "@nova/worker-shared/logger";
 
 async function getMinioClient() {
   const { Client: MinioClient } = await import("minio");
@@ -50,7 +51,7 @@ export async function ingestFileContent(fileId: string, orgId: string): Promise<
       const pages = result.text;
       text = Array.isArray(pages) ? pages.join("\n") : String(pages);
     } catch {
-      console.warn(`[file-ingest] PDF extraction failed for ${fileId}`);
+      logger.warn({ fileId }, "[file-ingest] PDF extraction failed");
       return;
     }
   } else if (ct === "text/csv" || file.filename?.toLowerCase().endsWith(".csv")) {
@@ -70,7 +71,7 @@ export async function ingestFileContent(fileId: string, orgId: string): Promise<
         },
       }).where(eq(files.id, fileId));
     } catch {
-      console.warn(`[file-ingest] CSV extraction failed for ${fileId}, falling back to raw text`);
+      logger.warn({ fileId }, "[file-ingest] CSV extraction failed, falling back to raw text");
       text = decodeBuffer(fileBuffer, { contentType: ct });
     }
   } else if (ct === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") {
@@ -90,7 +91,7 @@ export async function ingestFileContent(fileId: string, orgId: string): Promise<
         },
       }).where(eq(files.id, fileId));
     } catch {
-      console.warn(`[file-ingest] XLSX extraction failed for ${fileId}`);
+      logger.warn({ fileId }, "[file-ingest] XLSX extraction failed");
       return;
     }
   } else if (ct.startsWith("image/")) {
@@ -100,7 +101,7 @@ export async function ingestFileContent(fileId: string, orgId: string): Promise<
       const result = await extractImageContent(fileBuffer, ct, file.filename ?? undefined);
       text = result.text;
     } catch {
-      console.warn(`[file-ingest] Image extraction failed for ${fileId}`);
+      logger.warn({ fileId }, "[file-ingest] Image extraction failed");
       return;
     }
   } else {
@@ -152,7 +153,7 @@ export async function ingestFileContent(fileId: string, orgId: string): Promise<
         });
       }
     } catch (err) {
-      console.warn(`[file-ingest] Embedding batch failed:`, err);
+      logger.warn({ err }, "[file-ingest] Embedding batch failed");
     }
   }
 

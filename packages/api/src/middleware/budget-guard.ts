@@ -2,6 +2,7 @@ import { createMiddleware } from "hono/factory";
 import { eq, and, sql, gte, isNull } from "drizzle-orm";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
+import { logger } from "../lib/logger";
 import { groups, groupMemberships, usageStats } from "@nova/shared/schemas";
 import { AppError } from "@nova/shared/utils";
 
@@ -108,7 +109,7 @@ export function budgetGuard() {
     } catch (err) {
       if (err instanceof AppError) throw err;
       // Budget check failures shouldn't block requests - log and continue
-      console.error("Budget guard check failed:", err);
+      logger.error({ err }, "Budget guard check failed");
     }
 
     return next();

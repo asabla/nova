@@ -1,15 +1,16 @@
 import { serve } from "@hono/node-server";
 import { app } from "./app";
+import { logger } from "./logger";
 
 const port = Number(process.env.GATEWAY_PORT ?? 3001);
 
 serve({ fetch: app.fetch, port }, (info) => {
-  console.log(`Nova Gateway listening on port ${info.port}`);
+  logger.info({ port: info.port }, "Nova Gateway listening");
 });
 
 // Graceful shutdown
 async function shutdown() {
-  console.log("Gateway shutting down...");
+  logger.info("Gateway shutting down");
   const { closeDb } = await import("@nova/worker-shared/db");
   const { closeRedis } = await import("@nova/worker-shared/redis");
   await Promise.allSettled([closeDb(), closeRedis()]);

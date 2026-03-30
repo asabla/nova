@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "../lib/validator";
 import { z } from "zod";
 import type { AppContext } from "../types/context";
+import { logger } from "../lib/logger";
 import * as conversationService from "../services/conversation.service";
 import { writeAuditLog } from "../services/audit.service";
 import { notificationService } from "../services/notification.service";
@@ -257,7 +258,7 @@ conversations.post("/:id/participants", zValidator("json", addParticipantSchema)
   if (conversation) {
     notificationService
       .notifyConversationShare(orgId, actorUserId, userId, conversationId, conversation.title ?? "Untitled conversation")
-      .catch((err) => console.error("[NOTIFY] Failed to send share notification:", err));
+      .catch((err) => logger.error({ err }, "[NOTIFY] Failed to send share notification"));
   }
 
   return c.json(participant, 201);

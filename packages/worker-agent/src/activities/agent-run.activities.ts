@@ -16,6 +16,7 @@ import type { ResearchSource, ReportSection } from "@nova/worker-shared/tools";
 import { getModelParams } from "@nova/worker-shared/models";
 import { createReasoningModel } from "@nova/worker-shared/reasoning-model";
 import type { ResearchConfig } from "@nova/shared/types";
+import { logger } from "@nova/worker-shared/logger";
 
 
 export interface AgentRunInput {
@@ -218,11 +219,11 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
         }
         // Log first few events and response_done for debugging
         if (eventCount <= 3) {
-          console.log(`[agent-run] event #${eventCount}: raw_model type=${data?.type} keys=${data ? Object.keys(data).join(",") : "null"}`);
+          logger.info({ eventCount, rawType: data?.type, keys: data ? Object.keys(data).join(",") : null }, "[agent-run] raw_model event");
         }
         if (data?.type === "response_done") {
           const resp = data?.response;
-          console.log(`[agent-run] response_done: outputTokens=${resp?.usage?.outputTokens} inputTokens=${resp?.usage?.inputTokens} reasoningTokens=${resp?.usage?.outputTokensDetails?.reasoning_tokens} outputItems=${resp?.output?.length}`);
+          logger.info({ outputTokens: resp?.usage?.outputTokens, inputTokens: resp?.usage?.inputTokens, reasoningTokens: resp?.usage?.outputTokensDetails?.reasoning_tokens, outputItems: resp?.output?.length }, "[agent-run] response_done");
         }
         // output_text_delta events contain streaming text tokens
         if (data?.type === "output_text_delta" && data.delta) {
@@ -254,7 +255,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
         if (item?.type === "tool_call_item") {
           const rawItem = item.rawItem;
           if (eventCount <= 200) {
-            console.log(`[agent-run] tool_call_item: event=${event.name} rawType=${rawItem?.type} rawName=${rawItem?.name} rawCallId=${rawItem?.callId} rawId=${rawItem?.id} itemKeys=${Object.keys(item).join(",")}`);
+            logger.info({ event: event.name, rawType: rawItem?.type, rawName: rawItem?.name, rawCallId: rawItem?.callId, rawId: rawItem?.id, itemKeys: Object.keys(item).join(",") }, "[agent-run] tool_call_item");
           }
           const toolName = rawItem?.name ?? rawItem?.function?.name ?? "unknown";
 
@@ -305,7 +306,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
           toolStartTimes.delete(callId);
 
           const output = outputItem.output ?? outputItem.rawItem?.output;
-          console.log(`[agent-run] tool_output: tool=${toolName} callId=${callId} outputType=${typeof output} outputLen=${typeof output === "string" ? output.length : JSON.stringify(output)?.length ?? 0} preview=${typeof output === "string" ? output.slice(0, 200) : JSON.stringify(output)?.slice(0, 200)}`);
+          logger.info({ tool: toolName, callId, outputType: typeof output, outputLen: typeof output === "string" ? output.length : JSON.stringify(output)?.length ?? 0, preview: typeof output === "string" ? output.slice(0, 200) : JSON.stringify(output)?.slice(0, 200) }, "[agent-run] tool_output");
           toolCallRecords.push({
             toolName,
             input: tracked?.args ?? {},
@@ -330,7 +331,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
     try {
       await stream.completed;
     } catch (completedErr) {
-      console.warn(`[agent-run] stream.completed rejected: ${completedErr instanceof Error ? completedErr.message : completedErr}`);
+      logger.warn({ err: completedErr instanceof Error ? completedErr.message : completedErr }, "[agent-run] stream.completed rejected");
     }
 
     const usage = (stream as any).state?.usage;
@@ -368,7 +369,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
       steps === 0 // only auto-continue for pure text responses (no tool calls)
     ) {
       continuationCount++;
-      console.log(`[agent-run] auto-continuation #${continuationCount}: ${runOutputTokens} output tokens, injecting context`);
+      logger.info({ continuationCount, runOutputTokens }, "[agent-run] auto-continuation, injecting context");
 
       // Save the content accumulated so far before resetting for the next run
       const previousContent = fullContent;
@@ -404,9 +405,9 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
     if (isMaxTurns) {
       // MaxTurnsExceededError can be thrown during stream iteration (not just at stream.completed).
       // This is expected behavior — we already accumulated content from the stream, so just log and continue.
-      console.warn(`[agent-run] max turns reached: ${errMsg}, accumulated ${fullContent.length} chars`);
+      logger.warn({ err: errMsg, contentLength: fullContent.length }, "[agent-run] max turns reached");
     } else {
-      console.error(`[agent-run] CATCH: ${errMsg}, rateLimit=${isRateLimit}, channel=${input.streamChannelId}`);
+      logger.error({ err: errMsg, rateLimit: isRateLimit, channel: input.streamChannelId }, "[agent-run] error caught");
 
       // Publish rate-limit specific error so frontend can show appropriate state
       if (isRateLimit) {
@@ -429,7 +430,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
   }
 
   // Signal completion to the relay
-  console.log(`[agent-run] done: ${eventCount} events, ${fullContent.length} chars content, channel=${input.streamChannelId}`);
+  logger.info({ eventCount, contentLength: fullContent.length, channel: input.streamChannelId }, "[agent-run] done");
   await publishDone(input.streamChannelId, {
     content: fullContent,
     usage: { prompt_tokens: inputTokens, completion_tokens: outputTokens },

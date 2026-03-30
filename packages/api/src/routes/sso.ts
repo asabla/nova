@@ -3,6 +3,7 @@ import { zValidator } from "../lib/validator";
 import { z } from "zod";
 import { eq, and, isNull, desc } from "drizzle-orm";
 import { randomBytes, createHash } from "crypto";
+import { logger } from "../lib/logger";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
 import { env } from "../lib/env";
@@ -313,7 +314,7 @@ ssoOAuthRoutes.get("/:provider/callback", async (c) => {
 
     if (!tokenRes.ok) {
       const errText = await tokenRes.text();
-      console.error(`SSO token exchange failed for ${provider}:`, errText);
+      logger.error({ provider, errText }, "SSO token exchange failed");
       return c.redirect(`${env.APP_URL}/login?error=${encodeURIComponent("Failed to authenticate with provider")}`);
     }
 
@@ -455,7 +456,7 @@ ssoOAuthRoutes.get("/:provider/callback", async (c) => {
 
     return c.redirect(`${env.APP_URL}/`);
   } catch (err: any) {
-    console.error(`SSO callback error for ${provider}:`, err);
+    logger.error({ err, provider }, "SSO callback error");
     return c.redirect(`${env.APP_URL}/login?error=${encodeURIComponent("SSO authentication failed")}`);
   }
 });

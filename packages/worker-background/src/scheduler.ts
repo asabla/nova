@@ -4,6 +4,7 @@ import { db } from "@nova/worker-shared/db";
 import { agents } from "@nova/shared/schemas";
 import { eq, and, isNotNull, isNull } from "drizzle-orm";
 import { TASK_QUEUES } from "@nova/shared/constants";
+import { logger } from "@nova/worker-shared/logger";
 
 export async function setupSchedules() {
   const connection = await Connection.connect({
@@ -25,7 +26,7 @@ export async function setupSchedules() {
       },
       policies: { overlap: ScheduleOverlapPolicy.SKIP },
     });
-    console.log("Registered system cleanup schedule (daily 3AM UTC)");
+    logger.info("Registered system cleanup schedule (daily 3AM UTC)");
   } catch (err: any) {
     if (err.message?.includes("already exists")) {
       try {
@@ -39,12 +40,12 @@ export async function setupSchedules() {
             workflowId: "cleanup-scheduled",
           },
         }));
-        console.log("Updated system cleanup schedule");
+        logger.info("Updated system cleanup schedule");
       } catch {
-        console.log("System cleanup schedule already registered");
+        logger.info("System cleanup schedule already registered");
       }
     } else {
-      console.error("Failed to register cleanup schedule:", err.message);
+      logger.error({ err: err.message }, "Failed to register cleanup schedule");
     }
   }
 
@@ -62,7 +63,7 @@ export async function setupSchedules() {
       },
       policies: { overlap: ScheduleOverlapPolicy.SKIP },
     });
-    console.log("Registered conversation summary batch schedule (every 6h)");
+    logger.info("Registered conversation summary batch schedule (every 6h)");
   } catch (err: any) {
     if (err.message?.includes("already exists")) {
       try {
@@ -77,12 +78,12 @@ export async function setupSchedules() {
             args: [{ batchSize: 50 }],
           },
         }));
-        console.log("Updated conversation summary schedule to batch workflow");
+        logger.info("Updated conversation summary schedule to batch workflow");
       } catch {
-        console.log("Conversation summary schedule already registered");
+        logger.info("Conversation summary schedule already registered");
       }
     } else {
-      console.error("Failed to register summary schedule:", err.message);
+      logger.error({ err: err.message }, "Failed to register summary schedule");
     }
   }
 
@@ -99,7 +100,7 @@ export async function setupSchedules() {
       },
       policies: { overlap: ScheduleOverlapPolicy.SKIP },
     });
-    console.log("Registered connector sync dispatch schedule (every 30 min)");
+    logger.info("Registered connector sync dispatch schedule (every 30 min)");
   } catch (err: any) {
     if (err.message?.includes("already exists")) {
       try {
@@ -113,12 +114,12 @@ export async function setupSchedules() {
             workflowId: "connector-sync-dispatch",
           },
         }));
-        console.log("Updated connector sync dispatch schedule");
+        logger.info("Updated connector sync dispatch schedule");
       } catch {
-        console.log("Connector sync dispatch schedule already registered");
+        logger.info("Connector sync dispatch schedule already registered");
       }
     } else {
-      console.error("Failed to register connector sync dispatch schedule:", err.message);
+      logger.error({ err: err.message }, "Failed to register connector sync dispatch schedule");
     }
   }
 
@@ -135,19 +136,19 @@ export async function setupSchedules() {
       },
       policies: { overlap: ScheduleOverlapPolicy.SKIP },
     });
-    console.log("Registered metrics collection schedule (hourly)");
+    logger.info("Registered metrics collection schedule (hourly)");
   } catch (err: any) {
     if (err.message?.includes("already exists")) {
-      console.log("Metrics collection schedule already registered");
+      logger.info("Metrics collection schedule already registered");
     } else {
-      console.error("Failed to register metrics schedule:", err.message);
+      logger.error({ err: err.message }, "Failed to register metrics schedule");
     }
   }
 
   // ── 5. Register agent cron schedules (Story #107) ──
   await syncAgentSchedules(client);
 
-  console.log("Schedule setup complete");
+  logger.info("Schedule setup complete");
   await connection.close();
 }
 
@@ -190,7 +191,7 @@ async function syncAgentSchedules(client: Client) {
         },
         policies: { overlap: ScheduleOverlapPolicy.SKIP },
       });
-      console.log(`Registered cron schedule for agent ${agent.name}: ${agent.cronSchedule}`);
+      logger.info({ agentName: agent.name, cronSchedule: agent.cronSchedule }, "Registered cron schedule for agent");
     } catch (err: any) {
       if (err.message?.includes("already exists")) {
         // Update existing schedule
@@ -200,16 +201,16 @@ async function syncAgentSchedules(client: Client) {
             ...prev,
             spec: { cronExpressions: [agent.cronSchedule!] },
           }));
-          console.log(`Updated cron schedule for agent ${agent.name}`);
+          logger.info({ agentName: agent.name }, "Updated cron schedule for agent");
         } catch {
           // Schedule exists and is fine
         }
       } else {
-        console.error(`Failed to register agent schedule for ${agent.name}:`, err.message);
+        logger.error({ err: err.message, agentName: agent.name }, "Failed to register agent schedule");
       }
     }
   }
 
-  console.log(`Synced ${scheduledAgents.length} agent cron schedule(s)`);
+  logger.info({ count: scheduledAgents.length }, "Synced agent cron schedules");
 }
 

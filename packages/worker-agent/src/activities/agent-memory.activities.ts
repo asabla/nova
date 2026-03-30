@@ -5,6 +5,7 @@ import { buildChatParams } from "@nova/worker-shared/models";
 import { agentMemoryVectors } from "@nova/shared/schemas";
 import { upsertPoints, searchVector, COLLECTIONS } from "@nova/worker-shared/qdrant";
 import { getDefaultEmbeddingModel } from "@nova/worker-shared/models";
+import { logger } from "@nova/worker-shared/logger";
 
 /**
  * Generate an embedding for the given text via LiteLLM /embeddings endpoint.
@@ -59,7 +60,7 @@ export async function embedAndStoreMemory(input: {
       metadata: input.metadata ?? null,
       createdAt: new Date().toISOString(),
     },
-  }]).catch((err) => console.warn("[qdrant] Failed to upsert agent memory:", err));
+  }]).catch((err) => logger.warn({ err }, "[qdrant] Failed to upsert agent memory"));
 
   return { id: row.id };
 }
@@ -103,7 +104,7 @@ export async function searchSemanticMemory(input: {
       metadata: null,
     }));
   } catch (err) {
-    console.warn("[qdrant] Agent memory search failed, returning empty:", err);
+    logger.warn({ err }, "[qdrant] Agent memory search failed, returning empty");
     return [];
   }
 }

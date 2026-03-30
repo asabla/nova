@@ -2,6 +2,7 @@ import { db } from "../lib/db";
 import { messages, messageAttachments, messageRatings, messageNotes, conversations, files } from "@nova/shared/schemas";
 import { eq, and, isNull, asc, sql, inArray } from "drizzle-orm";
 import { TASK_QUEUES } from "@nova/shared/constants";
+import { logger } from "../lib/logger";
 import { parsePagination, buildPaginatedResponse, type PaginationInput } from "@nova/shared/utils";
 import { syncMessageUpsert, syncMessageDelete } from "../lib/qdrant-sync";
 import { getTemporalClient } from "../lib/temporal";
@@ -128,7 +129,7 @@ export async function createMessage(orgId: string, data: {
           args: [{ messageId: message.id, orgId }],
         }),
       )
-      .catch((err) => console.error("[message] Failed to start embedding workflow:", err));
+      .catch((err) => logger.error({ err }, "[message] Failed to start embedding workflow"));
   }
 
   return message;
@@ -183,7 +184,7 @@ export async function completeStreamingMessage(orgId: string, messageId: string,
           args: [{ messageId: message.id, orgId }],
         }),
       )
-      .catch((err) => console.error("[message] Failed to start embedding workflow:", err));
+      .catch((err) => logger.error({ err }, "[message] Failed to start embedding workflow"));
   }
 
   return message;
@@ -245,7 +246,7 @@ export async function rateMessage(orgId: string, messageId: string, userId: stri
 
     // Dispatch eval on thumbs-down
     if (rating === -1) {
-      dispatchEvalForRating(orgId, messageId).catch(() => {});
+      dispatchEvalForRating(orgId, messageId).catch((err) => logger.warn({ err, orgId, messageId }, "[eval] dispatch failed"));
     }
     return result[0];
   }
@@ -260,7 +261,7 @@ export async function rateMessage(orgId: string, messageId: string, userId: stri
 
   // Dispatch eval on thumbs-down
   if (rating === -1) {
-    dispatchEvalForRating(orgId, messageId).catch(() => {});
+    dispatchEvalForRating(orgId, messageId).catch((err) => logger.warn({ err, orgId, messageId }, "[eval] dispatch failed"));
   }
   return result[0];
 }

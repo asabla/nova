@@ -2,6 +2,7 @@ import { db } from "../lib/db";
 import { files } from "@nova/shared/schema";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { TASK_QUEUES } from "@nova/shared/constants";
+import { logger } from "../lib/logger";
 import { getUploadUrl, getDownloadUrl, deleteObject } from "../lib/minio";
 import { parsePagination, buildPaginatedResponse, type PaginationInput } from "@nova/shared/utils";
 import { env } from "../lib/env";
@@ -142,5 +143,5 @@ function triggerFileIngestion(file: { id: string; orgId: string; contentType: st
         args: [{ fileId: file.id, orgId: file.orgId }],
       }),
     )
-    .catch((err) => console.error("[file] Failed to start ingestion workflow:", err));
+    .catch((err) => logger.error({ err }, "[file] Failed to start ingestion workflow"));
 }

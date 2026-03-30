@@ -1,4 +1,5 @@
 import type TreeSitter from "web-tree-sitter";
+import { logger } from "@nova/worker-shared/logger";
 
 /** Extension → language name mapping */
 const EXTENSION_MAP: Record<string, string> = {
@@ -84,7 +85,7 @@ export async function loadGrammar(language: string): Promise<TreeSitter.Language
     loadedGrammars.set(language, grammar);
     return grammar;
   } catch (err) {
-    console.warn(`[tree-sitter] Failed to load WASM grammar for ${language}:`, err);
+    logger.warn({ err, language }, "[tree-sitter] Failed to load WASM grammar");
     return null;
   }
 }

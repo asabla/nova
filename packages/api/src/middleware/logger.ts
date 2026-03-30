@@ -1,4 +1,5 @@
 import { createMiddleware } from "hono/factory";
+import { logger as pinoLogger } from "../lib/logger";
 
 export const logger = () =>
   createMiddleware(async (c, next) => {
@@ -10,15 +11,12 @@ export const logger = () =>
     const path = c.req.path;
     const requestId = c.get("requestId") ?? "-";
 
-    console.log(
-      JSON.stringify({
-        level: status >= 500 ? "error" : status >= 400 ? "warn" : "info",
-        requestId,
-        method,
-        path,
-        status,
-        duration,
-        ts: new Date().toISOString(),
-      }),
-    );
+    const logData = { requestId, method, path, status, duration };
+    if (status >= 500) {
+      pinoLogger.error(logData, "request completed");
+    } else if (status >= 400) {
+      pinoLogger.warn(logData, "request completed");
+    } else {
+      pinoLogger.info(logData, "request completed");
+    }
   });
