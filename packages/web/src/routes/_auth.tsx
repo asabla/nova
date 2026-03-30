@@ -11,16 +11,11 @@ import { authClient } from "../hooks/useAuth";
 import { setActiveOrgId } from "../lib/api";
 
 export const Route = createFileRoute("/_auth")({
-  beforeLoad: async () => {
-    // Check for org switch via URL parameter (used by admin portal "Open in App")
-    const urlParams = new URLSearchParams(window.location.search);
-    const orgParam = urlParams.get("org");
-    if (orgParam) {
-      // Clean up the URL immediately
-      urlParams.delete("org");
-      const cleanUrl = urlParams.toString() ? `${window.location.pathname}?${urlParams}` : window.location.pathname;
-      window.history.replaceState({}, "", cleanUrl);
-    }
+  validateSearch: (search: Record<string, unknown>) => ({
+    org: (search.org as string) ?? undefined,
+  }),
+  beforeLoad: async ({ search }) => {
+    const orgParam = search.org;
 
     const { session, setSession, activeOrgId, initOrg } = useAuthStore.getState();
     if (!session) {
@@ -42,6 +37,8 @@ export const Route = createFileRoute("/_auth")({
       useAuthStore.setState((state) => ({
         user: state.user ? { ...state.user, role: state.user.role ?? "org-admin" } : state.user,
       }));
+      // Clean the URL
+      window.history.replaceState({}, "", window.location.pathname);
     } else if (!activeOrgId || !useAuthStore.getState().user?.role) {
       // Normal flow — let initOrg handle it
       await initOrg();
