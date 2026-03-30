@@ -4,7 +4,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { requestId } from "./middleware/request-id";
 import { logger } from "./middleware/logger";
 import { errorHandler } from "./middleware/error-handler";
-import { rateLimiter } from "./middleware/rate-limit";
+import { rateLimiter, authRateLimiter, webhookRateLimiter } from "./middleware/rate-limit";
 import { authMiddleware } from "./middleware/auth";
 import { orgScope } from "./middleware/org-scope";
 import { roleResolver } from "./middleware/role-resolver";
@@ -79,7 +79,10 @@ app.use("*", requestId());
 // 5. Logger
 app.use("*", logger());
 
-// 6. Public routes
+// 6. Public routes (with stricter rate limits)
+app.use("/api/auth/*", authRateLimiter());
+app.use("/api/sso/*", authRateLimiter());
+app.use("/api/webhooks/*", webhookRateLimiter());
 app.route("/api/auth", authRoutes);
 app.route("/health", healthRoutes);
 app.route("/api/sso/oauth", ssoOAuthRoutes);

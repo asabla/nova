@@ -19,4 +19,14 @@ export const RATE_LIMITS = {
     maxRequests: 20,
     windowSeconds: 60,
   },
+  /** Stricter limit for auth endpoints (login, register, password reset, MFA) */
+  AUTH: {
+    maxRequests: 10,
+    windowSeconds: 60,
+  },
+  /** Stricter limit for webhook endpoints */
+  WEBHOOKS: {
+    maxRequests: 60,
+    windowSeconds: 60,
+  },
 } as const;
