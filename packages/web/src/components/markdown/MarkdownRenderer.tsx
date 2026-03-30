@@ -487,6 +487,33 @@ function linkifyYouTubeTimestamps(text: string, fallbackVideoId?: string): strin
 }
 
 /**
+ * Fix malformed code fences where the closing ``` is on the same line as content.
+ * Models sometimes produce `{"type":"widget",...}``` ` instead of putting ``` on its own line.
+ * Only applies inside widget/excalidraw fences to avoid breaking regular code blocks.
+ */
+function fixInlineClosingFences(text: string): string {
+  const lines = text.split("\n");
+  const result: string[] = [];
+  let inTargetFence = false;
+
+  for (const line of lines) {
+    if (/^```(?:widget|excalidraw)\s*$/.test(line)) {
+      inTargetFence = true;
+      result.push(line);
+    } else if (inTargetFence && !line.startsWith("```") && line.endsWith("```") && line.length > 3) {
+      result.push(line.slice(0, -3));
+      result.push("```");
+      inTargetFence = false;
+    } else {
+      if (line.startsWith("```")) inTargetFence = false;
+      result.push(line);
+    }
+  }
+
+  return result.join("\n");
+}
+
+/**
  * Detect large blocks of CSV-like content (many comma-separated lines not in a code fence)
  * and wrap them in ```csv fences so the CsvTable renderer handles them with pagination.
  */
@@ -602,6 +629,8 @@ export function MarkdownRenderer({ content, youtubeVideoId }: MarkdownRendererPr
       if (youtubeVideoId) {
         text = enrichTimelineWidgets(text, youtubeVideoId);
       }
+      // Fix malformed code fences where closing ``` is on the same line as content
+      text = fixInlineClosingFences(text);
       // Auto-detect and wrap large inline CSV blocks for paginated rendering
       text = wrapLargeCsvBlocks(text);
       // If content is still extremely large after CSV wrapping, truncate the non-fenced parts
