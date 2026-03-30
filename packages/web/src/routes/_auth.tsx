@@ -8,9 +8,22 @@ import { useUIStore } from "../stores/ui.store";
 import { useTheme } from "../hooks/useTheme";
 import { useWebSocket } from "../hooks/useWebSocket";
 import { authClient } from "../hooks/useAuth";
+import { setActiveOrgId } from "../lib/api";
 
 export const Route = createFileRoute("/_auth")({
   beforeLoad: async () => {
+    // Check for org switch via URL parameter (used by admin portal "Open in App")
+    const urlParams = new URLSearchParams(window.location.search);
+    const orgParam = urlParams.get("org");
+    if (orgParam) {
+      setActiveOrgId(orgParam);
+      useAuthStore.getState().setActiveOrg(orgParam);
+      // Clean up the URL
+      urlParams.delete("org");
+      const cleanUrl = urlParams.toString() ? `${window.location.pathname}?${urlParams}` : window.location.pathname;
+      window.history.replaceState({}, "", cleanUrl);
+    }
+
     const { session, setSession, activeOrgId, initOrg } = useAuthStore.getState();
     if (!session) {
       // Try to restore session from cookie
