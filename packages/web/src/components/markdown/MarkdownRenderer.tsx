@@ -501,8 +501,14 @@ function fixInlineClosingFences(text: string): string {
       inTargetFence = true;
       result.push(line);
     } else if (inTargetFence && !line.startsWith("```") && line.endsWith("```") && line.length > 3) {
+      // Case 1: content}```  →  content}\n```
       result.push(line.slice(0, -3));
       result.push("```");
+      inTargetFence = false;
+    } else if (inTargetFence && line.startsWith("```") && line.length > 3 && !/^```\w/.test(line)) {
+      // Case 2: ```## Heading  →  ```\n## Heading  (closing fence merged with next content)
+      result.push("```");
+      result.push(line.slice(3));
       inTargetFence = false;
     } else {
       if (line.startsWith("```")) inTargetFence = false;
