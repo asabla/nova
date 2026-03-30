@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { CreditCard, Check, Zap, Building2, Crown, ArrowUpRight } from "lucide-react";
+import { CreditCard, Check, Zap, Building2, Crown, ArrowUpRight, Receipt, ExternalLink } from "lucide-react";
 import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
@@ -83,7 +83,13 @@ function BillingPage() {
 
   const { data: paymentMethod } = useQuery({
     queryKey: ["payment-method"],
-    queryFn: () => api.get<any>("/api/org/billing/payment-method"),
+    queryFn: () => api.get<{ data: any }>("/api/org/billing/payment-method").then((r) => r.data),
+    retry: false,
+  });
+
+  const { data: invoices } = useQuery({
+    queryKey: ["billing-invoices"],
+    queryFn: () => api.get<{ data: any[] }>("/api/org/billing/invoices").then((r) => r.data),
     retry: false,
   });
 
@@ -96,6 +102,14 @@ function BillingPage() {
       toast(t("admin.planUpdated", { defaultValue: "Plan updated" }), "success");
     },
     onError: (err: any) => toast(err.message ?? t("admin.planUpdateFailed", { defaultValue: "Failed to update plan" }), "error"),
+  });
+
+  const openPortal = useMutation({
+    mutationFn: () => api.post<{ url: string }>("/api/org/billing/portal"),
+    onSuccess: (data) => {
+      if (data.url) window.location.href = data.url;
+    },
+    onError: (err: any) => toast(err.message ?? t("admin.portalFailed", { defaultValue: "Failed to open billing portal" }), "error"),
   });
 
   return (
@@ -200,7 +214,7 @@ function BillingPage() {
         })}
       </div>
 
-      {/* Billing Details */}
+      {/* Payment Method */}
       <div className="p-6 rounded-xl bg-surface-secondary border border-border">
         <h3 className="text-sm font-medium text-text mb-4">{t("admin.paymentMethod", { defaultValue: "Payment Method" })}</h3>
         {org?.billingCustomerId ? (
@@ -210,9 +224,9 @@ function BillingPage() {
               <div>
                 {paymentMethod?.last4 ? (
                   <>
-                    <p className="text-sm text-text">**** **** **** {paymentMethod.last4}</p>
+                    <p className="text-sm text-text capitalize">{paymentMethod.brand} **** {paymentMethod.last4}</p>
                     <p className="text-xs text-text-tertiary">
-                      {t("admin.expires", { defaultValue: "Expires" })} {paymentMethod.expMonth}/{paymentMethod.expYear}
+                      {t("admin.expires", { defaultValue: "Expires" })} {String(paymentMethod.expMonth).padStart(2, "0")}/{paymentMethod.expYear}
                     </p>
                   </>
                 ) : (
@@ -220,19 +234,64 @@ function BillingPage() {
                 )}
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => toast(t("admin.paymentComingSoon", { defaultValue: "Payment method management coming soon" }), "info")}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openPortal.mutate()}
+              loading={openPortal.isPending}
+            >
               {t("admin.update", { defaultValue: "Update" })}
             </Button>
           </div>
         ) : (
           <div className="text-center py-4">
             <p className="text-sm text-text-tertiary">{t("admin.noPaymentMethod", { defaultValue: "No payment method on file" })}</p>
-            <Button variant="secondary" size="sm" className="mt-2" onClick={() => toast(t("admin.paymentComingSoon", { defaultValue: "Payment method management coming soon" }), "info")}>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-2"
+              onClick={() => openPortal.mutate()}
+              loading={openPortal.isPending}
+            >
               {t("admin.addPaymentMethod", { defaultValue: "Add Payment Method" })}
             </Button>
           </div>
         )}
       </div>
+
+      {/* Invoices */}
+      {invoices && invoices.length > 0 && (
+        <div className="p-6 rounded-xl bg-surface-secondary border border-border">
+          <h3 className="text-sm font-medium text-text mb-4">{t("admin.invoiceHistory", { defaultValue: "Invoice History" })}</h3>
+          <div className="space-y-2">
+            {invoices.map((inv: any) => (
+              <div key={inv.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                <div className="flex items-center gap-3">
+                  <Receipt className="h-4 w-4 text-text-tertiary" aria-hidden="true" />
+                  <div>
+                    <p className="text-sm text-text">{inv.number}</p>
+                    <p className="text-xs text-text-tertiary">{new Date(inv.date).toLocaleDateString()}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-text">
+                    ${(inv.amountCents / 100).toFixed(2)} {inv.currency.toUpperCase()}
+                  </span>
+                  <Badge variant={inv.status === "paid" ? "primary" : "default"} className="text-xs">
+                    {inv.status}
+                  </Badge>
+                  {inv.url && (
+                    <a href={inv.url} target="_blank" rel="noopener noreferrer" className="text-text-tertiary hover:text-text transition-colors">
+                      <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span className="sr-only">{t("admin.viewInvoice", { defaultValue: "View invoice" })}</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

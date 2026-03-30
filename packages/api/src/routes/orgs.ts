@@ -198,6 +198,22 @@ orgRoutes.post("/billing/portal", requireRole("org-admin"), async (c) => {
   return c.json(result);
 });
 
+// Billing - Get current payment method
+orgRoutes.get("/billing/payment-method", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  const { billingService } = await import("../services/billing.service");
+  const paymentMethod = await billingService.getPaymentMethod(orgId);
+  return c.json({ data: paymentMethod });
+});
+
+// Billing - Get invoice history
+orgRoutes.get("/billing/invoices", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  const { billingService } = await import("../services/billing.service");
+  const invoices = await billingService.getInvoices(orgId);
+  return c.json({ data: invoices });
+});
+
 // Members
 orgRoutes.get("/members", async (c) => {
   const orgId = c.get("orgId");
