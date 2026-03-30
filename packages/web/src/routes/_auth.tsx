@@ -35,19 +35,13 @@ export const Route = createFileRoute("/_auth")({
 
     if (orgParam) {
       // Explicit org switch from admin portal — force the org context
-      // Set it BEFORE initOrg so the x-org-id header is correct on API calls
-      setActiveOrgId(orgParam);
-      useAuthStore.getState().setActiveOrg(orgParam);
-      // Run initOrg to get role info, then force org back
-      // (initOrg may override the org to user's default — we override it back)
-      try {
-        await initOrg();
-      } catch {
-        // May fail if user has no profile in this org yet
-      }
-      // Force the org back regardless of what initOrg set
+      // Do NOT call initOrg() as it would override back to the user's default org
       setActiveOrgId(orgParam);
       useAuthStore.setState({ activeOrgId: orgParam });
+      // Set a default role so the app doesn't try to re-init
+      useAuthStore.setState((state) => ({
+        user: state.user ? { ...state.user, role: state.user.role ?? "org-admin" } : state.user,
+      }));
     } else if (!activeOrgId || !useAuthStore.getState().user?.role) {
       // Normal flow — let initOrg handle it
       await initOrg();
