@@ -26,6 +26,7 @@ const envSchema = z.object({
   BETTER_AUTH_URL: z.string().url(),
 
   CORS_ORIGINS: z.string().default("http://localhost:5173"),
+  ADMIN_CORS_ORIGIN: z.string().optional(),
 
   AZURE_AD_CLIENT_ID: z.string().optional(),
   AZURE_AD_CLIENT_SECRET: z.string().optional(),

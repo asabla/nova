@@ -26,7 +26,7 @@ export const adminApp = new Hono<AppContext>().basePath("/admin-api");
 
 // CORS — allow admin portal origins
 adminApp.use("*", cors({
-  origin: (env.ADMIN_CORS_ORIGIN ?? "http://localhost:5174,http://localhost:5173,http://localhost:3000").split(","),
+  origin: (env.ADMIN_CORS_ORIGIN ?? "http://localhost:5174,http://localhost:5173,http://localhost:3000").split(",").map((o) => o.trim()),
   credentials: true,
 }));
 

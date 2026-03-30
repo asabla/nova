@@ -72,7 +72,7 @@ app.use("*", secureHeaders());
 
 // 3. CORS
 app.use("*", cors({
-  origin: env.CORS_ORIGINS.split(","),
+  origin: env.CORS_ORIGINS.split(",").map((o) => o.trim()),
   credentials: true,
 }));
 
