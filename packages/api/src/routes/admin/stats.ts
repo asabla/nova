@@ -24,7 +24,7 @@ adminStatsRoutes.get("/", async (c) => {
 // Cross-org usage for billing
 adminStatsRoutes.get("/usage", async (c) => {
   const since = c.req.query("since");
-  const sinceDate = since ? new Date(since) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const sinceISO = since ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
   const usage = await db
     .select({
@@ -37,25 +37,25 @@ adminStatsRoutes.get("/usage", async (c) => {
       )`.mapWith(Number),
       conversationCount: sql<number>`(
         SELECT count(*) FROM conversations
-        WHERE org_id = ${organisations.id} AND created_at >= ${sinceDate}
+        WHERE org_id = ${organisations.id} AND created_at >= ${sinceISO}::timestamptz
       )`.mapWith(Number),
       messageCount: sql<number>`(
         SELECT count(*) FROM messages
-        WHERE org_id = ${organisations.id} AND created_at >= ${sinceDate}
+        WHERE org_id = ${organisations.id} AND created_at >= ${sinceISO}::timestamptz
       )`.mapWith(Number),
       totalTokens: sql<number>`(
         SELECT coalesce(sum(coalesce(token_count_prompt,0) + coalesce(token_count_completion,0)), 0)
         FROM messages
         WHERE org_id = ${organisations.id}
           AND sender_type = 'assistant'
-          AND created_at >= ${sinceDate}
+          AND created_at >= ${sinceISO}::timestamptz
       )`.mapWith(Number),
     })
     .from(organisations)
     .where(isNull(organisations.deletedAt))
     .orderBy(desc(sql`"messageCount"`));
 
-  return c.json({ since: sinceDate.toISOString(), data: usage });
+  return c.json({ since: sinceISO, data: usage });
 });
 
 // Platform metrics time-series (from usageStats collected by background worker)

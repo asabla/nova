@@ -209,16 +209,16 @@ adminOrgRoutes.patch("/:orgId/members/:userId/role", async (c) => {
 adminOrgRoutes.get("/:orgId/usage", async (c) => {
   const orgId = c.req.param("orgId");
   const since = c.req.query("since");
-  const sinceDate = since ? new Date(since) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const sinceISO = since ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
   const [usage] = await db.execute(sql`
     SELECT
-      (SELECT count(*) FROM conversations WHERE org_id = ${orgId} AND created_at >= ${sinceDate}) as conversations,
-      (SELECT count(*) FROM messages WHERE org_id = ${orgId} AND created_at >= ${sinceDate}) as messages,
-      (SELECT coalesce(sum(coalesce(token_count_prompt,0) + coalesce(token_count_completion,0)), 0) FROM messages WHERE org_id = ${orgId} AND sender_type = 'assistant' AND created_at >= ${sinceDate}) as tokens
+      (SELECT count(*) FROM conversations WHERE org_id = ${orgId} AND created_at >= ${sinceISO}::timestamptz) as conversations,
+      (SELECT count(*) FROM messages WHERE org_id = ${orgId} AND created_at >= ${sinceISO}::timestamptz) as messages,
+      (SELECT coalesce(sum(coalesce(token_count_prompt,0) + coalesce(token_count_completion,0)), 0) FROM messages WHERE org_id = ${orgId} AND sender_type = 'assistant' AND created_at >= ${sinceISO}::timestamptz) as tokens
   `);
 
-  return c.json({ since: sinceDate.toISOString(), ...usage });
+  return c.json({ since: sinceISO, ...usage });
 });
 
 // Remove member from org
