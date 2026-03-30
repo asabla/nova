@@ -177,7 +177,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
         thinkBuffer = combined;
       } else {
         thinkBuffer = "";
-        await publish(delta);
+        await publish(combined);
       }
     }
   }
