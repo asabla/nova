@@ -153,7 +153,7 @@ function BrandingPage() {
             <Image className="h-4 w-4 text-text-secondary" aria-hidden="true" />
             {t("admin.organizationLogo", { defaultValue: "Organization Logo" })}
           </h3>
-          <div className="flex items-start gap-4">
+          <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
             <div
               className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-border bg-surface overflow-hidden cursor-pointer hover:border-primary transition-colors"
               onClick={() => logoInputRef.current?.click()}
@@ -202,7 +202,7 @@ function BrandingPage() {
             <Palette className="h-4 w-4 text-text-secondary" aria-hidden="true" />
             {t("admin.primaryBrandColor", { defaultValue: "Primary Brand Color" })}
           </h3>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
             <input
               type="color"
               value={form.primaryColor}
@@ -214,10 +214,10 @@ function BrandingPage() {
               placeholder="#6366f1"
               value={form.primaryColor}
               onChange={(e) => updateField("primaryColor", e.target.value)}
-              className="flex-1 font-mono"
+              className="flex-1 min-w-0 font-mono"
             />
             <div
-              className="h-10 flex-1 rounded-lg border border-border"
+              className="h-10 flex-1 min-w-0 rounded-lg border border-border"
               style={{ backgroundColor: form.primaryColor }}
             />
           </div>

@@ -80,7 +80,7 @@ function DataRetentionPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-0 justify-between">
         <div className="flex items-center gap-3">
           <Database className="h-5 w-5 text-primary" aria-hidden="true" />
           <div>
@@ -168,18 +168,18 @@ function RetentionField({ label, description, value, onChange, min = 0 }: {
   const { t } = useTranslation();
 
   return (
-    <div className="flex items-center justify-between p-4 rounded-xl bg-surface-secondary border border-border">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-xl bg-surface-secondary border border-border gap-2 sm:gap-0">
       <div className="flex-1">
         <p className="text-sm font-medium text-text">{label}</p>
         <p className="text-xs text-text-tertiary mt-0.5">{description}</p>
       </div>
-      <div className="flex items-center gap-2 ml-4">
+      <div className="flex items-center gap-2 sm:ml-4">
         <Input
           type="number"
           value={value}
           onChange={(e) => onChange(Math.max(min, Number(e.target.value)))}
           min={min}
-          className="w-20 h-8 text-right"
+          className="w-16 sm:w-20 h-8 text-right"
           aria-label={label}
         />
         <span className="text-xs text-text-tertiary w-10">{t("admin.days", { defaultValue: "days" })}</span>

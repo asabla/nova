@@ -185,7 +185,7 @@ function SearchPage() {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+      <div className="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-3 sm:space-y-4">
         {/* Header */}
         <div className="flex items-center gap-3 mb-2">
           <Search className="h-5 w-5 text-primary" aria-hidden="true" />
@@ -194,7 +194,7 @@ function SearchPage() {
 
         {/* Search Input */}
         <div className="relative input-glow">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-text-tertiary" aria-hidden="true" />
+          <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-text-tertiary" aria-hidden="true" />
           <input
             type="text"
             value={query}
@@ -205,9 +205,9 @@ function SearchPage() {
             )}
             aria-label={t("search.placeholder", "Search conversations, messages, agents, knowledge, files...")}
             autoFocus
-            className="w-full pl-12 pr-24 py-3 rounded-xl border border-border bg-surface text-text placeholder:text-text-tertiary text-sm focus:border-primary focus:outline-none"
+            className="w-full pl-10 sm:pl-12 pr-16 sm:pr-24 py-2.5 sm:py-3 rounded-xl border border-border bg-surface text-text placeholder:text-text-tertiary text-sm focus:border-primary focus:outline-none"
           />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          <div className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 sm:gap-1">
             {/* Semantic toggle */}
             <button
               onClick={() =>
@@ -248,7 +248,7 @@ function SearchPage() {
 
         {/* Filters Panel */}
         {showFilters && (
-          <div className="flex flex-wrap items-end gap-3 p-4 rounded-xl bg-surface-secondary border border-border">
+          <div className="flex flex-wrap items-end gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl bg-surface-secondary border border-border">
             <Input
               type="date"
               label={t("search.filter.from", "From")}
@@ -269,7 +269,7 @@ function SearchPage() {
               value={model}
               onChange={(e) => setModel(e.target.value)}
               placeholder="e.g. gpt-4"
-              className="h-8 w-32 px-2 text-xs"
+              className="h-8 w-full sm:w-32 px-2 text-xs"
             />
             <Input
               type="text"
@@ -277,7 +277,7 @@ function SearchPage() {
               value={participants}
               onChange={(e) => setParticipants(e.target.value)}
               placeholder="user-id-1,user-id-2"
-              className="h-8 w-48 px-2 text-xs"
+              className="h-8 w-full sm:w-48 px-2 text-xs"
             />
             {hasFilters && (
               <button
@@ -330,7 +330,7 @@ function SearchPage() {
 
                   {/* Results List */}
                   {!isLoading && (
-                    <div className="space-y-1">
+                    <div className="space-y-0.5 sm:space-y-1">
                       {searchMode === "semantic" && (
                         <div className="flex items-center gap-1.5 px-1 pb-1">
                           <Sparkles className="h-3 w-3 text-primary" aria-hidden="true" />
@@ -344,9 +344,9 @@ function SearchPage() {
                         <button
                           key={`${result.type}-${result.id}`}
                           onClick={() => handleResultClick(result)}
-                          className="w-full text-left p-3 rounded-xl hover:bg-surface-secondary border border-transparent hover:border-border transition-all group"
+                          className="w-full text-left p-2.5 sm:p-3 rounded-xl hover:bg-surface-secondary border border-transparent hover:border-border transition-all group"
                         >
-                          <div className="flex items-start gap-3">
+                          <div className="flex items-start gap-2 sm:gap-3">
                             <div className="mt-0.5">{typeIcon(result.type)}</div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
@@ -439,7 +439,7 @@ function SearchPage() {
                 "Conversations, messages, agents, knowledge, and files",
               )}
             </p>
-            <div className="flex items-center justify-center gap-4 mt-4 text-[10px] text-text-tertiary">
+            <div className="flex items-center justify-center gap-2 sm:gap-4 mt-3 sm:mt-4 text-[10px] text-text-tertiary">
               <span className="flex items-center gap-1">
                 <Sparkles className="h-3 w-3" /> {t("search.tip.semantic", "Use semantic mode for meaning-based search")}
               </span>

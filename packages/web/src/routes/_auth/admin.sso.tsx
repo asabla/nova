@@ -99,7 +99,7 @@ function AdminSsoPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-0 items-start sm:items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold text-text">{t("admin.ssoTitle", { defaultValue: "Single Sign-On" })}</h2>
           <p className="text-sm text-text-secondary mt-1">{t("admin.ssoDescription", { defaultValue: "Configure SSO providers for your organization." })}</p>
@@ -118,8 +118,8 @@ function AdminSsoPage() {
       ) : (
         <div className="space-y-3">
           {providers.map((provider) => (
-            <div key={provider.id} className="p-4 rounded-xl bg-surface-secondary border border-border">
-              <div className="flex items-center justify-between mb-3">
+            <div key={provider.id} className="p-3 sm:p-4 rounded-xl bg-surface-secondary border border-border">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2 sm:gap-0">
                 <div className="flex items-center gap-3">
                   <Shield className="h-5 w-5 text-primary" aria-hidden="true" />
                   <div>

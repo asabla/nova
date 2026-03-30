@@ -105,7 +105,7 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-surface px-4">
+    <div className="min-h-screen flex items-center justify-center bg-surface px-4 sm:px-6">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
@@ -113,7 +113,7 @@ function LoginPage() {
               <Sparkles className="h-6 w-6 text-primary" />
             </div>
           </div>
-          <h1 className="text-xl font-bold text-text">{t("auth.signIn")}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-text">{t("auth.signIn")}</h1>
           <p className="text-sm text-text-secondary mt-1">{t("auth.signInDescription")}</p>
         </div>
 
@@ -122,7 +122,7 @@ function LoginPage() {
           <button
             onClick={() => handleSSO("microsoft")}
             disabled={ssoLoading !== null}
-            className="w-full flex items-center justify-center gap-2 h-10 rounded-lg border border-border bg-surface text-sm text-text hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-1.5 sm:gap-2 h-9 sm:h-10 rounded-lg border border-border bg-surface text-xs sm:text-sm text-text hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {ssoLoading === "microsoft" ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -134,7 +134,7 @@ function LoginPage() {
           <button
             onClick={() => handleSSO("google")}
             disabled={ssoLoading !== null}
-            className="w-full flex items-center justify-center gap-2 h-10 rounded-lg border border-border bg-surface text-sm text-text hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-1.5 sm:gap-2 h-9 sm:h-10 rounded-lg border border-border bg-surface text-xs sm:text-sm text-text hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {ssoLoading === "google" ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -146,7 +146,7 @@ function LoginPage() {
           <button
             onClick={() => handleSSO("github")}
             disabled={ssoLoading !== null}
-            className="w-full flex items-center justify-center gap-2 h-10 rounded-lg border border-border bg-surface text-sm text-text hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-1.5 sm:gap-2 h-9 sm:h-10 rounded-lg border border-border bg-surface text-xs sm:text-sm text-text hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {ssoLoading === "github" ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -167,7 +167,7 @@ function LoginPage() {
         <div className="flex gap-1 p-1 bg-surface-secondary rounded-lg w-fit mx-auto mb-4">
           <button
             onClick={() => setMode("password")}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+            className={`px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-medium rounded-md transition-colors ${
               mode === "password" ? "bg-surface text-text shadow-sm" : "text-text-tertiary hover:text-text"
             }`}
           >
@@ -175,7 +175,7 @@ function LoginPage() {
           </button>
           <button
             onClick={() => setMode("magic-link")}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+            className={`px-2.5 sm:px-3 py-1 text-xs sm:text-sm font-medium rounded-md transition-colors ${
               mode === "magic-link" ? "bg-surface text-text shadow-sm" : "text-text-tertiary hover:text-text"
             }`}
           >

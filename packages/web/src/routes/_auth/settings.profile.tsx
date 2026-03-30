@@ -34,7 +34,7 @@ const LANGUAGES = [
 function ProfileSkeleton() {
   return (
     <div className="space-y-6 animate-pulse">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 sm:gap-4">
         <div className="h-12 w-12 rounded-full bg-surface-secondary" />
         <div className="space-y-2">
           <div className="h-4 w-32 bg-surface-secondary rounded" />
@@ -156,11 +156,11 @@ function ProfileSettings() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 sm:gap-4">
         <Avatar name={profile?.displayName ?? profile?.name} src={avatarUrl || undefined} size="lg" />
         <div>
-          <p className="font-medium text-text">{profile?.displayName ?? profile?.name ?? "User"}</p>
-          <p className="text-sm text-text-secondary">{profile?.email}</p>
+          <p className="font-medium text-text text-sm sm:text-base">{profile?.displayName ?? profile?.name ?? "User"}</p>
+          <p className="text-xs sm:text-sm text-text-secondary">{profile?.email}</p>
         </div>
       </div>
 
