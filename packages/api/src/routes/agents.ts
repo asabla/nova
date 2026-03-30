@@ -60,7 +60,11 @@ const updateAgentSchema = z.object({
   isEnabled: z.boolean().optional(),
   toolApprovalMode: z.enum(["auto", "always-ask", "never"]).optional(),
   memoryScope: z.enum(["per-user", "per-conversation", "global"]).optional(),
-});
+  memoryLimitMb: z.number().int().positive().max(1024).nullable().optional(),
+  maxSteps: z.number().int().positive().optional(),
+  timeoutSeconds: z.number().int().positive().optional(),
+  starters: z.array(z.string()).optional(),
+}).passthrough();
 
 agentRoutes.patch("/:id", async (c) => {
   const orgId = c.get("orgId");
