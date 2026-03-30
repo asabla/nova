@@ -16,9 +16,7 @@ export const Route = createFileRoute("/_auth")({
     const urlParams = new URLSearchParams(window.location.search);
     const orgParam = urlParams.get("org");
     if (orgParam) {
-      setActiveOrgId(orgParam);
-      useAuthStore.getState().setActiveOrg(orgParam);
-      // Clean up the URL
+      // Clean up the URL immediately
       urlParams.delete("org");
       const cleanUrl = urlParams.toString() ? `${window.location.pathname}?${urlParams}` : window.location.pathname;
       window.history.replaceState({}, "", cleanUrl);
@@ -34,8 +32,31 @@ export const Route = createFileRoute("/_auth")({
         throw redirect({ to: "/login" });
       }
     }
-    // Ensure user has an org set up
-    if (!activeOrgId || !useAuthStore.getState().user?.role) {
+
+    if (orgParam) {
+      // Explicit org switch — set directly and re-init for role resolution
+      setActiveOrgId(orgParam);
+      useAuthStore.getState().setActiveOrg(orgParam);
+      // Fetch user's role in this org (if they have one)
+      try {
+        const res = await fetch("/api/auth/init", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json", "x-org-id": orgParam },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // Keep the orgParam, don't let init override it
+          useAuthStore.setState((state) => ({
+            activeOrgId: orgParam,
+            user: state.user ? { ...state.user, role: data.role ?? "member", displayName: data.displayName } : state.user,
+          }));
+        }
+      } catch {
+        // Non-critical — org switch still works, just no role info
+      }
+    } else if (!activeOrgId || !useAuthStore.getState().user?.role) {
+      // Normal flow — let initOrg handle it
       await initOrg();
     }
   },

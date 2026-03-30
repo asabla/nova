@@ -358,4 +358,39 @@ adminOrgRoutes.get("/:orgId/audit", async (c) => {
   return c.json({ data: result });
 });
 
+// Ensure the current admin user has a profile in this org (for "Open in App")
+adminOrgRoutes.post("/:orgId/ensure-access", async (c) => {
+  const adminId = c.get("userId");
+  const orgId = c.req.param("orgId");
+
+  // Check if admin already has a profile in this org
+  const [existing] = await db.select()
+    .from(userProfiles)
+    .where(and(eq(userProfiles.userId, adminId), eq(userProfiles.orgId, orgId), isNull(userProfiles.deletedAt)));
+
+  if (existing) {
+    return c.json({ ok: true, role: existing.role });
+  }
+
+  // Create an org-admin profile so the admin can access this org in the main app
+  const [novaUser] = await db.select({ email: users.email }).from(users).where(eq(users.id, adminId));
+  await db.insert(userProfiles).values({
+    userId: adminId,
+    orgId,
+    displayName: novaUser?.email?.split("@")[0] ?? "Admin",
+    role: "org-admin",
+  });
+
+  await writeAuditLog({
+    orgId,
+    actorId: adminId,
+    actorType: "user",
+    action: "admin.ensure_access",
+    resourceType: "org",
+    resourceId: orgId,
+  });
+
+  return c.json({ ok: true, role: "org-admin" });
+});
+
 export { adminOrgRoutes };

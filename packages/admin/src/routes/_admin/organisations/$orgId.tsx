@@ -78,15 +78,22 @@ function OrgDetailPage() {
             {org.setupCompletedAt && <span className="flex items-center gap-1 text-[10px]" style={{ color: "var(--color-accent-green)" }}><CheckCircle2 className="h-3 w-3" /> Setup complete</span>}
           </div>
         </div>
-        <a
-          href={`${import.meta.env.VITE_APP_URL ?? "http://localhost:5173"}?org=${orgId}`}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          onClick={async () => {
+            try {
+              // Ensure admin user has a profile in this org before opening
+              await adminApi.post(`/admin-api/orgs/${orgId}/ensure-access`);
+              const appUrl = import.meta.env.VITE_APP_URL ?? "http://localhost:5173";
+              window.open(`${appUrl}?org=${orgId}`, "_blank");
+            } catch {
+              toast("Failed to open in app", "error");
+            }
+          }}
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
           style={{ border: "1px solid var(--color-border-default)", color: "var(--color-text-secondary)" }}
         >
           Open in App <ExternalLink className="h-3.5 w-3.5" />
-        </a>
+        </button>
       </div>
 
       {/* Tabs */}
