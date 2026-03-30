@@ -341,12 +341,18 @@ authRoutes.post("/init", async (c) => {
     .where(and(eq(userProfiles.userId, novaUser.id), isNull(userProfiles.deletedAt)));
 
   if (existingProfiles.length > 0) {
-    // Fetch the user's role in this org
+    // If a specific org is requested (via x-org-id header), use that if user has access
+    const requestedOrgId = c.req.header("x-org-id");
+    const targetOrgId = (requestedOrgId && existingProfiles.some((p) => p.orgId === requestedOrgId))
+      ? requestedOrgId
+      : existingProfiles[0].orgId;
+
+    // Fetch the user's role in the target org
     const [profile] = await db
       .select({ role: userProfiles.role, displayName: userProfiles.displayName })
       .from(userProfiles)
-      .where(and(eq(userProfiles.userId, novaUser.id), eq(userProfiles.orgId, existingProfiles[0].orgId), isNull(userProfiles.deletedAt)));
-    return c.json({ orgId: existingProfiles[0].orgId, role: profile?.role ?? "member", displayName: profile?.displayName });
+      .where(and(eq(userProfiles.userId, novaUser.id), eq(userProfiles.orgId, targetOrgId), isNull(userProfiles.deletedAt)));
+    return c.json({ orgId: targetOrgId, role: profile?.role ?? "member", displayName: profile?.displayName });
   }
 
   // Create a personal org for the user

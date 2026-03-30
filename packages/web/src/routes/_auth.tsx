@@ -34,27 +34,20 @@ export const Route = createFileRoute("/_auth")({
     }
 
     if (orgParam) {
-      // Explicit org switch — set directly and re-init for role resolution
+      // Explicit org switch from admin portal — force the org context
+      // Set it BEFORE initOrg so the x-org-id header is correct on API calls
       setActiveOrgId(orgParam);
       useAuthStore.getState().setActiveOrg(orgParam);
-      // Fetch user's role in this org (if they have one)
+      // Run initOrg to get role info, then force org back
+      // (initOrg may override the org to user's default — we override it back)
       try {
-        const res = await fetch("/api/auth/init", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json", "x-org-id": orgParam },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          // Keep the orgParam, don't let init override it
-          useAuthStore.setState((state) => ({
-            activeOrgId: orgParam,
-            user: state.user ? { ...state.user, role: data.role ?? "member", displayName: data.displayName } : state.user,
-          }));
-        }
+        await initOrg();
       } catch {
-        // Non-critical — org switch still works, just no role info
+        // May fail if user has no profile in this org yet
       }
+      // Force the org back regardless of what initOrg set
+      setActiveOrgId(orgParam);
+      useAuthStore.setState({ activeOrgId: orgParam });
     } else if (!activeOrgId || !useAuthStore.getState().user?.role) {
       // Normal flow — let initOrg handle it
       await initOrg();
