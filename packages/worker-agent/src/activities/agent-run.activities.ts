@@ -106,7 +106,8 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
 
   const modelSettings: Record<string, unknown> = {};
   if (!dropSet.has("temperature")) modelSettings.temperature = input.temperature ?? 0.7;
-  if (!dropSet.has("max_tokens")) modelSettings.maxTokens = input.maxTokens ?? 4096;
+  // Always set maxTokens — for reasoning models the wrapper converts it to max_completion_tokens
+  modelSettings.maxTokens = input.maxTokens ?? 16384;
 
   const agent = new Agent({
     name: "nova-chat",
@@ -117,7 +118,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
   });
 
   // Convert message history to SDK protocol format
-  const sdkInput = toAgentInput(input.messageHistory);
+  let sdkInput = toAgentInput(input.messageHistory);
 
   let fullContent = "";
   let totalTokens = 0;
@@ -125,6 +126,11 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
   let outputTokens = 0;
   let steps = 0;
   const toolCallRecords: AgentRunResult["toolCallRecords"] = [];
+
+  // Continuation: minimum output tokens before considering auto-continuation
+  const CONTINUATION_THRESHOLD = 300;
+  const MAX_CONTINUATIONS = 5;
+  let continuationCount = 0;
 
   // Track active tool calls for timing
   const toolStartTimes = new Map<string, { name: string; startMs: number; args: Record<string, unknown> }>();
@@ -182,6 +188,13 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
     }
   }
 
+  // Outer continuation loop: after each run, check if the model stopped with
+  // substantial output. If so, inject the output as context and ask to continue.
+  // This ensures the model sees its own partial output and can decide to keep going.
+  let runLoop = true;
+  while (runLoop) {
+  runLoop = false; // default: single run
+
   try {
     const stream = await run(agent, sdkInput, {
       stream: true,
@@ -203,13 +216,18 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
           currentTurnHasToolCall = false;
           preToolContentLength = 0;
         }
-        // Log first few events for debugging
+        // Log first few events and response_done for debugging
         if (eventCount <= 3) {
           console.log(`[agent-run] event #${eventCount}: raw_model type=${data?.type} keys=${data ? Object.keys(data).join(",") : "null"}`);
+        }
+        if (data?.type === "response_done") {
+          const resp = data?.response;
+          console.log(`[agent-run] response_done: outputTokens=${resp?.usage?.outputTokens} inputTokens=${resp?.usage?.inputTokens} reasoningTokens=${resp?.usage?.outputTokensDetails?.reasoning_tokens} outputItems=${resp?.output?.length}`);
         }
         // output_text_delta events contain streaming text tokens
         if (data?.type === "output_text_delta" && data.delta) {
           fullContent += data.delta;
+
           // Only stream tokens if no tool call has been detected in this turn.
           // Pre-tool reasoning ("I need to search...") gets cleared when the
           // first tool_called event arrives.
@@ -241,12 +259,18 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
           const toolName = rawItem?.name ?? rawItem?.function?.name ?? "unknown";
 
           if (event.name === "tool_called") {
+            // continue_response is a continuation tool — the text before it IS
+            // the actual content, not pre-tool reasoning. Don't clear or suppress.
+            const isContinuation = toolName === "continue_response";
+
             // First tool call in this turn — discard any pre-tool reasoning
             // that was already streamed ("I need to search...", "Let me look up...")
-            if (!currentTurnHasToolCall && preToolContentLength > 0) {
+            if (!isContinuation && !currentTurnHasToolCall && preToolContentLength > 0) {
               await publishContentClear(input.streamChannelId, "tool_calls_detected");
             }
-            currentTurnHasToolCall = true;
+            if (!isContinuation) {
+              currentTurnHasToolCall = true;
+            }
 
             let parsedArgs: Record<string, unknown> = {};
             try {
@@ -264,9 +288,11 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
               args: parsedArgs,
             });
 
-            await publishToolStatus(input.streamChannelId, toolName, "running", {
-              args: parsedArgs,
-            });
+            if (!isContinuation) {
+              await publishToolStatus(input.streamChannelId, toolName, "running", {
+                args: parsedArgs,
+              });
+            }
           }
         }
 
@@ -287,11 +313,13 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
             durationMs,
           });
 
-          const summary = buildResultSummary(toolName, output);
-          await publishToolStatus(input.streamChannelId, toolName, "completed", {
-            resultSummary: summary,
-          });
-          steps++;
+          if (toolName !== "continue_response") {
+            const summary = buildResultSummary(toolName, output);
+            await publishToolStatus(input.streamChannelId, toolName, "completed", {
+              resultSummary: summary,
+            });
+            steps++;
+          }
         }
       }
     }
@@ -307,9 +335,10 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
 
     const usage = (stream as any).state?.usage;
     if (usage) {
-      inputTokens = usage.inputTokens ?? 0;
-      outputTokens = usage.outputTokens ?? 0;
-      totalTokens = usage.totalTokens ?? inputTokens + outputTokens;
+      // Accumulate tokens across continuation runs
+      inputTokens += usage.inputTokens ?? 0;
+      outputTokens += usage.outputTokens ?? 0;
+      totalTokens += usage.totalTokens ?? (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0);
     }
 
     // Prefer finalOutput from the SDK — it contains the clean final answer
@@ -319,9 +348,53 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
       const finalText = typeof finalOutput === "string"
         ? finalOutput
         : JSON.stringify(finalOutput);
-      if (finalText) {
+      if (finalText && (!fullContent || streamedContentLength === 0)) {
         fullContent = finalText;
       }
+    }
+
+    // ── Auto-continuation: if the model produced substantial output,
+    // inject it as context and tell it to continue.
+    // The model sees its own output and continues with the next section.
+    // Stops when: continuation produces very little (< threshold), or max reached.
+    const runOutputTokens = (usage?.outputTokens ?? 0);
+    const isSubstantialOutput = runOutputTokens >= CONTINUATION_THRESHOLD;
+    const shouldContinue = continuationCount === 0
+      ? isSubstantialOutput // first run: continue if substantial output
+      : isSubstantialOutput; // continuation run: continue if it produced substantial content (not just "ok" or "done")
+    if (
+      shouldContinue &&
+      continuationCount < MAX_CONTINUATIONS &&
+      steps === 0 // only auto-continue for pure text responses (no tool calls)
+    ) {
+      continuationCount++;
+      console.log(`[agent-run] auto-continuation #${continuationCount}: ${runOutputTokens} output tokens, injecting context`);
+
+      // Save the content accumulated so far before resetting for the next run
+      const previousContent = fullContent;
+
+      // Inject the current output as assistant message + assertive continuation prompt
+      sdkInput = toAgentInput([
+        ...input.messageHistory,
+        { role: "assistant", content: previousContent },
+        { role: "user", content: "Continue. Show the next section of your response. Do not repeat any content already shown above." },
+      ]);
+
+      // Keep previous content; ensure newline separator so continuation
+      // output doesn't merge with the last line (e.g. ``` + ## Heading)
+      fullContent = previousContent;
+      if (fullContent && !fullContent.endsWith("\n")) {
+        fullContent += "\n\n";
+        await publishToken(input.streamChannelId, "\n\n");
+      }
+
+      // Reset per-run state for the next iteration
+      currentTurnHasToolCall = false;
+      preToolContentLength = 0;
+      insideThinkBlock = false;
+      thinkBuffer = "";
+
+      runLoop = true; // trigger next iteration
     }
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
@@ -343,6 +416,8 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
       throw err;
     }
   }
+
+  } // end while (runLoop) continuation loop
 
   // Strip <think> reasoning blocks before returning
   fullContent = stripThinkBlocks(fullContent);

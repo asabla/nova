@@ -800,6 +800,26 @@ export function createQueryKnowledgeTool(orgId: string, collectionIds: string[])
   });
 }
 
+/**
+ * Continuation tool — allows the model to produce long responses in sections.
+ * When the model has more content to generate, it calls this tool to signal
+ * it needs another turn. The tool returns a simple continuation prompt.
+ * This is always included and cannot be filtered out by allowedTools.
+ */
+export const continueResponseTool = tool({
+  name: "continue_response",
+  description: "Call this when your response is not yet complete and you need to continue generating more content. Output your content first, then call this tool to get another turn for the next section. Use this for long responses like listing many items, generating multiple examples, or producing comprehensive documents.",
+  parameters: {
+    type: "object" as const,
+    properties: {},
+    required: [] as string[],
+    additionalProperties: false,
+  },
+  execute: async () => {
+    return "Continue your response from where you left off. Do not repeat content you already produced.";
+  },
+});
+
 /** Static built-in tools (no org context needed) */
 export const builtinTools = [webSearchTool, fetchUrlTool, invokeAgentTool, codeExecuteTool, readFileTool];
 
@@ -821,5 +841,7 @@ export function getBuiltinTools(orgId?: string, allowedTools?: string[] | null, 
   if (allowedTools && allowedTools.length > 0) {
     tools = tools.filter((t) => allowedTools.includes(t.name));
   }
+  // Always include continue_response — it enables multi-section output
+  tools.push(continueResponseTool);
   return tools;
 }
