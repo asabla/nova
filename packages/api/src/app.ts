@@ -59,6 +59,8 @@ import { superAdminRoutes } from "./routes/super-admin";
 import { customWorkerRoutes } from "./routes/custom-workers";
 import evalRoutes from "./routes/evals";
 import { workflowRoutes } from "./routes/workflows";
+import { metricsMiddleware } from "./middleware/metrics";
+import { registry } from "./lib/metrics";
 
 const app = new Hono<AppContext>();
 
@@ -80,12 +82,19 @@ app.use("*", requestId());
 // 5. Logger
 app.use("*", logger());
 
+// 5b. Prometheus metrics collection
+app.use("*", metricsMiddleware());
+
 // 6. Public routes (with stricter rate limits)
 app.use("/api/auth/*", authRateLimiter());
 app.use("/api/sso/*", authRateLimiter());
 app.use("/api/webhooks/*", webhookRateLimiter());
 app.route("/api/auth", authRoutes);
 app.route("/health", healthRoutes);
+app.get("/metrics", async (c) => {
+  const metrics = await registry.metrics();
+  return c.text(metrics, 200, { "Content-Type": registry.contentType });
+});
 app.route("/api/sso/oauth", ssoOAuthRoutes);
 app.route("/api/webhooks", webhookRoutes);
 
