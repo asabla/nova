@@ -34,6 +34,12 @@ const envSchema = z.object({
     .default("true")
     .transform((v) => v === "true" || v === "1"),
 
+  IMAGE_GENERATION_ENABLED: z
+    .enum(["true", "false", "1", "0"])
+    .default("false")
+    .transform((v) => v === "true" || v === "1"),
+  IMAGE_GENERATION_MODEL: z.string().default("gpt-image-1"),
+
   MINIO_ENDPOINT: z.string().default("http://minio:9000"),
   MINIO_ROOT_USER: z.string().default("minioadmin"),
   MINIO_ROOT_PASSWORD: z.string().default("minioadmin"),

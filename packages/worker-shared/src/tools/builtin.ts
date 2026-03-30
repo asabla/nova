@@ -13,6 +13,7 @@ import { db } from "../db";
 import { openai } from "../litellm";
 import { getDefaultChatModel, getDefaultEmbeddingModel } from "../models";
 import { COLLECTIONS, searchVector, scrollFullText, scrollFiltered } from "../qdrant";
+import { createImageGenerateTool } from "./image-generate";
 
 /**
  * Built-in tools extracted from agent-execution.activities.ts,
@@ -836,6 +837,9 @@ export function getBuiltinTools(orgId?: string, allowedTools?: string[] | null, 
     tools.push(createSearchWorkspaceTool(orgId));
     if (knowledgeCollectionIds && knowledgeCollectionIds.length > 0) {
       tools.push(createQueryKnowledgeTool(orgId, knowledgeCollectionIds));
+    }
+    if (process.env.IMAGE_GENERATION_ENABLED === "true" || process.env.IMAGE_GENERATION_ENABLED === "1") {
+      tools.push(createImageGenerateTool(orgId));
     }
   }
   if (allowedTools && allowedTools.length > 0) {
