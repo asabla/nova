@@ -1,14 +1,20 @@
 import { proxyActivities } from "@temporalio/workflow";
 import type * as activities from "../activities";
+import { RETRY_POLICIES } from "@nova/shared/constants";
 
 const {
   updateConnectorSyncStatus,
   updateConnectorSyncState,
-  syncRepoFiles,
 } = proxyActivities<typeof activities>({
   startToCloseTimeout: "30 minutes",
   heartbeatTimeout: "5 minutes",
-  retry: { maximumAttempts: 2 },
+  retry: RETRY_POLICIES.DATABASE,
+});
+
+const { syncRepoFiles } = proxyActivities<typeof activities>({
+  startToCloseTimeout: "30 minutes",
+  heartbeatTimeout: "5 minutes",
+  retry: RETRY_POLICIES.LONG_RUNNING,
 });
 
 export interface RepoSyncInput {

@@ -1,23 +1,37 @@
 import { proxyActivities, CancellationScope } from "@temporalio/workflow";
 import type * as researchAgentActivities from "../activities/research-agent.activities";
 import type * as deepResearchActivities from "../activities/deep-research.activities";
+import { RETRY_POLICIES } from "@nova/shared/constants";
 
-const { runResearchAgentLoop, persistResearchResult } =
+const { runResearchAgentLoop } =
   proxyActivities<typeof researchAgentActivities>({
     startToCloseTimeout: "30 minutes",
     heartbeatTimeout: "60 seconds",
-    retry: { maximumAttempts: 2 },
+    retry: RETRY_POLICIES.LONG_RUNNING,
+  });
+
+const { persistResearchResult } =
+  proxyActivities<typeof researchAgentActivities>({
+    startToCloseTimeout: "30 minutes",
+    heartbeatTimeout: "60 seconds",
+    retry: RETRY_POLICIES.DATABASE,
   });
 
 const {
   updateResearchStatus,
+} = proxyActivities<typeof deepResearchActivities>({
+  startToCloseTimeout: "30 seconds",
+  retry: RETRY_POLICIES.DATABASE,
+});
+
+const {
   publishResearchStatusActivity,
   publishResearchProgressActivity,
   publishResearchDoneActivity,
   publishResearchErrorActivity,
 } = proxyActivities<typeof deepResearchActivities>({
   startToCloseTimeout: "30 seconds",
-  retry: { maximumAttempts: 3 },
+  retry: RETRY_POLICIES.PUBLISH,
 });
 
 export interface ResearchAgentWorkflowInput {

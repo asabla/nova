@@ -32,6 +32,7 @@ import type {
   UserInteractionResponse,
   EffortLevel,
 } from "@nova/shared/types";
+import { RETRY_POLICIES } from "@nova/shared/constants";
 
 // ---------------------------------------------------------------------------
 // Effort-level → prompt instructions & token caps
@@ -253,41 +254,41 @@ const {
   notifyAgentCompletion,
 } = proxyActivities<typeof agentActivities>({
   startToCloseTimeout: "2 minutes",
-  retry: { maximumAttempts: 3 },
+  retry: RETRY_POLICIES.DATABASE,
 });
 
 const { executeAgentStepWithSDK } = proxyActivities<typeof agentStepActivities>({
   startToCloseTimeout: "2 minutes",
   heartbeatTimeout: "30 seconds",
-  retry: { maximumAttempts: 3 },
+  retry: RETRY_POLICIES.EXTERNAL,
 });
 
 // Longer timeout for research synthesis which can produce 16k+ tokens
 const { executeAgentStepWithSDK: executeResearchSynthesis } = proxyActivities<typeof agentStepActivities>({
   startToCloseTimeout: "10 minutes",
   heartbeatTimeout: "60 seconds",
-  retry: { maximumAttempts: 2 },
+  retry: RETRY_POLICIES.LONG_RUNNING,
 });
 
 const { runAgentLoop } = proxyActivities<typeof agentRunActivities>({
   startToCloseTimeout: "30 minutes",
   heartbeatTimeout: "60 seconds",
-  retry: { maximumAttempts: 3 },
+  retry: RETRY_POLICIES.LONG_RUNNING,
 });
 
 const { publishDone, updateWorkflowStatus } = proxyActivities<typeof smartChatActivities>({
   startToCloseTimeout: "10 seconds",
-  retry: { maximumAttempts: 2 },
+  retry: RETRY_POLICIES.PUBLISH,
 });
 
 const { assessTier, generateDAGPlan } = proxyActivities<typeof planningActivities>({
   startToCloseTimeout: "2 minutes",
-  retry: { maximumAttempts: 2 },
+  retry: RETRY_POLICIES.EXTERNAL,
 });
 
 const { summarizeContext } = proxyActivities<typeof contextActivities>({
   startToCloseTimeout: "1 minute",
-  retry: { maximumAttempts: 2 },
+  retry: RETRY_POLICIES.EXTERNAL,
 });
 
 const {
@@ -300,42 +301,48 @@ const {
   publishDoneActivity,
 } = proxyActivities<typeof streamActivities>({
   startToCloseTimeout: "10 seconds",
-  retry: { maximumAttempts: 2 },
+  retry: RETRY_POLICIES.PUBLISH,
 });
 
 const {
   persistResearchResult,
   persistRefinementResult,
   updateResearchStatus: updateResearchStatusActivity,
+} = proxyActivities<typeof researchPersistenceActivities>({
+  startToCloseTimeout: "30 seconds",
+  retry: RETRY_POLICIES.DATABASE,
+});
+
+const {
   publishResearchStatusActivity,
   publishResearchProgressActivity,
   publishResearchDoneActivity,
   publishResearchErrorActivity,
 } = proxyActivities<typeof researchPersistenceActivities>({
   startToCloseTimeout: "30 seconds",
-  retry: { maximumAttempts: 3 },
+  retry: RETRY_POLICIES.PUBLISH,
 });
 
 const { proxyWorkerActivity } = proxyActivities<typeof proxyWorkerActivities>({
   startToCloseTimeout: "30 minutes",
   heartbeatTimeout: "60 seconds",
-  retry: { maximumAttempts: 2 },
+  retry: RETRY_POLICIES.LONG_RUNNING,
 });
 
 const { resolveWorkerForAgent } = proxyActivities<typeof resolveWorkerActivities>({
   startToCloseTimeout: "10 seconds",
-  retry: { maximumAttempts: 2 },
+  retry: RETRY_POLICIES.EXTERNAL,
 });
 
 const { resolveWorkflowPrompts } = proxyActivities<typeof promptResolutionActivities>({
   startToCloseTimeout: "10 seconds",
-  retry: { maximumAttempts: 2 },
+  retry: RETRY_POLICIES.EXTERNAL,
 });
 
 import type * as notificationActivities from "../activities/notification.activities";
 const { notifyAgentCompleteActivity } = proxyActivities<typeof notificationActivities>({
   startToCloseTimeout: "15 seconds",
-  retry: { maximumAttempts: 2 },
+  retry: RETRY_POLICIES.PUBLISH,
 });
 
 // ---------------------------------------------------------------------------
@@ -1216,7 +1223,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
     const { runAgentLoop: runNodeAgentLoop } = proxyActivities<typeof agentRunActivities>({
       startToCloseTimeout: "30 minutes",
       heartbeatTimeout: "60 seconds",
-      retry: { maximumAttempts: 3 },
+      retry: RETRY_POLICIES.LONG_RUNNING,
       activityId: `runAgentLoop-${node.id}`,
     });
 

@@ -7,15 +7,28 @@ import {
 } from "@temporalio/workflow";
 import type * as activities from "../activities";
 import type { UserInteractionResponse } from "@nova/shared/types";
+import { RETRY_POLICIES } from "@nova/shared/constants";
 
 const {
   searchWeb,
   fetchPageContent,
   analyzeSource,
   generateResearchReport,
-  updateResearchStatus,
   queryKnowledgeCollections,
   fetchFileContents,
+} = proxyActivities<typeof activities>({
+  startToCloseTimeout: "5 minutes",
+  retry: RETRY_POLICIES.EXTERNAL,
+});
+
+const {
+  updateResearchStatus,
+} = proxyActivities<typeof activities>({
+  startToCloseTimeout: "5 minutes",
+  retry: RETRY_POLICIES.DATABASE,
+});
+
+const {
   publishResearchStatusActivity,
   publishResearchSourceActivity,
   publishResearchProgressActivity,
@@ -23,14 +36,14 @@ const {
   publishResearchErrorActivity,
 } = proxyActivities<typeof activities>({
   startToCloseTimeout: "5 minutes",
-  retry: { maximumAttempts: 3 },
+  retry: RETRY_POLICIES.PUBLISH,
 });
 
 const {
   publishInteractionRequestActivity,
 } = proxyActivities<typeof activities>({
   startToCloseTimeout: "10 seconds",
-  retry: { maximumAttempts: 2 },
+  retry: RETRY_POLICIES.PUBLISH,
 });
 
 // --- Signals ---

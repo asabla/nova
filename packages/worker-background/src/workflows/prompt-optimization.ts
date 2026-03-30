@@ -1,14 +1,21 @@
 import { proxyActivities } from "@temporalio/workflow";
 import type * as activities from "../activities";
+import { RETRY_POLICIES } from "@nova/shared/constants";
 
 const {
   analyzeLowScoringOutputs,
-  generateImprovedPrompt,
   createOptimizationRun,
   resolveSystemPromptId,
 } = proxyActivities<typeof activities>({
   startToCloseTimeout: "10 minutes",
-  retry: { maximumAttempts: 2 },
+  retry: RETRY_POLICIES.DATABASE,
+});
+
+const {
+  generateImprovedPrompt,
+} = proxyActivities<typeof activities>({
+  startToCloseTimeout: "10 minutes",
+  retry: RETRY_POLICIES.EXTERNAL,
 });
 
 export interface PromptOptimizationInput {

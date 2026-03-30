@@ -1,13 +1,20 @@
 import { proxyActivities } from "@temporalio/workflow";
 import type * as activities from "../activities";
+import { RETRY_POLICIES } from "@nova/shared/constants";
 
 const {
   getConversationMessages,
-  generateSummary,
   updateConversationTitle,
 } = proxyActivities<typeof activities>({
   startToCloseTimeout: "2 minutes",
-  retry: { maximumAttempts: 3 },
+  retry: RETRY_POLICIES.DATABASE,
+});
+
+const {
+  generateSummary,
+} = proxyActivities<typeof activities>({
+  startToCloseTimeout: "2 minutes",
+  retry: RETRY_POLICIES.EXTERNAL,
 });
 
 export interface ConversationSummaryInput {

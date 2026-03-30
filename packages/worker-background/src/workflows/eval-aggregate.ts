@@ -1,9 +1,10 @@
 import { proxyActivities } from "@temporalio/workflow";
 import type * as activities from "../activities";
+import { RETRY_POLICIES } from "@nova/shared/constants";
 
 const { computeAggregates, getOrgsWithEvalsEnabled } = proxyActivities<typeof activities>({
   startToCloseTimeout: "10 minutes",
-  retry: { maximumAttempts: 2 },
+  retry: RETRY_POLICIES.DATABASE,
 });
 
 /**

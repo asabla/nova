@@ -1,5 +1,6 @@
 import { proxyActivities } from "@temporalio/workflow";
 import type * as activities from "../activities";
+import { RETRY_POLICIES } from "@nova/shared/constants";
 
 const {
   cleanupExpiredSessions,
@@ -8,7 +9,7 @@ const {
   cleanupSoftDeletedRecords,
 } = proxyActivities<typeof activities>({
   startToCloseTimeout: "30 minutes",
-  retry: { maximumAttempts: 2 },
+  retry: RETRY_POLICIES.LONG_RUNNING,
 });
 
 export async function scheduledCleanupWorkflow(): Promise<{

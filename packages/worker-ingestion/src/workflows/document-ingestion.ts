@@ -1,12 +1,15 @@
 import { proxyActivities } from "@temporalio/workflow";
 import type * as activities from "../activities";
+import { RETRY_POLICIES } from "@nova/shared/constants";
 
-const {
-  ingestDocument,
-  updateDocumentStatus,
-} = proxyActivities<typeof activities>({
+const { updateDocumentStatus } = proxyActivities<typeof activities>({
   startToCloseTimeout: "10 minutes",
-  retry: { maximumAttempts: 3 },
+  retry: RETRY_POLICIES.DATABASE,
+});
+
+const { ingestDocument } = proxyActivities<typeof activities>({
+  startToCloseTimeout: "10 minutes",
+  retry: RETRY_POLICIES.EXTERNAL,
 });
 
 export interface DocumentIngestionInput {

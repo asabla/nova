@@ -13,14 +13,15 @@ import type {
   UserInteractionRequest,
   UserInteractionResponse,
 } from "@nova/shared/types";
+import { RETRY_POLICIES } from "@nova/shared/constants";
 const { executeAgentStepWithSDK } = proxyActivities<typeof agentStepActivities>({
   startToCloseTimeout: "3 minutes",
-  retry: { maximumAttempts: 3 },
+  retry: RETRY_POLICIES.EXTERNAL,
 });
 
 const { executeToolCall } = proxyActivities<typeof agentActivities>({
   startToCloseTimeout: "2 minutes",
-  retry: { maximumAttempts: 3 },
+  retry: RETRY_POLICIES.DATABASE,
 });
 
 const {
@@ -28,7 +29,7 @@ const {
   publishInteractionRequestActivity,
 } = proxyActivities<typeof streamActivities>({
   startToCloseTimeout: "10 seconds",
-  retry: { maximumAttempts: 2 },
+  retry: RETRY_POLICIES.PUBLISH,
 });
 
 // --- Signals ---

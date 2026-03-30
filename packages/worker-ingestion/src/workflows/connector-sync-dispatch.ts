@@ -1,10 +1,11 @@
 import { proxyActivities, startChild } from "@temporalio/workflow";
 import type * as activities from "../activities";
+import { RETRY_POLICIES } from "@nova/shared/constants";
 import { connectorSyncWorkflow } from "./connector-sync.js";
 
 const { findConnectorsDueForSync } = proxyActivities<typeof activities>({
   startToCloseTimeout: "2 minutes",
-  retry: { maximumAttempts: 2 },
+  retry: RETRY_POLICIES.DATABASE,
 });
 
 /**

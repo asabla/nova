@@ -1,13 +1,20 @@
 import { proxyActivities, startChild } from "@temporalio/workflow";
 import type * as activities from "../activities";
+import { RETRY_POLICIES } from "@nova/shared/constants";
 
 const {
   enqueueEval,
-  runEval,
   checkOptimizationTrigger,
 } = proxyActivities<typeof activities>({
   startToCloseTimeout: "5 minutes",
-  retry: { maximumAttempts: 2 },
+  retry: RETRY_POLICIES.DATABASE,
+});
+
+const {
+  runEval,
+} = proxyActivities<typeof activities>({
+  startToCloseTimeout: "5 minutes",
+  retry: RETRY_POLICIES.EXTERNAL,
 });
 
 export interface EvalWorkflowInput {

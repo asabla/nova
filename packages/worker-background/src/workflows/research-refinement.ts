@@ -1,12 +1,25 @@
 import { proxyActivities, CancellationScope } from "@temporalio/workflow";
 import type * as activities from "../activities";
+import { RETRY_POLICIES } from "@nova/shared/constants";
 
 const {
   searchWeb,
   fetchPageContent,
   analyzeSource,
   generateResearchReport,
+} = proxyActivities<typeof activities>({
+  startToCloseTimeout: "5 minutes",
+  retry: RETRY_POLICIES.EXTERNAL,
+});
+
+const {
   updateResearchStatus,
+} = proxyActivities<typeof activities>({
+  startToCloseTimeout: "5 minutes",
+  retry: RETRY_POLICIES.DATABASE,
+});
+
+const {
   publishResearchStatusActivity,
   publishResearchSourceActivity,
   publishResearchProgressActivity,
@@ -14,7 +27,7 @@ const {
   publishResearchErrorActivity,
 } = proxyActivities<typeof activities>({
   startToCloseTimeout: "5 minutes",
-  retry: { maximumAttempts: 3 },
+  retry: RETRY_POLICIES.PUBLISH,
 });
 
 export interface ResearchRefinementInput {

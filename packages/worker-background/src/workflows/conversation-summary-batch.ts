@@ -1,9 +1,10 @@
 import { proxyActivities, executeChild } from "@temporalio/workflow";
 import type * as activities from "../activities";
+import { RETRY_POLICIES } from "@nova/shared/constants";
 
 const { getUnsummarizedConversations } = proxyActivities<typeof activities>({
   startToCloseTimeout: "1 minute",
-  retry: { maximumAttempts: 3 },
+  retry: RETRY_POLICIES.DATABASE,
 });
 
 export interface ConversationSummaryBatchInput {
