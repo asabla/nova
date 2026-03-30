@@ -13,31 +13,19 @@ const adminOrgRoutes = new Hono<AppContext>();
 
 // List all organisations
 adminOrgRoutes.get("/", async (c) => {
-  const orgs = await db
-    .select({
-      id: organisations.id,
-      name: organisations.name,
-      slug: organisations.slug,
-      domain: organisations.domain,
-      billingPlan: organisations.billingPlan,
-      isSaas: organisations.isSaas,
-      isSystemOrg: organisations.isSystemOrg,
-      setupCompletedAt: organisations.setupCompletedAt,
-      createdAt: organisations.createdAt,
-      memberCount: sql<number>`(
-        SELECT count(*) FROM user_profiles
-        WHERE org_id = ${organisations.id} AND deleted_at IS NULL
-      )`.mapWith(Number),
-      conversationCount: sql<number>`(
-        SELECT count(*) FROM conversations
-        WHERE org_id = ${organisations.id} AND deleted_at IS NULL
-      )`.mapWith(Number),
-    })
-    .from(organisations)
-    .where(isNull(organisations.deletedAt))
-    .orderBy(desc(organisations.createdAt));
+  const result = await db.execute(sql`
+    SELECT
+      o.id, o.name, o.slug, o.domain, o.billing_plan as "billingPlan",
+      o.is_saas as "isSaas", o.is_system_org as "isSystemOrg",
+      o.setup_completed_at as "setupCompletedAt", o.created_at as "createdAt",
+      (SELECT count(*)::int FROM user_profiles WHERE org_id = o.id AND deleted_at IS NULL) as "memberCount",
+      (SELECT count(*)::int FROM conversations WHERE org_id = o.id AND deleted_at IS NULL) as "conversationCount"
+    FROM organisations o
+    WHERE o.deleted_at IS NULL
+    ORDER BY o.created_at DESC
+  `);
 
-  return c.json({ data: orgs });
+  return c.json({ data: result });
 });
 
 // Get single organisation with details
