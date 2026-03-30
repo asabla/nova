@@ -15,11 +15,14 @@ adminAuditRoutes.get("/", async (c) => {
   const since = c.req.query("since");
   const until = c.req.query("until");
 
+  const resourceType = c.req.query("resourceType");
+
   const conditions: any[] = [];
   if (orgId) conditions.push(eq(auditLogs.orgId, orgId));
   if (action) conditions.push(ilike(auditLogs.action, `%${action}%`));
   if (since) conditions.push(gte(auditLogs.createdAt, new Date(since)));
   if (until) conditions.push(lte(auditLogs.createdAt, new Date(until)));
+  if (resourceType) conditions.push(eq(auditLogs.resourceType, resourceType));
 
   const result = await db
     .select({

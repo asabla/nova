@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   Search, Shield, Users as UsersIcon, UserCheck, UserX, Eye, ChevronDown,
   ShieldCheck, ShieldOff, Building2, ArrowLeft, Mail, Clock, LogIn, ExternalLink,
+  Download,
 } from "lucide-react";
 import { adminApi } from "@/lib/api";
 import { toast } from "@/components/Toast";
@@ -18,13 +19,43 @@ function UsersPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  const [includeDeactivated, setIncludeDeactivated] = useState(false);
+  const [limit, setLimit] = useState(100);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-users", search],
-    queryFn: () => adminApi.get<{ data: any[]; total: number }>(`/admin-api/users?search=${search}&limit=100`),
+    queryKey: ["admin-users", search, includeDeactivated, limit],
+    queryFn: () => adminApi.get<{ data: any[]; total: number }>(
+      `/admin-api/users?search=${search}&limit=${limit}${includeDeactivated ? "&includeDeactivated=true" : ""}`
+    ),
   });
 
   const users = data?.data ?? [];
+  const total = data?.total ?? 0;
+  const hasMore = users.length < total;
+
+  const exportCsv = useCallback(async () => {
+    try {
+      const all = await adminApi.get<{ data: any[]; total: number }>(
+        `/admin-api/users?limit=1000${includeDeactivated ? "&includeDeactivated=true" : ""}${search ? `&search=${search}` : ""}`
+      );
+      const rows = all.data;
+      const header = "email,name,isSuperAdmin,orgCount,createdAt";
+      const escape = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const csv = [header, ...rows.map((u: any) =>
+        [escape(u.email), escape(u.name ?? ""), u.isSuperAdmin, u.orgCount, u.createdAt].join(",")
+      )].join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `nova-users-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast("CSV exported", "success");
+    } catch {
+      toast("Failed to export CSV", "error");
+    }
+  }, [includeDeactivated, search]);
 
   const toggleSuperAdmin = useMutation({
     mutationFn: ({ userId, isSuperAdmin }: { userId: string; isSuperAdmin: boolean }) =>
@@ -62,16 +93,35 @@ function UsersPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--color-text-primary)" }}>Users</h1>
           <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>
-            Manage users across all organisations &middot; {data?.total ?? 0} total
+            Manage users across all organisations &middot; {total} total
           </p>
         </div>
+        <button
+          onClick={exportCsv}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+          style={{ background: "var(--color-surface-raised)", border: "1px solid var(--color-border-default)", color: "var(--color-text-secondary)" }}
+        >
+          <Download className="h-3.5 w-3.5" /> Export CSV
+        </button>
       </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-2 px-3 h-10 rounded-lg border max-w-md" style={{ background: "var(--color-surface-raised)", borderColor: "var(--color-border-default)" }}>
-        <Search className="h-4 w-4" style={{ color: "var(--color-text-muted)" }} />
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name or email..."
-          className="bg-transparent border-none text-sm flex-1 outline-none" style={{ color: "var(--color-text-primary)" }} />
+      {/* Search & Filters */}
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 px-3 h-10 rounded-lg border max-w-md flex-1" style={{ background: "var(--color-surface-raised)", borderColor: "var(--color-border-default)" }}>
+          <Search className="h-4 w-4" style={{ color: "var(--color-text-muted)" }} />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name or email..."
+            className="bg-transparent border-none text-sm flex-1 outline-none" style={{ color: "var(--color-text-primary)" }} />
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={includeDeactivated}
+            onChange={(e) => setIncludeDeactivated(e.target.checked)}
+            className="rounded"
+            style={{ accentColor: "var(--color-accent-blue)" }}
+          />
+          <span className="text-xs whitespace-nowrap" style={{ color: "var(--color-text-secondary)" }}>Show deactivated</span>
+        </label>
       </div>
 
       <div className="flex gap-6">
@@ -108,11 +158,18 @@ function UsersPage() {
                       <td className="px-5 py-3 text-center font-mono" style={{ color: "var(--color-text-secondary)" }}>{user.orgCount}</td>
                       <td className="px-5 py-3 text-xs" style={{ color: "var(--color-text-muted)" }}>{new Date(user.createdAt).toLocaleDateString()}</td>
                       <td className="px-5 py-3">
-                        {user.isSuperAdmin && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--color-accent-red-dim)", color: "var(--color-accent-red)" }}>
-                            <Shield className="h-3 w-3" /> Super Admin
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {user.deletedAt && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--color-accent-red-dim)", color: "var(--color-accent-red)" }}>
+                              <UserX className="h-3 w-3" /> Deactivated
+                            </span>
+                          )}
+                          {user.isSuperAdmin && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold" style={{ background: "var(--color-accent-red-dim)", color: "var(--color-accent-red)" }}>
+                              <Shield className="h-3 w-3" /> Super Admin
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-5 py-3 text-right">
                         <Eye className="h-3.5 w-3.5 inline" style={{ color: selectedUser === user.id ? "var(--color-accent-blue)" : "var(--color-text-muted)" }} />
@@ -121,11 +178,20 @@ function UsersPage() {
                   ))}
                 </tbody>
               </table>
-              {data?.total != null && (
-                <div className="px-5 py-2.5 text-[11px] font-mono" style={{ borderTop: "1px solid var(--color-border-subtle)", color: "var(--color-text-muted)" }}>
-                  Showing {users.length} of {data.total}
-                </div>
-              )}
+              <div className="px-5 py-2.5 flex items-center justify-between" style={{ borderTop: "1px solid var(--color-border-subtle)" }}>
+                <span className="text-[11px] font-mono" style={{ color: "var(--color-text-muted)" }}>
+                  Showing {users.length} of {total}
+                </span>
+                {hasMore && (
+                  <button
+                    onClick={() => setLimit((prev) => prev + 100)}
+                    className="text-[11px] font-medium px-2.5 py-1 rounded transition-colors"
+                    style={{ color: "var(--color-accent-blue)", background: "var(--color-accent-blue-dim)" }}
+                  >
+                    Load more
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>

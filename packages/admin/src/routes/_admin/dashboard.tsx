@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Building2, Users, MessageSquare, Zap, TrendingUp, Activity, ArrowUpRight, Clock, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { Building2, Users, MessageSquare, Zap, TrendingUp, Activity, ArrowUpRight, Clock, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { adminApi } from "@/lib/api";
 
@@ -38,6 +39,63 @@ const chartTooltipStyle = {
   fontSize: "12px",
   color: "var(--color-text-primary)",
 };
+
+const ORG_TABLE_HEADERS = ["Organisation", "Plan", "Members", "Messages", "Tokens", "Cost"] as const;
+const RIGHT_ALIGNED = new Set(["Members", "Messages", "Tokens", "Cost"]);
+const COLLAPSE_THRESHOLD = 10;
+
+function OrgUsageTable({ data }: { data: any[] }) {
+  const [showAll, setShowAll] = useState(false);
+  const canCollapse = data.length > COLLAPSE_THRESHOLD;
+  const visibleData = canCollapse && !showAll ? data.slice(0, COLLAPSE_THRESHOLD) : data;
+
+  return (
+    <div className="rounded-xl border overflow-hidden" style={{ background: "var(--color-surface-raised)", borderColor: "var(--color-border-subtle)" }}>
+      <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: "var(--color-border-subtle)" }}>
+        <div>
+          <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Usage by Organisation</h2>
+          <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>Last 30 days</p>
+        </div>
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
+            {ORG_TABLE_HEADERS.map((h) => (
+              <th key={h} className={`${RIGHT_ALIGNED.has(h) ? "text-right" : "text-left"} px-5 py-3 text-[10px] font-semibold uppercase tracking-wider font-mono`} style={{ color: "var(--color-text-muted)" }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {visibleData.map((org: any) => (
+            <tr key={org.orgId} className="row-hover transition-colors" style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
+              <td className="px-5 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{org.orgName}</td>
+              <td className="px-5 py-3">
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium" style={{ background: "var(--color-surface-overlay)", color: "var(--color-text-secondary)" }}>{org.billingPlan ?? "free"}</span>
+              </td>
+              <td className="px-5 py-3 text-right font-mono" style={{ color: "var(--color-text-secondary)" }}>{org.memberCount}</td>
+              <td className="px-5 py-3 text-right font-mono" style={{ color: "var(--color-text-secondary)" }}>{Number(org.messageCount).toLocaleString()}</td>
+              <td className="px-5 py-3 text-right font-mono" style={{ color: "var(--color-text-secondary)" }}>{Number(org.totalTokens).toLocaleString()}</td>
+              <td className="px-5 py-3 text-right font-mono" style={{ color: "var(--color-text-secondary)" }}>${(Number(org.totalCostCents ?? 0) / 100).toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {canCollapse && (
+        <button
+          onClick={() => setShowAll((v) => !v)}
+          className="w-full flex items-center justify-center gap-1.5 px-5 py-3 text-xs font-medium transition-colors hover:bg-[var(--color-surface-overlay)]"
+          style={{ color: "var(--color-text-secondary)", borderTop: "1px solid var(--color-border-subtle)" }}
+        >
+          {showAll ? (
+            <>Show top {COLLAPSE_THRESHOLD} <ChevronUp className="h-3.5 w-3.5" /></>
+          ) : (
+            <>Show all {data.length} organisations <ChevronDown className="h-3.5 w-3.5" /></>
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
 
 function DashboardPage() {
   const { data: stats, isLoading } = useQuery({
@@ -208,36 +266,7 @@ function DashboardPage() {
 
       {/* Usage by Organisation Table */}
       {usage?.data && usage.data.length > 0 && (
-        <div className="rounded-xl border overflow-hidden" style={{ background: "var(--color-surface-raised)", borderColor: "var(--color-border-subtle)" }}>
-          <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: "var(--color-border-subtle)" }}>
-            <div>
-              <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Usage by Organisation</h2>
-              <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>Last 30 days</p>
-            </div>
-          </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
-                {["Organisation", "Plan", "Members", "Messages", "Tokens"].map((h) => (
-                  <th key={h} className={`${h === "Members" || h === "Messages" || h === "Tokens" ? "text-right" : "text-left"} px-5 py-3 text-[10px] font-semibold uppercase tracking-wider font-mono`} style={{ color: "var(--color-text-muted)" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {usage.data.slice(0, 10).map((org: any) => (
-                <tr key={org.orgId} className="row-hover transition-colors" style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
-                  <td className="px-5 py-3 font-medium" style={{ color: "var(--color-text-primary)" }}>{org.orgName}</td>
-                  <td className="px-5 py-3">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium" style={{ background: "var(--color-surface-overlay)", color: "var(--color-text-secondary)" }}>{org.billingPlan ?? "free"}</span>
-                  </td>
-                  <td className="px-5 py-3 text-right font-mono" style={{ color: "var(--color-text-secondary)" }}>{org.memberCount}</td>
-                  <td className="px-5 py-3 text-right font-mono" style={{ color: "var(--color-text-secondary)" }}>{Number(org.messageCount).toLocaleString()}</td>
-                  <td className="px-5 py-3 text-right font-mono" style={{ color: "var(--color-text-secondary)" }}>{Number(org.totalTokens).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <OrgUsageTable data={usage.data} />
       )}
 
       {/* Empty state */}

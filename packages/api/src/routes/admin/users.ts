@@ -11,10 +11,15 @@ const adminUserRoutes = new Hono<AppContext>();
 // List all users across orgs
 adminUserRoutes.get("/", async (c) => {
   const search = c.req.query("search");
-  const limit = Math.min(Number(c.req.query("limit") ?? 50), 100);
+  const limit = Math.min(Number(c.req.query("limit") ?? 50), 1000);
   const offset = Number(c.req.query("offset") ?? 0);
 
-  const conditions: any[] = [isNull(users.deletedAt)];
+  const includeDeactivated = c.req.query("includeDeactivated") === "true";
+
+  const conditions: any[] = [];
+  if (!includeDeactivated) {
+    conditions.push(isNull(users.deletedAt));
+  }
   if (search) {
     conditions.push(or(
       ilike(users.email, `%${search}%`),
@@ -30,6 +35,7 @@ adminUserRoutes.get("/", async (c) => {
       isSuperAdmin: users.isSuperAdmin,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
+      deletedAt: users.deletedAt,
       orgCount: sql<number>`(
         SELECT count(*) FROM user_profiles
         WHERE user_id = ${users.id} AND deleted_at IS NULL

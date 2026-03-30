@@ -50,6 +50,12 @@ adminStatsRoutes.get("/usage", async (c) => {
           AND sender_type = 'assistant'
           AND created_at >= ${sinceISO}::timestamptz
       )`.mapWith(Number),
+      totalCostCents: sql<number>`(
+        SELECT coalesce(sum(coalesce(cost_cents, 0)), 0)
+        FROM messages
+        WHERE org_id = ${organisations.id}
+          AND created_at >= ${sinceISO}::timestamptz
+      )`.mapWith(Number),
     })
     .from(organisations)
     .where(isNull(organisations.deletedAt))
