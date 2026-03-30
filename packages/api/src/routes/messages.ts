@@ -938,6 +938,40 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
           } catch (fileErr) {
             console.error("[planned-chat] Failed to persist output files:", fileErr);
           }
+
+          // Extract generated images from image_generate results and attach to message
+          try {
+            const envMod = await import("../lib/env");
+            for (const r of toolCallRecords) {
+              if (r.toolName !== "image_generate") continue;
+              const output = r.output as {
+                success?: boolean;
+                storageKey?: string;
+                mimeType?: string;
+                sizeBytes?: number;
+                revisedPrompt?: string;
+              } | null;
+              if (!output?.success || !output.storageKey) continue;
+
+              const [fileRecord] = await db.insert(files).values({
+                orgId, userId,
+                filename: `generated-image-${Date.now()}.png`,
+                contentType: output.mimeType ?? "image/png",
+                sizeBytes: output.sizeBytes ?? 0,
+                storagePath: output.storageKey,
+                storageBucket: envMod.env.MINIO_BUCKET,
+                metadata: { source: "image_generation", revisedPrompt: output.revisedPrompt },
+              }).returning();
+
+              await db.insert(messageAttachments).values({
+                messageId: assistantMessage.id, orgId,
+                fileId: fileRecord.id,
+                attachmentType: "file",
+              });
+            }
+          } catch (imgErr) {
+            console.error("[planned-chat] Failed to persist generated images:", imgErr);
+          }
         }
 
         // Auto-generate title for untitled conversations
