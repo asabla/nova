@@ -52,6 +52,8 @@ COPY --from=builder /app/packages/worker-shared ./packages/worker-shared
 COPY --from=builder /app/packages/gateway ./packages/gateway
 COPY --from=builder /app/package.json ./
 
+USER node
+
 EXPOSE 3001
 
 CMD ["npx", "tsx", "packages/gateway/src/server.ts"]

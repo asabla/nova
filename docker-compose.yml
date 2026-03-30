@@ -224,6 +224,11 @@ services:
       dockerfile: infra/docker/Dockerfile.api
     container_name: nova-api
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "2.0"
     ports:
       - "3000:3000"
     env_file: .env
@@ -268,6 +273,11 @@ services:
       dockerfile: infra/docker/Dockerfile.gateway
     container_name: nova-gateway
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "1.0"
     # Internal only — no host port mapping in production
     ports:
       - "3001:3001"
@@ -309,6 +319,11 @@ services:
         WORKER_PACKAGE: worker-agent
     container_name: nova-worker-agent
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          cpus: "2.0"
     env_file: .env
     environment:
       DATABASE_URL: postgres://nova:nova@postgres:5432/nova
@@ -348,6 +363,11 @@ services:
         WORKER_PACKAGE: worker-ingestion
     container_name: nova-worker-ingestion
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          cpus: "2.0"
     env_file: .env
     environment:
       DATABASE_URL: postgres://nova:nova@postgres:5432/nova
@@ -381,6 +401,11 @@ services:
         WORKER_PACKAGE: worker-background
     container_name: nova-worker-background
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          cpus: "2.0"
     env_file: .env
     environment:
       DATABASE_URL: postgres://nova:nova@postgres:5432/nova
@@ -419,6 +444,11 @@ services:
       dockerfile: infra/docker/Dockerfile.web
     container_name: nova-web
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.5"
     ports:
       - "5173:80"
     depends_on:
@@ -431,6 +461,11 @@ services:
       dockerfile: infra/docker/Dockerfile.admin
     container_name: nova-admin
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.5"
     ports:
       - "5174:80"
     depends_on:

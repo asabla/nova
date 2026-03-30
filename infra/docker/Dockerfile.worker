@@ -123,5 +123,7 @@ COPY --from=builder /app/packages/worker-shared ./packages/worker-shared
 COPY --from=builder /app/packages/${WORKER_PACKAGE} ./packages/${WORKER_PACKAGE}
 COPY --from=builder /app/package.json ./
 
+USER node
+
 ENV WORKER_PACKAGE=${WORKER_PACKAGE}
 CMD npx tsx packages/${WORKER_PACKAGE}/dist/index.js

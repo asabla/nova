@@ -38,6 +38,8 @@ COPY --from=production /app/packages/shared ./packages/shared
 COPY --from=production /app/packages/api ./packages/api
 COPY --from=production /app/package.json ./
 
+USER bun
+
 EXPOSE 3000
 
 CMD ["bun", "run", "packages/api/src/index.ts"]
