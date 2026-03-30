@@ -1,8 +1,11 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { randomBytes } from "crypto";
+import { eq } from "drizzle-orm";
 import type { AppContext } from "../types/context";
 import { logger } from "../lib/logger";
+import { db } from "../lib/db";
+import { knowledgeConnectors } from "@nova/shared/schemas";
 import { knowledgeConnectorService } from "../services/knowledge-connector.service";
 import { writeAuditLog } from "../services/audit.service";
 import { redis } from "../lib/redis";
@@ -210,6 +213,34 @@ knowledgeConnectorRoutes.post("/:collectionId/connectors/:connectorId/sync", asy
   });
 
   return c.json(result);
+});
+
+knowledgeConnectorRoutes.post("/:collectionId/connectors/:connectorId/reset-sync", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const connectorId = c.req.param("connectorId");
+
+  // Verify collection + connector belongs to org
+  await knowledgeConnectorService.getConnector(orgId, connectorId);
+
+  await db.update(knowledgeConnectors).set({
+    lastSyncStatus: "pending",
+    lastSyncError: null,
+    updatedAt: new Date(),
+  }).where(eq(knowledgeConnectors.id, connectorId));
+
+  const connector = await knowledgeConnectorService.getConnector(orgId, connectorId);
+
+  await writeAuditLog({
+    orgId,
+    actorId: userId,
+    actorType: "user",
+    action: "knowledge.connector.sync_reset",
+    resourceType: "knowledge_connector",
+    resourceId: connectorId,
+  });
+
+  return c.json(connector);
 });
 
 // ── Git Repository Validation ──

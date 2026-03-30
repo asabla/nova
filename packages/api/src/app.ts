@@ -58,6 +58,7 @@ import { voiceRoutes } from "./routes/voice";
 import { superAdminRoutes } from "./routes/super-admin";
 import { customWorkerRoutes } from "./routes/custom-workers";
 import evalRoutes from "./routes/evals";
+import { workflowRoutes } from "./routes/workflows";
 
 const app = new Hono<AppContext>();
 
@@ -154,5 +155,6 @@ app.route("/api/voice", voiceRoutes);
 app.route("/api/super-admin", superAdminRoutes);
 app.route("/api/custom-workers", customWorkerRoutes);
 app.route("/api/evals", evalRoutes);
+app.route("/api/workflows", workflowRoutes);
 
 export { app };

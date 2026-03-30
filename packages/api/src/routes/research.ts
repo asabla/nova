@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { z } from "zod";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { TASK_QUEUES } from "@nova/shared/constants";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
@@ -365,6 +365,44 @@ researchRoutes.patch("/:id", async (c) => {
   }).where(eq(researchReports.id, report.id)).returning();
 
   return c.json(updated);
+});
+
+// Delete a single research report
+researchRoutes.delete("/:id", async (c) => {
+  const orgId = c.get("orgId");
+  const [report] = await db.select().from(researchReports)
+    .where(and(eq(researchReports.id, c.req.param("id")), eq(researchReports.orgId, orgId)));
+
+  if (!report) throw AppError.notFound("Research report not found");
+
+  await db.delete(researchReportVersions).where(eq(researchReportVersions.reportId, report.id));
+  await db.delete(researchReports).where(eq(researchReports.id, report.id));
+
+  return c.body(null, 204);
+});
+
+// Bulk delete research reports
+const bulkDeleteSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(50),
+});
+
+researchRoutes.delete("/bulk", async (c) => {
+  const orgId = c.get("orgId");
+  const body = bulkDeleteSchema.parse(await c.req.json());
+
+  // Verify all reports belong to the org
+  const reports = await db.select({ id: researchReports.id }).from(researchReports)
+    .where(and(inArray(researchReports.id, body.ids), eq(researchReports.orgId, orgId)));
+
+  const validIds = reports.map((r) => r.id);
+  if (validIds.length === 0) {
+    return c.json({ deleted: 0 });
+  }
+
+  await db.delete(researchReportVersions).where(inArray(researchReportVersions.reportId, validIds));
+  await db.delete(researchReports).where(inArray(researchReports.id, validIds));
+
+  return c.json({ deleted: validIds.length });
 });
 
 // Export research report
