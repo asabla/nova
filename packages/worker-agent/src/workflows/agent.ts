@@ -53,16 +53,14 @@ const FORMATTING_INSTRUCTIONS = [
   "Write in natural prose paragraphs, like a knowledgeable colleague explaining something.",
   "Do NOT structure your response as bullet-point lists or numbered lists. Lists feel robotic and are hard to read.",
   "Instead of a bulleted list of points, weave those points into flowing paragraphs with clear topic sentences.",
-  "You may use a short list (3-5 items max, never nested) ONLY when the user explicitly asks for a list, or for truly atomic items like terminal commands or file names.",
+  "You may use lists when the user explicitly asks for a list, or for truly atomic items like terminal commands or file names.",
   "Use markdown headings (##) to organize longer responses into sections, but the content within each section should be prose.",
   "Never use bold text on every other phrase — reserve bold for one or two genuinely key terms per section at most.",
 ].join("\n");
 
-const EFFORT_TOKEN_CAPS: Record<EffortLevel, number> = {
-  low: 1024,
-  medium: 4096,
-  high: 8192,
-};
+// Default max output tokens — generous ceiling, not a target.
+// Effort instructions guide actual response length; this just prevents runaway output.
+const DEFAULT_MAX_OUTPUT_TOKENS = 16384;
 
 function applyEffortToPrompt(systemPrompt: string | undefined, level: EffortLevel): string | undefined {
   const instructions = EFFORT_INSTRUCTIONS[level];
@@ -741,22 +739,15 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
       // Normal conversation mode — use DB-backed effort/formatting prompts if available
       const effortLevel: EffortLevel = input.effort?.level ?? "medium";
       if (resolvedPrompts) {
-        const effortMap = {
-          low: resolvedPrompts.effortLow.content,
-          medium: resolvedPrompts.effortMedium.content,
-          high: resolvedPrompts.effortHigh.content,
-        };
-        const effortContent = effortMap[effortLevel] || EFFORT_INSTRUCTIONS[effortLevel];
         const formattingContent = resolvedPrompts.formatting.content || FORMATTING_INSTRUCTIONS;
-        const combined = `## Output Length\n${effortContent}\n\n## Formatting\n${formattingContent}`;
+        const combined = `## Formatting\n${formattingContent}`;
         systemPrompt = rawSystemPrompt ? `${rawSystemPrompt}\n\n${combined}` : combined;
       } else {
-        systemPrompt = applyEffortToPrompt(rawSystemPrompt, effortLevel);
+        // Append formatting instructions only (no effort-based output length constraints)
+        const combined = `## Formatting\n${FORMATTING_INSTRUCTIONS}`;
+        systemPrompt = rawSystemPrompt ? `${rawSystemPrompt}\n\n${combined}` : combined;
       }
-      const effortCap = EFFORT_TOKEN_CAPS[effortLevel];
-      effectiveMaxTokens = input.modelParams?.maxTokens
-        ? Math.min(input.modelParams.maxTokens, effortCap)
-        : effortCap;
+      effectiveMaxTokens = input.modelParams?.maxTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
       effectiveMaxTurns = input.maxSteps ?? 5;
     }
 
@@ -1262,7 +1253,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         systemPrompt,
         messageHistory: nodeMessages,
         temperature: input.researchConfig ? 0.5 : input.modelParams?.temperature,
-        maxTokens: input.researchConfig ? 16384 : Math.min(input.modelParams?.maxTokens ?? 2048, 2048),
+        maxTokens: input.researchConfig ? 16384 : (input.modelParams?.maxTokens ?? DEFAULT_MAX_OUTPUT_TOKENS),
         maxTurns: input.researchConfig ? 15 : 5,
         agentId: input.agentId,
         orgId: input.orgId,
