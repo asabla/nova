@@ -74,7 +74,10 @@ agentRoutes.patch("/:id", async (c) => {
     console.error("[agents PATCH] Validation failed:", JSON.stringify(result.error.issues));
     return c.json({ error: "Validation failed", issues: result.error.issues }, 400);
   }
-  const agent = await agentService.update(orgId, c.req.param("id"), result.data);
+  // Convert empty strings to null for UUID fields (Postgres rejects "" for uuid)
+  const data = { ...result.data };
+  if (data.modelId === "") data.modelId = null;
+  const agent = await agentService.update(orgId, c.req.param("id"), data);
   return c.json(agent);
 });
 
