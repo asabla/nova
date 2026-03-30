@@ -11,7 +11,10 @@ import { toast } from "@/components/Toast";
 import { useState } from "react";
 
 export const Route = createFileRoute("/_admin/organisations/$orgId")({
-  component: OrgDetailPage,
+  component: () => {
+    const { orgId } = Route.useParams();
+    return <OrgDetailPage key={orgId} />;
+  },
 });
 
 // Shared styles
