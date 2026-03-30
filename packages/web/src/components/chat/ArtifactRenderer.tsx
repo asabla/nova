@@ -780,6 +780,7 @@ export function ArtifactRenderer({ artifact, className }: ArtifactRendererProps)
             onClick={handleDownload}
             className="text-text-tertiary hover:text-text-secondary p-1 rounded"
             title="Download"
+            aria-label="Download"
           >
             <Download className="h-3.5 w-3.5" />
           </button>

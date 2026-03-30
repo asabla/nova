@@ -127,6 +127,7 @@ function MermaidArtifact({ code, artifactId, onConvert }: { code: string; artifa
             onClick={handleConvertToExcalidraw}
             disabled={converting}
             className="text-[10px] text-text-tertiary hover:text-text-secondary flex items-center gap-1"
+            aria-label="Convert to Excalidraw"
           >
             <PenTool className="h-3 w-3" />
             {converting ? "Converting..." : "Open in Excalidraw"}
@@ -215,6 +216,7 @@ function SortableTable({ csv }: { csv: string }) {
         <button
           onClick={handleDownloadCsv}
           className="text-[10px] text-text-tertiary hover:text-text-secondary flex items-center gap-1"
+          aria-label="Download CSV"
         >
           <Download className="h-3 w-3" /> CSV
         </button>

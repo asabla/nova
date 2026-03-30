@@ -178,6 +178,7 @@ export function DynamicWidget({ config, className, artifactId }: DynamicWidgetPr
               onClick={handleRefresh}
               className="text-text-tertiary hover:text-text-secondary p-1 rounded"
               title="Refresh"
+              aria-label="Refresh"
             >
               <RefreshCw className="h-3 w-3" />
             </button>

@@ -107,6 +107,7 @@ export function FlashcardWidget({
             type="button"
             onClick={handleRestart}
             className="flex items-center gap-1.5 rounded-md p-1.5 text-xs text-text-tertiary transition-colors hover:bg-surface-tertiary hover:text-text"
+            aria-label="Restart flashcards"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             Restart
@@ -168,6 +169,7 @@ export function FlashcardWidget({
               "hover:bg-surface-tertiary hover:text-text",
               "disabled:opacity-30",
             )}
+            aria-label="Previous card"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -183,6 +185,7 @@ export function FlashcardWidget({
               "hover:bg-surface-tertiary hover:text-text",
               "disabled:opacity-30",
             )}
+            aria-label="Next card"
           >
             <ChevronRight className="h-4 w-4" />
           </button>

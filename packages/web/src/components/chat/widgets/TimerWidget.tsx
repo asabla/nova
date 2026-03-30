@@ -46,6 +46,7 @@ export function TimerWidget({ params }: { params?: Record<string, string> }) {
         <button
           onClick={reset}
           className="flex items-center gap-1 px-3 py-1 rounded-lg border border-border text-xs text-text-secondary hover:bg-surface-tertiary transition-colors"
+          aria-label="Reset timer"
         >
           <RotateCcw className="h-3 w-3" />
           Reset

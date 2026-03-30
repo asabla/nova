@@ -353,7 +353,7 @@ export function CommandPalette() {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]" role="dialog" aria-modal="true" aria-label={t("commandPalette.title", { defaultValue: "Command palette" })}>
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-overlay backdrop-blur-sm" onClick={close} />
+      <div className="fixed inset-0 bg-overlay backdrop-blur-sm" onClick={close} role="presentation" />
 
       {/* Palette container */}
       <div className="relative w-full max-w-lg bg-surface border border-border rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-4 duration-150">

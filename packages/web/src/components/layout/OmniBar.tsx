@@ -512,7 +512,7 @@ export function OmniBar() {
   return (
     <div ref={dropdownRef} className="relative w-full max-w-2xl mx-auto" role="dialog" aria-modal="true" aria-label={t("omnibar.title", { defaultValue: "Universal search" })}>
       {/* Frosted backdrop */}
-      <div className="fixed inset-0 z-40 omni-backdrop" onClick={close} />
+      <div className="fixed inset-0 z-40 omni-backdrop" onClick={close} role="presentation" />
 
       <div className="relative z-50">
         {/* Search input — signature glow */}
