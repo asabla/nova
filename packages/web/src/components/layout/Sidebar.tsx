@@ -35,6 +35,16 @@ export function Sidebar() {
   const sidebarWidth = useUIStore((s) => s.sidebarWidth);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const user = useAuthStore((s) => s.user);
+  const activeOrgId = useAuthStore((s) => s.activeOrgId);
+
+  // Fetch current org name
+  const { data: currentOrg } = useQuery({
+    queryKey: ["current-org", activeOrgId],
+    queryFn: () => api.get<any>("/api/org"),
+    staleTime: 5 * 60 * 1000,
+    enabled: !!activeOrgId,
+  });
+  const orgName = currentOrg?.name ?? "NOVA";
   const [showFilters, setShowFilters] = useState(false);
   const [filterDateRange, setFilterDateRange] = useState<DateRange>("all");
   const [filterFolderId, setFilterFolderId] = useState<string | null>(null);
@@ -271,7 +281,7 @@ export function Sidebar() {
                 <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
                   <Zap className="h-4 w-4 text-primary" aria-hidden="true" />
                 </div>
-                <span className="font-bold text-sm tracking-tight text-text nova-glow">NOVA</span>
+                <span className="font-bold text-sm tracking-tight text-text nova-glow">{orgName}</span>
               </button>
               <button
                 onClick={toggleSidebar}
