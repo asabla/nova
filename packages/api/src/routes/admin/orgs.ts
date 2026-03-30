@@ -3,11 +3,12 @@ import { z } from "zod";
 import { eq, sql, desc, asc, and, isNull, gte } from "drizzle-orm";
 import type { AppContext } from "../../types/context";
 import { db } from "../../lib/db";
-import { organisations, userProfiles, users, conversations, messages, orgSettings, invitations, auditLogs } from "@nova/shared/schemas";
+import { organisations, userProfiles, users, conversations, messages, orgSettings, invitations, auditLogs, modelProviders, models } from "@nova/shared/schemas";
 import { AppError } from "@nova/shared/utils";
 import { writeAuditLog } from "../../services/audit.service";
 import { zValidator } from "../../lib/validator";
 import { randomBytes } from "crypto";
+import { provisionPlatformProviders } from "../../services/provider-provisioning.service";
 
 const adminOrgRoutes = new Hono<AppContext>();
 
@@ -94,6 +95,22 @@ adminOrgRoutes.post("/", zValidator("json", createOrgSchema), async (c) => {
     }
   }
 
+  // Auto-provision platform providers for the new org
+  if (!data.isSystemOrg) {
+    const provisioned = await provisionPlatformProviders(org.id);
+    if (provisioned.providers > 0) {
+      await writeAuditLog({
+        orgId: org.id,
+        actorId: adminId,
+        actorType: "user",
+        action: "org.providers.provisioned",
+        resourceType: "org",
+        resourceId: org.id,
+        details: { providers: provisioned.providers, models: provisioned.models },
+      });
+    }
+  }
+
   await writeAuditLog({
     orgId: org.id,
     actorId: adminId,
@@ -105,6 +122,29 @@ adminOrgRoutes.post("/", zValidator("json", createOrgSchema), async (c) => {
   });
 
   return c.json(org, 201);
+});
+
+// Sync platform providers to an existing org
+adminOrgRoutes.post("/:orgId/provision-providers", async (c) => {
+  const adminId = c.get("userId");
+  const orgId = c.req.param("orgId");
+
+  const [org] = await db.select().from(organisations).where(eq(organisations.id, orgId));
+  if (!org) throw AppError.notFound("Organization");
+
+  const result = await provisionPlatformProviders(orgId);
+
+  await writeAuditLog({
+    orgId,
+    actorId: adminId,
+    actorType: "user",
+    action: "org.providers.provisioned",
+    resourceType: "org",
+    resourceId: orgId,
+    details: result,
+  });
+
+  return c.json({ ok: true, ...result });
 });
 
 // Update organisation
@@ -356,6 +396,16 @@ adminOrgRoutes.get("/:orgId/audit", async (c) => {
     .limit(limit);
 
   return c.json({ data: result });
+});
+
+// Get providers and models for an org
+adminOrgRoutes.get("/:orgId/providers", async (c) => {
+  const orgId = c.req.param("orgId");
+
+  const providers = await db.select().from(modelProviders).where(and(eq(modelProviders.orgId, orgId), isNull(modelProviders.deletedAt)));
+  const orgModels = await db.select().from(models).where(and(eq(models.orgId, orgId), isNull(models.deletedAt)));
+
+  return c.json({ data: { providers, models: orgModels } });
 });
 
 // Ensure the current admin user has a profile in this org (for "Open in App")

@@ -59,6 +59,7 @@ import { Route as AuthAdminIntegrationsRouteImport } from './routes/_auth/admin.
 import { Route as AuthAdminHealthRouteImport } from './routes/_auth/admin.health'
 import { Route as AuthAdminGroupsRouteImport } from './routes/_auth/admin.groups'
 import { Route as AuthAdminEvalsRouteImport } from './routes/_auth/admin.evals'
+import { Route as AuthAdminDomainsRouteImport } from './routes/_auth/admin.domains'
 import { Route as AuthAdminDataRetentionRouteImport } from './routes/_auth/admin.data-retention'
 import { Route as AuthAdminContentFilterRouteImport } from './routes/_auth/admin.content-filter'
 import { Route as AuthAdminBrandingRouteImport } from './routes/_auth/admin.branding'
@@ -317,6 +318,11 @@ const AuthAdminEvalsRoute = AuthAdminEvalsRouteImport.update({
   path: '/evals',
   getParentRoute: () => AuthAdminRoute,
 } as any)
+const AuthAdminDomainsRoute = AuthAdminDomainsRouteImport.update({
+  id: '/domains',
+  path: '/domains',
+  getParentRoute: () => AuthAdminRoute,
+} as any)
 const AuthAdminDataRetentionRoute = AuthAdminDataRetentionRouteImport.update({
   id: '/data-retention',
   path: '/data-retention',
@@ -378,6 +384,7 @@ export interface FileRoutesByFullPath {
   '/admin/branding': typeof AuthAdminBrandingRoute
   '/admin/content-filter': typeof AuthAdminContentFilterRoute
   '/admin/data-retention': typeof AuthAdminDataRetentionRoute
+  '/admin/domains': typeof AuthAdminDomainsRoute
   '/admin/evals': typeof AuthAdminEvalsRoute
   '/admin/groups': typeof AuthAdminGroupsRoute
   '/admin/health': typeof AuthAdminHealthRoute
@@ -433,6 +440,7 @@ export interface FileRoutesByTo {
   '/admin/branding': typeof AuthAdminBrandingRoute
   '/admin/content-filter': typeof AuthAdminContentFilterRoute
   '/admin/data-retention': typeof AuthAdminDataRetentionRoute
+  '/admin/domains': typeof AuthAdminDomainsRoute
   '/admin/evals': typeof AuthAdminEvalsRoute
   '/admin/groups': typeof AuthAdminGroupsRoute
   '/admin/health': typeof AuthAdminHealthRoute
@@ -492,6 +500,7 @@ export interface FileRoutesById {
   '/_auth/admin/branding': typeof AuthAdminBrandingRoute
   '/_auth/admin/content-filter': typeof AuthAdminContentFilterRoute
   '/_auth/admin/data-retention': typeof AuthAdminDataRetentionRoute
+  '/_auth/admin/domains': typeof AuthAdminDomainsRoute
   '/_auth/admin/evals': typeof AuthAdminEvalsRoute
   '/_auth/admin/groups': typeof AuthAdminGroupsRoute
   '/_auth/admin/health': typeof AuthAdminHealthRoute
@@ -551,6 +560,7 @@ export interface FileRouteTypes {
     | '/admin/branding'
     | '/admin/content-filter'
     | '/admin/data-retention'
+    | '/admin/domains'
     | '/admin/evals'
     | '/admin/groups'
     | '/admin/health'
@@ -606,6 +616,7 @@ export interface FileRouteTypes {
     | '/admin/branding'
     | '/admin/content-filter'
     | '/admin/data-retention'
+    | '/admin/domains'
     | '/admin/evals'
     | '/admin/groups'
     | '/admin/health'
@@ -664,6 +675,7 @@ export interface FileRouteTypes {
     | '/_auth/admin/branding'
     | '/_auth/admin/content-filter'
     | '/_auth/admin/data-retention'
+    | '/_auth/admin/domains'
     | '/_auth/admin/evals'
     | '/_auth/admin/groups'
     | '/_auth/admin/health'
@@ -1051,6 +1063,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthAdminEvalsRouteImport
       parentRoute: typeof AuthAdminRoute
     }
+    '/_auth/admin/domains': {
+      id: '/_auth/admin/domains'
+      path: '/domains'
+      fullPath: '/admin/domains'
+      preLoaderRoute: typeof AuthAdminDomainsRouteImport
+      parentRoute: typeof AuthAdminRoute
+    }
     '/_auth/admin/data-retention': {
       id: '/_auth/admin/data-retention'
       path: '/data-retention'
@@ -1103,6 +1122,7 @@ interface AuthAdminRouteChildren {
   AuthAdminBrandingRoute: typeof AuthAdminBrandingRoute
   AuthAdminContentFilterRoute: typeof AuthAdminContentFilterRoute
   AuthAdminDataRetentionRoute: typeof AuthAdminDataRetentionRoute
+  AuthAdminDomainsRoute: typeof AuthAdminDomainsRoute
   AuthAdminEvalsRoute: typeof AuthAdminEvalsRoute
   AuthAdminGroupsRoute: typeof AuthAdminGroupsRoute
   AuthAdminHealthRoute: typeof AuthAdminHealthRoute
@@ -1123,6 +1143,7 @@ const AuthAdminRouteChildren: AuthAdminRouteChildren = {
   AuthAdminBrandingRoute: AuthAdminBrandingRoute,
   AuthAdminContentFilterRoute: AuthAdminContentFilterRoute,
   AuthAdminDataRetentionRoute: AuthAdminDataRetentionRoute,
+  AuthAdminDomainsRoute: AuthAdminDomainsRoute,
   AuthAdminEvalsRoute: AuthAdminEvalsRoute,
   AuthAdminGroupsRoute: AuthAdminGroupsRoute,
   AuthAdminHealthRoute: AuthAdminHealthRoute,

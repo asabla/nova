@@ -4,6 +4,7 @@ import {
   ArrowLeft, Users, Settings, BarChart3, Trash2, Shield, Calendar, Building2,
   UserPlus, UserMinus, Mail, Clock, FileSearch, Palette, Lock, ChevronDown,
   CheckCircle2, XCircle, ToggleLeft, ToggleRight, Image, Code2, Save, ExternalLink,
+  Server, RefreshCw,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { adminApi } from "@/lib/api";
@@ -23,7 +24,7 @@ const inputStyle = { background: "var(--color-surface-overlay)", borderColor: "v
 const labelClass = "block text-[11px] font-semibold uppercase tracking-wider font-mono mb-1.5";
 const chartTooltip = { backgroundColor: "var(--color-surface-overlay)", border: "1px solid var(--color-border-default)", borderRadius: "8px", fontSize: "12px", color: "var(--color-text-primary)" };
 
-type TabId = "overview" | "members" | "usage" | "security" | "branding" | "audit";
+type TabId = "overview" | "members" | "providers" | "usage" | "security" | "branding" | "audit";
 
 function OrgDetailPage() {
   const { orgId } = Route.useParams();
@@ -51,6 +52,7 @@ function OrgDetailPage() {
   const tabs: { id: TabId; icon: any; label: string }[] = [
     { id: "overview", icon: Building2, label: "Overview" },
     { id: "members", icon: Users, label: `Members (${memberList.length})` },
+    { id: "providers", icon: Server, label: "Providers" },
     { id: "usage", icon: BarChart3, label: "Usage" },
     { id: "security", icon: Lock, label: "Security" },
     { id: "branding", icon: Palette, label: "Branding" },
@@ -110,6 +112,7 @@ function OrgDetailPage() {
       {/* Tab Content */}
       {activeTab === "overview" && <OverviewTab org={org} memberCount={memberList.length} usage={usage} updateOrg={updateOrg} deleteOrg={deleteOrg} />}
       {activeTab === "members" && <MembersTab orgId={orgId} members={memberList} />}
+      {activeTab === "providers" && <ProvidersTab orgId={orgId} />}
       {activeTab === "usage" && <UsageTab orgId={orgId} />}
       {activeTab === "security" && <SecurityTab orgId={orgId} />}
       {activeTab === "branding" && <BrandingTab orgId={orgId} org={org} />}
@@ -553,6 +556,131 @@ function AuditTab({ orgId }: { orgId: string }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROVIDERS TAB
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function ProvidersTab({ orgId }: { orgId: string }) {
+  const qc = useQueryClient();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-org-providers", orgId],
+    queryFn: () => adminApi.get<{ data: { providers: any[]; models: any[] } }>(`/admin-api/orgs/${orgId}/providers`),
+  });
+
+  const syncProviders = useMutation({
+    mutationFn: () => adminApi.post<{ ok: boolean; providers: number; models: number }>(`/admin-api/orgs/${orgId}/provision-providers`),
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ["admin-org-providers", orgId] });
+      toast(`Synced ${result.providers} provider(s) and ${result.models} model(s)`, "success");
+    },
+    onError: () => toast("Failed to sync providers", "error"),
+  });
+
+  const providers = data?.data?.providers ?? [];
+  const orgModels = data?.data?.models ?? [];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>Model Providers</h3>
+          <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>
+            Providers and models configured for this organisation. Sync to push the latest platform provider settings.
+          </p>
+        </div>
+        <button
+          onClick={() => syncProviders.mutate()}
+          disabled={syncProviders.isPending}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50 transition-colors"
+          style={{ background: "var(--color-accent-blue)" }}
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${syncProviders.isPending ? "animate-spin" : ""}`} />
+          {syncProviders.isPending ? "Syncing..." : "Sync Platform Providers"}
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 2 }).map((_, i) => <div key={i} className="h-24 rounded-xl skeleton" />)}
+        </div>
+      ) : providers.length === 0 ? (
+        <div className="rounded-xl border p-12 text-center" style={card}>
+          <div className="inline-flex p-4 rounded-xl mb-4" style={{ background: "var(--color-accent-blue-dim)" }}>
+            <Server className="h-8 w-8" style={{ color: "var(--color-accent-blue)" }} />
+          </div>
+          <h3 className="text-lg font-semibold mb-2" style={{ color: "var(--color-text-primary)" }}>No providers configured</h3>
+          <p className="text-sm max-w-md mx-auto mb-6" style={{ color: "var(--color-text-secondary)" }}>
+            Click "Sync Platform Providers" to provision this organisation with the platform's default providers and models.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {providers.map((provider: any) => {
+            const providerModels = orgModels.filter((m: any) => m.modelProviderId === provider.id);
+            return (
+              <div key={provider.id} className="rounded-xl border p-5" style={card}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-lg" style={{ background: "var(--color-surface-overlay)" }}>
+                      <Server className="h-5 w-5" style={{ color: "var(--color-accent-blue)" }} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{provider.name}</span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-medium" style={{ background: "var(--color-surface-overlay)", color: "var(--color-text-secondary)" }}>
+                          {provider.type}
+                        </span>
+                        {provider.isEnabled ? (
+                          <span className="flex items-center gap-0.5 text-[10px]" style={{ color: "var(--color-accent-green)" }}><CheckCircle2 className="h-3 w-3" /> Enabled</span>
+                        ) : (
+                          <span className="flex items-center gap-0.5 text-[10px]" style={{ color: "var(--color-text-muted)" }}><XCircle className="h-3 w-3" /> Disabled</span>
+                        )}
+                      </div>
+                      {provider.apiBaseUrl && (
+                        <span className="text-xs font-mono" style={{ color: "var(--color-text-muted)" }}>{provider.apiBaseUrl}</span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono" style={{ color: "var(--color-text-muted)" }}>
+                    {providerModels.length} model{providerModels.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+
+                {providerModels.length > 0 && (
+                  <div className="ml-12 space-y-1.5">
+                    {providerModels.map((model: any) => (
+                      <div key={model.id} className="flex items-center justify-between py-1.5 px-3 rounded-lg" style={{ background: "var(--color-surface-overlay)" }}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium" style={{ color: "var(--color-text-primary)" }}>{model.name}</span>
+                          <span className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>{model.modelIdExternal}</span>
+                          {model.isDefault && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold" style={{ background: "var(--color-accent-blue-dim)", color: "var(--color-accent-blue)" }}>DEFAULT</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {(model.capabilities as string[] | null)?.map((cap: string) => (
+                            <span key={cap} className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>{cap}</span>
+                          ))}
+                          {model.isEnabled ? (
+                            <span className="text-[10px]" style={{ color: "var(--color-accent-green)" }}>enabled</span>
+                          ) : (
+                            <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>disabled</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
