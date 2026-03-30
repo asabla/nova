@@ -33,9 +33,15 @@ export function wrapClientWithParamFilter(client: OpenAI, dropParams: string[]):
 
   const interceptedCreate = function (params: any, ...rest: any[]) {
     const cleaned = { ...params };
+    // Convert max_tokens → max_completion_tokens for reasoning models
+    // (OpenAI reasoning models reject max_tokens but accept max_completion_tokens)
+    if (paramSet.has("max_tokens") && cleaned.max_tokens != null) {
+      cleaned.max_completion_tokens = cleaned.max_tokens;
+    }
     for (const p of paramSet) {
       delete cleaned[p];
     }
+    console.log(`[reasoning-model] API params: model=${cleaned.model} max_completion_tokens=${cleaned.max_completion_tokens} dropped=[${dropParams.join(",")}]`);
     return originalCreate(cleaned, ...rest);
   };
 
