@@ -53,7 +53,7 @@ const updateAgentSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   description: z.string().max(2000).optional(),
   systemPrompt: z.string().max(100_000).optional(),
-  modelId: z.string().uuid().optional(),
+  modelId: z.string().uuid().nullable().optional().or(z.literal("")),
   modelParams: z.record(z.unknown()).optional(),
   visibility: z.enum(["private", "team", "org", "public"]).optional(),
   isPublished: z.boolean().optional(),
@@ -68,8 +68,13 @@ const updateAgentSchema = z.object({
 
 agentRoutes.patch("/:id", async (c) => {
   const orgId = c.get("orgId");
-  const body = updateAgentSchema.parse(await c.req.json());
-  const agent = await agentService.update(orgId, c.req.param("id"), body);
+  const rawBody = await c.req.json();
+  const result = updateAgentSchema.safeParse(rawBody);
+  if (!result.success) {
+    console.error("[agents PATCH] Validation failed:", JSON.stringify(result.error.issues));
+    return c.json({ error: "Validation failed", issues: result.error.issues }, 400);
+  }
+  const agent = await agentService.update(orgId, c.req.param("id"), result.data);
   return c.json(agent);
 });
 
