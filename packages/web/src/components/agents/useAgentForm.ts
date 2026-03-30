@@ -19,6 +19,8 @@ export interface AgentForm {
   maxSteps: number;
   timeoutSeconds: number;
   starters: string[];
+  defaultTier: "" | "direct" | "sequential" | "orchestrated";
+  effortLevel: "low" | "medium" | "high";
 }
 
 export interface TestMessage {
@@ -38,6 +40,8 @@ const DEFAULT_FORM: AgentForm = {
   maxSteps: 10,
   timeoutSeconds: 300,
   starters: [],
+  defaultTier: "",
+  effortLevel: "medium",
 };
 
 export function useAgentForm(options: { mode: "create" | "edit"; agentId?: string }) {
@@ -80,6 +84,8 @@ export function useAgentForm(options: { mode: "create" | "edit"; agentId?: strin
         maxSteps: agent.maxSteps ?? 10,
         timeoutSeconds: agent.timeoutSeconds ?? 300,
         starters: agent.starters ?? [],
+        defaultTier: agent.modelParams?.defaultTier ?? "",
+        effortLevel: agent.modelParams?.effortLevel ?? "medium",
       };
       setForm(loaded);
       savedFormRef.current = loaded;

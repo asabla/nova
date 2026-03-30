@@ -38,12 +38,24 @@ const createAgentSchema = z.object({
   maxSteps: z.number().int().min(1).max(100).optional(),
   timeoutSeconds: z.number().int().min(1).max(3600).optional(),
   starters: z.array(z.string()).optional(),
+  defaultTier: z.enum(["", "direct", "sequential", "orchestrated"]).optional(),
+  effortLevel: z.enum(["low", "medium", "high"]).optional(),
 });
 
 agentRoutes.post("/", async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
-  const body = createAgentSchema.parse(await c.req.json());
+  const { defaultTier, effortLevel, ...rest } = createAgentSchema.parse(await c.req.json());
+
+  // Merge tier/effort into modelParams
+  const body = {
+    ...rest,
+    modelParams: {
+      ...rest.modelParams,
+      ...(defaultTier ? { defaultTier } : {}),
+      ...(effortLevel && effortLevel !== "medium" ? { effortLevel } : {}),
+    },
+  };
 
   const agent = await agentService.create(orgId, userId, body);
   await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "agent.create", resourceType: "agent", resourceId: agent.id });
@@ -65,6 +77,8 @@ const updateAgentSchema = z.object({
   maxSteps: z.number().int().positive().optional(),
   timeoutSeconds: z.number().int().positive().optional(),
   starters: z.array(z.string()).optional(),
+  defaultTier: z.enum(["", "direct", "sequential", "orchestrated"]).optional(),
+  effortLevel: z.enum(["low", "medium", "high"]).optional(),
 }).passthrough();
 
 agentRoutes.patch("/:id", async (c) => {
@@ -76,8 +90,19 @@ agentRoutes.patch("/:id", async (c) => {
     return c.json({ error: "Validation failed", issues: result.error.issues }, 400);
   }
   // Convert empty strings to null for UUID fields (Postgres rejects "" for uuid)
-  const data = { ...result.data };
+  const { defaultTier, effortLevel, ...parsed } = result.data;
+  const data = { ...parsed };
   if (data.modelId === "") data.modelId = null;
+
+  // Merge tier/effort into modelParams
+  if (defaultTier !== undefined || effortLevel !== undefined) {
+    data.modelParams = {
+      ...(data.modelParams ?? {}),
+      ...(defaultTier !== undefined ? { defaultTier: defaultTier || undefined } : {}),
+      ...(effortLevel !== undefined ? { effortLevel: effortLevel === "medium" ? undefined : effortLevel } : {}),
+    };
+  }
+
   const agent = await agentService.update(orgId, c.req.param("id"), data);
   return c.json(agent);
 });

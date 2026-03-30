@@ -149,6 +149,29 @@ export function ConfigPanel({ ctx }: { ctx: UseAgentFormReturn }) {
                 { value: "global", label: t("agents.memoryGlobal", { defaultValue: "Global" }) },
               ]}
             />
+            <Select
+              label={t("agents.executionTier", { defaultValue: "Execution Tier" })}
+              size="sm"
+              value={form.defaultTier}
+              onChange={(value) => setField("defaultTier", value as any)}
+              options={[
+                { value: "", label: t("agents.tierAuto", { defaultValue: "Auto (LLM decides)" }) },
+                { value: "direct", label: t("agents.tierDirect", { defaultValue: "Direct" }) },
+                { value: "sequential", label: t("agents.tierSequential", { defaultValue: "Sequential" }) },
+                { value: "orchestrated", label: t("agents.tierOrchestrated", { defaultValue: "Orchestrated (DAG)" }) },
+              ]}
+            />
+            <Select
+              label={t("agents.effortLevel", { defaultValue: "Effort Level" })}
+              size="sm"
+              value={form.effortLevel}
+              onChange={(value) => setField("effortLevel", value as any)}
+              options={[
+                { value: "low", label: t("agents.effortLow", { defaultValue: "Low (fast)" }) },
+                { value: "medium", label: t("agents.effortMedium", { defaultValue: "Medium" }) },
+                { value: "high", label: t("agents.effortHigh", { defaultValue: "High (thorough)" }) },
+              ]}
+            />
             <div>
               <label className="block text-xs text-text-secondary mb-1">
                 {t("agents.memoryLimit", { defaultValue: "Memory Limit (MB)" })}
