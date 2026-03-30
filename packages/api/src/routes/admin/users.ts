@@ -138,4 +138,54 @@ adminUserRoutes.post("/:userId/reactivate", async (c) => {
   return c.json({ ok: true });
 });
 
+// Impersonate a user — creates a Better Auth session and returns a URL
+adminUserRoutes.post("/:userId/impersonate", async (c) => {
+  const adminId = c.get("userId");
+  const userId = c.req.param("userId");
+  const { orgId } = await c.req.json().catch(() => ({ orgId: undefined }));
+
+  // Get target user
+  const [targetUser] = await db
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)));
+
+  if (!targetUser) throw AppError.notFound("User");
+
+  // Get the Better Auth user ID (different from NOVA user ID)
+  const [baUser] = await db.execute(
+    sql`SELECT id FROM "user" WHERE email = ${targetUser.email} LIMIT 1`
+  ) as any[];
+
+  if (!baUser) throw AppError.notFound("Better Auth user not found");
+
+  // Create a Better Auth session (plain token in session table)
+  const { randomBytes } = await import("crypto");
+  const token = randomBytes(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await db.execute(sql`
+    INSERT INTO session (id, token, user_id, expires_at, created_at, updated_at, user_agent, ip_address, active_organization_id)
+    VALUES (${randomBytes(16).toString("hex")}, ${token}, ${baUser.id}, ${expiresAt.toISOString()}::timestamp, NOW(), NOW(), ${"Impersonation by admin"}, ${"admin-portal"}, ${orgId ?? null})
+  `);
+
+  await writeAuditLog({
+    orgId: orgId ?? "system",
+    actorId: adminId,
+    actorType: "user",
+    action: "user.impersonate",
+    resourceType: "user",
+    resourceId: userId,
+    details: { targetEmail: targetUser.email },
+  });
+
+  // Return the token — frontend will set it as a cookie and redirect to main app
+  return c.json({
+    ok: true,
+    token,
+    targetEmail: targetUser.email,
+    expiresAt: expiresAt.toISOString(),
+  });
+});
+
 export { adminUserRoutes };

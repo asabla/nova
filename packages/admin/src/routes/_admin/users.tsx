@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
   Search, Shield, Users as UsersIcon, UserCheck, UserX, Eye, ChevronDown,
-  ShieldCheck, ShieldOff, Building2, ArrowLeft, Mail, Clock,
+  ShieldCheck, ShieldOff, Building2, ArrowLeft, Mail, Clock, LogIn, ExternalLink,
 } from "lucide-react";
 import { adminApi } from "@/lib/api";
 import { toast } from "@/components/Toast";
@@ -152,6 +152,19 @@ function UserDetailPanel({ userId, onClose, onToggleSuperAdmin, onDeactivate, on
   onDeactivate: (userId: string) => void;
   onReactivate: (userId: string) => void;
 }) {
+  const handleImpersonate = async (targetUserId: string, orgId?: string) => {
+    try {
+      const result = await adminApi.post<{ ok: boolean; token: string; targetEmail: string }>(`/admin-api/users/${targetUserId}/impersonate`, { orgId });
+      // Set the session cookie for the main app and open it
+      document.cookie = `nova_session=${result.token}; path=/; max-age=3600; samesite=lax`;
+      const appUrl = import.meta.env.VITE_APP_URL ?? "http://localhost:5173";
+      window.open(appUrl, "_blank");
+      toast(`Impersonating ${result.targetEmail}`, "info");
+    } catch (err: any) {
+      toast(err.message ?? "Failed to impersonate", "error");
+    }
+  };
+
   const { data: user, isLoading } = useQuery({
     queryKey: ["admin-user-detail", userId],
     queryFn: () => adminApi.get<any>(`/admin-api/users/${userId}`),
@@ -234,6 +247,19 @@ function UserDetailPanel({ userId, onClose, onToggleSuperAdmin, onDeactivate, on
       {/* Actions Card */}
       <div className="rounded-xl border p-5 space-y-3" style={{ background: "var(--color-surface-raised)", borderColor: "var(--color-border-subtle)" }}>
         <h3 className="text-[10px] font-mono font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>Actions</h3>
+
+        {/* Impersonate */}
+        {!isDeactivated && (
+          <button
+            onClick={() => handleImpersonate(user.id, user.memberships?.[0]?.orgId)}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left"
+            style={{ background: "var(--color-accent-blue-dim)", color: "var(--color-accent-blue)" }}
+          >
+            <LogIn className="h-4 w-4" />
+            <span className="flex-1">Impersonate user</span>
+            <ExternalLink className="h-3 w-3 opacity-50" />
+          </button>
+        )}
 
         {/* Toggle Super Admin */}
         <button

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, Users, Settings, BarChart3, Trash2, Shield, Calendar, Building2,
   UserPlus, UserMinus, Mail, Clock, FileSearch, Palette, Lock, ChevronDown,
-  CheckCircle2, XCircle, ToggleLeft, ToggleRight, Image, Code2, Save,
+  CheckCircle2, XCircle, ToggleLeft, ToggleRight, Image, Code2, Save, ExternalLink,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { adminApi } from "@/lib/api";
@@ -75,6 +75,15 @@ function OrgDetailPage() {
             {org.setupCompletedAt && <span className="flex items-center gap-1 text-[10px]" style={{ color: "var(--color-accent-green)" }}><CheckCircle2 className="h-3 w-3" /> Setup complete</span>}
           </div>
         </div>
+        <a
+          href={`${import.meta.env.VITE_APP_URL ?? "http://localhost:5173"}?org=${orgId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+          style={{ border: "1px solid var(--color-border-default)", color: "var(--color-text-secondary)" }}
+        >
+          Open in App <ExternalLink className="h-3.5 w-3.5" />
+        </a>
       </div>
 
       {/* Tabs */}
