@@ -122,7 +122,29 @@ export async function setupSchedules() {
     }
   }
 
-  // ── 4. Register agent cron schedules (Story #107) ──
+  // ── 4. Platform metrics collection (every hour) ──
+  try {
+    await client.schedule.create({
+      scheduleId: "nova-metrics-collection",
+      spec: { cronExpressions: ["0 * * * *"] },
+      action: {
+        type: "startWorkflow",
+        workflowType: "metricsCollectionWorkflow",
+        taskQueue: TASK_QUEUES.BACKGROUND,
+        workflowId: "metrics-collection-scheduled",
+      },
+      policies: { overlap: ScheduleOverlapPolicy.SKIP },
+    });
+    console.log("Registered metrics collection schedule (hourly)");
+  } catch (err: any) {
+    if (err.message?.includes("already exists")) {
+      console.log("Metrics collection schedule already registered");
+    } else {
+      console.error("Failed to register metrics schedule:", err.message);
+    }
+  }
+
+  // ── 5. Register agent cron schedules (Story #107) ──
   await syncAgentSchedules(client);
 
   console.log("Schedule setup complete");

@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Building2, Plus, Users, MessageSquare, ExternalLink, Search, Shield } from "lucide-react";
 import { adminApi } from "@/lib/api";
+import { toast } from "@/components/Toast";
 
 export const Route = createFileRoute("/_admin/organisations/")({
   component: OrgsPage,
@@ -40,7 +41,9 @@ function OrgsPage() {
       queryClient.invalidateQueries({ queryKey: ["admin-orgs"] });
       setShowCreate(false);
       setName(""); setSlug(""); setAdminEmail(""); setIsSystemOrg(false);
+      toast("Organisation created", "success");
     },
+    onError: (err: any) => toast(err.message ?? "Failed to create organisation", "error"),
   });
 
   return (

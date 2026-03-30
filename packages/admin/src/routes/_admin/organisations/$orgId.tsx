@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { adminApi } from "@/lib/api";
+import { toast } from "@/components/Toast";
 import { useState } from "react";
 
 export const Route = createFileRoute("/_admin/organisations/$orgId")({
@@ -32,11 +33,12 @@ function OrgDetailPage() {
 
   const updateOrg = useMutation({
     mutationFn: (data: any) => adminApi.patch(`/admin-api/orgs/${orgId}`, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-org", orgId] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-org", orgId] }); toast("Organisation updated", "success"); },
+    onError: () => toast("Failed to update organisation", "error"),
   });
   const deleteOrg = useMutation({
     mutationFn: () => adminApi.delete(`/admin-api/orgs/${orgId}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-orgs"] }); window.history.back(); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-orgs"] }); toast("Organisation deleted"); window.history.back(); },
   });
 
   if (isLoading) return <div className="space-y-4"><div className="h-8 w-48 rounded skeleton" /><div className="h-32 rounded-xl skeleton" /></div>;
@@ -144,19 +146,22 @@ function MembersTab({ orgId, members }: { orgId: string; members: any[] }) {
 
   const changeRole = useMutation({
     mutationFn: ({ userId, role }: { userId: string; role: string }) => adminApi.patch(`/admin-api/orgs/${orgId}/members/${userId}/role`, { role }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-org-members", orgId] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-org-members", orgId] }); toast("Role updated"); },
+    onError: () => toast("Failed to update role", "error"),
   });
   const removeMember = useMutation({
     mutationFn: (userId: string) => adminApi.delete(`/admin-api/orgs/${orgId}/members/${userId}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-org-members", orgId] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-org-members", orgId] }); toast("Member removed"); },
+    onError: () => toast("Failed to remove member", "error"),
   });
   const invite = useMutation({
     mutationFn: () => adminApi.post(`/admin-api/orgs/${orgId}/invite`, { email: inviteEmail, role: inviteRole }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-org-invitations", orgId] }); setShowInvite(false); setInviteEmail(""); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-org-invitations", orgId] }); setShowInvite(false); setInviteEmail(""); toast("Invitation sent"); },
+    onError: () => toast("Failed to send invitation", "error"),
   });
   const revokeInvite = useMutation({
     mutationFn: (id: string) => adminApi.delete(`/admin-api/orgs/${orgId}/invitations/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-org-invitations", orgId] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-org-invitations", orgId] }); toast("Invitation revoked"); },
   });
 
   const pendingInvites = invitations?.data ?? [];
@@ -340,7 +345,8 @@ function SecurityTab({ orgId }: { orgId: string }) {
 
   const update = useMutation({
     mutationFn: (data: any) => adminApi.patch(`/admin-api/orgs/${orgId}/security`, data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-org-security", orgId] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-org-security", orgId] }); toast("Security settings saved"); },
+    onError: () => toast("Failed to save security settings", "error"),
   });
 
   if (isLoading) return <div className="h-40 rounded-xl skeleton" />;
@@ -418,7 +424,8 @@ function BrandingTab({ orgId, org }: { orgId: string; org: any }) {
 
   const save = useMutation({
     mutationFn: () => adminApi.patch(`/admin-api/orgs/${orgId}/branding`, { logoUrl: logoUrl || null, faviconUrl: faviconUrl || null, primaryColor: primaryColor || null, customCss: customCss || null }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-org", orgId] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-org", orgId] }); toast("Branding saved"); },
+    onError: () => toast("Failed to save branding", "error"),
   });
 
   return (
