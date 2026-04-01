@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppContext } from "../types/context";
-import { chatCompletion, streamChatCompletion, openai } from "../lib/litellm";
+import { chatCompletion, streamChatCompletion, openai, resolveModelExternalId } from "../lib/litellm";
 import { writeAuditLog } from "../services/audit.service";
 
 const v1ChatRoutes = new Hono<AppContext>();
@@ -184,9 +184,11 @@ v1ChatRoutes.post("/../agents/run", async (c) => {
 
   const modelParams = (agent.modelParams as Record<string, unknown>) ?? {};
 
+  const resolvedModel = await resolveModelExternalId(orgId, agent.modelId);
+
   if (body.stream) {
     const stream = await streamChatCompletion({
-      model: agent.modelId ?? "default",
+      model: resolvedModel,
       messages,
       temperature: modelParams.temperature as number | undefined,
       max_tokens: modelParams.maxTokens as number | undefined,
@@ -204,7 +206,7 @@ v1ChatRoutes.post("/../agents/run", async (c) => {
   }
 
   const result = await chatCompletion({
-    model: agent.modelId ?? "default",
+    model: resolvedModel,
     messages,
     temperature: modelParams.temperature as number | undefined,
     max_tokens: modelParams.maxTokens as number | undefined,

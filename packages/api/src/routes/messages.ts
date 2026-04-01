@@ -6,7 +6,7 @@ import type { AppContext } from "../types/context";
 import { logger } from "../lib/logger";
 import * as messageService from "../services/message.service";
 import * as conversationService from "../services/conversation.service";
-import { streamChatCompletion, chatCompletion } from "../lib/litellm";
+import { streamChatCompletion, chatCompletion, resolveModelExternalId } from "../lib/litellm";
 import { AppError } from "@nova/shared/utils";
 import { DEFAULTS, TASK_QUEUES } from "@nova/shared/constants";
 import { notificationService } from "../services/notification.service";
@@ -355,12 +355,8 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
   const conversation = await conversationService.getConversation(orgId, conversationId);
   if (!conversation) throw AppError.notFound("Conversation");
 
-  // Resolve "default" to the org's configured default model
-  let resolvedModel = body.model;
-  if (!resolvedModel || resolvedModel === "default") {
-    const [setting] = await db.select().from(orgSettings).where(and(eq(orgSettings.orgId, orgId), eq(orgSettings.key, "defaultModel")));
-    resolvedModel = setting?.value ?? body.model;
-  }
+  // Resolve "default" or UUID to actual model external ID
+  const resolvedModel = await resolveModelExternalId(orgId, body.model);
 
   // Resolve model UUID from external ID for analytics tracking
   let resolvedModelId: string | null = conversation.modelId;

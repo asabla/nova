@@ -4,7 +4,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
 import { agents } from "@nova/shared/schemas";
-import { chatCompletion } from "../lib/litellm";
+import { chatCompletion, resolveModelExternalId } from "../lib/litellm";
 import { writeAuditLog } from "../services/audit.service";
 
 const webhookRoutes = new Hono<AppContext>();
@@ -45,10 +45,11 @@ webhookRoutes.post("/agents/:webhookId", async (c) => {
   messages.push({ role: "user", content: String(input) });
 
   const modelParams = (agent.modelParams as Record<string, unknown>) ?? {};
+  const resolvedModel = await resolveModelExternalId(agent.orgId, agent.modelId);
 
   try {
     const result = await chatCompletion({
-      model: agent.modelId ?? "default",
+      model: resolvedModel,
       messages,
       temperature: modelParams.temperature as number | undefined,
       max_tokens: modelParams.maxTokens as number | undefined,
@@ -107,9 +108,11 @@ webhookRoutes.post("/email/inbound", async (c) => {
   }
   messages.push({ role: "user", content: `Process this email:\n\n${emailContent}` });
 
+  const resolvedEmailModel = await resolveModelExternalId(agent.orgId, agent.modelId);
+
   try {
     const result = await chatCompletion({
-      model: agent.modelId ?? "default",
+      model: resolvedEmailModel,
       messages,
       orgId: agent.orgId,
     });

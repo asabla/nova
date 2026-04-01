@@ -82,6 +82,33 @@ async function getClientForModel(orgId: string | undefined, modelExternalId: str
 
 // ─── Model params (drop_params replacement) ─────────
 
+/**
+ * Resolves a model identifier to its external ID.
+ * Handles: "default" → org's default model, UUID → lookup by id, already-external-id → pass through.
+ */
+export async function resolveModelExternalId(orgId: string, modelIdOrName: string | null | undefined): Promise<string> {
+  if (!modelIdOrName || modelIdOrName === "default") {
+    // Find org's default model
+    const [defaultModel] = await db.select({ modelIdExternal: models.modelIdExternal }).from(models)
+      .where(and(eq(models.orgId, orgId), eq(models.isDefault, true), eq(models.isEnabled, true), isNull(models.deletedAt)))
+      .limit(1);
+    if (defaultModel) return defaultModel.modelIdExternal;
+    // Fall back to any enabled model in the org
+    const [anyModel] = await db.select({ modelIdExternal: models.modelIdExternal }).from(models)
+      .where(and(eq(models.orgId, orgId), eq(models.isEnabled, true), isNull(models.deletedAt)))
+      .limit(1);
+    return anyModel?.modelIdExternal ?? "gpt-5.4";
+  }
+  // Check if it's a UUID (model table PK) and resolve to external ID
+  if (modelIdOrName.match(/^[0-9a-f]{8}-[0-9a-f]{4}-/)) {
+    const [row] = await db.select({ modelIdExternal: models.modelIdExternal }).from(models)
+      .where(and(eq(models.id, modelIdOrName), isNull(models.deletedAt)))
+      .limit(1);
+    return row?.modelIdExternal ?? modelIdOrName;
+  }
+  return modelIdOrName;
+}
+
 interface ModelParams {
   dropParams?: string[];
   defaultOverrides?: Record<string, unknown>;

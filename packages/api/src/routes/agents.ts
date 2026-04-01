@@ -246,14 +246,15 @@ agentRoutes.post("/:id/test", async (c) => {
   const { prompt } = z.object({ prompt: z.string().min(1).max(5000) }).parse(await c.req.json());
 
   // Use litellm to run a test completion with agent's system prompt
-  const { chatCompletion } = await import("../lib/litellm");
+  const { chatCompletion, resolveModelExternalId } = await import("../lib/litellm");
+  const resolvedModel = await resolveModelExternalId(orgId, agent.modelId);
   const messages = [];
   if (agent.systemPrompt) messages.push({ role: "system" as const, content: agent.systemPrompt });
   messages.push({ role: "user" as const, content: prompt });
 
   try {
     const result = await chatCompletion({
-      model: agent.modelId ?? "default",
+      model: resolvedModel,
       messages,
       ...(agent.modelParams as Record<string, unknown> ?? {}),
       orgId,
