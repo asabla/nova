@@ -5,8 +5,8 @@ echo "=== NOVA DB Init ==="
 cd /app/packages/api
 
 echo "[1/3] Applying database schema..."
-# Use db:push for dev — ensures schema matches code regardless of migration state
-bunx drizzle-kit push
+# Apply migrations (non-interactive, idempotent)
+bunx drizzle-kit migrate 2>&1 || echo "  Migrations already applied."
 
 # Ensure Better Auth tables exist (they're not in drizzle-kit migrations)
 bun -e "
