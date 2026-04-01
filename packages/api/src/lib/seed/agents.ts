@@ -28,6 +28,7 @@ export async function seedAgents(orgId: string, userId: string): Promise<void> {
           maxSteps: a.maxSteps,
           timeoutSeconds: a.timeoutSeconds,
           builtinTools: a.builtinTools,
+          isPublished: true,
           updatedAt: new Date(),
         },
       });

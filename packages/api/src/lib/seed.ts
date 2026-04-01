@@ -11,7 +11,7 @@ async function seed() {
   console.log("Seeding database...\n");
 
   // 1. System org (platform-level config for admin portal)
-  await seedSystemOrg();
+  const systemOrgId = await seedSystemOrg();
 
   // 2. Default org
   const orgId = await seedOrg();
@@ -22,14 +22,14 @@ async function seed() {
   // 4. Org-level providers + models
   await seedProviders(orgId);
 
-  // 5. Prompt templates
+  // 5. Prompt templates (org-local)
   await seedPrompts(orgId, userId);
 
-  // 6. Agents
-  await seedAgents(orgId, userId);
+  // 6. Platform agents (system org — visible to all orgs)
+  await seedAgents(systemOrgId, userId);
 
-  // 7. Explore templates
-  await seedExploreTemplates(orgId, userId);
+  // 7. Platform explore templates (system org — visible to all orgs)
+  await seedExploreTemplates(systemOrgId, userId);
 
   // 8. System prompts & eval dimensions
   await seedEvals(orgId);
