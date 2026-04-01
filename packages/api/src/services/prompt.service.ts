@@ -1,6 +1,6 @@
-import { eq, and, or, desc, ilike, sql } from "drizzle-orm";
+import { eq, and, or, desc, ilike, sql, isNull } from "drizzle-orm";
 import { db } from "../lib/db";
-import { promptTemplates, promptTemplateVersions } from "@nova/shared/schemas";
+import { promptTemplates, promptTemplateVersions, organisations } from "@nova/shared/schemas";
 import type { PromptTemplateInput } from "@nova/shared/schemas";
 import { AppError } from "@nova/shared/utils";
 
@@ -253,6 +253,56 @@ export const promptService = {
     });
 
     return forked;
+  },
+
+  async installFromMarketplace(templateId: string, targetOrgId: string, userId: string) {
+    const [source] = await db
+      .select()
+      .from(promptTemplates)
+      .where(and(
+        eq(promptTemplates.id, templateId),
+        eq(promptTemplates.isPublished, true),
+        eq(promptTemplates.isSystem, true),
+        isNull(promptTemplates.deletedAt),
+      ));
+
+    if (!source) throw AppError.notFound("Template not found in marketplace");
+
+    const [sourceOrg] = await db
+      .select({ isSystemOrg: organisations.isSystemOrg })
+      .from(organisations)
+      .where(eq(organisations.id, source.orgId));
+
+    if (!sourceOrg?.isSystemOrg) {
+      throw AppError.forbidden("Can only install templates from the platform marketplace");
+    }
+
+    const { id: _id, orgId: _orgId, ownerId: _ownerId, createdAt: _ca, updatedAt: _ua, deletedAt: _da, isPublished: _ip, isSystem: _is, isApproved: _ia, usageCount: _uc, avgRating: _ar, currentVersion: _cv, ...templateData } = source;
+    const [cloned] = await db
+      .insert(promptTemplates)
+      .values({
+        ...templateData,
+        orgId: targetOrgId,
+        ownerId: userId,
+        forkedFromTemplateId: templateId,
+        isPublished: false,
+        isSystem: false,
+        visibility: "private",
+      })
+      .returning();
+
+    // Create initial version
+    await db.insert(promptTemplateVersions).values({
+      promptTemplateId: cloned.id,
+      orgId: targetOrgId,
+      version: 1,
+      content: source.content,
+      variables: source.variables,
+      systemPrompt: source.systemPrompt,
+      changelog: `Installed from "${source.name}"`,
+    });
+
+    return cloned;
   },
 
   // --- Rating (User Story #186) ---

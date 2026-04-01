@@ -18,6 +18,15 @@ promptRoutes.get("/explore", async (c) => {
   return c.json(result);
 });
 
+// --- Marketplace install (clone system template to user's org) ---
+
+promptRoutes.post("/marketplace/:id/install", async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const template = await promptService.installFromMarketplace(c.req.param("id"), orgId, userId);
+  return c.json(template, 201);
+});
+
 // --- Basic CRUD ---
 
 promptRoutes.get("/", async (c) => {
