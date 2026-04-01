@@ -1,5 +1,6 @@
 import { Worker, NativeConnection } from "@temporalio/worker";
 import { Connection, Client } from "@temporalio/client";
+import path from "node:path";
 import * as activities from "./activities";
 import { env } from "@nova/worker-shared/env";
 import { closeDb } from "@nova/worker-shared/db";
@@ -18,7 +19,9 @@ async function run() {
     connection,
     namespace: env.TEMPORAL_NAMESPACE,
     taskQueue: TASK_QUEUE,
-    workflowsPath: new URL("./workflows/index.js", import.meta.url).pathname,
+    workflowsPath: import.meta.filename.endsWith(".ts")
+      ? path.resolve(import.meta.dirname, "workflows/index.ts")
+      : new URL("./workflows/index.js", import.meta.url).pathname,
     activities,
     maxConcurrentActivityTaskExecutions: env.WORKER_MAX_ACTIVITIES,
     maxConcurrentWorkflowTaskExecutions: env.WORKER_MAX_WORKFLOWS,

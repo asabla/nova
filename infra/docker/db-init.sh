@@ -4,10 +4,9 @@ echo "=== NOVA DB Init ==="
 
 cd /app/packages/api
 
-echo "[1/3] Running database migrations..."
-# Always backfill first — it's idempotent and handles db:push state
-bun run /app/db-init-backfill-migrations.ts
-bunx drizzle-kit migrate
+echo "[1/3] Applying database schema..."
+# Use db:push for dev — ensures schema matches code regardless of migration state
+bunx drizzle-kit push
 
 # Ensure Better Auth tables exist (they're not in drizzle-kit migrations)
 bun -e "

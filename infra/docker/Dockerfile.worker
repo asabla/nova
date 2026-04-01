@@ -84,25 +84,7 @@ RUN for f in node_modules/@openai/agents-core/dist/types/protocol.mjs \
       "; \
     done
 
-# Create zod/v3 and zod/v4 shims — openai SDK imports 'zod/v3' and 'zod/v4'
-# but zod 3.x doesn't export either. Must patch files AND package.json exports.
-RUN for v in v3 v4; do \
-      mkdir -p node_modules/zod/$v && \
-      echo "// zod $v shim — re-exports zod v3 for openai SDK compatibility" > node_modules/zod/$v/index.js && \
-      echo 'module.exports = require("zod");' >> node_modules/zod/$v/index.js && \
-      echo 'export * from "zod";' > node_modules/zod/$v/index.mjs; \
-    done && \
-    bun -e " \
-      const pkg = JSON.parse(await Bun.file('node_modules/zod/package.json').text()); \
-      if (!pkg.exports) pkg.exports = {}; \
-      for (const v of ['./v3', './v4']) { \
-        if (!pkg.exports[v]) { \
-          const dir = v.slice(2); \
-          pkg.exports[v] = { import: './' + dir + '/index.mjs', require: './' + dir + '/index.js', default: './' + dir + '/index.js' }; \
-        } \
-      } \
-      await Bun.write('node_modules/zod/package.json', JSON.stringify(pkg, null, 2)); \
-    "
+# Note: zod 3.25+ has native ./v3 and ./v4 sub-path exports — no shims needed.
 
 # ── Stage 3: Runtime (Node.js — required by Temporal) ──
 FROM node:22-slim

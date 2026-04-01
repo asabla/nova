@@ -20,7 +20,7 @@
     "@nova/shared": "workspace:*",
     "@tanstack/react-query": "^5.72.2",
     "@tanstack/react-router": "^1.114.26",
-    "better-auth": "^1.2.7",
+    "better-auth": "~1.2.7",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "diff": "^8.0.3",
