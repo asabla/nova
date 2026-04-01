@@ -1,8 +1,33 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bot, FileText, Plus, Sparkles, Eye, EyeOff } from "lucide-react";
+import {
+  Bot, FileText, Plus, Sparkles, Eye, EyeOff,
+  Lightbulb, Code2, Terminal, Database, Search, BookOpen, Mail, PenTool,
+  BarChart3, Presentation, Megaphone, TrendingUp, Headphones, Receipt,
+  Clock, UserPlus, FolderOpen, Globe, Workflow, Layers, FileSpreadsheet,
+  Zap, Blocks, Paintbrush, Palette, LayoutDashboard, Award, GraduationCap,
+  TestTube, GitBranch, Pencil, ClipboardCheck, Scale, Shield, Target,
+  MessageSquare,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { adminApi } from "@/lib/api";
 import { toast } from "@/components/Toast";
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  Lightbulb, FileText, Sparkles, Code2, Terminal, Database, Search, BookOpen,
+  Mail, PenTool, BarChart3, Presentation, Megaphone, TrendingUp, Headphones,
+  Receipt, Clock, UserPlus, FolderOpen, Globe, Workflow, Layers,
+  FileSpreadsheet, Zap, Blocks, Paintbrush, Palette, LayoutDashboard, Award,
+  GraduationCap, TestTube, GitBranch, Pencil, ClipboardCheck, Scale, Shield,
+  Target, MessageSquare,
+};
+
+const COLOR_MAP: Record<string, string> = {
+  "text-primary": "#6366f1",
+  "text-success": "#22c55e",
+  "text-warning": "#f59e0b",
+  "text-danger": "#ef4444",
+};
 
 export const Route = createFileRoute("/_admin/marketplace/templates/")({
   component: MarketplaceTemplatesPage,
@@ -126,9 +151,15 @@ function TemplateCard({ template }: { template: any }) {
       style={{ background: "var(--color-surface-raised)", borderColor: "var(--color-border-subtle)" }}
     >
       <div className="flex items-start gap-3 mb-3">
-        <div className="p-2 rounded-lg" style={{ background: "var(--color-accent-amber-dim)" }}>
-          <FileText className="h-4 w-4" style={{ color: "var(--color-accent-amber)" }} />
-        </div>
+        {(() => {
+          const Icon = (template.icon && ICON_MAP[template.icon]) || FileText;
+          const iconColor = (template.color && COLOR_MAP[template.color]) || "#f59e0b";
+          return (
+            <div className="p-2 rounded-lg" style={{ background: `${iconColor}15` }}>
+              <Icon className="h-4 w-4" style={{ color: iconColor }} />
+            </div>
+          );
+        })()}
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-semibold truncate" style={{ color: "var(--color-text-primary)" }}>{template.name}</h3>
           {template.description && <p className="text-xs mt-0.5 line-clamp-2" style={{ color: "var(--color-text-secondary)" }}>{template.description}</p>}
