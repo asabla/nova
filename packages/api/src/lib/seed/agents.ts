@@ -11,6 +11,7 @@ export async function seedAgents(orgId: string, userId: string): Promise<void> {
         ownerId: userId,
         name: a.name,
         description: a.description,
+        avatarUrl: a.avatarUrl,
         systemPrompt: a.systemPrompt,
         visibility: a.visibility,
         toolApprovalMode: a.toolApprovalMode,
@@ -24,6 +25,7 @@ export async function seedAgents(orgId: string, userId: string): Promise<void> {
         target: [agents.orgId, agents.name],
         set: {
           description: a.description,
+          avatarUrl: a.avatarUrl,
           systemPrompt: a.systemPrompt,
           maxSteps: a.maxSteps,
           timeoutSeconds: a.timeoutSeconds,

@@ -1,6 +1,7 @@
 export const agentDefs = [
   {
     name: "Web Researcher",
+    avatarUrl: "color:#3b82f6",
     description: "Searches the web, reads pages, and synthesizes findings into structured, cited reports.",
     systemPrompt: `You are a thorough web researcher. Your job is to find accurate, up-to-date information and present it in a clear, well-organized format.
 
@@ -31,6 +32,7 @@ export const agentDefs = [
   },
   {
     name: "Code Assistant",
+    avatarUrl: "color:#22c55e",
     description: "Writes, reviews, debugs, and explains code. Runs code in a sandbox to verify solutions.",
     systemPrompt: `You are a senior software engineer who writes production-quality code and helps others improve theirs.
 
@@ -59,6 +61,7 @@ export const agentDefs = [
   },
   {
     name: "Writing Partner",
+    avatarUrl: "color:#a855f7",
     description: "Helps draft, edit, restructure, and polish written content for any audience and format.",
     systemPrompt: `You are a versatile writing partner who helps people produce clear, effective written content.
 
@@ -93,6 +96,7 @@ Unless told otherwise: professional but conversational, active voice, concise se
   },
   {
     name: "Data Analyst",
+    avatarUrl: "color:#f97316",
     description: "Analyzes datasets, generates charts, writes SQL, and extracts insights from numbers.",
     systemPrompt: `You are a data analyst who turns raw data into clear insights and actionable recommendations.
 
@@ -128,6 +132,7 @@ Unless told otherwise: professional but conversational, active voice, concise se
   },
   {
     name: "Workspace Navigator",
+    avatarUrl: "color:#06b6d4",
     description: "Searches your team's conversations, knowledge base, and files to find information fast.",
     systemPrompt: `You are a workspace search specialist. You help people find information across their organization's conversations, knowledge base, and files.
 
@@ -158,6 +163,7 @@ Unless told otherwise: professional but conversational, active voice, concise se
   },
   {
     name: "Task Planner",
+    avatarUrl: "color:#ec4899",
     description: "Breaks down complex projects into structured plans with clear steps, dependencies, and priorities.",
     systemPrompt: `You are a project planning specialist who helps teams break down complex work into clear, actionable plans.
 
