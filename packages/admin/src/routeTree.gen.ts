@@ -23,6 +23,12 @@ import { Route as AdminMarketplaceIndexRouteImport } from './routes/_admin/marke
 import { Route as AdminOrganisationsOrgIdRouteImport } from './routes/_admin/organisations/$orgId'
 import { Route as AdminMarketplaceTemplatesRouteImport } from './routes/_admin/marketplace/templates'
 import { Route as AdminMarketplaceAgentsRouteImport } from './routes/_admin/marketplace/agents'
+import { Route as AdminMarketplaceTemplatesIndexRouteImport } from './routes/_admin/marketplace/templates.index'
+import { Route as AdminMarketplaceAgentsIndexRouteImport } from './routes/_admin/marketplace/agents.index'
+import { Route as AdminMarketplaceTemplatesNewRouteImport } from './routes/_admin/marketplace/templates.new'
+import { Route as AdminMarketplaceTemplatesTemplateIdRouteImport } from './routes/_admin/marketplace/templates.$templateId'
+import { Route as AdminMarketplaceAgentsNewRouteImport } from './routes/_admin/marketplace/agents.new'
+import { Route as AdminMarketplaceAgentsAgentIdRouteImport } from './routes/_admin/marketplace/agents.$agentId'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -94,6 +100,42 @@ const AdminMarketplaceAgentsRoute = AdminMarketplaceAgentsRouteImport.update({
   path: '/marketplace/agents',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminMarketplaceTemplatesIndexRoute =
+  AdminMarketplaceTemplatesIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AdminMarketplaceTemplatesRoute,
+  } as any)
+const AdminMarketplaceAgentsIndexRoute =
+  AdminMarketplaceAgentsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AdminMarketplaceAgentsRoute,
+  } as any)
+const AdminMarketplaceTemplatesNewRoute =
+  AdminMarketplaceTemplatesNewRouteImport.update({
+    id: '/new',
+    path: '/new',
+    getParentRoute: () => AdminMarketplaceTemplatesRoute,
+  } as any)
+const AdminMarketplaceTemplatesTemplateIdRoute =
+  AdminMarketplaceTemplatesTemplateIdRouteImport.update({
+    id: '/$templateId',
+    path: '/$templateId',
+    getParentRoute: () => AdminMarketplaceTemplatesRoute,
+  } as any)
+const AdminMarketplaceAgentsNewRoute =
+  AdminMarketplaceAgentsNewRouteImport.update({
+    id: '/new',
+    path: '/new',
+    getParentRoute: () => AdminMarketplaceAgentsRoute,
+  } as any)
+const AdminMarketplaceAgentsAgentIdRoute =
+  AdminMarketplaceAgentsAgentIdRouteImport.update({
+    id: '/$agentId',
+    path: '/$agentId',
+    getParentRoute: () => AdminMarketplaceAgentsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -104,11 +146,17 @@ export interface FileRoutesByFullPath {
   '/providers': typeof AdminProvidersRoute
   '/settings': typeof AdminSettingsRoute
   '/users': typeof AdminUsersRoute
-  '/marketplace/agents': typeof AdminMarketplaceAgentsRoute
-  '/marketplace/templates': typeof AdminMarketplaceTemplatesRoute
+  '/marketplace/agents': typeof AdminMarketplaceAgentsRouteWithChildren
+  '/marketplace/templates': typeof AdminMarketplaceTemplatesRouteWithChildren
   '/organisations/$orgId': typeof AdminOrganisationsOrgIdRoute
   '/marketplace/': typeof AdminMarketplaceIndexRoute
   '/organisations/': typeof AdminOrganisationsIndexRoute
+  '/marketplace/agents/$agentId': typeof AdminMarketplaceAgentsAgentIdRoute
+  '/marketplace/agents/new': typeof AdminMarketplaceAgentsNewRoute
+  '/marketplace/templates/$templateId': typeof AdminMarketplaceTemplatesTemplateIdRoute
+  '/marketplace/templates/new': typeof AdminMarketplaceTemplatesNewRoute
+  '/marketplace/agents/': typeof AdminMarketplaceAgentsIndexRoute
+  '/marketplace/templates/': typeof AdminMarketplaceTemplatesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -119,11 +167,15 @@ export interface FileRoutesByTo {
   '/providers': typeof AdminProvidersRoute
   '/settings': typeof AdminSettingsRoute
   '/users': typeof AdminUsersRoute
-  '/marketplace/agents': typeof AdminMarketplaceAgentsRoute
-  '/marketplace/templates': typeof AdminMarketplaceTemplatesRoute
   '/organisations/$orgId': typeof AdminOrganisationsOrgIdRoute
   '/marketplace': typeof AdminMarketplaceIndexRoute
   '/organisations': typeof AdminOrganisationsIndexRoute
+  '/marketplace/agents/$agentId': typeof AdminMarketplaceAgentsAgentIdRoute
+  '/marketplace/agents/new': typeof AdminMarketplaceAgentsNewRoute
+  '/marketplace/templates/$templateId': typeof AdminMarketplaceTemplatesTemplateIdRoute
+  '/marketplace/templates/new': typeof AdminMarketplaceTemplatesNewRoute
+  '/marketplace/agents': typeof AdminMarketplaceAgentsIndexRoute
+  '/marketplace/templates': typeof AdminMarketplaceTemplatesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -136,11 +188,17 @@ export interface FileRoutesById {
   '/_admin/providers': typeof AdminProvidersRoute
   '/_admin/settings': typeof AdminSettingsRoute
   '/_admin/users': typeof AdminUsersRoute
-  '/_admin/marketplace/agents': typeof AdminMarketplaceAgentsRoute
-  '/_admin/marketplace/templates': typeof AdminMarketplaceTemplatesRoute
+  '/_admin/marketplace/agents': typeof AdminMarketplaceAgentsRouteWithChildren
+  '/_admin/marketplace/templates': typeof AdminMarketplaceTemplatesRouteWithChildren
   '/_admin/organisations/$orgId': typeof AdminOrganisationsOrgIdRoute
   '/_admin/marketplace/': typeof AdminMarketplaceIndexRoute
   '/_admin/organisations/': typeof AdminOrganisationsIndexRoute
+  '/_admin/marketplace/agents/$agentId': typeof AdminMarketplaceAgentsAgentIdRoute
+  '/_admin/marketplace/agents/new': typeof AdminMarketplaceAgentsNewRoute
+  '/_admin/marketplace/templates/$templateId': typeof AdminMarketplaceTemplatesTemplateIdRoute
+  '/_admin/marketplace/templates/new': typeof AdminMarketplaceTemplatesNewRoute
+  '/_admin/marketplace/agents/': typeof AdminMarketplaceAgentsIndexRoute
+  '/_admin/marketplace/templates/': typeof AdminMarketplaceTemplatesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -158,6 +216,12 @@ export interface FileRouteTypes {
     | '/organisations/$orgId'
     | '/marketplace/'
     | '/organisations/'
+    | '/marketplace/agents/$agentId'
+    | '/marketplace/agents/new'
+    | '/marketplace/templates/$templateId'
+    | '/marketplace/templates/new'
+    | '/marketplace/agents/'
+    | '/marketplace/templates/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -168,11 +232,15 @@ export interface FileRouteTypes {
     | '/providers'
     | '/settings'
     | '/users'
-    | '/marketplace/agents'
-    | '/marketplace/templates'
     | '/organisations/$orgId'
     | '/marketplace'
     | '/organisations'
+    | '/marketplace/agents/$agentId'
+    | '/marketplace/agents/new'
+    | '/marketplace/templates/$templateId'
+    | '/marketplace/templates/new'
+    | '/marketplace/agents'
+    | '/marketplace/templates'
   id:
     | '__root__'
     | '/'
@@ -189,6 +257,12 @@ export interface FileRouteTypes {
     | '/_admin/organisations/$orgId'
     | '/_admin/marketplace/'
     | '/_admin/organisations/'
+    | '/_admin/marketplace/agents/$agentId'
+    | '/_admin/marketplace/agents/new'
+    | '/_admin/marketplace/templates/$templateId'
+    | '/_admin/marketplace/templates/new'
+    | '/_admin/marketplace/agents/'
+    | '/_admin/marketplace/templates/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -297,8 +371,87 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminMarketplaceAgentsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/_admin/marketplace/templates/': {
+      id: '/_admin/marketplace/templates/'
+      path: '/'
+      fullPath: '/marketplace/templates/'
+      preLoaderRoute: typeof AdminMarketplaceTemplatesIndexRouteImport
+      parentRoute: typeof AdminMarketplaceTemplatesRoute
+    }
+    '/_admin/marketplace/agents/': {
+      id: '/_admin/marketplace/agents/'
+      path: '/'
+      fullPath: '/marketplace/agents/'
+      preLoaderRoute: typeof AdminMarketplaceAgentsIndexRouteImport
+      parentRoute: typeof AdminMarketplaceAgentsRoute
+    }
+    '/_admin/marketplace/templates/new': {
+      id: '/_admin/marketplace/templates/new'
+      path: '/new'
+      fullPath: '/marketplace/templates/new'
+      preLoaderRoute: typeof AdminMarketplaceTemplatesNewRouteImport
+      parentRoute: typeof AdminMarketplaceTemplatesRoute
+    }
+    '/_admin/marketplace/templates/$templateId': {
+      id: '/_admin/marketplace/templates/$templateId'
+      path: '/$templateId'
+      fullPath: '/marketplace/templates/$templateId'
+      preLoaderRoute: typeof AdminMarketplaceTemplatesTemplateIdRouteImport
+      parentRoute: typeof AdminMarketplaceTemplatesRoute
+    }
+    '/_admin/marketplace/agents/new': {
+      id: '/_admin/marketplace/agents/new'
+      path: '/new'
+      fullPath: '/marketplace/agents/new'
+      preLoaderRoute: typeof AdminMarketplaceAgentsNewRouteImport
+      parentRoute: typeof AdminMarketplaceAgentsRoute
+    }
+    '/_admin/marketplace/agents/$agentId': {
+      id: '/_admin/marketplace/agents/$agentId'
+      path: '/$agentId'
+      fullPath: '/marketplace/agents/$agentId'
+      preLoaderRoute: typeof AdminMarketplaceAgentsAgentIdRouteImport
+      parentRoute: typeof AdminMarketplaceAgentsRoute
+    }
   }
 }
+
+interface AdminMarketplaceAgentsRouteChildren {
+  AdminMarketplaceAgentsAgentIdRoute: typeof AdminMarketplaceAgentsAgentIdRoute
+  AdminMarketplaceAgentsNewRoute: typeof AdminMarketplaceAgentsNewRoute
+  AdminMarketplaceAgentsIndexRoute: typeof AdminMarketplaceAgentsIndexRoute
+}
+
+const AdminMarketplaceAgentsRouteChildren: AdminMarketplaceAgentsRouteChildren =
+  {
+    AdminMarketplaceAgentsAgentIdRoute: AdminMarketplaceAgentsAgentIdRoute,
+    AdminMarketplaceAgentsNewRoute: AdminMarketplaceAgentsNewRoute,
+    AdminMarketplaceAgentsIndexRoute: AdminMarketplaceAgentsIndexRoute,
+  }
+
+const AdminMarketplaceAgentsRouteWithChildren =
+  AdminMarketplaceAgentsRoute._addFileChildren(
+    AdminMarketplaceAgentsRouteChildren,
+  )
+
+interface AdminMarketplaceTemplatesRouteChildren {
+  AdminMarketplaceTemplatesTemplateIdRoute: typeof AdminMarketplaceTemplatesTemplateIdRoute
+  AdminMarketplaceTemplatesNewRoute: typeof AdminMarketplaceTemplatesNewRoute
+  AdminMarketplaceTemplatesIndexRoute: typeof AdminMarketplaceTemplatesIndexRoute
+}
+
+const AdminMarketplaceTemplatesRouteChildren: AdminMarketplaceTemplatesRouteChildren =
+  {
+    AdminMarketplaceTemplatesTemplateIdRoute:
+      AdminMarketplaceTemplatesTemplateIdRoute,
+    AdminMarketplaceTemplatesNewRoute: AdminMarketplaceTemplatesNewRoute,
+    AdminMarketplaceTemplatesIndexRoute: AdminMarketplaceTemplatesIndexRoute,
+  }
+
+const AdminMarketplaceTemplatesRouteWithChildren =
+  AdminMarketplaceTemplatesRoute._addFileChildren(
+    AdminMarketplaceTemplatesRouteChildren,
+  )
 
 interface AdminRouteChildren {
   AdminAuditRoute: typeof AdminAuditRoute
@@ -307,8 +460,8 @@ interface AdminRouteChildren {
   AdminProvidersRoute: typeof AdminProvidersRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminUsersRoute: typeof AdminUsersRoute
-  AdminMarketplaceAgentsRoute: typeof AdminMarketplaceAgentsRoute
-  AdminMarketplaceTemplatesRoute: typeof AdminMarketplaceTemplatesRoute
+  AdminMarketplaceAgentsRoute: typeof AdminMarketplaceAgentsRouteWithChildren
+  AdminMarketplaceTemplatesRoute: typeof AdminMarketplaceTemplatesRouteWithChildren
   AdminOrganisationsOrgIdRoute: typeof AdminOrganisationsOrgIdRoute
   AdminMarketplaceIndexRoute: typeof AdminMarketplaceIndexRoute
   AdminOrganisationsIndexRoute: typeof AdminOrganisationsIndexRoute
@@ -321,8 +474,8 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminProvidersRoute: AdminProvidersRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminUsersRoute: AdminUsersRoute,
-  AdminMarketplaceAgentsRoute: AdminMarketplaceAgentsRoute,
-  AdminMarketplaceTemplatesRoute: AdminMarketplaceTemplatesRoute,
+  AdminMarketplaceAgentsRoute: AdminMarketplaceAgentsRouteWithChildren,
+  AdminMarketplaceTemplatesRoute: AdminMarketplaceTemplatesRouteWithChildren,
   AdminOrganisationsOrgIdRoute: AdminOrganisationsOrgIdRoute,
   AdminMarketplaceIndexRoute: AdminMarketplaceIndexRoute,
   AdminOrganisationsIndexRoute: AdminOrganisationsIndexRoute,
