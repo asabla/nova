@@ -77,12 +77,13 @@ function toExploreTemplate(t: ApiTemplate): ExploreTemplate {
 function AgentCard({
   agent,
   onChat,
-  onView,
+  onInstall,
 }: {
   agent: any;
   onChat: (agent: any) => void;
-  onView: (agent: any) => void;
+  onInstall: (agent: any) => void;
 }) {
+  const isPlatform = agent.source === "platform";
   return (
     <div className="flex flex-col p-4 rounded-xl bg-surface-secondary border border-border hover:border-border-strong transition-colors group">
       <div className="flex items-start gap-3 mb-3">
@@ -91,11 +92,16 @@ function AgentCard({
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-semibold text-text truncate">{agent.name}</h3>
-          {agent.visibility && (
-            <Badge variant={agent.visibility === "public" ? "primary" : "default"} className="mt-0.5">
-              {agent.visibility}
-            </Badge>
-          )}
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {isPlatform && (
+              <Badge variant="default" className="text-[9px]">Marketplace</Badge>
+            )}
+            {agent.visibility && !isPlatform && (
+              <Badge variant={agent.visibility === "public" ? "primary" : "default"} className="mt-0.5">
+                {agent.visibility}
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
       {agent.description && (
@@ -108,12 +114,22 @@ function AgentCard({
             <span className="text-[10px] text-text-tertiary">{agent.usageCount}</span>
           </div>
         )}
-        <button
-          onClick={() => onView(agent)}
-          className="text-xs text-text-tertiary hover:text-text transition-colors"
-        >
-          View
-        </button>
+        {isPlatform && (
+          <button
+            onClick={() => onInstall(agent)}
+            className="text-xs text-primary hover:text-primary-dark transition-colors"
+          >
+            Install
+          </button>
+        )}
+        {!isPlatform && (
+          <button
+            onClick={() => onInstall(agent)}
+            className="text-xs text-text-tertiary hover:text-text transition-colors"
+          >
+            View
+          </button>
+        )}
         <Button variant="ghost" size="sm" onClick={() => onChat(agent)}>
           <MessageSquare className="h-3 w-3 mr-1" aria-hidden="true" />
           Chat
@@ -268,8 +284,18 @@ function ExplorePage() {
     navigate({ to: "/conversations/new", search: { agentId: agent.id } });
   };
 
-  const handleViewAgent = (agent: any) => {
-    navigate({ to: `/agents/${agent.id}` });
+  const handleInstallAgent = async (agent: any) => {
+    if (agent.source === "platform") {
+      try {
+        const installed = await api.post<any>(`/api/agents/marketplace/${agent.id}/install`);
+        navigate({ to: `/agents/${installed.id}` });
+      } catch {
+        // If already installed or fails, go to marketplace page
+        navigate({ to: "/agents/marketplace" });
+      }
+    } else {
+      navigate({ to: `/agents/${agent.id}` });
+    }
   };
 
   return (
@@ -343,7 +369,7 @@ function ExplorePage() {
                   key={agent.id}
                   agent={agent}
                   onChat={handleChatWithAgent}
-                  onView={handleViewAgent}
+                  onInstall={handleInstallAgent}
                 />
               ))}
             </div>
