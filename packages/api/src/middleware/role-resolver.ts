@@ -20,9 +20,10 @@ export const roleResolver = () =>
         ),
       );
 
-    if (profile) {
-      c.set("userRole", profile.role as Role);
+    if (!profile) {
+      return c.json({ error: "You are not a member of this organisation" }, 403);
     }
 
+    c.set("userRole", profile.role as Role);
     await next();
   });
