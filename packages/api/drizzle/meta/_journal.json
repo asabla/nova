@@ -8,6 +8,13 @@
       "when": 1774906596058,
       "tag": "0000_silent_bedlam",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775065356709,
+      "tag": "0001_open_ghost_rider",
+      "breakpoints": true
     }
   ]
 }

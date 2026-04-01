@@ -31,7 +31,7 @@ export const promptService = {
   },
 
   async listExplore(orgId: string, opts?: { search?: string; category?: string; limit?: number; offset?: number }) {
-    const orgOrSystem = or(eq(promptTemplates.orgId, orgId), eq(promptTemplates.isSystem, true));
+    const orgOrSystem = or(eq(promptTemplates.orgId, orgId), and(eq(promptTemplates.isSystem, true), eq(promptTemplates.isPublished, true)));
     const conditions = [orgOrSystem];
     if (opts?.search) {
       conditions.push(ilike(promptTemplates.name, `%${opts.search}%`));

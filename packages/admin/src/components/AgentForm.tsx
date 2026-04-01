@@ -175,6 +175,24 @@ export function AgentForm({ mode, agentId }: { mode: "create" | "edit"; agentId?
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const agentColor = form.avatarUrl?.startsWith("color:") ? form.avatarUrl.slice(6) : AGENT_COLORS[0];
 
+  // ─── Publish toggle (independent of save) ────────────────────────
+
+  const [isPublishing, setIsPublishing] = useState(false);
+  const togglePublish = async () => {
+    setIsPublishing(true);
+    try {
+      await adminApi.patch(`/admin-api/marketplace/agents/${agentId}`, { isPublished: !form.isPublished });
+      setField("isPublished", !form.isPublished);
+      savedRef.current = { ...savedRef.current, isPublished: !form.isPublished };
+      qc.invalidateQueries({ queryKey: ["admin-marketplace-agents"] });
+      toast(form.isPublished ? "Agent unpublished" : "Agent published", "success");
+    } catch (err: any) {
+      toast(err.message ?? "Failed to update publish status", "error");
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   // ─── AI Generation ───────────────────────────────────────────────
 
   const generatePrompt = async () => {
@@ -268,6 +286,20 @@ export function AgentForm({ mode, agentId }: { mode: "create" | "edit"; agentId?
               style={{ color: "var(--color-accent-red)" }}
             >
               <Trash2 className="h-3.5 w-3.5" /> Delete
+            </button>
+          )}
+          {mode === "edit" && (
+            <button
+              onClick={togglePublish}
+              disabled={isPublishing}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
+              style={form.isPublished
+                ? { background: "var(--color-surface-overlay)", borderColor: "var(--color-border-default)", color: "var(--color-text-muted)", border: "1px solid" }
+                : { background: "var(--color-accent-green-dim)", color: "var(--color-accent-green)", border: "1px solid var(--color-accent-green)" }
+              }
+            >
+              {form.isPublished ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              {isPublishing ? "…" : form.isPublished ? "Unpublish" : "Publish"}
             </button>
           )}
           <button
@@ -420,20 +452,6 @@ function ConfigPanel({
             <select value={form.effortLevel} onChange={(e) => setField("effortLevel", e.target.value)} className="w-full h-9 rounded-lg border px-3 text-sm appearance-none" style={inputStyle}>
               {EFFORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={() => setField("isPublished", !form.isPublished)}
-              className="inline-flex items-center gap-2 px-3 h-9 rounded-lg border text-sm font-medium transition-all"
-              style={{
-                background: form.isPublished ? "var(--color-accent-green-dim)" : "var(--color-surface-overlay)",
-                borderColor: form.isPublished ? "var(--color-accent-green)" : "var(--color-border-default)",
-                color: form.isPublished ? "var(--color-accent-green)" : "var(--color-text-muted)",
-              }}
-            >
-              {form.isPublished ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-              {form.isPublished ? "Published" : "Draft"}
-            </button>
           </div>
         </div>
       </section>

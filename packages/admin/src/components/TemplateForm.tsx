@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
-  ArrowLeft, Save, Trash2, FileText, Plus, X,
-  Sparkles, Tag, Code2, Type, Upload, ToggleLeft,
+  ArrowLeft, Save, Trash2, FileText, Plus, X, Eye, EyeOff,
+  Sparkles, Tag, Code2, Type, Upload,
 } from "lucide-react";
 import { adminApi } from "@/lib/api";
 import { toast } from "@/components/Toast";
@@ -28,6 +28,7 @@ interface TemplateFormData {
   category: string;
   tags: string[];
   visibility: string;
+  isPublished: boolean;
   icon: string;
   color: string;
   bgColor: string;
@@ -42,6 +43,7 @@ const DEFAULT_FORM: TemplateFormData = {
   category: "",
   tags: [],
   visibility: "org",
+  isPublished: false,
   icon: "",
   color: "",
   bgColor: "",
@@ -121,6 +123,7 @@ export function TemplateForm({ mode, templateId }: { mode: "create" | "edit"; te
         category: template.category ?? "",
         tags: (template.tags as string[]) ?? [],
         visibility: template.visibility ?? "org",
+        isPublished: template.isPublished ?? false,
         icon: template.icon ?? "",
         color: template.color ?? "",
         bgColor: template.bgColor ?? "",
@@ -173,6 +176,24 @@ export function TemplateForm({ mode, templateId }: { mode: "create" | "edit"; te
   };
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
+
+  // ─── Publish toggle (independent of save) ────────────────────────
+
+  const [isPublishing, setIsPublishing] = useState(false);
+  const togglePublish = async () => {
+    setIsPublishing(true);
+    try {
+      await adminApi.patch(`/admin-api/marketplace/templates/${templateId}`, { isPublished: !form.isPublished });
+      setField("isPublished", !form.isPublished);
+      savedRef.current = { ...savedRef.current, isPublished: !form.isPublished };
+      qc.invalidateQueries({ queryKey: ["admin-marketplace-templates"] });
+      toast(form.isPublished ? "Template unpublished" : "Template published", "success");
+    } catch (err: any) {
+      toast(err.message ?? "Failed to update publish status", "error");
+    } finally {
+      setIsPublishing(false);
+    }
+  };
 
   const addTag = () => {
     const tag = tagInput.trim();
@@ -244,6 +265,20 @@ export function TemplateForm({ mode, templateId }: { mode: "create" | "edit"; te
               style={{ color: "var(--color-accent-red)" }}
             >
               <Trash2 className="h-3.5 w-3.5" /> Delete
+            </button>
+          )}
+          {mode === "edit" && (
+            <button
+              onClick={togglePublish}
+              disabled={isPublishing}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-40"
+              style={form.isPublished
+                ? { background: "var(--color-surface-overlay)", borderColor: "var(--color-border-default)", color: "var(--color-text-muted)", border: "1px solid" }
+                : { background: "var(--color-accent-green-dim)", color: "var(--color-accent-green)", border: "1px solid var(--color-accent-green)" }
+              }
+            >
+              {form.isPublished ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              {isPublishing ? "…" : form.isPublished ? "Unpublish" : "Publish"}
             </button>
           )}
           <button

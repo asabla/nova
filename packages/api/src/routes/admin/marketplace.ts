@@ -75,7 +75,9 @@ const createTemplateSchema = z.object({
   bgColor: z.string().max(50).optional(),
 });
 
-const updateTemplateSchema = createTemplateSchema.partial();
+const updateTemplateSchema = createTemplateSchema.partial().extend({
+  isPublished: z.boolean().optional(),
+});
 
 function mergeModelParams(
   data: { defaultTier?: string; effortLevel?: string; [key: string]: unknown },

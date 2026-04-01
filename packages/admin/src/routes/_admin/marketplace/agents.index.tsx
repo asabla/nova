@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bot, Plus, Eye, EyeOff, FileText } from "lucide-react";
 import { adminApi } from "@/lib/api";
+import { toast } from "@/components/Toast";
 
 export const Route = createFileRoute("/_admin/marketplace/agents/")({
   component: MarketplaceAgentsPage,
@@ -115,7 +116,17 @@ function MarketplaceAgentsPage() {
 }
 
 function AgentCard({ agent }: { agent: any }) {
+  const qc = useQueryClient();
   const color = agent.avatarUrl?.startsWith("color:") ? agent.avatarUrl.slice(6) : null;
+
+  const togglePublish = useMutation({
+    mutationFn: () => adminApi.patch(`/admin-api/marketplace/agents/${agent.id}`, { isPublished: !agent.isPublished }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-marketplace-agents"] });
+      toast(agent.isPublished ? "Agent unpublished" : "Agent published", "success");
+    },
+    onError: (err: any) => toast(err.message ?? "Failed to update", "error"),
+  });
 
   return (
     <Link
@@ -149,9 +160,14 @@ function AgentCard({ agent }: { agent: any }) {
         >
           {agent.isPublished ? "Published" : "Draft"}
         </span>
-        <span className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
-          {new Date(agent.updatedAt).toLocaleDateString()}
-        </span>
+        <button
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePublish.mutate(); }}
+          disabled={togglePublish.isPending}
+          className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold hover:bg-white/5 disabled:opacity-40"
+          style={{ color: agent.isPublished ? "var(--color-text-muted)" : "var(--color-accent-green)" }}
+        >
+          {agent.isPublished ? <><EyeOff className="h-3 w-3" /> Unpublish</> : <><Eye className="h-3 w-3" /> Publish</>}
+        </button>
       </div>
     </Link>
   );

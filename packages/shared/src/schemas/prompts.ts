@@ -32,6 +32,7 @@ export const promptTemplates = pgTable("prompt_templates", {
   isSystem: boolean("is_system").notNull().default(false),
   visibility: text("visibility").notNull().default("private"),
   isApproved: boolean("is_approved").notNull().default(false),
+  isPublished: boolean("is_published").notNull().default(false),
   currentVersion: integer("current_version").notNull().default(1),
   forkedFromTemplateId: uuid("forked_from_template_id"),
   usageCount: integer("usage_count").notNull().default(0),
@@ -69,7 +70,7 @@ export const insertPromptTemplateSchema = createInsertSchema(promptTemplates, {
 }).omit({
   id: true, orgId: true, ownerId: true,
   createdAt: true, updatedAt: true, deletedAt: true,
-  currentVersion: true, usageCount: true, avgRating: true, isApproved: true,
+  currentVersion: true, usageCount: true, avgRating: true, isApproved: true, isPublished: true,
 });
 
 export type PromptTemplate = z.infer<typeof selectPromptTemplateSchema>;

@@ -1,0 +1,1 @@
+ALTER TABLE "prompt_templates" ADD COLUMN "is_published" boolean DEFAULT false NOT NULL;
