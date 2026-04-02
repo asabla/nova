@@ -35,6 +35,7 @@ export const tracing = () =>
     // Use trace ID as request ID for unified correlation
     const spanContext = span.spanContext();
     c.set("requestId", spanContext.traceId);
+    c.set("spanId", spanContext.spanId);
     c.header("X-Request-Id", spanContext.traceId);
 
     try {
