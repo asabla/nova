@@ -17,6 +17,7 @@ import { getModelParams } from "@nova/worker-shared/models";
 import { createReasoningModel } from "@nova/worker-shared/reasoning-model";
 import type { ResearchConfig } from "@nova/shared/types";
 import { logger } from "@nova/worker-shared/logger";
+import { startChildSpan, deriveTraceContext, isOtelEnabled, SpanStatusCode } from "@nova/worker-shared/telemetry";
 
 
 export interface AgentRunInput {
@@ -69,6 +70,15 @@ export interface AgentRunResult {
  * (call LLM -> detect tool_calls -> execute -> repeat).
  */
 export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult> {
+  // Create a top-level "agent.run" span as child of the API request.
+  // All publish calls inside this activity become children of this span,
+  // creating the hierarchy: API → agent.run → stream.token/stream.done
+  const runSpan = (input.traceId && isOtelEnabled())
+    ? startChildSpan("agent.run", input.traceId, { "agent.model": input.model, "agent.max_turns": input.maxTurns ?? 0 })
+    : null;
+  // Derive a new traceContext so publish calls become children of agent.run (not the API span)
+  const tid = runSpan ? deriveTraceContext(runSpan) : input.traceId;
+
   // Build tools list: built-in (filtered by agent config) + any custom tools from DB
   const tools: FunctionTool<any, any>[] = getBuiltinTools(input.orgId, input.allowedBuiltinTools, input.knowledgeCollectionIds);
   if (input.agentId) {
@@ -151,7 +161,6 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
   let insideThinkBlock = false;
   let thinkBuffer = "";
 
-  const tid = input.traceId;
   async function streamWithThinkFilter(channelId: string, delta: string) {
     const publish = async (text: string) => {
       streamedContentLength += text.length;
@@ -417,6 +426,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
         await publishError(input.streamChannelId, `Rate limited: ${errMsg}`, tid);
       }
       // Otherwise don't publish error — Temporal may retry the activity on the same channel.
+      if (runSpan) { runSpan.setStatus({ code: SpanStatusCode.ERROR, message: errMsg }); runSpan.end(); }
       throw err;
     }
   }
@@ -438,6 +448,14 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
     content: fullContent,
     usage: { prompt_tokens: inputTokens, completion_tokens: outputTokens },
   }, tid);
+
+  if (runSpan) {
+    runSpan.setAttribute("agent.steps", steps);
+    runSpan.setAttribute("agent.tokens.input", inputTokens);
+    runSpan.setAttribute("agent.tokens.output", outputTokens);
+    runSpan.setAttribute("agent.content_length", fullContent.length);
+    runSpan.end();
+  }
 
   return {
     content: fullContent,
