@@ -39,8 +39,10 @@ datasources:
     jsonData:
       tracesToLogsV2:
         datasourceUid: loki
-        filterByTraceID: true
+        filterByTraceID: false
         filterBySpanID: false
+        customQuery: true
+        query: '{container=~"nova-.*"} |= "$${__span.traceId}"'
       tracesToMetrics:
         datasourceUid: prometheus
       nodeGraph:
