@@ -37,6 +37,8 @@ export interface AgentRunInput {
   knowledgeCollectionIds?: string[];
   /** When set, research-specific tools are injected and research results are tracked. */
   researchConfig?: ResearchConfig;
+  /** OTel trace ID for distributed trace correlation */
+  traceId?: string;
 }
 
 export interface AgentRunResult {
@@ -149,10 +151,11 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
   let insideThinkBlock = false;
   let thinkBuffer = "";
 
+  const tid = input.traceId;
   async function streamWithThinkFilter(channelId: string, delta: string) {
     const publish = async (text: string) => {
       streamedContentLength += text.length;
-      await publishToken(channelId, text);
+      await publishToken(channelId, text, tid);
     };
     if (insideThinkBlock) {
       thinkBuffer += delta;
@@ -267,7 +270,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
             // First tool call in this turn — discard any pre-tool reasoning
             // that was already streamed ("I need to search...", "Let me look up...")
             if (!isContinuation && !currentTurnHasToolCall && preToolContentLength > 0) {
-              await publishContentClear(input.streamChannelId, "tool_calls_detected");
+              await publishContentClear(input.streamChannelId, "tool_calls_detected", tid);
             }
             if (!isContinuation) {
               currentTurnHasToolCall = true;
@@ -292,7 +295,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
             if (!isContinuation) {
               await publishToolStatus(input.streamChannelId, toolName, "running", {
                 args: parsedArgs,
-              });
+              }, tid);
             }
           }
         }
@@ -318,7 +321,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
             const summary = buildResultSummary(toolName, output);
             await publishToolStatus(input.streamChannelId, toolName, "completed", {
               resultSummary: summary,
-            });
+            }, tid);
             steps++;
           }
         }
@@ -386,7 +389,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
       fullContent = previousContent;
       if (fullContent && !fullContent.endsWith("\n")) {
         fullContent += "\n\n";
-        await publishToken(input.streamChannelId, "\n\n");
+        await publishToken(input.streamChannelId, "\n\n", tid);
       }
 
       // Reset per-run state for the next iteration
@@ -411,7 +414,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
 
       // Publish rate-limit specific error so frontend can show appropriate state
       if (isRateLimit) {
-        await publishError(input.streamChannelId, `Rate limited: ${errMsg}`);
+        await publishError(input.streamChannelId, `Rate limited: ${errMsg}`, tid);
       }
       // Otherwise don't publish error — Temporal may retry the activity on the same channel.
       throw err;
@@ -426,15 +429,15 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
   // If the streamed tokens were all inside <think> blocks (filtered out) but we have
   // clean content from finalOutput, stream it now so the frontend receives it.
   if (fullContent && streamedContentLength === 0) {
-    await publishToken(input.streamChannelId, fullContent);
+    await publishToken(input.streamChannelId, fullContent, tid);
   }
 
   // Signal completion to the relay
-  logger.info({ eventCount, contentLength: fullContent.length, channel: input.streamChannelId }, "[agent-run] done");
+  logger.info({ eventCount, contentLength: fullContent.length, channel: input.streamChannelId, traceId: tid }, "[agent-run] done");
   await publishDone(input.streamChannelId, {
     content: fullContent,
     usage: { prompt_tokens: inputTokens, completion_tokens: outputTokens },
-  });
+  }, tid);
 
   return {
     content: fullContent,

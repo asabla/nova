@@ -777,6 +777,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         allowedBuiltinTools,
         knowledgeCollectionIds: input.knowledgeCollectionIds,
         researchConfig: rc,
+        traceId: tid,
       });
 
       totalTokens += agentResult.totalTokens;
@@ -1268,6 +1269,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         allowedBuiltinTools,
         knowledgeCollectionIds: input.knowledgeCollectionIds,
         researchConfig: input.researchConfig,
+        traceId: tid,
       });
 
       currentStep++;
