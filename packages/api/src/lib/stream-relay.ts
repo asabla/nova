@@ -1,5 +1,6 @@
 import { redis, redisSub } from "./redis";
 import { logger } from "./logger";
+import { getTracer, isOtelEnabled, recordSpan } from "./telemetry";
 
 interface RelayOptions {
   timeoutMs?: number;
@@ -16,6 +17,8 @@ export async function relayRedisToSSE(
   opts: RelayOptions = {},
 ): Promise<{ content: string; usage: { prompt_tokens?: number; completion_tokens?: number } } | null> {
   const timeoutMs = opts.timeoutMs ?? 30_000;
+
+  const relayStartMs = Date.now();
 
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -153,6 +156,20 @@ export async function relayRedisToSSE(
       redisSub.off("message", handler);
       redisSub.unsubscribe(channelId).catch((err) => logger.debug({ err, channelId }, "[relay] unsubscribe failed"));
       logger.info({ channelId: channelId.slice(-12), messageCount, traceId: relayTraceId }, "[relay] completed");
+
+      // Create an sse.relay span linked to the worker trace
+      if (relayTraceId && isOtelEnabled()) {
+        const tracer = getTracer();
+        const span = tracer.startSpan("sse.relay", {
+          attributes: {
+            "sse.channel_id": channelId,
+            "sse.event_count": messageCount,
+            "sse.content_length": accumulatedContent.length,
+          },
+        });
+        span.end();
+        recordSpan(span, relayStartMs, { "sse.event_count": messageCount });
+      }
     };
 
     // Attach handler before subscribing to avoid missing messages
