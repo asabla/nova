@@ -64,7 +64,7 @@
       "title": "Active WS Connections",
       "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "nova_ws_connections_active or vector(0)", "legendFormat": "connections", "instant": true }],
+      "targets": [{ "expr": "sum(nova_ws_connections_active)", "legendFormat": "", "instant": true }],
       "fieldConfig": {
         "defaults": {
           "noValue": "0",
@@ -79,7 +79,7 @@
       "title": "Active Streams",
       "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "nova_streaming_requests_active or vector(0)", "legendFormat": "streams", "instant": true }],
+      "targets": [{ "expr": "sum(nova_streaming_requests_active)", "legendFormat": "", "instant": true }],
       "fieldConfig": {
         "defaults": {
           "noValue": "0",
@@ -160,7 +160,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "expr": "sum(rate(nova_workflows_dispatched_total[5m])) by (type)", "legendFormat": "{{type}}" }
+        { "expr": "sum(increase(nova_workflows_dispatched_total[5m])) by (type)", "legendFormat": "{{type}}" }
       ],
       "fieldConfig": {
         "defaults": { "unit": "ops", "custom": { "fillOpacity": 15, "lineWidth": 2, "stacking": { "mode": "normal" } } }
