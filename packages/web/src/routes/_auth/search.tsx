@@ -28,19 +28,22 @@ export const Route = createFileRoute("/_auth/search")({
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function highlightMatches(text: string, query: string): string {
-  if (!query || query.length < 2) return escapeHtml(text);
+function HighlightedText({ text, query }: { text: string; query: string }) {
+  if (!query || query.length < 2) return <>{text}</>;
   const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const regex = new RegExp(`(${escaped})`, "gi");
-  return escapeHtml(text).replace(regex, "<mark>$1</mark>");
+  const parts = text.split(regex);
+  return (
+    <>
+      {parts.map((part, i) =>
+        regex.test(part) ? (
+          <mark key={i} className="bg-primary/20 text-primary rounded-sm px-0.5">{part}</mark>
+        ) : (
+          <span key={i}>{part}</span>
+        ),
+      )}
+    </>
+  );
 }
 
 type ResultType = "all" | "conversations" | "messages" | "agents" | "knowledge" | "files" | "research";
@@ -358,31 +361,19 @@ function SearchPage() {
 
                               {/* Snippet with highlighted matches */}
                               {result.snippet && (
-                                <p
-                                  className="text-xs text-text-secondary mt-1 line-clamp-2 [&_mark]:bg-primary/20 [&_mark]:text-primary [&_mark]:rounded-sm [&_mark]:px-0.5"
-                                  dangerouslySetInnerHTML={{
-                                    __html: highlightMatches(result.snippet, debouncedQuery),
-                                  }}
-                                />
+                                <p className="text-xs text-text-secondary mt-1 line-clamp-2">
+                                  <HighlightedText text={result.snippet} query={debouncedQuery} />
+                                </p>
                               )}
                               {result.description && !result.snippet && (
-                                <p
-                                  className="text-xs text-text-secondary mt-1 line-clamp-2 [&_mark]:bg-primary/20 [&_mark]:text-primary [&_mark]:rounded-sm [&_mark]:px-0.5"
-                                  dangerouslySetInnerHTML={{
-                                    __html: highlightMatches(
-                                      result.description.slice(0, 200),
-                                      debouncedQuery,
-                                    ),
-                                  }}
-                                />
+                                <p className="text-xs text-text-secondary mt-1 line-clamp-2">
+                                  <HighlightedText text={result.description.slice(0, 200)} query={debouncedQuery} />
+                                </p>
                               )}
                               {result.content && !result.snippet && !result.description && (
-                                <p
-                                  className="text-xs text-text-tertiary mt-1 line-clamp-2 [&_mark]:bg-primary/20 [&_mark]:text-primary [&_mark]:rounded-sm [&_mark]:px-0.5"
-                                  dangerouslySetInnerHTML={{
-                                    __html: highlightMatches(result.content.slice(0, 200), debouncedQuery),
-                                  }}
-                                />
+                                <p className="text-xs text-text-tertiary mt-1 line-clamp-2">
+                                  <HighlightedText text={result.content.slice(0, 200)} query={debouncedQuery} />
+                                </p>
                               )}
 
                               {/* Metadata row */}

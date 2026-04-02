@@ -13,7 +13,7 @@ interface State {
   error?: Error;
 }
 
-function ErrorBoundaryFallback({ error }: { error?: Error }) {
+function ErrorBoundaryFallback({ error, onReset }: { error?: Error; onReset?: () => void }) {
   const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center justify-center min-h-[400px] px-4 text-center border border-border rounded-xl bg-surface" role="alert">
@@ -24,13 +24,21 @@ function ErrorBoundaryFallback({ error }: { error?: Error }) {
       <p className="text-sm text-text-secondary mb-4 max-w-md">
         {error?.message ?? t("errors.unexpectedError", "An unexpected error occurred. Please try again.")}
       </p>
-      <Button
-        variant="primary"
-        onClick={() => window.location.reload()}
-      >
-        <RefreshCw className="h-4 w-4" aria-hidden="true" />
-        {t("errors.reloadPage", "Reload Page")}
-      </Button>
+      <div className="flex items-center gap-3">
+        {onReset && (
+          <Button variant="primary" onClick={onReset}>
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            {t("errors.tryAgain", "Try Again")}
+          </Button>
+        )}
+        <Button
+          variant={onReset ? "secondary" : "primary"}
+          onClick={() => window.location.reload()}
+        >
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          {t("errors.reloadPage", "Reload Page")}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -53,7 +61,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
 
-      return <ErrorBoundaryFallback error={this.state.error} />;
+      return <ErrorBoundaryFallback error={this.state.error} onReset={() => this.setState({ hasError: false })} />;
     }
 
     return this.props.children;

@@ -11,8 +11,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
 
   if (!resp.ok) {
+    if (resp.status === 401 && !path.includes("/auth/me")) {
+      window.location.href = "/login";
+      throw new Error("Session expired");
+    }
     const body = await resp.json().catch(() => ({}));
-    throw new Error(body.error ?? body.message ?? `HTTP ${resp.status}`);
+    throw new Error(body.detail ?? body.error ?? body.message ?? `HTTP ${resp.status}`);
   }
 
   if (resp.status === 204) return undefined as T;
