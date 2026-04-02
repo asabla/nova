@@ -3,6 +3,7 @@ import { AppError } from "@nova/shared/utils";
 import { env } from "../lib/env";
 import { logger } from "../lib/logger";
 import { trace, context, SpanStatusCode } from "@opentelemetry/api";
+import { errorsTotal } from "../lib/metrics";
 
 export const errorHandler: ErrorHandler = (err, c) => {
   const requestId = c.get("requestId") ?? "unknown";
@@ -16,6 +17,7 @@ export const errorHandler: ErrorHandler = (err, c) => {
   }
 
   if (err instanceof AppError) {
+    errorsTotal.inc({ type: err.status >= 500 ? "server_error" : "client_error" });
     return c.json(
       {
         type: err.type,
@@ -29,6 +31,7 @@ export const errorHandler: ErrorHandler = (err, c) => {
   }
 
   if (err.name === "ZodError") {
+    errorsTotal.inc({ type: "validation" });
     return c.json(
       {
         type: "https://nova.dev/errors/validation",
@@ -40,6 +43,7 @@ export const errorHandler: ErrorHandler = (err, c) => {
     );
   }
 
+  errorsTotal.inc({ type: "server_error" });
   return c.json(
     {
       type: "https://nova.dev/errors/internal",

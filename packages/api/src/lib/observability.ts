@@ -1,5 +1,6 @@
 import { env } from "./env";
 import { logger } from "./logger";
+import { llmTokensTotal } from "./metrics";
 
 /**
  * LangFuse / Helicone observability integration (Story #160).
@@ -151,6 +152,14 @@ export function traceGeneration(params: {
     statusMessage: params.error,
     level: params.error ? "ERROR" : "DEFAULT",
   });
+
+  // Increment LLM token counters for Prometheus
+  if (params.usage?.promptTokens) {
+    llmTokensTotal.inc({ direction: "prompt", model: params.model }, params.usage.promptTokens);
+  }
+  if (params.usage?.completionTokens) {
+    llmTokensTotal.inc({ direction: "completion", model: params.model }, params.usage.completionTokens);
+  }
 }
 
 /**
