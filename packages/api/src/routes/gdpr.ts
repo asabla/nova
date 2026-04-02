@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "../lib/validator";
 import { z } from "zod";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, inArray } from "drizzle-orm";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
 import {
@@ -62,14 +62,12 @@ gdprRoutes.post(
         .where(and(eq(conversations.ownerId, userId), eq(conversations.orgId, orgId)));
 
       const conversationIds = userConversations.map((conv) => conv.id);
-      const userMessages: any[] = [];
-      for (const convId of conversationIds) {
-        const msgs = await db
-          .select()
-          .from(messages)
-          .where(and(eq(messages.conversationId, convId), eq(messages.orgId, orgId)));
-        userMessages.push(...msgs);
-      }
+      const userMessages = conversationIds.length > 0
+        ? await db
+            .select()
+            .from(messages)
+            .where(and(inArray(messages.conversationId, conversationIds), eq(messages.orgId, orgId)))
+        : [];
 
       const userAgents = await db
         .select()

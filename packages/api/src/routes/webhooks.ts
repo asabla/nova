@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, sql } from "drizzle-orm";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
 import { agents } from "@nova/shared/schemas";
@@ -16,18 +16,15 @@ webhookRoutes.post("/agents/:webhookId", async (c) => {
   const secret = c.req.header("x-webhook-secret") ?? c.req.query("secret");
 
   // Find agent by webhookUrl containing the webhook ID
-  const allAgents = await db
+  const [agent] = await db
     .select()
     .from(agents)
     .where(and(
       eq(agents.isEnabled, true),
       isNull(agents.deletedAt),
-    ));
-
-  const agent = allAgents.find((a) => {
-    const webhookUrl = a.webhookUrl as string | null;
-    return webhookUrl?.includes(webhookId);
-  });
+      sql`${agents.webhookUrl} LIKE ${'%' + webhookId + '%'}`,
+    ))
+    .limit(1);
 
   if (!agent) {
     return c.json({ error: "Agent not found or webhook not configured" }, 404);

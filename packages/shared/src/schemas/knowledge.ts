@@ -49,6 +49,7 @@ export const knowledgeDocuments = pgTable("knowledge_documents", {
 }, (table) => [
   index("idx_knowledge_documents_collection").on(table.knowledgeCollectionId),
   index("idx_knowledge_documents_org_id").on(table.orgId),
+  index("idx_knowledge_documents_status").on(table.status),
   uniqueIndex("idx_knowledge_documents_connector_external").on(table.connectorId, table.externalId),
 ]);
 
