@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { requestId } from "./middleware/request-id";
+import { tracing } from "./middleware/tracing";
 import { logger } from "./middleware/logger";
 import { errorHandler } from "./middleware/error-handler";
 import { rateLimiter, authRateLimiter, webhookRateLimiter } from "./middleware/rate-limit";
@@ -78,6 +79,9 @@ app.use("*", cors({
 
 // 4. Request ID
 app.use("*", requestId());
+
+// 4b. Distributed tracing (OTel — sets traceId as requestId when enabled)
+app.use("*", tracing());
 
 // 5. Logger
 app.use("*", logger());

@@ -2,10 +2,18 @@ import type { ErrorHandler } from "hono";
 import { AppError } from "@nova/shared/utils";
 import { env } from "../lib/env";
 import { logger } from "../lib/logger";
+import { trace, context, SpanStatusCode } from "@opentelemetry/api";
 
 export const errorHandler: ErrorHandler = (err, c) => {
   const requestId = c.get("requestId") ?? "unknown";
   logger.error({ err, requestId }, err.message);
+
+  // Record exception on the active OTel span
+  const span = trace.getSpan(context.active());
+  if (span) {
+    span.recordException(err);
+    span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
+  }
 
   if (err instanceof AppError) {
     return c.json(

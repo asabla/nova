@@ -53,6 +53,14 @@ const envSchema = z.object({
 
   APP_URL: z.string().default("http://localhost:5173"),
   APP_VERSION: z.string().default("0.1.0"),
+
+  // OpenTelemetry
+  OTEL_ENABLED: z
+    .enum(["true", "false", "1", "0"])
+    .default("false")
+    .transform((v) => v === "true" || v === "1"),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
+  OTEL_SERVICE_NAME: z.string().default("nova-api"),
 });
 
 export type Env = z.infer<typeof envSchema>;
