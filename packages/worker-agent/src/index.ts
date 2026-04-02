@@ -1,3 +1,6 @@
+import { initTelemetry, shutdownTelemetry } from "@nova/worker-shared/telemetry";
+initTelemetry("nova-worker-agent");
+
 import { Worker, NativeConnection } from "@temporalio/worker";
 import { Connection, Client } from "@temporalio/client";
 import path from "node:path";
@@ -41,6 +44,7 @@ async function run() {
   const shutdown = async () => {
     logger.info("Shutting down agent worker...");
     await worker.shutdown();
+    await shutdownTelemetry();
     await closeDb();
     await closeRedis();
     await connection.close();

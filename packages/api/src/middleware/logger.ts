@@ -1,5 +1,6 @@
 import { createMiddleware } from "hono/factory";
 import { logger as pinoLogger } from "../lib/logger";
+import { trace, context } from "@opentelemetry/api";
 
 export const logger = () =>
   createMiddleware(async (c, next) => {
@@ -11,7 +12,18 @@ export const logger = () =>
     const path = c.req.path;
     const requestId = c.get("requestId") ?? "-";
 
-    const logData = { requestId, method, path, status, duration };
+    // Add OTel trace/span IDs for log-to-trace correlation
+    const span = trace.getSpan(context.active());
+    const spanCtx = span?.spanContext();
+    const logData = {
+      requestId,
+      method,
+      path,
+      status,
+      duration,
+      ...(spanCtx?.traceId ? { traceId: spanCtx.traceId, spanId: spanCtx.spanId } : {}),
+    };
+
     if (status >= 500) {
       pinoLogger.error(logData, "request completed");
     } else if (status >= 400) {

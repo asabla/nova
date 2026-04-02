@@ -46,6 +46,14 @@ const envSchema = z.object({
   MINIO_BUCKET: z.string().default("nova-files"),
 
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+
+  // OpenTelemetry
+  OTEL_ENABLED: z
+    .enum(["true", "false", "1", "0"])
+    .default("false")
+    .transform((v) => v === "true" || v === "1"),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
+  OTEL_SERVICE_NAME: z.string().optional(),
 });
 
 export type WorkerEnv = z.infer<typeof envSchema>;

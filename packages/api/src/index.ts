@@ -1,3 +1,6 @@
+import { initTelemetry, shutdownTelemetry } from "./lib/telemetry";
+initTelemetry();
+
 import { app } from "./app";
 import { adminApp } from "./admin-app";
 import { env } from "./lib/env";

@@ -82,6 +82,10 @@
     "./logger": {
       "types": "./dist/logger.d.ts",
       "default": "./src/logger.ts"
+    },
+    "./telemetry": {
+      "types": "./dist/telemetry.d.ts",
+      "default": "./src/telemetry.ts"
     }
   },
   "scripts": {
@@ -91,6 +95,13 @@
   "dependencies": {
     "@nova/shared": "workspace:*",
     "@openai/agents": "^0.7.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/exporter-trace-otlp-grpc": "^0.214.0",
+    "@opentelemetry/instrumentation-http": "^0.214.0",
+    "@opentelemetry/resources": "^2.6.1",
+    "@opentelemetry/sdk-node": "^0.214.0",
+    "@opentelemetry/sdk-trace-node": "^2.6.1",
+    "@opentelemetry/semantic-conventions": "^1.40.0",
     "@qdrant/js-client-rest": "1.13.0",
     "drizzle-orm": "^0.39.3",
     "ioredis": "^5.4.2",
