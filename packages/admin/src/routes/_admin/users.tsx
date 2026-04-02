@@ -40,7 +40,12 @@ function UsersPage() {
       );
       const rows = all.data;
       const header = "email,name,isSuperAdmin,orgCount,createdAt";
-      const escape = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const escape = (v: string) => {
+        let s = String(v ?? "").replace(/"/g, '""');
+        // Prevent CSV formula injection in spreadsheet apps
+        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+        return `"${s}"`;
+      };
       const csv = [header, ...rows.map((u: any) =>
         [escape(u.email), escape(u.name ?? ""), u.isSuperAdmin, u.orgCount, u.createdAt].join(",")
       )].join("\n");

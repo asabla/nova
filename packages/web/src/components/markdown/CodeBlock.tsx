@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Copy, Check } from "lucide-react";
+import DOMPurify from "dompurify";
 
 interface CodeBlockProps {
   code: string;
@@ -55,7 +56,7 @@ export function CodeBlock({ code, language }: CodeBlockProps) {
       {highlightedHtml ? (
         <div
           className="overflow-x-auto p-3 bg-surface-secondary text-xs font-mono leading-relaxed [&_pre]:!bg-transparent [&_pre]:!p-0 [&_pre]:!m-0 [&_code]:!bg-transparent"
-          dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(highlightedHtml) }}
         />
       ) : (
         <pre className="overflow-x-auto p-3 bg-surface-secondary">

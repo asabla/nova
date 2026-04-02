@@ -44,8 +44,10 @@ export function connectWebSocket() {
       for (const listener of listeners) {
         listener(msg);
       }
-    } catch {
-      // Ignore malformed messages
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.warn("[ws] Malformed message:", event.data, err);
+      }
     }
   };
 }
