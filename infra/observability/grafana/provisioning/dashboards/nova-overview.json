@@ -141,16 +141,16 @@
     },
     {
       "type": "timeseries",
-      "title": "LLM Token Consumption",
-      "description": "Populates when LLM calls are made (send a chat message to trigger)",
+      "title": "LLM Tokens Used (per 5m)",
+      "description": "Total tokens consumed in each 5-minute window, by model and direction",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "expr": "sum(rate(nova_llm_tokens_total{direction=\"prompt\"}[5m])) by (model)", "legendFormat": "prompt: {{model}}" },
-        { "expr": "sum(rate(nova_llm_tokens_total{direction=\"completion\"}[5m])) by (model)", "legendFormat": "completion: {{model}}" }
+        { "expr": "sum(increase(nova_llm_tokens_total{direction=\"prompt\"}[5m])) by (model)", "legendFormat": "prompt: {{model}}" },
+        { "expr": "sum(increase(nova_llm_tokens_total{direction=\"completion\"}[5m])) by (model)", "legendFormat": "completion: {{model}}" }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "lineWidth": 2, "stacking": { "mode": "normal" } } }
+        "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "lineWidth": 2, "stacking": { "mode": "normal" }, "drawStyle": "bars" } }
       }
     },
     {

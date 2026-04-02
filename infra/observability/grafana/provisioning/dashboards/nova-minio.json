@@ -1,85 +1,83 @@
 {
   "annotations": { "list": [] },
   "editable": true,
-  "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "links": [],
   "panels": [
     {
-      "type": "stat",
-      "title": "Total Storage Used",
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "minio_cluster_usage_total_bytes", "legendFormat": "", "instant": true }],
-      "fieldConfig": {
-        "defaults": {
-          "noValue": "0",
-          "unit": "bytes",
-          "thresholds": { "mode": "absolute", "steps": [
-            { "color": "green", "value": null },
-            { "color": "yellow", "value": 5368709120 },
-            { "color": "red", "value": 10737418240 }
-          ]}
-        }
-      }
+      "type": "row", "title": "MinIO Overview",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "collapsed": false
     },
     {
-      "type": "stat",
-      "title": "Object Count",
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "type": "stat", "title": "Buckets",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "minio_cluster_usage_object_total", "legendFormat": "", "instant": true }],
-      "fieldConfig": {
-        "defaults": {
-          "noValue": "0",
-          "unit": "short",
-          "thresholds": { "mode": "absolute", "steps": [
-            { "color": "blue", "value": null }
-          ]}
-        }
-      }
+      "targets": [{ "expr": "minio_cluster_bucket_total", "instant": true, "legendFormat": "" }],
+      "fieldConfig": { "defaults": { "noValue": "0", "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } } }
     },
     {
-      "type": "timeseries",
-      "title": "S3 Request Rate by API",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "type": "stat", "title": "Total Storage Used",
+      "description": "Updates when MinIO's background scanner runs",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "minio_cluster_usage_total_bytes", "instant": true, "legendFormat": "" }],
+      "fieldConfig": { "defaults": { "noValue": "0 B", "unit": "bytes", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 5368709120 }, { "color": "red", "value": 10737418240 }] } } }
+    },
+    {
+      "type": "stat", "title": "Object Count",
+      "description": "Updates when MinIO's background scanner runs",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "minio_cluster_usage_object_total", "instant": true, "legendFormat": "" }],
+      "fieldConfig": { "defaults": { "noValue": "0", "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } } }
+    },
+    {
+      "type": "stat", "title": "Disk Free",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "minio_cluster_capacity_usable_free_bytes", "instant": true, "legendFormat": "" }],
+      "fieldConfig": { "defaults": { "noValue": "N/A", "unit": "bytes", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 5368709120 }, { "color": "green", "value": 53687091200 }] } } }
+    },
+    {
+      "type": "row", "title": "S3 Activity",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 }, "collapsed": false
+    },
+    {
+      "type": "timeseries", "title": "S3 Request Rate",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         { "expr": "sum(rate(minio_s3_requests_total[5m])) by (api)", "legendFormat": "{{api}}" }
       ],
-      "fieldConfig": {
-        "defaults": { "unit": "reqps", "custom": { "fillOpacity": 15, "lineWidth": 2 } }
-      }
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 15, "lineWidth": 2 } } }
     },
     {
-      "type": "timeseries",
-      "title": "S3 Errors",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "type": "timeseries", "title": "S3 Rejected Requests",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "expr": "sum(rate(minio_s3_requests_rejected_auth_total[5m])) + sum(rate(minio_s3_requests_rejected_invalid_total[5m]))", "legendFormat": "rejected" }
+        { "expr": "sum(rate(minio_s3_requests_rejected_auth_total[5m]))", "legendFormat": "auth rejected" },
+        { "expr": "sum(rate(minio_s3_requests_rejected_invalid_total[5m]))", "legendFormat": "invalid rejected" }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps",
-          "custom": { "fillOpacity": 15, "lineWidth": 2 }
-        },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 15, "lineWidth": 2 } },
         "overrides": [
-          { "matcher": { "id": "byFrameRefID", "options": "A" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+          { "matcher": { "id": "byName", "options": "auth rejected" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "invalid rejected" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] }
         ]
       }
     },
     {
-      "type": "timeseries",
-      "title": "Traffic In / Out",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+      "type": "row", "title": "Traffic",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 }, "collapsed": false
+    },
+    {
+      "type": "timeseries", "title": "Traffic (cumulative bytes per 5m window)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 15 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "expr": "sum(rate(minio_s3_traffic_received_bytes[5m]))", "legendFormat": "received" },
-        { "expr": "sum(rate(minio_s3_traffic_sent_bytes[5m]))", "legendFormat": "sent" }
+        { "expr": "sum(increase(minio_s3_traffic_received_bytes[5m]))", "legendFormat": "received" },
+        { "expr": "sum(increase(minio_s3_traffic_sent_bytes[5m]))", "legendFormat": "sent" }
       ],
-      "fieldConfig": {
-        "defaults": { "unit": "Bps", "custom": { "fillOpacity": 15, "lineWidth": 2 } },
+      "fieldConfig": { "defaults": { "unit": "decbytes", "custom": { "fillOpacity": 15, "lineWidth": 2 } },
         "overrides": [
           { "matcher": { "id": "byName", "options": "received" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
           { "matcher": { "id": "byName", "options": "sent" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] }
@@ -92,9 +90,8 @@
   "tags": ["nova", "infrastructure", "minio"],
   "templating": { "list": [] },
   "time": { "from": "now-1h", "to": "now" },
-  "timepicker": {},
   "timezone": "browser",
   "title": "Nova MinIO",
   "uid": "nova-minio",
-  "version": 1
+  "version": 3
 }
