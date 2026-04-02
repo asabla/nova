@@ -1,18 +1,60 @@
 # Prometheus configuration for Nova observability stack
-# Scrapes the Nova API /metrics endpoint directly.
+# Scrapes all Nova application and infrastructure metrics.
 
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
 scrape_configs:
+  # ─── Nova Application ──────────────────────────────
   - job_name: "nova-api"
     static_configs:
       - targets: ["nova-api:3000"]
     metrics_path: /metrics
 
+  # ─── Infrastructure: Temporal ──────────────────────
   - job_name: "temporal"
     static_configs:
       - targets: ["nova-temporal:9090"]
     metrics_path: /metrics
     scrape_interval: 30s
+
+  # ─── Infrastructure: PostgreSQL ────────────────────
+  - job_name: "postgres"
+    static_configs:
+      - targets: ["nova-postgres-exporter:9187"]
+    scrape_interval: 30s
+
+  # ─── Infrastructure: Redis ─────────────────────────
+  - job_name: "redis"
+    static_configs:
+      - targets: ["nova-redis-exporter:9121"]
+    scrape_interval: 30s
+
+  # ─── Infrastructure: Qdrant ────────────────────────
+  - job_name: "qdrant"
+    static_configs:
+      - targets: ["nova-qdrant:6333"]
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  # ─── Infrastructure: MinIO ─────────────────────────
+  - job_name: "minio"
+    static_configs:
+      - targets: ["nova-minio:9000"]
+    metrics_path: /minio/v2/metrics/cluster
+    scrape_interval: 30s
+
+  # ─── Nginx: Web App ────────────────────────────────
+  - job_name: "nginx-web"
+    static_configs:
+      - targets: ["nova-nginx-exporter-web:9113"]
+        labels:
+          nginx_role: "web"
+
+  # ─── Nginx: Admin Portal ───────────────────────────
+  - job_name: "nginx-admin"
+    static_configs:
+      - targets: ["nova-nginx-exporter-admin:9113"]
+        labels:
+          nginx_role: "admin"
