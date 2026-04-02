@@ -82,27 +82,40 @@ export async function traceActivity<T>(name: string, attrs: Record<string, strin
 }
 
 /**
- * Create a child span linked to a remote parent trace and span ID.
- * The parentSpanId must be the API's root span ID so Tempo builds
- * a proper parent-child hierarchy.
- *
- * traceContext format: "traceId:spanId" (both 16-hex-char strings)
+ * Parse a traceContext string ("traceId:parentSpanId") and create an
+ * OTel parent context from it. Used to link worker spans to the API trace.
  */
-export function startChildSpan(name: string, traceContext: string, attrs?: Record<string, string | number>): Span {
-  const tracer = getTracer();
-
+function makeParentContext(traceContext: string) {
   const [traceId, parentSpanId] = traceContext.split(":");
-  if (!traceId) return tracer.startSpan(name, { attributes: attrs });
-
+  if (!traceId) return null;
   const parentSpanContext: SpanContext = {
     traceId,
     spanId: parentSpanId || "0000000000000000",
     traceFlags: TraceFlags.SAMPLED,
     isRemote: true,
   };
-  const parentContext = trace.setSpanContext(context.active(), parentSpanContext);
+  return trace.setSpanContext(context.active(), parentSpanContext);
+}
 
+/**
+ * Create a child span linked to a remote parent trace and span ID.
+ * traceContext format: "traceId:parentSpanId"
+ */
+export function startChildSpan(name: string, traceContext: string, attrs?: Record<string, string | number>): Span {
+  const tracer = getTracer();
+  const parentContext = makeParentContext(traceContext);
+  if (!parentContext) return tracer.startSpan(name, { attributes: attrs });
   return tracer.startSpan(name, { attributes: attrs }, parentContext);
+}
+
+/**
+ * Derive a new traceContext string from a span, preserving the traceId
+ * but using this span's spanId as the new parent. Use this to create
+ * intermediate hierarchy levels (e.g., agent.run → stream.token).
+ */
+export function deriveTraceContext(span: Span): string {
+  const sc = span.spanContext();
+  return `${sc.traceId}:${sc.spanId}`;
 }
 
 export { trace, context, SpanStatusCode };
