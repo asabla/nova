@@ -8,6 +8,19 @@ import { clsx } from "clsx";
 import { adminApi } from "@/lib/api";
 
 export const Route = createFileRoute("/_admin")({
+  beforeLoad: async () => {
+    try {
+      const auth = await adminApi.get<{ authenticated: boolean }>("/admin-api/auth/me");
+      if (!auth?.authenticated) {
+        throw redirect({ to: "/login" });
+      }
+    } catch (e) {
+      if (e instanceof Error) {
+        throw redirect({ to: "/login" });
+      }
+      throw e; // Re-throw redirect
+    }
+  },
   component: AdminLayout,
 });
 
@@ -127,7 +140,7 @@ function AdminLayout() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[11px] font-medium truncate max-w-[120px]" style={{ color: "var(--color-text-secondary)" }}>{auth?.email}</p>
-              <span className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>v1.0.0</span>
+              <span className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>v{typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "0.0.0"}</span>
             </div>
             <button
               onClick={async () => {

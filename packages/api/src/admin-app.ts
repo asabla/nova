@@ -41,7 +41,7 @@ adminApp.post("/auth/login", async (c) => {
   const { env: appEnv } = await import("./lib/env");
 
   const { email, password } = await c.req.json();
-  if (!email || !password) return c.json({ error: "Email and password required" }, 400);
+  if (!email || !password) return c.json({ type: "https://nova.dev/errors/validation", title: "Validation Error", status: 400, detail: "Email and password required" }, 400);
 
   // Verify credentials via Better Auth's sign-in endpoint (internal call)
   const apiUrl = `http://localhost:${appEnv.PORT}`;
@@ -52,7 +52,7 @@ adminApp.post("/auth/login", async (c) => {
   });
 
   if (!authResp.ok) {
-    return c.json({ error: "Invalid email or password" }, 401);
+    return c.json({ type: "https://nova.dev/errors/unauthorized", title: "Unauthorized", status: 401, detail: "Invalid email or password" }, 401);
   }
 
   // Extract the session cookie set by Better Auth
@@ -61,7 +61,7 @@ adminApp.post("/auth/login", async (c) => {
   const token = sessionCookie?.match(/nova_session=([^;]+)/)?.[1];
 
   if (!token) {
-    return c.json({ error: "Authentication failed — no session created" }, 401);
+    return c.json({ type: "https://nova.dev/errors/unauthorized", title: "Unauthorized", status: 401, detail: "Authentication failed — no session created" }, 401);
   }
 
   // Verify user is a super-admin
@@ -71,7 +71,7 @@ adminApp.post("/auth/login", async (c) => {
     .where(and(eq(users.email, email), isNull(users.deletedAt)));
 
   if (!user?.isSuperAdmin) {
-    return c.json({ error: "Super-admin access required" }, 403);
+    return c.json({ type: "https://nova.dev/errors/forbidden", title: "Forbidden", status: 403, detail: "Super-admin access required" }, 403);
   }
 
   // Forward the session cookie to the admin portal
@@ -94,32 +94,36 @@ adminApp.get("/auth/me", async (c) => {
 
   if (!rawCookie) return c.json({ authenticated: false }, 401);
 
-  // Better Auth uses signed cookies: "token.signature" — extract just the token
-  const decoded = decodeURIComponent(rawCookie);
-  const token = decoded.split(".")[0];
+  try {
+    // Better Auth uses signed cookies: "token.signature" — extract just the token
+    const decoded = decodeURIComponent(rawCookie);
+    const token = decoded.split(".")[0];
 
-  // Look up in Better Auth's session table (plain token, not hashed)
-  const [session] = await database.execute(
-    sql`SELECT user_id FROM session WHERE token = ${token} AND expires_at > NOW() LIMIT 1`
-  ) as any[];
+    // Look up in Better Auth's session table (plain token, not hashed)
+    const [session] = await database.execute(
+      sql`SELECT user_id FROM session WHERE token = ${token} AND expires_at > NOW() LIMIT 1`
+    ) as any[];
 
-  if (!session) return c.json({ authenticated: false }, 401);
+    if (!session) return c.json({ authenticated: false }, 401);
 
-  // Get email from Better Auth user table, then find NOVA user
-  const [baUser] = await database.execute(
-    sql`SELECT email FROM "user" WHERE id = ${session.user_id} LIMIT 1`
-  ) as any[];
+    // Get email from Better Auth user table, then find NOVA user
+    const [baUser] = await database.execute(
+      sql`SELECT email FROM "user" WHERE id = ${session.user_id} LIMIT 1`
+    ) as any[];
 
-  if (!baUser) return c.json({ authenticated: false }, 401);
+    if (!baUser) return c.json({ authenticated: false }, 401);
 
-  const [novaUser] = await database
-    .select({ id: users.id, email: users.email, isSuperAdmin: users.isSuperAdmin })
-    .from(users)
-    .where(and(eq(users.email, baUser.email), isNull(users.deletedAt)));
+    const [novaUser] = await database
+      .select({ id: users.id, email: users.email, isSuperAdmin: users.isSuperAdmin })
+      .from(users)
+      .where(and(eq(users.email, baUser.email), isNull(users.deletedAt)));
 
-  if (!novaUser?.isSuperAdmin) return c.json({ authenticated: false }, 401);
+    if (!novaUser?.isSuperAdmin) return c.json({ authenticated: false }, 401);
 
-  return c.json({ authenticated: true, email: novaUser.email });
+    return c.json({ authenticated: true, email: novaUser.email });
+  } catch {
+    return c.json({ authenticated: false }, 401);
+  }
 });
 
 // Logout — clear session

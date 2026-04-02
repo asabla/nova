@@ -25,8 +25,8 @@ export const mfaGuard = () =>
     // Skip MFA check for auth/TOTP routes so users can enroll
     const path = c.req.path;
     if (
-      path.includes("/auth/totp") ||
-      path.includes("/auth/session") ||
+      path.startsWith("/api/auth/totp") ||
+      path.startsWith("/api/auth/session") ||
       path.startsWith("/health")
     ) {
       await next();

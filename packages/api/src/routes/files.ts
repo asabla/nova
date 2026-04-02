@@ -16,7 +16,10 @@ const fileRoutes = new Hono<AppContext>();
 
 const presignSchema = z.object({
   filename: z.string().min(1).max(500),
-  contentType: z.string().min(1),
+  contentType: z.string().min(1).refine(
+    (v) => (ALLOWED_MIME_TYPES as readonly string[]).includes(v),
+    { message: "File type not allowed" },
+  ),
   size: z.number().int().positive().max(MAX_FILE_SIZE_BYTES),
 });
 
