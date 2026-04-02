@@ -10,7 +10,7 @@
       "title": "Total Storage Used",
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "sum(minio_cluster_capacity_usable_total_bytes) or sum(minio_node_disk_used_bytes)", "legendFormat": "used", "instant": true }],
+      "targets": [{ "expr": "minio_cluster_usage_total_bytes", "legendFormat": "", "instant": true }],
       "fieldConfig": {
         "defaults": {
           "noValue": "0",
@@ -28,7 +28,7 @@
       "title": "Object Count",
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "sum(minio_bucket_usage_object_total)", "legendFormat": "objects", "instant": true }],
+      "targets": [{ "expr": "minio_cluster_usage_object_total", "legendFormat": "", "instant": true }],
       "fieldConfig": {
         "defaults": {
           "noValue": "0",
@@ -57,7 +57,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "expr": "sum(rate(minio_s3_requests_errors_total[5m])) by (api)", "legendFormat": "{{api}}" }
+        { "expr": "sum(rate(minio_s3_requests_rejected_auth_total[5m])) + sum(rate(minio_s3_requests_rejected_invalid_total[5m]))", "legendFormat": "rejected" }
       ],
       "fieldConfig": {
         "defaults": {
@@ -75,8 +75,8 @@
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "expr": "sum(rate(minio_s3_traffic_received_bytes_total[5m]))", "legendFormat": "received" },
-        { "expr": "sum(rate(minio_s3_traffic_sent_bytes_total[5m]))", "legendFormat": "sent" }
+        { "expr": "sum(rate(minio_s3_traffic_received_bytes[5m]))", "legendFormat": "received" },
+        { "expr": "sum(rate(minio_s3_traffic_sent_bytes[5m]))", "legendFormat": "sent" }
       ],
       "fieldConfig": {
         "defaults": { "unit": "Bps", "custom": { "fillOpacity": 15, "lineWidth": 2 } },

@@ -252,7 +252,7 @@ services:
       APP_URL: http://localhost:5173
       QDRANT_URL: http://qdrant:6333
       OTEL_ENABLED: ${OTEL_ENABLED:-false}
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana-alloy:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
       OTEL_SERVICE_NAME: nova-api
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
@@ -346,7 +346,7 @@ services:
       WORKER_BUILD_ID: ${WORKER_BUILD_ID:-dev}
       QDRANT_URL: http://qdrant:6333
       OTEL_ENABLED: ${OTEL_ENABLED:-false}
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana-alloy:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
       OTEL_SERVICE_NAME: nova-worker-agent
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -391,7 +391,7 @@ services:
       WORKER_BUILD_ID: ${WORKER_BUILD_ID:-dev}
       QDRANT_URL: http://qdrant:6333
       OTEL_ENABLED: ${OTEL_ENABLED:-false}
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana-alloy:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
       OTEL_SERVICE_NAME: nova-worker-ingestion
     depends_on:
       db-init:
@@ -434,7 +434,7 @@ services:
       WORKER_BUILD_ID: ${WORKER_BUILD_ID:-dev}
       QDRANT_URL: http://qdrant:6333
       OTEL_ENABLED: ${OTEL_ENABLED:-false}
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana-alloy:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
       OTEL_SERVICE_NAME: nova-worker-background
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
