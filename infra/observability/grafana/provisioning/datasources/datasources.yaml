@@ -2,11 +2,12 @@
 apiVersion: 1
 
 datasources:
-  # Prometheus — scraped from Nova API /metrics by Alloy
+  # Prometheus — scrapes Nova API /metrics directly
   - name: Prometheus
     type: prometheus
+    uid: prometheus
     access: proxy
-    url: http://grafana:3000/api/v1/prom
+    url: http://prometheus:9090
     isDefault: true
     editable: false
     jsonData:
