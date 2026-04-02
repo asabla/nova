@@ -59,6 +59,7 @@ import { voiceRoutes } from "./routes/voice";
 import { superAdminRoutes } from "./routes/super-admin";
 import { customWorkerRoutes } from "./routes/custom-workers";
 import evalRoutes from "./routes/evals";
+import { telemetryRoutes } from "./routes/telemetry";
 import { workflowRoutes } from "./routes/workflows";
 import { metricsMiddleware } from "./middleware/metrics";
 import { registry } from "./lib/metrics";
@@ -168,6 +169,7 @@ app.route("/api/voice", voiceRoutes);
 app.route("/api/super-admin", superAdminRoutes);
 app.route("/api/custom-workers", customWorkerRoutes);
 app.route("/api/evals", evalRoutes);
+app.route("/api/telemetry", telemetryRoutes);
 app.route("/api/workflows", workflowRoutes);
 
 export { app };

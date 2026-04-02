@@ -8,6 +8,9 @@ import "@fontsource-variable/dm-sans/wght-italic.css";
 import "@fontsource-variable/jetbrains-mono";
 import "./i18n";
 import "./styles/app.css";
+import { initFrontendTelemetry } from "./lib/frontend-telemetry";
+
+initFrontendTelemetry();
 
 const queryClient = new QueryClient({
   defaultOptions: {

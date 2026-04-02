@@ -182,10 +182,26 @@ export async function chatCompletion(request: ChatCompletionRequest): Promise<Op
     applyDropParams(payload, modelParams);
 
     try {
+      // Create OTel span for the LLM call
+      const { trace: otelTrace, context: otelContext } = await import("@opentelemetry/api");
+      const tracer = otelTrace.getTracer("nova-api");
+      const span = tracer.startSpan(`llm.chat ${model}`, {
+        attributes: {
+          "gen_ai.system": "openai",
+          "gen_ai.request.model": model,
+          "gen_ai.request.max_tokens": (payload.max_tokens as number) ?? 0,
+        },
+      }, otelContext.active());
+
       const result = await client.chat.completions.create({
         ...payload,
         stream: false,
       } as ChatCompletionCreateParamsNonStreaming);
+
+      span.setAttribute("gen_ai.usage.prompt_tokens", result.usage?.prompt_tokens ?? 0);
+      span.setAttribute("gen_ai.usage.completion_tokens", result.usage?.completion_tokens ?? 0);
+      span.setAttribute("gen_ai.response.model", result.model ?? model);
+      span.end();
 
       if (model !== req.model) {
         (result as any)._fallbackModel = model;

@@ -1,0 +1,71 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Collections",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "qdrant_collections_total or app_info", "legendFormat": "collections", "instant": true }],
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0",
+          "unit": "short",
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "blue", "value": null }
+          ]}
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "REST Request Duration (avg)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "rate(rest_responses_duration_seconds_sum[5m]) / rate(rest_responses_duration_seconds_count[5m])", "legendFormat": "avg duration" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "fillOpacity": 10, "lineWidth": 2 } }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "REST Request Rate",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(rate(rest_responses_total[5m])) by (method, status)", "legendFormat": "{{method}} {{status}}" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "fillOpacity": 15, "lineWidth": 2 } }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "gRPC Request Rate",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(rate(grpc_responses_total[5m])) by (endpoint)", "legendFormat": "{{endpoint}}" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "fillOpacity": 15, "lineWidth": 2 } }
+      }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["nova", "infrastructure", "qdrant"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Nova Qdrant",
+  "uid": "nova-qdrant",
+  "version": 1
+}
