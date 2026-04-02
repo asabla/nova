@@ -7,6 +7,7 @@ import type {
   UserInteractionResponse,
 } from "@nova/shared/types";
 import { redis } from "./redis";
+import { startChildSpan, isOtelEnabled } from "./telemetry";
 
 const STREAM_BUFFER_TTL = 1800; // 30 minutes
 
@@ -41,10 +42,18 @@ export async function cleanupStreamBuffer(channelId: string) {
 async function publishAndBuffer(channelId: string, event: Record<string, unknown>, traceId?: string) {
   const payload = traceId ? { ...event, traceId } : event;
   const json = JSON.stringify(payload);
+
+  // Create a child span linked to the API request's trace
+  const span = (traceId && isOtelEnabled())
+    ? startChildSpan(`stream.${event.type ?? "publish"}`, traceId, { "stream.channel_id": channelId })
+    : null;
+
   await Promise.all([
     redis.publish(channelId, json),
     redis.rpush(`stream-events:${channelId}`, json),
   ]);
+
+  span?.end();
 }
 
 export async function publishToken(channelId: string, token: string, traceId?: string) {
@@ -70,15 +79,25 @@ export async function publishDone(
   result: { content: string; usage: { prompt_tokens?: number; completion_tokens?: number } },
   traceId?: string,
 ) {
+  const span = (traceId && isOtelEnabled())
+    ? startChildSpan("stream.done", traceId, {
+        "stream.channel_id": channelId,
+        "stream.prompt_tokens": result.usage.prompt_tokens ?? 0,
+        "stream.completion_tokens": result.usage.completion_tokens ?? 0,
+      })
+    : null;
   const payload = traceId ? { type: "done", ...result, traceId } : { type: "done", ...result };
   await redis.publish(channelId, JSON.stringify(payload));
   await cleanupStreamBuffer(channelId);
+  span?.end();
 }
 
 export async function publishError(channelId: string, message: string, traceId?: string) {
+  const span = (traceId && isOtelEnabled()) ? startChildSpan("stream.error", traceId, { "stream.channel_id": channelId }) : null;
   const payload = traceId ? { type: "error", message, traceId } : { type: "error", message };
   await redis.publish(channelId, JSON.stringify(payload));
   await cleanupStreamBuffer(channelId);
+  span?.end();
 }
 
 // --- Research progress publishers ---
