@@ -37,23 +37,15 @@ export async function cleanupStreamBuffer(channelId: string) {
 
 /**
  * Publish an event to both pub/sub and the replay buffer.
- * Every event goes through here so reconnecting clients get a perfect replay.
+ * No per-event span — token events are too numerous for individual spans.
  */
 async function publishAndBuffer(channelId: string, event: Record<string, unknown>, traceId?: string) {
   const payload = traceId ? { ...event, traceId } : event;
   const json = JSON.stringify(payload);
-
-  // Create a child span linked to the API request's trace
-  const span = (traceId && isOtelEnabled())
-    ? startChildSpan(`stream.${event.type ?? "publish"}`, traceId, { "stream.channel_id": channelId })
-    : null;
-
   await Promise.all([
     redis.publish(channelId, json),
     redis.rpush(`stream-events:${channelId}`, json),
   ]);
-
-  span?.end();
 }
 
 export async function publishToken(channelId: string, token: string, traceId?: string) {
@@ -67,7 +59,12 @@ export async function publishToolStatus(
   extra?: { args?: Record<string, unknown>; resultSummary?: string },
   traceId?: string,
 ) {
+  // Create a span only for tool invocations (running), not completions
+  const span = (traceId && isOtelEnabled() && status === "running")
+    ? startChildSpan(`tool: ${tool}`, traceId, { "tool.name": tool })
+    : null;
   await publishAndBuffer(channelId, { type: "tool_status", tool, status, ...extra }, traceId);
+  span?.end();
 }
 
 export async function publishContentClear(channelId: string, reason?: string, traceId?: string) {
@@ -93,35 +90,30 @@ export async function publishDone(
 }
 
 export async function publishError(channelId: string, message: string, traceId?: string) {
-  const span = (traceId && isOtelEnabled()) ? startChildSpan("stream.error", traceId, { "stream.channel_id": channelId }) : null;
+  const span = (traceId && isOtelEnabled())
+    ? startChildSpan("stream.error", traceId, { "stream.channel_id": channelId, "error.message": message })
+    : null;
   const payload = traceId ? { type: "error", message, traceId } : { type: "error", message };
   await redis.publish(channelId, JSON.stringify(payload));
   await cleanupStreamBuffer(channelId);
   span?.end();
 }
 
-// --- Research progress publishers ---
+// --- Research event publishers ---
 
 export async function publishResearchStatus(
   channelId: string,
   status: ResearchStatus,
   phase?: string,
 ) {
-  await redis.publish(channelId, JSON.stringify({
-    type: "research.status",
-    status,
-    phase,
-  }));
+  await redis.publish(channelId, JSON.stringify({ type: "research.status", status, phase }));
 }
 
 export async function publishResearchSource(
   channelId: string,
   source: { title: string; url: string; relevance?: number },
 ) {
-  await redis.publish(channelId, JSON.stringify({
-    type: "research.source",
-    ...source,
-  }));
+  await redis.publish(channelId, JSON.stringify({ type: "research.source", ...source }));
 }
 
 export async function publishResearchProgress(
@@ -130,29 +122,18 @@ export async function publishResearchProgress(
   message: string,
   extra?: { sourceUrl?: string },
 ) {
-  await redis.publish(channelId, JSON.stringify({
-    type: "research.progress",
-    progressType,
-    message,
-    ...extra,
-  }));
+  await redis.publish(channelId, JSON.stringify({ type: "research.progress", progressType, message, ...extra }));
 }
 
 export async function publishResearchDone(
   channelId: string,
   data: { reportId: string; sourcesCount: number },
 ) {
-  await redis.publish(channelId, JSON.stringify({
-    type: "research.done",
-    ...data,
-  }));
+  await redis.publish(channelId, JSON.stringify({ type: "research.done", ...data }));
 }
 
 export async function publishResearchError(channelId: string, message: string) {
-  await redis.publish(channelId, JSON.stringify({
-    type: "research.error",
-    message,
-  }));
+  await redis.publish(channelId, JSON.stringify({ type: "research.error", message }));
 }
 
 // --- Agent flow: tier & plan publishers ---
@@ -202,7 +183,7 @@ export async function publishInteractionResponse(
   await redis.publish(channelId, JSON.stringify({ type: "interaction.response", response }));
 }
 
-// --- Agent plan & subtask publishers (legacy, kept for subtask workflow) ---
+// --- Agent plan & subtask publishers ---
 
 export async function publishSubtaskSpawned(
   channelId: string,
