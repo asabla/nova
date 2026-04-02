@@ -1,0 +1,152 @@
+// ─── Grafana Alloy configuration for Nova ───────────────────────────
+// Unified collector: scrapes Prometheus metrics, tails Docker logs,
+// receives OTLP traces, and forwards everything to Loki/Tempo.
+// ─────────────────────────────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════
+// LOGS: Docker container log collection → Loki
+// ═══════════════════════════════════════════════════════════════════
+
+// Discover Docker containers
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+// Relabel: extract container name, service, compose project
+discovery.relabel "docker_logs" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "project"
+  }
+
+  // Only collect logs from nova-* containers
+  rule {
+    source_labels = ["container"]
+    regex         = "nova-.*"
+    action        = "keep"
+  }
+}
+
+// Tail logs from discovered containers
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.docker_logs.output
+  forward_to = [loki.process.docker_logs.receiver]
+}
+
+// Process: parse JSON logs, extract level and traceId labels
+loki.process "docker_logs" {
+  forward_to = [loki.write.default.receiver]
+
+  // Parse JSON log lines
+  stage.json {
+    expressions = {
+      level   = "level",
+      msg     = "msg",
+      traceId = "traceId",
+    }
+  }
+
+  // Map pino numeric levels to names
+  stage.label_drop { values = ["filename"] }
+
+  stage.labels {
+    values = {
+      level   = "",
+      traceId = "",
+    }
+  }
+}
+
+// Write logs to Loki
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// METRICS: Scrape Prometheus endpoints
+// ═══════════════════════════════════════════════════════════════════
+
+// Scrape Nova API metrics
+prometheus.scrape "nova_api" {
+  targets = [{
+    __address__ = "nova-api:3000",
+  }]
+  metrics_path = "/metrics"
+  scrape_interval = "15s"
+
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+// Scrape Temporal server metrics (if available)
+prometheus.scrape "temporal" {
+  targets = [{
+    __address__ = "nova-temporal:9090",
+  }]
+  metrics_path = "/metrics"
+  scrape_interval = "30s"
+
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+// Write metrics to Grafana's built-in Prometheus
+prometheus.remote_write "default" {
+  endpoint {
+    url = "http://grafana:3000/api/v1/prom/push"
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TRACES: Receive OTLP and forward to Tempo
+// ═══════════════════════════════════════════════════════════════════
+
+// OTLP gRPC receiver (port 4317)
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+// Export traces to Tempo
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ENTERPRISE: OTLP-compatible backend (Datadog, Splunk, New Relic)
+// Uncomment and set OTEL_ENTERPRISE_ENDPOINT to enable dual export.
+// ═══════════════════════════════════════════════════════════════════
+
+// otelcol.exporter.otlphttp "enterprise" {
+//   client {
+//     endpoint = env("OTEL_ENTERPRISE_ENDPOINT")
+//     headers  = { "Authorization" = env("OTEL_ENTERPRISE_AUTH") }
+//   }
+// }

@@ -1,0 +1,14 @@
+# Dashboard provider — loads JSON dashboards from this directory
+apiVersion: 1
+
+providers:
+  - name: Nova
+    orgId: 1
+    folder: Nova
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

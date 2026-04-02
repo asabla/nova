@@ -1,5 +1,6 @@
 .PHONY: help setup up down restart status logs \
        infra infra-down \
+       observability observability-down \
        build deploy deploy-api deploy-web deploy-worker \
        dev dev-api dev-web dev-worker \
        db-generate db-migrate db-push db-studio db-seed \
@@ -60,6 +61,15 @@ infra: ## Start infrastructure services only (postgres, redis, minio, temporal, 
 
 infra-down: ## Stop infrastructure services only
 	$(COMPOSE) stop $(INFRA)
+
+# ──────────────────────────────────────────────
+# Observability (Grafana, Loki, Tempo, Alloy)
+# ──────────────────────────────────────────────
+observability: ## Start observability stack (Grafana on :3002, Alloy on :12345)
+	$(COMPOSE) --profile observability up -d loki tempo grafana-alloy grafana
+
+observability-down: ## Stop observability stack
+	$(COMPOSE) --profile observability stop loki tempo grafana-alloy grafana
 
 # ──────────────────────────────────────────────
 # Build & deploy (Docker)

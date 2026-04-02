@@ -1,0 +1,47 @@
+# Auto-provisioned data sources for Nova observability
+apiVersion: 1
+
+datasources:
+  # Prometheus — scraped from Nova API /metrics by Alloy
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://grafana:3000/api/v1/prom
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: "15s"
+
+  # Loki — centralized logs from all Nova services
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      derivedFields:
+        # Link traceId in logs to Tempo traces
+        - datasourceUid: tempo
+          matcherRegex: '"traceId":"([a-f0-9]+)"'
+          name: TraceID
+          url: "$${__value.raw}"
+          urlDisplayLabel: View Trace
+
+  # Tempo — distributed traces
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    uid: tempo
+    editable: false
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: loki
+        filterByTraceID: true
+        filterBySpanID: false
+      tracesToMetrics:
+        datasourceUid: Prometheus
+      nodeGraph:
+        enabled: true
+      serviceMap:
+        datasourceUid: Prometheus
