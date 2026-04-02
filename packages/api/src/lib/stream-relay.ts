@@ -27,7 +27,6 @@ export async function relayRedisToSSE(
   return new Promise((resolve, reject) => {
     let settled = false;
     let accumulatedContent = "";
-    let messageCount = 0;
 
     const timeout = setTimeout(() => {
       if (settled) return;
