@@ -7,7 +7,7 @@
  * Import this module at the very top of each worker's index.ts.
  */
 
-import { trace, context, SpanStatusCode, type Span } from "@opentelemetry/api";
+import { trace, context, SpanStatusCode, TraceFlags, type Span, type SpanContext } from "@opentelemetry/api";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-grpc";
 import { resourceFromAttributes } from "@opentelemetry/resources";
@@ -79,6 +79,31 @@ export async function traceActivity<T>(name: string, attrs: Record<string, strin
   } finally {
     span.end();
   }
+}
+
+/**
+ * Create a child span linked to a remote parent trace ID.
+ * This is how worker spans become part of the API request's trace.
+ */
+export function startChildSpan(name: string, remoteTraceId: string, attrs?: Record<string, string | number>): Span {
+  const tracer = getTracer();
+
+  // Construct a remote parent context from the trace ID
+  const parentSpanContext: SpanContext = {
+    traceId: remoteTraceId,
+    spanId: randomSpanId(),
+    traceFlags: TraceFlags.SAMPLED,
+    isRemote: true,
+  };
+  const parentContext = trace.setSpanContext(context.active(), parentSpanContext);
+
+  return tracer.startSpan(name, { attributes: attrs }, parentContext);
+}
+
+function randomSpanId(): string {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 export { trace, context, SpanStatusCode };

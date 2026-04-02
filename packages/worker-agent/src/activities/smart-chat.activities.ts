@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { publishToken, publishToolStatus as pubToolStatus, publishDone as pubDone, publishError } from "@nova/worker-shared/stream";
 import { openai } from "@nova/worker-shared/litellm";
 import { buildChatParams } from "@nova/worker-shared/models";
+import { startChildSpan, isOtelEnabled, SpanStatusCode } from "@nova/worker-shared/telemetry";
 import { db } from "@nova/worker-shared/db";
 import { workflows } from "@nova/shared/schemas";
 import type { ToolCallStatus, WorkflowStatus } from "@nova/shared/constants";
@@ -100,6 +101,11 @@ export async function streamingLLMStep(input: {
 
   const params = await buildChatParams(input.model, rawParams);
 
+  // Create a child span of the API request's trace for the LLM call
+  const llmSpan = (input.traceId && isOtelEnabled())
+    ? startChildSpan("llm.streaming_step", input.traceId, { "gen_ai.request.model": input.model })
+    : null;
+
   try {
     const stream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk> = await openai.chat.completions.create({
       ...params,
@@ -143,10 +149,21 @@ export async function streamingLLMStep(input: {
       }
     }
 
+    if (llmSpan) {
+      llmSpan.setAttribute("gen_ai.usage.prompt_tokens", usage.prompt_tokens ?? 0);
+      llmSpan.setAttribute("gen_ai.usage.completion_tokens", usage.completion_tokens ?? 0);
+      llmSpan.setAttribute("gen_ai.response.finish_reason", finishReason);
+      llmSpan.end();
+    }
     return { content: fullContent, toolCalls: toolCalls.filter(Boolean), finishReason, usage };
   } catch (err) {
+    if (llmSpan) {
+      llmSpan.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+      llmSpan.recordException(err as Error);
+      llmSpan.end();
+    }
     const errMsg = err instanceof Error ? err.message : String(err);
-    await publishError(input.streamChannelId, `LLM API error: ${errMsg}`);
+    await publishError(input.streamChannelId, `LLM API error: ${errMsg}`, input.traceId);
     throw err;
   }
 }
