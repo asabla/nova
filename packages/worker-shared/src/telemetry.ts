@@ -61,5 +61,25 @@ export function isOtelEnabled() {
   return OTEL_ENABLED;
 }
 
+/**
+ * Wrap a function in an OTel span. Use for instrumenting activities.
+ */
+export async function traceActivity<T>(name: string, attrs: Record<string, string | number>, fn: () => Promise<T>): Promise<T> {
+  if (!OTEL_ENABLED) return fn();
+  const tracer = getTracer();
+  const span = tracer.startSpan(name, { attributes: attrs }, context.active());
+  try {
+    const result = await fn();
+    span.setStatus({ code: SpanStatusCode.OK });
+    return result;
+  } catch (err) {
+    span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+    span.recordException(err as Error);
+    throw err;
+  } finally {
+    span.end();
+  }
+}
+
 export { trace, context, SpanStatusCode };
 export type { Span };

@@ -1,5 +1,6 @@
 import { redis, redisSub } from "./redis";
 import { logger } from "./logger";
+import { trace, context, SpanStatusCode } from "@opentelemetry/api";
 
 interface RelayOptions {
   timeoutMs?: number;
@@ -17,9 +18,16 @@ export async function relayRedisToSSE(
 ): Promise<{ content: string; usage: { prompt_tokens?: number; completion_tokens?: number } } | null> {
   const timeoutMs = opts.timeoutMs ?? 30_000;
 
+  // Create OTel span for the SSE relay lifecycle
+  const tracer = trace.getTracer("nova-api");
+  const relaySpan = tracer.startSpan("sse.relay", {
+    attributes: { "sse.channel_id": channelId },
+  }, context.active());
+
   return new Promise((resolve, reject) => {
     let settled = false;
     let accumulatedContent = "";
+    let messageCount = 0;
 
     const timeout = setTimeout(() => {
       if (settled) return;
@@ -143,6 +151,8 @@ export async function relayRedisToSSE(
       clearTimeout(timeout);
       redisSub.off("message", handler);
       redisSub.unsubscribe(channelId).catch((err) => logger.debug({ err, channelId }, "[relay] unsubscribe failed"));
+      relaySpan.setAttribute("sse.event_count", messageCount);
+      relaySpan.end();
     };
 
     // Attach handler before subscribing to avoid missing messages
@@ -153,6 +163,8 @@ export async function relayRedisToSSE(
       settled = true;
       clearTimeout(timeout);
       redisSub.off("message", handler);
+      relaySpan.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+      relaySpan.end();
       reject(err);
     });
   });

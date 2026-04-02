@@ -55,6 +55,10 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("[ErrorBoundary]", error, errorInfo.componentStack);
+    // Report to telemetry backend (no-ops if VITE_TELEMETRY_ENABLED is not set)
+    import("../lib/frontend-telemetry").then(({ reportError }) => {
+      reportError(error, errorInfo.componentStack ?? undefined);
+    }).catch(() => {});
   }
 
   render() {

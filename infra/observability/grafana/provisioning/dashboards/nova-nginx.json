@@ -1,0 +1,124 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "type": "row",
+      "title": "Nginx Overview",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Active Connections (Web)",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "nginx_connections_active{job=\"nginx-web\"}", "instant": true }],
+      "fieldConfig": { "defaults": { "noValue": "0", "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } } }
+    },
+    {
+      "type": "stat",
+      "title": "Active Connections (Admin)",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "nginx_connections_active{job=\"nginx-admin\"}", "instant": true }],
+      "fieldConfig": { "defaults": { "noValue": "0", "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] } } }
+    },
+    {
+      "type": "stat",
+      "title": "Total Requests (Web)",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "rate(nginx_http_requests_total{job=\"nginx-web\"}[5m])", "instant": true }],
+      "fieldConfig": { "defaults": { "noValue": "0", "unit": "reqps", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } } }
+    },
+    {
+      "type": "stat",
+      "title": "Total Requests (Admin)",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "rate(nginx_http_requests_total{job=\"nginx-admin\"}[5m])", "instant": true }],
+      "fieldConfig": { "defaults": { "noValue": "0", "unit": "reqps", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } } }
+    },
+    {
+      "type": "row",
+      "title": "Connection Details",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Connection States (Web)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "nginx_connections_reading{job=\"nginx-web\"}", "legendFormat": "reading" },
+        { "expr": "nginx_connections_writing{job=\"nginx-web\"}", "legendFormat": "writing" },
+        { "expr": "nginx_connections_waiting{job=\"nginx-web\"}", "legendFormat": "waiting" },
+        { "expr": "nginx_connections_active{job=\"nginx-web\"}", "legendFormat": "active" }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 15, "lineWidth": 2 } } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Connection States (Admin)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "nginx_connections_reading{job=\"nginx-admin\"}", "legendFormat": "reading" },
+        { "expr": "nginx_connections_writing{job=\"nginx-admin\"}", "legendFormat": "writing" },
+        { "expr": "nginx_connections_waiting{job=\"nginx-admin\"}", "legendFormat": "waiting" },
+        { "expr": "nginx_connections_active{job=\"nginx-admin\"}", "legendFormat": "active" }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "fillOpacity": 15, "lineWidth": 2 } } }
+    },
+    {
+      "type": "row",
+      "title": "Request Rate",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Request Rate — Web vs Admin",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 15 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "rate(nginx_http_requests_total{job=\"nginx-web\"}[5m])", "legendFormat": "Web App" },
+        { "expr": "rate(nginx_http_requests_total{job=\"nginx-admin\"}[5m])", "legendFormat": "Admin Portal" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 15, "lineWidth": 2 } } }
+    },
+    {
+      "type": "row",
+      "title": "Access Logs",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "collapsed": false
+    },
+    {
+      "type": "logs",
+      "title": "Nginx Access Logs (Web + Admin)",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 24 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{ "expr": "{container=~\"nova-web|nova-admin\"} | json" }],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "wrapLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["nova", "infrastructure", "nginx"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Nova Nginx",
+  "uid": "nova-nginx",
+  "version": 1
+}

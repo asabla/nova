@@ -7,6 +7,7 @@ import type {
   UserInteractionResponse,
 } from "@nova/shared/types";
 import { redis } from "./redis";
+import { trace, context } from "@opentelemetry/api";
 
 const STREAM_BUFFER_TTL = 1800; // 30 minutes
 
@@ -39,10 +40,18 @@ export async function cleanupStreamBuffer(channelId: string) {
  * Every event goes through here so reconnecting clients get a perfect replay.
  */
 async function publishAndBuffer(channelId: string, event: string) {
+  const tracer = trace.getTracer("nova-worker");
+  const span = tracer.startSpan("stream.publish", {
+    attributes: {
+      "stream.channel_id": channelId,
+      "stream.event_type": JSON.parse(event).type ?? "unknown",
+    },
+  }, context.active());
   await Promise.all([
     redis.publish(channelId, event),
     redis.rpush(`stream-events:${channelId}`, event),
   ]);
+  span.end();
 }
 
 export async function publishToken(channelId: string, token: string) {
