@@ -23,7 +23,7 @@ export async function presignUpload(orgId: string, userId: string, filename: str
   }).returning();
 
   const file = result[0];
-  syncFileUpsert(file as any).catch((err) => logger.error({ err, fileId: file.id }, "[file] Qdrant sync failed"));
+  syncFileUpsert(file as any);
   return { uploadUrl: url, fileId: file.id, key };
 }
 
@@ -38,7 +38,7 @@ export async function createFileRecord(orgId: string, userId: string, filename: 
     storageBucket: env.MINIO_BUCKET,
   }).returning();
   const file = result[0];
-  syncFileUpsert(file as any).catch((err) => logger.error({ err, fileId: file.id }, "[file] Qdrant sync failed"));
+  syncFileUpsert(file as any);
   triggerFileIngestion(file as any);
   return file;
 }
