@@ -41,6 +41,8 @@ datasources:
         datasourceUid: loki
         filterByTraceID: false
         filterBySpanID: false
+        spanStartTimeShift: "-5m"
+        spanEndTimeShift: "5m"
         customQuery: true
         query: '{container=~"nova-.*"} |= "$${__span.traceId}"'
       tracesToMetrics:

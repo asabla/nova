@@ -730,6 +730,8 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         await redisClient.expire(`stream-events:${streamChannelId}`, 1800);
 
         const { relayRedisToSSE } = await import("../lib/stream-relay");
+        // Defer trace span recording until after relay completes (covers full SSE duration)
+        (c as any).__otelDeferred = true;
         const relayPromise = relayRedisToSSE(stream, streamChannelId, { timeoutMs: 600_000 });
 
         const temporalWorkflowId = `agent-chat-${conversationId}-${Date.now()}`;
@@ -800,6 +802,11 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         } catch (relayErr) {
           logger.error({ err: relayErr }, "[stream] relay error");
         }
+
+        // Finalize the API trace span now that the full stream is complete
+        const { finalizeTrace } = await import("../middleware/tracing");
+        finalizeTrace(c);
+
         const totalContent = stripThinkBlocks(relayResult?.content ?? "");
 
         let toolCallRecords: any[] = [];

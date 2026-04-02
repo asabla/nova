@@ -1,12 +1,10 @@
 /**
  * OpenTelemetry tracing middleware for Hono (Bun-compatible).
  *
- * Bun does not support AsyncLocalStorage, so we cannot rely on
- * OTel's context.with() for context propagation. Instead, we store
- * the span directly on the Hono context object and manually end it.
- *
- * Creates a root span for each HTTP request with standard semantic
- * conventions. Sets the trace ID as the request ID.
+ * Creates a root span for each HTTP request. For normal requests,
+ * the span is recorded when the middleware completes. For streaming
+ * endpoints (SSE), the route handler calls finalizeTrace() after
+ * the stream completes so the span covers the full duration.
  */
 
 import { createMiddleware } from "hono/factory";
@@ -32,11 +30,14 @@ export const tracing = () =>
       },
     });
 
-    // Use trace ID as request ID for unified correlation
     const spanContext = span.spanContext();
     c.set("requestId", spanContext.traceId);
     c.set("spanId", spanContext.spanId);
     c.header("X-Request-Id", spanContext.traceId);
+
+    // Store span on context so route handlers can finalize it for streaming
+    (c as any).__otelSpan = span;
+    (c as any).__otelStartMs = startTimeMs;
 
     try {
       await next();
@@ -54,19 +55,40 @@ export const tracing = () =>
       span.recordException(err as Error);
       throw err;
     } finally {
-      // Add user/org context if available (set by auth + orgScope middleware)
       const userId = c.get("userId") as string | undefined;
       const orgId = c.get("orgId") as string | undefined;
       if (userId) span.setAttribute("enduser.id", userId);
       if (orgId) span.setAttribute("nova.org_id", orgId);
 
-      span.end();
-
-      // Manual export — Bun's OTel SDK doesn't fire span processor callbacks
-      const extraAttrs: Record<string, string | number> = {};
-      if (userId) extraAttrs["enduser.id"] = userId;
-      if (orgId) extraAttrs["nova.org_id"] = orgId;
-      extraAttrs["http.response.status_code"] = c.res.status;
-      recordSpan(span, startTimeMs, extraAttrs);
+      // Only record span if the route hasn't marked it as deferred (streaming)
+      if (!(c as any).__otelDeferred) {
+        span.end();
+        const extraAttrs: Record<string, string | number> = {};
+        if (userId) extraAttrs["enduser.id"] = userId;
+        if (orgId) extraAttrs["nova.org_id"] = orgId;
+        extraAttrs["http.response.status_code"] = c.res.status;
+        recordSpan(span, startTimeMs, extraAttrs);
+      }
     }
   });
+
+/**
+ * Call from streaming route handlers AFTER the stream completes.
+ * This records the span with the correct end time covering the full
+ * request duration (not just the middleware's 26ms).
+ */
+export function finalizeTrace(c: any) {
+  const span = c.__otelSpan as Span | undefined;
+  const startMs = c.__otelStartMs as number | undefined;
+  if (!span || !startMs) return;
+
+  const userId = c.get?.("userId") as string | undefined;
+  const orgId = c.get?.("orgId") as string | undefined;
+
+  span.end();
+  const extraAttrs: Record<string, string | number> = {};
+  if (userId) extraAttrs["enduser.id"] = userId;
+  if (orgId) extraAttrs["nova.org_id"] = orgId;
+  extraAttrs["http.response.status_code"] = c.res?.status ?? 200;
+  recordSpan(span, startMs, extraAttrs);
+}
