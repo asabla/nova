@@ -1,6 +1,7 @@
 import type { ServerWebSocket } from "bun";
 import { redisSub, redisPub } from "./redis";
 import { logger } from "./logger";
+import { wsConnectionsActive } from "./metrics";
 
 export interface WSData {
   userId: string;
@@ -15,6 +16,7 @@ export function handleWsUpgrade(ws: ServerWebSocket<WSData>) {
     connections.set(userId, new Set());
   }
   connections.get(userId)!.add(ws);
+  wsConnectionsActive.inc();
   // Force a frame to be sent — confirms connection through proxy
   ws.send(JSON.stringify({ type: "connected" }));
 }
@@ -24,6 +26,7 @@ export function handleWsClose(ws: ServerWebSocket<WSData>) {
   const userConns = connections.get(userId);
   if (userConns) {
     userConns.delete(ws);
+    wsConnectionsActive.dec();
     if (userConns.size === 0) connections.delete(userId);
   }
 }

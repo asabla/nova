@@ -10,7 +10,7 @@ import { streamChatCompletion, chatCompletion, resolveModelExternalId } from "..
 import { AppError } from "@nova/shared/utils";
 import { DEFAULTS, TASK_QUEUES } from "@nova/shared/constants";
 import { notificationService } from "../services/notification.service";
-import { getTemporalClient } from "../lib/temporal";
+import { getTemporalClient, dispatchWorkflow } from "../lib/temporal";
 import { db } from "../lib/db";
 import { userProfiles, users, agents, orgSettings, files, toolCalls as toolCallsTable, messageAttachments, messages as messagesTable, models, workflows, conversationKnowledgeCollections, knowledgeCollections } from "@nova/shared/schemas";
 import { eq, and, isNull, inArray } from "drizzle-orm";
@@ -732,7 +732,6 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         const { relayRedisToSSE } = await import("../lib/stream-relay");
         const relayPromise = relayRedisToSSE(stream, streamChannelId, { timeoutMs: 600_000 });
 
-        const client = await getTemporalClient();
         const temporalWorkflowId = `agent-chat-${conversationId}-${Date.now()}`;
         const userId = c.get("userId");
 
@@ -771,7 +770,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
           });
         }
 
-        await client.workflow.start("agentWorkflow", {
+        await dispatchWorkflow("agentWorkflow", {
           taskQueue: TASK_QUEUES.AGENT,
           workflowId: temporalWorkflowId,
           args: [{

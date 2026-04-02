@@ -6,9 +6,12 @@
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
 import type { AppContext } from "./types/context";
 import { adminAuth } from "./middleware/admin-auth";
+import { requestId } from "./middleware/request-id";
+import { tracing } from "./middleware/tracing";
+import { logger } from "./middleware/logger";
+import { metricsMiddleware } from "./middleware/metrics";
 import { adminOrgRoutes } from "./routes/admin/orgs";
 import { adminUserRoutes } from "./routes/admin/users";
 import { adminStatsRoutes } from "./routes/admin/stats";
@@ -29,6 +32,12 @@ adminApp.use("*", cors({
   origin: (env.ADMIN_CORS_ORIGIN ?? "http://localhost:5174,http://localhost:5173,http://localhost:3000").split(",").map((o) => o.trim()),
   credentials: true,
 }));
+
+// Request ID, tracing, logging, metrics (same as main app)
+adminApp.use("*", requestId());
+adminApp.use("*", tracing());
+adminApp.use("*", logger());
+adminApp.use("*", metricsMiddleware());
 
 // Health check — unauthenticated (for Docker health checks)
 adminApp.get("/health", (c) => c.json({ status: "ok", service: "admin-api" }));

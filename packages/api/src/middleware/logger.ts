@@ -15,12 +15,16 @@ export const logger = () =>
     // Add OTel trace/span IDs for log-to-trace correlation
     const span = trace.getSpan(context.active());
     const spanCtx = span?.spanContext();
+    const userId = c.get("userId") as string | undefined;
+    const orgId = c.get("orgId") as string | undefined;
     const logData = {
       requestId,
       method,
       path,
       status,
       duration,
+      ...(userId ? { userId } : {}),
+      ...(orgId ? { orgId } : {}),
       ...(spanCtx?.traceId ? { traceId: spanCtx.traceId, spanId: spanCtx.spanId } : {}),
     };
 
