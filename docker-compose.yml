@@ -519,6 +519,23 @@ services:
       timeout: 5s
       retries: 5
 
+  prometheus:
+    image: prom/prometheus:v3.4.0
+    container_name: nova-prometheus
+    restart: unless-stopped
+    profiles: ["observability"]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/observability/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command: --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.retention.time=30d
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   grafana-alloy:
     image: grafana/alloy:v1.8.1
     container_name: nova-alloy
@@ -560,6 +577,8 @@ services:
         condition: service_healthy
       tempo:
         condition: service_healthy
+      prometheus:
+        condition: service_healthy
 
 volumes:
   postgres_data:
@@ -570,4 +589,5 @@ volumes:
   qdrant_data:
   loki_data:
   tempo_data:
+  prometheus_data:
   grafana_data:
