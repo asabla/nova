@@ -1,0 +1,153 @@
+# Nova alert rules — provisioned into Grafana
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Nova Platform Alerts
+    folder: Nova
+    interval: 1m
+    rules:
+      # ─── Availability ──────────────────────────────────
+      - uid: nova-high-error-rate
+        title: High Error Rate
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: Prometheus
+            model:
+              expr: sum(rate(nova_http_requests_total{status=~"5.."}[5m])) / sum(rate(nova_http_requests_total[5m])) * 100
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [5] }
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "HTTP 5xx error rate is above 5%"
+          description: "Error rate is {{ $value }}% over the last 5 minutes."
+        labels:
+          severity: critical
+
+      # ─── Latency ───────────────────────────────────────
+      - uid: nova-high-latency-p95
+        title: High P95 Latency
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: Prometheus
+            model:
+              expr: histogram_quantile(0.95, sum(rate(nova_http_request_duration_seconds_bucket[5m])) by (le))
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [5] }
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "P95 request latency exceeds 5 seconds"
+          description: "P95 latency is {{ $value }}s over the last 5 minutes."
+        labels:
+          severity: warning
+
+      # ─── Workflows ─────────────────────────────────────
+      - uid: nova-workflow-failure-spike
+        title: Workflow Failure Spike
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: Prometheus
+            model:
+              expr: sum(rate(nova_errors_total{type="workflow_failure"}[15m]))
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0.1] }
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "Workflow failure rate is elevated"
+          description: "Workflow failures detected at {{ $value }}/s over the last 15 minutes."
+        labels:
+          severity: warning
+
+      # ─── LLM ───────────────────────────────────────────
+      - uid: nova-llm-error-rate
+        title: LLM Error Rate High
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: Prometheus
+            model:
+              expr: sum(rate(nova_errors_total{type="llm_error"}[10m]))
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0.05] }
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "LLM error rate is above threshold"
+          description: "LLM errors at {{ $value }}/s over the last 10 minutes."
+        labels:
+          severity: warning
+
+      # ─── Resource Usage ────────────────────────────────
+      - uid: nova-high-memory
+        title: High Memory Usage
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: Prometheus
+            model:
+              expr: process_resident_memory_bytes / 1024 / 1024
+              intervalMs: 15000
+              maxDataPoints: 43200
+          - refId: C
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [1800] }
+        noDataState: OK
+        execErrState: Alerting
+        for: 10m
+        annotations:
+          summary: "API process memory exceeds 1.8 GB"
+          description: "Resident memory is {{ $value }}MB. Investigate for memory leaks."
+        labels:
+          severity: warning
