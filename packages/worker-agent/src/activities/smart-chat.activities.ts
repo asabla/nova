@@ -13,15 +13,17 @@ export async function publishToolStatus(
   tool: string,
   status: ToolCallStatus,
   extra?: { args?: Record<string, unknown>; resultSummary?: string },
+  traceId?: string,
 ) {
-  await pubToolStatus(channelId, tool, status, extra);
+  await pubToolStatus(channelId, tool, status, extra, traceId);
 }
 
 export async function publishDone(
   channelId: string,
   result: { content: string; usage: { prompt_tokens?: number; completion_tokens?: number } },
+  traceId?: string,
 ) {
-  await pubDone(channelId, result);
+  await pubDone(channelId, result, traceId);
 }
 
 /**
@@ -76,6 +78,7 @@ export async function streamingLLMStep(input: {
   temperature?: number;
   maxTokens?: number;
   tools?: unknown[];
+  traceId?: string;
 }): Promise<{
   content: string;
   toolCalls: any[];
@@ -115,7 +118,7 @@ export async function streamingLLMStep(input: {
 
       if (delta?.content) {
         fullContent += delta.content;
-        await publishToken(input.streamChannelId, delta.content);
+        await publishToken(input.streamChannelId, delta.content, input.traceId);
       }
 
       // Accumulate tool calls from deltas

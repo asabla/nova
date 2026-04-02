@@ -7,7 +7,6 @@ import type {
   UserInteractionResponse,
 } from "@nova/shared/types";
 import { redis } from "./redis";
-import { trace, context } from "@opentelemetry/api";
 
 const STREAM_BUFFER_TTL = 1800; // 30 minutes
 
@@ -39,23 +38,17 @@ export async function cleanupStreamBuffer(channelId: string) {
  * Publish an event to both pub/sub and the replay buffer.
  * Every event goes through here so reconnecting clients get a perfect replay.
  */
-async function publishAndBuffer(channelId: string, event: string) {
-  const tracer = trace.getTracer("nova-worker");
-  const span = tracer.startSpan("stream.publish", {
-    attributes: {
-      "stream.channel_id": channelId,
-      "stream.event_type": JSON.parse(event).type ?? "unknown",
-    },
-  }, context.active());
+async function publishAndBuffer(channelId: string, event: Record<string, unknown>, traceId?: string) {
+  const payload = traceId ? { ...event, traceId } : event;
+  const json = JSON.stringify(payload);
   await Promise.all([
-    redis.publish(channelId, event),
-    redis.rpush(`stream-events:${channelId}`, event),
+    redis.publish(channelId, json),
+    redis.rpush(`stream-events:${channelId}`, json),
   ]);
-  span.end();
 }
 
-export async function publishToken(channelId: string, token: string) {
-  await publishAndBuffer(channelId, JSON.stringify({ type: "token", content: token }));
+export async function publishToken(channelId: string, token: string, traceId?: string) {
+  await publishAndBuffer(channelId, { type: "token", content: token }, traceId);
 }
 
 export async function publishToolStatus(
@@ -63,24 +56,28 @@ export async function publishToolStatus(
   tool: string,
   status: ToolCallStatus,
   extra?: { args?: Record<string, unknown>; resultSummary?: string },
+  traceId?: string,
 ) {
-  await publishAndBuffer(channelId, JSON.stringify({ type: "tool_status", tool, status, ...extra }));
+  await publishAndBuffer(channelId, { type: "tool_status", tool, status, ...extra }, traceId);
 }
 
-export async function publishContentClear(channelId: string, reason?: string) {
-  await publishAndBuffer(channelId, JSON.stringify({ type: "content_clear", reason }));
+export async function publishContentClear(channelId: string, reason?: string, traceId?: string) {
+  await publishAndBuffer(channelId, { type: "content_clear", reason }, traceId);
 }
 
 export async function publishDone(
   channelId: string,
   result: { content: string; usage: { prompt_tokens?: number; completion_tokens?: number } },
+  traceId?: string,
 ) {
-  await redis.publish(channelId, JSON.stringify({ type: "done", ...result }));
+  const payload = traceId ? { type: "done", ...result, traceId } : { type: "done", ...result };
+  await redis.publish(channelId, JSON.stringify(payload));
   await cleanupStreamBuffer(channelId);
 }
 
-export async function publishError(channelId: string, message: string) {
-  await redis.publish(channelId, JSON.stringify({ type: "error", message }));
+export async function publishError(channelId: string, message: string, traceId?: string) {
+  const payload = traceId ? { type: "error", message, traceId } : { type: "error", message };
+  await redis.publish(channelId, JSON.stringify(payload));
   await cleanupStreamBuffer(channelId);
 }
 
@@ -144,8 +141,9 @@ export async function publishResearchError(channelId: string, message: string) {
 export async function publishTierAssessed(
   channelId: string,
   data: { tier: ExecutionTier; reasoning: string },
+  traceId?: string,
 ) {
-  await redis.publish(channelId, JSON.stringify({ type: "tier.assessed", ...data }));
+  await redis.publish(channelId, JSON.stringify({ type: "tier.assessed", ...data, ...(traceId ? { traceId } : {}) }));
 }
 
 export async function publishPlanGeneratedV2(

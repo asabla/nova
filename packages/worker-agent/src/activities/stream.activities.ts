@@ -12,8 +12,9 @@ import {
 export async function publishTierAssessedActivity(
   channelId: string,
   data: { tier: ExecutionTier; reasoning: string },
+  traceId?: string,
 ) {
-  await publishTierAssessed(channelId, data);
+  await publishTierAssessed(channelId, data, traceId);
 }
 
 export async function publishPlanGeneratedActivity(
@@ -44,13 +45,14 @@ export async function publishInteractionRequestActivity(
   await publishInteractionRequest(channelId, request);
 }
 
-export async function publishTokenActivity(channelId: string, content: string) {
-  await publishToken(channelId, content);
+export async function publishTokenActivity(channelId: string, content: string, traceId?: string) {
+  await publishToken(channelId, content, traceId);
 }
 
 export async function publishDoneActivity(
   channelId: string,
   result: { content: string; usage: { prompt_tokens?: number; completion_tokens?: number } },
+  traceId?: string,
 ) {
-  await publishDone(channelId, result);
+  await publishDone(channelId, result, traceId);
 }

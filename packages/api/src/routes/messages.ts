@@ -788,6 +788,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
             maxSteps: 25,
             enableSearchAttributes: true,
             preAssessedTier: assessedTier,
+            traceId: c.get("requestId"),
           }],
         });
 
