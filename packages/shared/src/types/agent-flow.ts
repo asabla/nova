@@ -214,6 +214,8 @@ export interface AgentWorkflowInput {
   knowledgeCollectionIds?: string[];
   /** When set, this run is a research task. Research tools are injected and results persisted to research_reports. */
   researchConfig?: ResearchConfig;
+  /** OTel trace ID for distributed trace correlation across API → Temporal → Worker */
+  traceId?: string;
 }
 
 export interface AgentWorkflowResult {

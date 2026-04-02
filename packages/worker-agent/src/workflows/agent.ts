@@ -423,6 +423,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
   }
 
   const ch = input.streamChannelId;
+  const tid = input.traceId;
   const isResearch = !!input.researchConfig;
 
   // Resolve DB-backed system prompts (falls back to hardcoded defaults)
@@ -452,12 +453,12 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
     // Tier was already assessed by the API — use it directly
     tier = input.preAssessedTier;
     if (ch) {
-      await publishTierAssessedActivity(ch, { tier, reasoning: "Pre-assessed by API" });
+      await publishTierAssessedActivity(ch, { tier, reasoning: "Pre-assessed by API" }, tid);
     }
   } else if (hasPendingToolCalls) {
     tier = "direct";
     if (ch) {
-      await publishTierAssessedActivity(ch, { tier, reasoning: "Tool calls already requested by LLM" });
+      await publishTierAssessedActivity(ch, { tier, reasoning: "Tool calls already requested by LLM" }, tid);
     }
   } else {
     try {
@@ -478,7 +479,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
       tier = assessment.tier;
 
       if (ch) {
-        await publishTierAssessedActivity(ch, { tier, reasoning: assessment.reasoning });
+        await publishTierAssessedActivity(ch, { tier, reasoning: assessment.reasoning }, tid);
       }
 
       // Apply suggested effort if none provided
@@ -552,7 +553,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
     await publishDoneActivity(ch, {
       content: finalContent,
       usage: { prompt_tokens: totalInputTokens, completion_tokens: totalOutputTokens },
-    });
+    }, tid);
   }
 
   if (input.workflowId) {
@@ -798,7 +799,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
           await updateResearchStatusActivity(rc.reportId, "failed", { error: isTimeout ? "Research timed out" : "Research cancelled" });
           await publishResearchErrorActivity(ch, isTimeout ? "Research timed out" : "Research cancelled");
         }
-        await publishDone(input.streamChannelId!, { content: "", usage: { prompt_tokens: totalInputTokens, completion_tokens: totalOutputTokens } });
+        await publishDone(input.streamChannelId!, { content: "", usage: { prompt_tokens: totalInputTokens, completion_tokens: totalOutputTokens } }, tid);
         return isTimeout ? "timeout" : "cancelled";
       }
       // Handle research error
@@ -1044,7 +1045,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
     if (completedWithContent.length === 1) {
       // Single node — use its output directly without an extra LLM call
       finalContent = completedWithContent[0].result!.content;
-      if (ch) await publishTokenActivity(ch, finalContent);
+      if (ch) await publishTokenActivity(ch, finalContent, tid);
 
       if (conversationId && input.agentId) {
         const msg = await saveAgentMessage(
@@ -1104,7 +1105,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
 
           if (synthesis.content) {
             finalContent = synthesis.content;
-            if (ch) await publishTokenActivity(ch, synthesis.content);
+            if (ch) await publishTokenActivity(ch, synthesis.content, tid);
           }
         } catch (synthErr: any) {
           // Fallback: use concatenated node results directly if synthesis fails
@@ -1112,7 +1113,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
           finalContent = completedWithContent
             .map((n) => n.result!.content)
             .join("\n\n---\n\n");
-          if (ch) await publishTokenActivity(ch, finalContent);
+          if (ch) await publishTokenActivity(ch, finalContent, tid);
         }
       } else {
         // Normal conversation: concise synthesis
@@ -1142,7 +1143,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
 
         if (synthesis.content) {
           finalContent = synthesis.content;
-          if (ch) await publishTokenActivity(ch, synthesis.content);
+          if (ch) await publishTokenActivity(ch, synthesis.content, tid);
 
           if (conversationId && input.agentId) {
             const msg = await saveAgentMessage(
@@ -1330,6 +1331,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
             agentId: input.agentId ?? "",
             conversationId,
             streamChannelId: ch ?? `stream:subtask:${parentWorkflowId}:${node.id}`,
+            traceId: tid,
             task: node.description,
             context: input.userMessage ?? "",
             systemPrompt: agent?.systemPrompt,
