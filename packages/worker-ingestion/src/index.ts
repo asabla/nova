@@ -40,7 +40,7 @@ async function run() {
   // Graceful shutdown
   const shutdown = async () => {
     logger.info("Shutting down ingestion worker...");
-    worker.shutdown();
+    await worker.shutdown();
     await closeDb();
     await closeRedis();
     await connection.close();
