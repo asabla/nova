@@ -6,7 +6,7 @@ import { TASK_QUEUES } from "@nova/shared/constants";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
 import { researchReports, researchReportVersions, orgSettings, models } from "@nova/shared/schemas";
-import { getTemporalClient } from "../lib/temporal";
+import { getTemporalClient, dispatchWorkflow } from "../lib/temporal";
 import { AppError } from "@nova/shared/utils";
 import { relayResearchToSSE } from "../lib/stream-relay";
 
@@ -312,12 +312,11 @@ researchRoutes.post("/", async (c) => {
 
   // Start Temporal workflow (dispatched to agent worker)
   try {
-    const client = await getTemporalClient();
     const resolvedModel = await resolveDefaultModel(orgId);
     const hasKnowledge = body.sources.knowledgeCollectionIds.length > 0;
     const hasFiles = body.sources.fileIds.length > 0;
     const maxTurns = Math.max(20, body.maxSources * 2 + (hasKnowledge ? 10 : 0) + (hasFiles ? 5 : 0));
-    await client.workflow.start("agentWorkflow", {
+    await dispatchWorkflow("agentWorkflow", {
       taskQueue: TASK_QUEUES.AGENT,
       workflowId: `research-${report.id}`,
       args: [{
@@ -330,6 +329,7 @@ researchRoutes.post("/", async (c) => {
         messageHistory: [],
         maxSteps: maxTurns,
         timeoutSeconds: 1800,
+        traceId: `${c.get("requestId")}:${c.get("spanId") ?? ""}`,
         researchConfig: {
           reportId: report.id,
           query: body.query,
@@ -541,8 +541,7 @@ researchRoutes.post("/:id/rerun", async (c) => {
     const rerunHasFiles = resolvedSources.fileIds.length > 0;
     const maxTurns = Math.max(20, maxSources * 2 + (rerunHasKnowledge ? 10 : 0) + (rerunHasFiles ? 5 : 0));
     const resolvedModel = await resolveDefaultModel(orgId);
-    const client = await getTemporalClient();
-    await client.workflow.start("agentWorkflow", {
+    await dispatchWorkflow("agentWorkflow", {
       taskQueue: TASK_QUEUES.AGENT,
       workflowId: `research-${newReport.id}`,
       args: [{
@@ -555,6 +554,7 @@ researchRoutes.post("/:id/rerun", async (c) => {
         messageHistory: [],
         maxSteps: maxTurns,
         timeoutSeconds: 1800,
+        traceId: `${c.get("requestId")}:${c.get("spanId") ?? ""}`,
         researchConfig: {
           reportId: newReport.id,
           query: originalReport.query,
@@ -662,12 +662,11 @@ researchRoutes.post("/:id/refine", async (c) => {
 
   // Start refinement workflow (dispatched to agent worker)
   try {
-    const client = await getTemporalClient();
     const resolvedModel = await resolveDefaultModel(orgId);
     const streamChannelId = `research:${reportId}:v${newVersion}`;
     const reportConfig = (report.config as Record<string, any>) ?? {};
 
-    await client.workflow.start("agentWorkflow", {
+    await dispatchWorkflow("agentWorkflow", {
       taskQueue: TASK_QUEUES.AGENT,
       workflowId: `research-refine-${reportId}-v${newVersion}`,
       args: [{
@@ -680,6 +679,7 @@ researchRoutes.post("/:id/refine", async (c) => {
         messageHistory: [],
         maxSteps: 25,
         timeoutSeconds: 900,
+        traceId: `${c.get("requestId")}:${c.get("spanId") ?? ""}`,
         researchConfig: {
           reportId,
           query: report.query,
