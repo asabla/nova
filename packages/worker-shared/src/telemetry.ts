@@ -82,28 +82,27 @@ export async function traceActivity<T>(name: string, attrs: Record<string, strin
 }
 
 /**
- * Create a child span linked to a remote parent trace ID.
- * This is how worker spans become part of the API request's trace.
+ * Create a child span linked to a remote parent trace and span ID.
+ * The parentSpanId must be the API's root span ID so Tempo builds
+ * a proper parent-child hierarchy.
+ *
+ * traceContext format: "traceId:spanId" (both 16-hex-char strings)
  */
-export function startChildSpan(name: string, remoteTraceId: string, attrs?: Record<string, string | number>): Span {
+export function startChildSpan(name: string, traceContext: string, attrs?: Record<string, string | number>): Span {
   const tracer = getTracer();
 
-  // Construct a remote parent context from the trace ID
+  const [traceId, parentSpanId] = traceContext.split(":");
+  if (!traceId) return tracer.startSpan(name, { attributes: attrs });
+
   const parentSpanContext: SpanContext = {
-    traceId: remoteTraceId,
-    spanId: randomSpanId(),
+    traceId,
+    spanId: parentSpanId || "0000000000000000",
     traceFlags: TraceFlags.SAMPLED,
     isRemote: true,
   };
   const parentContext = trace.setSpanContext(context.active(), parentSpanContext);
 
   return tracer.startSpan(name, { attributes: attrs }, parentContext);
-}
-
-function randomSpanId(): string {
-  const bytes = new Uint8Array(8);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 export { trace, context, SpanStatusCode };
