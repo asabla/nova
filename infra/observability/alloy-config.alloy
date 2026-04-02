@@ -51,22 +51,25 @@ loki.source.docker "containers" {
 loki.process "docker_logs" {
   forward_to = [loki.write.default.receiver]
 
-  // Parse JSON log lines
+  // Parse JSON log lines (works for both pino logs and nginx JSON format)
   stage.json {
     expressions = {
       level   = "level",
       msg     = "msg",
       traceId = "traceId",
+      source  = "source",
+      status  = "status",
+      method  = "method",
     }
   }
 
-  // Map pino numeric levels to names
   stage.label_drop { values = ["filename"] }
 
   stage.labels {
     values = {
       level   = "",
       traceId = "",
+      source  = "",
     }
   }
 }
