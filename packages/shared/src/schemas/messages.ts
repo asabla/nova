@@ -32,6 +32,7 @@ export const messages = pgTable("messages", {
   index("idx_messages_org_id").on(table.orgId),
   index("idx_messages_parent").on(table.parentMessageId),
   index("idx_messages_active").on(table.conversationId, table.createdAt),
+  index("idx_messages_status").on(table.status),
 ]);
 
 export const messageAttachments = pgTable("message_attachments", {

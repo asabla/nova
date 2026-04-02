@@ -37,28 +37,12 @@ export async function saveAgentMemory(
   userId?: string,
 ) {
   for (const [key, value] of Object.entries(entries)) {
-    const existing = await db.select().from(agentMemoryEntries)
-      .where(and(
-        eq(agentMemoryEntries.agentId, agentId),
-        eq(agentMemoryEntries.key, key),
-        eq(agentMemoryEntries.scope, scope),
-        isNull(agentMemoryEntries.deletedAt),
-      ));
-
-    if (existing.length > 0) {
-      await db.update(agentMemoryEntries)
-        .set({ value, updatedAt: new Date() })
-        .where(eq(agentMemoryEntries.id, existing[0].id));
-    } else {
-      await db.insert(agentMemoryEntries).values({
-        agentId,
-        orgId,
-        userId,
-        scope,
-        key,
-        value,
+    await db.insert(agentMemoryEntries)
+      .values({ agentId, orgId, userId, scope, key, value })
+      .onConflictDoUpdate({
+        target: [agentMemoryEntries.agentId, agentMemoryEntries.scope, agentMemoryEntries.key],
+        set: { value, updatedAt: new Date() },
       });
-    }
   }
 }
 

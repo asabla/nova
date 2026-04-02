@@ -120,6 +120,7 @@ export const agentMemoryEntries = pgTable("agent_memory_entries", {
 }, (table) => [
   index("idx_agent_memory_agent_scope").on(table.agentId, table.scope),
   index("idx_agent_memory_org_id").on(table.orgId),
+  uniqueIndex("idx_agent_memory_agent_scope_key").on(table.agentId, table.scope, table.key),
 ]);
 
 export const agentKnowledgeCollections = pgTable("agent_knowledge_collections", {
