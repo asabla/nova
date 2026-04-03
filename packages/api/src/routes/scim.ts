@@ -108,8 +108,8 @@ scimRoutes.post("/Users", async (c) => {
   const email = body.userName?.toLowerCase() ?? body.emails?.[0]?.value?.toLowerCase();
   if (!email) throw AppError.badRequest("userName (email) is required");
 
-  const displayName = body.displayName ?? body.name?.formatted
-    ?? `${body.name?.givenName ?? ""} ${body.name?.familyName ?? ""}`.trim() || email.split("@")[0];
+  const nameParts = `${body.name?.givenName ?? ""} ${body.name?.familyName ?? ""}`.trim();
+  const displayName = body.displayName ?? body.name?.formatted ?? (nameParts || email.split("@")[0]);
 
   // Find or create user
   let [existingUser] = await db.select().from(users).where(eq(users.email, email));
