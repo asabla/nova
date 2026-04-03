@@ -103,6 +103,10 @@ app.get("/metrics", async (c) => {
 app.route("/api/sso/oauth", ssoOAuthRoutes);
 app.route("/api/webhooks", webhookRoutes);
 
+// SCIM 2.0 provisioning (bearer token auth, not session-based)
+import { scimRoutes } from "./routes/scim";
+app.route("/scim/v2", scimRoutes);
+
 // 7. Rate limiting (on API routes)
 app.use("/api/*", rateLimiter());
 
