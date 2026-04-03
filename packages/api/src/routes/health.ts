@@ -34,11 +34,11 @@ health.get("/ready", async (c) => {
   // RustFS check
   try {
     const start = performance.now();
-    const minioUrl = env.MINIO_ENDPOINT ?? "http://localhost:9000";
-    const res = await fetch(`${minioUrl}/minio/health/live`, { signal: AbortSignal.timeout(5000) });
-    checks.minio = { status: res.ok ? "ok" : "error", latencyMs: Math.round(performance.now() - start) };
+    const s3Url = env.S3_ENDPOINT ?? "http://localhost:9000";
+    const res = await fetch(`${s3Url}/minio/health/live`, { signal: AbortSignal.timeout(5000) });
+    checks.s3 = { status: res.ok ? "ok" : "error", latencyMs: Math.round(performance.now() - start) };
   } catch (err: any) {
-    checks.minio = { status: "error", error: err.message };
+    checks.s3 = { status: "error", error: err.message };
   }
 
   // Temporal check (uses gRPC, so HTTP check is best-effort)
@@ -158,15 +158,15 @@ health.post("/diagnostics", async (c) => {
   // 4. RustFS / Object Storage
   try {
     const start = performance.now();
-    const minioUrl = env.MINIO_ENDPOINT ?? "http://localhost:9000";
-    const res = await fetch(`${minioUrl}/minio/health/live`, { signal: AbortSignal.timeout(5000) });
-    results.minio = {
+    const s3Url = env.S3_ENDPOINT ?? "http://localhost:9000";
+    const res = await fetch(`${s3Url}/minio/health/live`, { signal: AbortSignal.timeout(5000) });
+    results.s3 = {
       status: res.ok ? "pass" : "fail",
       message: res.ok ? "RustFS healthy" : `HTTP ${res.status}`,
       latencyMs: Math.round(performance.now() - start),
     };
   } catch (err: any) {
-    results.minio = { status: "fail", message: err.message, latencyMs: 0 };
+    results.s3 = { status: "fail", message: err.message, latencyMs: 0 };
   }
 
   // 5. LLM providers (models from DB)

@@ -43,7 +43,7 @@ function AdminHealthPage() {
     switch (name) {
       case "database": return <Database className="h-5 w-5" aria-hidden="true" />;
       case "redis": return <Cpu className="h-5 w-5" aria-hidden="true" />;
-      case "minio": return <HardDrive className="h-5 w-5" aria-hidden="true" />;
+      case "s3": return <HardDrive className="h-5 w-5" aria-hidden="true" />;
       case "litellm": return <Cloud className="h-5 w-5" aria-hidden="true" />;
       case "temporal": return <Activity className="h-5 w-5" aria-hidden="true" />;
       default: return <Activity className="h-5 w-5" aria-hidden="true" />;

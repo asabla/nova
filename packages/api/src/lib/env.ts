@@ -7,11 +7,11 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
 
-  MINIO_ENDPOINT: z.string(),
-  MINIO_PUBLIC_URL: z.string().optional(),
-  MINIO_ROOT_USER: z.string(),
-  MINIO_ROOT_PASSWORD: z.string(),
-  MINIO_BUCKET: z.string().default("nova-files"),
+  S3_ENDPOINT: z.string(),
+  S3_PUBLIC_URL: z.string().optional(),
+  S3_ACCESS_KEY: z.string(),
+  S3_SECRET_KEY: z.string(),
+  S3_BUCKET: z.string().default("nova-files"),
 
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_BASE_URL: z.string().url().optional(),

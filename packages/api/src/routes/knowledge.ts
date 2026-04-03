@@ -5,7 +5,8 @@ import { knowledgeService, triggerDocumentIngestion } from "../services/knowledg
 import { writeAuditLog } from "../services/audit.service";
 import { parsePagination } from "@nova/shared/utils";
 import * as fileService from "../services/file.service";
-import { minio } from "../lib/minio";
+import { s3 } from "../lib/s3";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { env } from "../lib/env";
 import { listModels } from "../lib/litellm";
 
@@ -183,9 +184,12 @@ knowledgeRoutes.post("/:id/documents/upload", async (c) => {
 
     // Upload directly to RustFS via the client (avoids presigned URL localhost issues in Docker)
     const buffer = Buffer.from(await file.arrayBuffer());
-    await minio.putObject(env.MINIO_BUCKET, key, buffer, buffer.length, {
-      "Content-Type": contentType,
-    });
+    await s3.send(new PutObjectCommand({
+      Bucket: env.S3_BUCKET,
+      Key: key,
+      Body: buffer,
+      ContentType: contentType,
+    }));
 
     // Create file record in DB
     const fileRecord = await fileService.createFileRecord(orgId, userId, filename, contentType, file.size, key);

@@ -269,7 +269,7 @@ CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
 ## Security Headers
 
 ```
-Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://*.minio.local; connect-src 'self' wss://*; frame-ancestors 'none'
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://*.rustfs.local; connect-src 'self' wss://*; frame-ancestors 'none'
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
 X-XSS-Protection: 0  (deprecated, rely on CSP)

@@ -415,7 +415,7 @@ Signal flow through the observability stack:
                                            - nginx-exporter-admin
                                            - temporal :9090
                                            - qdrant :6333
-                                           - minio :9000
+                                           - rustfs :9000
 ```
 
 ### Scrape targets
@@ -431,7 +431,7 @@ Prometheus is configured to scrape these targets at 15s intervals:
 | nginx-exporter-admin | `nginx-exporter-admin:9113/metrics` | Admin proxy stats |
 | temporal | `temporal:9090/metrics` | Workflow engine stats |
 | qdrant | `qdrant:6333/metrics` | Vector DB stats |
-| minio | `minio:9000/minio/v2/metrics/cluster` | Object storage stats |
+| rustfs | `rustfs:9000/rustfs/v2/metrics/cluster` | Object storage stats |
 
 ---
 

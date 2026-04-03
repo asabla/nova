@@ -11,7 +11,7 @@
 | **postgres** | `postgres:16-alpine` | 5432 | `nova-pgdata:/var/lib/postgresql/data` | `pg_isready -U nova` |
 | **postgres-temporal** | `postgres:16-alpine` | 5433 | `temporal-pgdata:/var/lib/postgresql/data` | `pg_isready -U temporal` |
 | **redis** | `redis:7.2-alpine` | 6379 | `redis-data:/data` | `redis-cli ping` |
-| **minio** | `minio/minio:RELEASE.2026-03-01T00-00-00Z` | 9000 (API), 9001 (Console) | `minio-data:/data` | `mc ready local` |
+| **rustfs** | `rustfs/rustfs:1.0.0-alpha.90` |
 | **litellm** | `ghcr.io/berriai/litellm:main-v1.x.x` | 4000 | `./litellm_config.yaml:/app/config.yaml` | `curl -f http://localhost:4000/health` |
 | **temporal** | `temporalio/auto-setup:1.24.x` | 7233 | none | `tctl cluster health` |
 | **temporal-ui** | `temporalio/ui:2.x` | 8233 | none | `curl -f http://localhost:8080` |
@@ -26,16 +26,16 @@
 ### Startup Dependency Order
 
 ```
-postgres, postgres-temporal, redis, minio
+postgres, postgres-temporal, redis, rustfs
     |
     v
 litellm, temporal (depends on postgres-temporal), langfuse (depends on postgres), otel-collector
     |
     v
-api (depends on postgres, redis, minio, litellm, temporal, otel-collector)
+api (depends on postgres, redis, rustfs, litellm, temporal, otel-collector)
     |
     v
-worker (depends on temporal, postgres, redis, minio, litellm)
+worker (depends on temporal, postgres, redis, rustfs, litellm)
     |
     v
 web (depends on api)
@@ -85,16 +85,16 @@ services:
       interval: 5s
       retries: 5
 
-  minio:
-    image: minio/minio:RELEASE.2026-03-01T00-00-00Z
+  rustfs:
+    image: rustfs/rustfs:1.0.0-alpha.90
     ports:
       - "9000:9000"
       - "9001:9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-nova_minio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-nova_minio_dev}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-nova_rustfs}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-nova_rustfs_dev}
     volumes:
-      - minio-data:/data
+      - rustfs-data:/data
     command: server /data --console-address ":9001"
 
   litellm:
@@ -164,7 +164,7 @@ volumes:
   nova-pgdata:
   temporal-pgdata:
   redis-data:
-  minio-data:
+  rustfs-data:
   grafana-data:
 ```
 
@@ -178,10 +178,10 @@ volumes:
 | `TEMPORAL_DB_PASSWORD` | postgres-temporal, temporal | `temporal_dev` | Yes | Temporal database password |
 | `REDIS_URL` | api, worker | `redis://redis:6379` | No | |
 | `DATABASE_URL` | api, worker | `postgresql://nova:pass@postgres:5432/nova` | Yes | NOVA PostgreSQL connection |
-| `MINIO_ENDPOINT` | api, worker | `http://minio:9000` | No | |
-| `MINIO_ROOT_USER` | minio, api, worker | `nova_minio` | Yes | |
-| `MINIO_ROOT_PASSWORD` | minio, api, worker | `nova_minio_dev` | Yes | |
-| `MINIO_BUCKET` | api, worker | `nova-files` | No | Default bucket name |
+| `S3_ENDPOINT` | api, worker | `http://rustfs:9000` | No | |
+| `S3_ACCESS_KEY` | rustfs, api, worker | `nova_rustfs` | Yes | |
+| `S3_SECRET_KEY` | rustfs, api, worker | `nova_rustfs_dev` | Yes | |
+| `S3_BUCKET` | api, worker | `nova-files` | No | Default bucket name |
 | `LITELLM_API_URL` | api, worker | `http://litellm:4000` | No | |
 | `LITELLM_MASTER_KEY` | litellm, api | `sk-nova-dev` | Yes | |
 | `TEMPORAL_ADDRESS` | api, worker | `temporal:7233` | No | |
@@ -247,7 +247,7 @@ The development seed creates:
 | postgres | 1 (primary) | 1000m/4000m | 2Gi/8Gi | No | PVC: 100Gi SSD |
 | postgres-temporal | 1 | 500m/2000m | 1Gi/4Gi | No | PVC: 20Gi SSD |
 | redis | 1 (Sentinel for HA) | 250m/1000m | 512Mi/2Gi | No | PVC: 10Gi |
-| minio | 4 (erasure coding) | 500m/2000m | 1Gi/4Gi | No | PVC: 500Gi each |
+| rustfs | 4 (erasure coding) | 500m/2000m | 1Gi/4Gi | No | PVC: 500Gi each |
 | litellm | 2-4 | 250m/1000m | 512Mi/2Gi | Yes (CPU 70%) | Stateless |
 | temporal | 1-3 | 500m/2000m | 2Gi/4Gi | No | |
 | langfuse | 1-2 | 250m/1000m | 512Mi/2Gi | No | |

@@ -651,7 +651,7 @@ Mark each story with a checkbox [ ] for tracking.
 
 Infrastructure:
 - [ ] Bun monorepo scaffold with workspaces
-- [ ] Docker Compose: postgres, redis, minio, litellm, api, web
+- [ ] Docker Compose: postgres, redis, rustfs, litellm, api, web
 - [ ] Drizzle migrations running on startup
 - [ ] CI: GitHub Actions lint + type-check + test
 
@@ -942,7 +942,7 @@ Shared types must only flow downward: shared → api, shared → web, shared →
 Write `infra/INFRASTRUCTURE.md` covering:
 
 ### Docker Compose (local dev)
-Services: api, web, postgres, redis, minio, litellm, temporal, temporal-ui, langfuse, prometheus, grafana
+Services: api, web, postgres, redis, rustfs, litellm, temporal, temporal-ui, langfuse, prometheus, grafana
 
 For each service document:
 - Docker image + version pin

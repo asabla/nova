@@ -37,7 +37,7 @@ Each infrastructure service has its own healthcheck defined in `docker-compose.y
 
 - **postgres**: `pg_isready -U nova` (5s interval)
 - **redis**: `redis-cli ping` (5s interval)
-- **minio**: `mc ready local` (10s interval)
+- **rustfs**: `curl healthcheck` (10s interval)
 - **temporal**: `temporal operator cluster health` (10s interval, 30s start period)
 - **qdrant**: TCP probe on port 6333 (10s interval)
 - **searxng**: `wget --spider http://localhost:8080/healthz` (10s interval)
@@ -72,7 +72,7 @@ docker compose exec postgres psql -U nova -d nova -c "SELECT 1"
 ```
 
 - Workers depend on `db-init` and `temporal-init` completing. If those fail, workers won't start.
-- API depends on `db-init`, `temporal-init`, redis, minio, and qdrant being healthy.
+- API depends on `db-init`, `temporal-init`, redis, rustfs, and qdrant being healthy.
 
 ### Temporal Workflow Stuck
 
@@ -121,20 +121,20 @@ docker compose exec redis redis-cli PUBSUB CHANNELS "stream-events:*"
 
 ```bash
 # Check RustFS health
-curl -s http://localhost:9000/minio/health/live
+curl -s http://localhost:9000/rustfs/health/live
 
 # Open RustFS Console
-open http://localhost:9001   # login: minioadmin / minioadmin
+open http://localhost:9001   # login: rustfsadmin / rustfsadmin
 
 # List buckets (from inside the container)
-docker compose exec minio mc ls local/
+docker compose exec rustfs rustfs ls/
 
 # Ensure the nova-files bucket exists
-docker compose exec minio mc mb local/nova-files --ignore-existing
+docker compose exec rustfs rustfs mb/nova-files --ignore-existing
 ```
 
 - The `db-init` service creates the bucket on startup. If it failed, create manually.
-- Check `MINIO_ENDPOINT`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_BUCKET` env vars.
+- Check `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET` env vars.
 
 ### Qdrant Collection Errors
 

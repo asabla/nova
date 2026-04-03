@@ -3,7 +3,7 @@ import { files } from "@nova/shared/schema";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { TASK_QUEUES } from "@nova/shared/constants";
 import { logger } from "../lib/logger";
-import { getUploadUrl, getDownloadUrl, deleteObject } from "../lib/minio";
+import { getUploadUrl, getDownloadUrl, deleteObject } from "../lib/s3";
 import { parsePagination, buildPaginatedResponse, type PaginationInput } from "@nova/shared/utils";
 import { env } from "../lib/env";
 import { syncFileUpsert, syncFileDelete } from "../lib/qdrant-sync";
@@ -19,7 +19,7 @@ export async function presignUpload(orgId: string, userId: string, filename: str
     contentType,
     sizeBytes,
     storagePath: key,
-    storageBucket: env.MINIO_BUCKET,
+    storageBucket: env.S3_BUCKET,
   }).returning();
 
   const file = result[0];
@@ -35,7 +35,7 @@ export async function createFileRecord(orgId: string, userId: string, filename: 
     contentType,
     sizeBytes,
     storagePath,
-    storageBucket: env.MINIO_BUCKET,
+    storageBucket: env.S3_BUCKET,
   }).returning();
   const file = result[0];
   syncFileUpsert(file as any);

@@ -40,10 +40,10 @@ const envSchema = z.object({
     .transform((v) => v === "true" || v === "1"),
   IMAGE_GENERATION_MODEL: z.string().default("gpt-image-1"),
 
-  MINIO_ENDPOINT: z.string().default("http://minio:9000"),
-  MINIO_ROOT_USER: z.string().default("minioadmin"),
-  MINIO_ROOT_PASSWORD: z.string().default("minioadmin"),
-  MINIO_BUCKET: z.string().default("nova-files"),
+  S3_ENDPOINT: z.string().default("http://rustfs:9000"),
+  S3_ACCESS_KEY: z.string().default("minioadmin"),
+  S3_SECRET_KEY: z.string().default("minioadmin"),
+  S3_BUCKET: z.string().default("nova-files"),
 
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 

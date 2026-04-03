@@ -14,7 +14,7 @@ Bun workspace monorepo with 11 packages:
 - **@nova/api** — Hono + Bun API server (REST, SSE, WebSocket)
 - **@nova/web** — React 19 + Vite + Tailwind v4 + TanStack Router + TanStack Query + Zustand
 - **@nova/admin** — Separate admin portal (React 19 + Vite + TanStack Router, port 5174)
-- **@nova/worker-shared** — Shared worker infrastructure (db, redis, litellm, stream-publisher, qdrant, minio, sandbox, tools)
+- **@nova/worker-shared** — Shared worker infrastructure (db, redis, litellm, stream-publisher, qdrant, s3, sandbox, tools)
 - **@nova/worker-agent** — Temporal agent workflows (task queue: `nova-agent`). Chat execution, tool use, DAG orchestration
 - **@nova/worker-ingestion** — Temporal ingestion workflows (task queue: `nova-ingestion`). Document/file/message embedding pipelines
 - **@nova/worker-background** — Temporal background workflows (task queue: `nova-background`). Research, summaries, cleanup, scheduling
@@ -51,7 +51,7 @@ This starts all packages concurrently:
 ### Manual setup (without Make)
 
 ```bash
-docker compose up -d postgres redis minio temporal temporal-db temporal-ui qdrant searxng
+docker compose up -d postgres redis rustfs temporal temporal-db temporal-ui qdrant searxng
 bun run db:push
 bun run --filter @nova/api db:seed
 bun run dev

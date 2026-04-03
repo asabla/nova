@@ -45,7 +45,7 @@ Nova supports three deployment scenarios:
 Run infrastructure in Docker and application services via Bun/Node.js for hot-reload:
 
 ```bash
-docker compose up -d postgres redis minio qdrant temporal temporal-db searxng
+docker compose up -d postgres redis rustfs qdrant temporal temporal-db searxng
 bun run dev        # Starts API, web, admin, and workers with hot-reload
 ```
 
@@ -166,7 +166,7 @@ Additional providers can be configured through the Nova UI after first login.
 docker compose build
 
 # Start infrastructure first
-docker compose up -d postgres redis minio qdrant temporal temporal-db searxng
+docker compose up -d postgres redis rustfs qdrant temporal temporal-db searxng
 
 # Wait for infrastructure, then init
 docker compose up -d temporal-init db-init sandbox-python sandbox-init
@@ -264,7 +264,7 @@ Terminate TLS at the load balancer (AWS ALB, GCP LB, Cloudflare, etc.) and proxy
 The following ship with insecure defaults for development convenience:
 
 - **PostgreSQL**: `nova:nova` -- change `POSTGRES_PASSWORD` in both the `postgres` and `temporal-db` services, plus `DATABASE_URL`
-- **RustFS**: `minioadmin:minioadmin` -- change `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` in all services that reference them (api, gateway, workers, db-init, minio)
+- **RustFS**: `rustfsadmin:rustfsadmin` -- change `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` in all services that reference them (api, gateway, workers, db-init, rustfs)
 - **`BETTER_AUTH_SECRET`**: `change-me-in-production-use-openssl-rand-base64-32`
 
 ### Rotation
@@ -346,13 +346,13 @@ docker compose exec -i postgres pg_restore -U nova -d nova --clean < nova_202603
 ```bash
 # Install mc (RustFS client) on host
 # Configure alias
-mc alias set nova http://localhost:9000 minioadmin minioadmin
+mc alias set nova http://localhost:9000 rustfsadmin rustfsadmin
 
 # Mirror to backup location
-mc mirror nova/nova-files /backups/minio/nova-files
+mc mirror nova/nova-files /backups/rustfs/nova-files
 
 # Restore
-mc mirror /backups/minio/nova-files nova/nova-files
+mc mirror /backups/rustfs/nova-files nova/nova-files
 ```
 
 ### Qdrant (vector store)
@@ -402,7 +402,7 @@ Redis is used for cache and pub/sub -- it is ephemeral by design. The `redis_dat
 - Container restart count > 0 (check with `docker compose ps`)
 - PostgreSQL connection count approaching `max_connections`
 - Redis memory usage (`redis-cli INFO memory`)
-- Disk usage on volumes (especially `postgres_data`, `minio_data`, `qdrant_data`)
+- Disk usage on volumes (especially `postgres_data`, `rustfs_data`, `qdrant_data`)
 - Worker lag -- check Temporal UI at port 8233 for task queue backlogs
 - API response times via nginx access logs
 
@@ -434,7 +434,7 @@ Before going live, verify the following:
 - [ ] **`BETTER_AUTH_SECRET`** is not the default value (`change-me-in-production-use-openssl-rand-base64-32`). Generate with `openssl rand -base64 32`
 - [ ] **`CORS_ORIGINS`** is set to your exact production domain(s), not `*` or `localhost`
 - [ ] **PostgreSQL password** is changed from the default `nova:nova` in both `DATABASE_URL` and the `postgres` service
-- [ ] **RustFS credentials** are changed from `minioadmin:minioadmin`
+- [ ] **RustFS credentials** are changed from `rustfsadmin:rustfsadmin`
 - [ ] **Redis persistence** is enabled -- the production override sets `appendonly yes` with `appendfsync everysec`
 - [ ] **Source maps** are disabled in Vite production builds (default behavior; verify `GENERATE_SOURCEMAP` is not set to `true`)
 - [ ] **Host port mappings** are removed for internal services (the production override handles this with `ports: !reset []`)

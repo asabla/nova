@@ -1486,7 +1486,7 @@ CREATE TRIGGER trg_user_keyboard_shortcuts_updated_at
 -- Append-only, system-wide. No updated_at, no deleted_at, no org_id.
 CREATE TABLE system_health_checks (
     id                  UUID        NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-    service             TEXT        NOT NULL CHECK (service IN ('postgresql', 'redis', 'minio', 'litellm', 'temporal')),
+    service             TEXT        NOT NULL CHECK (service IN ('postgresql', 'redis', 'rustfs', 'litellm', 'temporal')),
     status              TEXT        NOT NULL CHECK (status IN ('healthy', 'degraded', 'down')),
     response_time_ms    INTEGER,
     details             JSONB,

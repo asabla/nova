@@ -97,7 +97,7 @@ NOVA is a self-hosted-first AI chat platform with multi-tenancy, custom agents, 
 | `packages/worker-agent` | **Node.js** | Temporal Worker SDK requires Node.js (task queue: `nova-agent`) |
 | `packages/worker-ingestion` | **Node.js** | Temporal Worker SDK requires Node.js (task queue: `nova-ingestion`) |
 | `packages/worker-background` | **Node.js** | Temporal Worker SDK requires Node.js (task queue: `nova-background`) |
-| `packages/worker-shared` | **Node.js** | Shared worker infrastructure (db, redis, qdrant, minio, sandbox) |
+| `packages/worker-shared` | **Node.js** | Shared worker infrastructure (db, redis, qdrant, rustfs, sandbox) |
 | `packages/shared` | Both | Pure TypeScript types and utilities |
 
 This is the most significant finding from research. Temporal's Worker SDK depends on Node.js-specific APIs (`worker_threads`, `vm` module). The API server uses only `@temporalio/client` which is lighter. Workers are split by concern into three packages with a shared infrastructure package.

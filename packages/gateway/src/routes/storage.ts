@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { GatewayEnv } from "../app";
-import { getObjectBuffer, putObjectBuffer } from "@nova/worker-shared/minio";
+import { getObjectBuffer, putObjectBuffer } from "@nova/worker-shared/s3";
 
 export const storageRoutes = new Hono<GatewayEnv>();
 
@@ -32,11 +32,21 @@ storageRoutes.put("/objects/:key{.+}", async (c) => {
 
 storageRoutes.delete("/objects/:key{.+}", async (c) => {
   const key = c.req.param("key");
-  const { minio } = await import("@nova/worker-shared/minio") as any;
-  const bucket = process.env.MINIO_BUCKET ?? "nova-files";
+  const { S3Client, DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+  const bucket = process.env.S3_BUCKET ?? "nova-files";
+
+  const s3 = new S3Client({
+    region: "us-east-1",
+    endpoint: process.env.S3_ENDPOINT!,
+    credentials: {
+      accessKeyId: process.env.S3_ACCESS_KEY!,
+      secretAccessKey: process.env.S3_SECRET_KEY!,
+    },
+    forcePathStyle: true,
+  });
 
   try {
-    await minio.removeObject(bucket, key);
+    await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
   } catch {
     // Ignore not-found on delete
   }

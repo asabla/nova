@@ -40,12 +40,12 @@ adminHealthRoutes.get("/", async (c) => {
 
   // RustFS
   try {
-    const minioUrl = env.MINIO_ENDPOINT ?? "http://minio:9000";
+    const s3Url = env.S3_ENDPOINT ?? "http://rustfs:9000";
     const start = Date.now();
-    const resp = await fetch(`${minioUrl}/minio/health/live`, { signal: AbortSignal.timeout(5000) });
-    checks.minio = { status: resp.ok ? "healthy" : "unhealthy", latencyMs: Date.now() - start };
+    const resp = await fetch(`${s3Url}/minio/health/live`, { signal: AbortSignal.timeout(5000) });
+    checks.s3 = { status: resp.ok ? "healthy" : "unhealthy", latencyMs: Date.now() - start };
   } catch (err: any) {
-    checks.minio = { status: "unhealthy", error: err.message };
+    checks.s3 = { status: "unhealthy", error: err.message };
   }
 
   // Temporal — check via the Temporal UI's HTTP API (gRPC port 7233 is not HTTP)

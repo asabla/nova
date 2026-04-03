@@ -125,7 +125,7 @@ export const healthResponseSchema = z.object({
     db: z.boolean(),
     redis: z.boolean(),
     qdrant: z.boolean(),
-    minio: z.boolean(),
+    s3: z.boolean(),
   }),
 });
 

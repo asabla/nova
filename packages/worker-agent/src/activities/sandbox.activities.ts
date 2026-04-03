@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { sandboxExecute, type SandboxFile } from "@nova/worker-shared/sandbox";
-import { getObjectBuffer, putObjectBuffer } from "@nova/worker-shared/minio";
+import { getObjectBuffer, putObjectBuffer } from "@nova/worker-shared/s3";
 import { env } from "@nova/worker-shared/env";
 import { db } from "@nova/worker-shared/db";
 import { sandboxExecutions } from "@nova/shared/schemas";

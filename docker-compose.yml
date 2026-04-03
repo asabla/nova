@@ -36,9 +36,9 @@ services:
       retries: 5
 
   # ─── RustFS (S3-compatible object storage) ───────────
-  minio:
+  rustfs:
     image: rustfs/rustfs:1.0.0-alpha.90
-    container_name: nova-minio
+    container_name: nova-rustfs
     restart: unless-stopped
     ports:
       - "9000:9000"
@@ -200,10 +200,10 @@ services:
     environment:
       DATABASE_URL: postgres://nova:nova@postgres:5432/nova
       REDIS_URL: redis://redis:6379
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-      MINIO_BUCKET: nova-files
+      S3_ENDPOINT: http://rustfs:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: nova-files
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       BETTER_AUTH_SECRET: change-me-in-production-use-openssl-rand-base64-32
@@ -217,7 +217,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      minio:
+      rustfs:
         condition: service_healthy
 
   # ─── NOVA API ────────────────────────────────────
@@ -238,11 +238,11 @@ services:
     environment:
       DATABASE_URL: postgres://nova:nova@postgres:5432/nova
       REDIS_URL: redis://redis:6379
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_PUBLIC_URL: http://localhost:5173/storage
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-      MINIO_BUCKET: nova-files
+      S3_ENDPOINT: http://rustfs:9000
+      S3_PUBLIC_URL: http://localhost:5173/storage
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: nova-files
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       TEMPORAL_ADDRESS: temporal:7233
@@ -267,7 +267,7 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
-      minio:
+      rustfs:
         condition: service_healthy
       qdrant:
         condition: service_healthy
@@ -292,10 +292,10 @@ services:
       DATABASE_URL: postgres://nova:nova@postgres:5432/nova
       REDIS_URL: redis://redis:6379
       QDRANT_URL: http://qdrant:6333
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-      MINIO_BUCKET: nova-files
+      S3_ENDPOINT: http://rustfs:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: nova-files
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       NOVA_GATEWAY_JWT_SECRET: ${NOVA_GATEWAY_JWT_SECRET:-dev-gateway-secret}
@@ -313,7 +313,7 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_healthy
-      minio:
+      rustfs:
         condition: service_healthy
 
   # ─── NOVA Workers ───────────────────────────────
@@ -338,10 +338,10 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       SEARXNG_URL: http://searxng:8080
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-      MINIO_BUCKET: nova-files
+      S3_ENDPOINT: http://rustfs:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: nova-files
       SANDBOX_ENABLED: ${SANDBOX_ENABLED:-false}
       WORKER_BUILD_ID: ${WORKER_BUILD_ID:-dev}
       QDRANT_URL: http://qdrant:6333
@@ -384,10 +384,10 @@ services:
       TEMPORAL_ADDRESS: temporal:7233
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-      MINIO_BUCKET: nova-files
+      S3_ENDPOINT: http://rustfs:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: nova-files
       WORKER_BUILD_ID: ${WORKER_BUILD_ID:-dev}
       QDRANT_URL: http://qdrant:6333
       OTEL_ENABLED: ${OTEL_ENABLED:-false}
@@ -426,10 +426,10 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       SEARXNG_URL: http://searxng:8080
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-      MINIO_BUCKET: nova-files
+      S3_ENDPOINT: http://rustfs:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: nova-files
       SANDBOX_ENABLED: ${SANDBOX_ENABLED:-false}
       WORKER_BUILD_ID: ${WORKER_BUILD_ID:-dev}
       QDRANT_URL: http://qdrant:6333

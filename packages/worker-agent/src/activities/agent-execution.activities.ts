@@ -324,7 +324,7 @@ export async function executeToolCall(
             .from(filesTable)
             .where(inArray(filesTable.id, fileIds));
 
-          const { getObjectBuffer } = await import("@nova/worker-shared/minio");
+          const { getObjectBuffer } = await import("@nova/worker-shared/s3");
           inputFiles = await Promise.all(
             fileRecords.map(async (f: any) => ({
               name: f.filename ?? f.id,
@@ -345,7 +345,7 @@ export async function executeToolCall(
         // Upload output files to RustFS
         let outputFileInfo: { name: string; sizeBytes: number; storageKey: string }[] = [];
         if (result.outputFiles.length > 0) {
-          const { putObjectBuffer } = await import("@nova/worker-shared/minio");
+          const { putObjectBuffer } = await import("@nova/worker-shared/s3");
           const { randomUUID } = await import("node:crypto");
           const execId = randomUUID();
           outputFileInfo = await Promise.all(
@@ -369,7 +369,7 @@ export async function executeToolCall(
       }
       case "read_file": {
         const { files: filesTable } = await import("@nova/shared/schema");
-        const { getObjectBuffer } = await import("@nova/worker-shared/minio");
+        const { getObjectBuffer } = await import("@nova/worker-shared/s3");
 
         let fileRecord: any;
 

@@ -194,7 +194,7 @@ export async function extractPptxContent(
     throw new Error("PPTX extraction did not produce metadata.json");
   }
 
-  const { getObjectBuffer } = await import("@nova/worker-shared/minio");
+  const { getObjectBuffer } = await import("@nova/worker-shared/s3");
   const metadataBuffer = await getObjectBuffer(metadataFile.storageKey);
   const metadata: PptxMetadata = JSON.parse(metadataBuffer.toString("utf-8"));
 

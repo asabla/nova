@@ -60,7 +60,7 @@ packages/api/
 │   ├── lib/
 │   │   ├── db.ts                 # Drizzle client (postgres-js driver)
 │   │   ├── redis.ts              # ioredis client (single instance + pub/sub pair)
-│   │   ├── minio.ts              # RustFS client (presigned URLs, bucket ops)
+│   │   ├── s3.ts              # RustFS client (presigned URLs, bucket ops)
 │   │   ├── temporal.ts           # @temporalio/client (Connection, WorkflowClient)
 │   │   ├── auth.ts               # Better Auth instance (betterAuth config)
 │   │   ├── litellm.ts            # HTTP client wrapper for LiteLLM API
@@ -516,28 +516,28 @@ app.get("/api/workflows/:workflowId/progress", async (c) => {
 ## RustFS Client
 
 ```typescript
-// src/lib/minio.ts
-import { Client as MinioClient } from "minio";
+// src/lib/s3.ts
+import { Client as S3Client } from "@aws-sdk/client-s3";
 
-export const minio = new MinioClient({
-  endPoint: new URL(process.env.MINIO_ENDPOINT!).hostname,
-  port: Number(new URL(process.env.MINIO_ENDPOINT!).port),
-  useSSL: process.env.MINIO_ENDPOINT!.startsWith("https"),
-  accessKey: process.env.MINIO_ROOT_USER!,
-  secretKey: process.env.MINIO_ROOT_PASSWORD!,
+export const s3 = new S3Client({
+  endPoint: new URL(process.env.S3_ENDPOINT!).hostname,
+  port: Number(new URL(process.env.S3_ENDPOINT!).port),
+  useSSL: process.env.S3_ENDPOINT!.startsWith("https"),
+  accessKey: process.env.S3_ACCESS_KEY!,
+  secretKey: process.env.S3_SECRET_KEY!,
 });
 
-const BUCKET = process.env.MINIO_BUCKET ?? "nova-files";
+const BUCKET = process.env.S3_BUCKET ?? "nova-files";
 
 // Generate presigned upload URL (client uploads directly to RustFS)
 export async function getUploadUrl(orgId: string, filename: string): Promise<string> {
   const key = `${orgId}/${crypto.randomUUID()}/${filename}`;
-  return minio.presignedPutObject(BUCKET, key, 60 * 15); // 15 min expiry
+  return s3.presignedPutObject(BUCKET, key, 60 * 15); // 15 min expiry
 }
 
 // Generate presigned download URL
 export async function getDownloadUrl(key: string): Promise<string> {
-  return minio.presignedGetObject(BUCKET, key, 60 * 60); // 1 hour expiry
+  return s3.presignedGetObject(BUCKET, key, 60 * 60); // 1 hour expiry
 }
 ```
 
@@ -713,7 +713,7 @@ CMD ["bun", "run", "dist/index.js"]
     "postgres": "^3.4.0",
     "better-auth": "^1.4.0",
     "ioredis": "^5.4.0",
-    "minio": "^8.0.0",
+    "@aws-sdk/client-s3": "^8.0.0",
     "@temporalio/client": "^1.11.0",
     "zod": "^3.23.0",
     "@nova/shared": "workspace:*"
@@ -734,7 +734,7 @@ Validated at startup via Zod (see `src/lib/env.ts`). The full set is documented 
 Required:
 - `DATABASE_URL` -- PostgreSQL connection string
 - `REDIS_URL` -- Redis connection string
-- `MINIO_ENDPOINT`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_BUCKET`
+- `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`
 - `LITELLM_API_URL`, `LITELLM_MASTER_KEY`
 - `TEMPORAL_ADDRESS`
 - `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`

@@ -1418,7 +1418,7 @@ Results of admin diagnostic checks. Not org-scoped (system-wide).
 | Column | Type | Nullable | Default | Notes |
 |---|---|---|---|---|
 | `id` | `uuid` | NO | UUIDv7 | PK |
-| `service` | `text` | NO | | `postgresql`, `redis`, `minio`, `litellm`, `temporal` |
+| `service` | `text` | NO | | `postgresql`, `redis`, `rustfs`, `litellm`, `temporal` |
 | `status` | `text` | NO | | `healthy`, `degraded`, `down` |
 | `response_time_ms` | `integer` | YES | | |
 | `details` | `jsonb` | YES | | Version info, error details |

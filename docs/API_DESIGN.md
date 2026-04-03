@@ -550,7 +550,7 @@ Better Auth manages these routes. NOVA mounts them at `/api/auth/`. Request/resp
   "services": [
     { "name": "postgresql", "status": "healthy", "response_time_ms": 2, "version": "16.4" },
     { "name": "redis", "status": "healthy", "response_time_ms": 1, "version": "7.2.4" },
-    { "name": "minio", "status": "healthy", "response_time_ms": 5 },
+    { "name": "rustfs", "status": "healthy", "response_time_ms": 5 },
     { "name": "litellm", "status": "healthy", "response_time_ms": 12 },
     { "name": "temporal", "status": "healthy", "response_time_ms": 8 }
   ],

@@ -26,15 +26,16 @@ import { chunkCodeFile } from "../lib/code-chunker";
 import { CODE_FILE_EXTENSIONS } from "@nova/shared/constants";
 import { logger } from "@nova/worker-shared/logger";
 
-async function getMinioClient() {
-  const { Client: MinioClient } = await import("minio");
-  const endpoint = new URL(process.env.MINIO_ENDPOINT ?? "http://minio:9000");
-  return new MinioClient({
-    endPoint: endpoint.hostname,
-    port: Number(endpoint.port) || 9000,
-    useSSL: endpoint.protocol === "https:",
-    accessKey: process.env.MINIO_ROOT_USER ?? "minioadmin",
-    secretKey: process.env.MINIO_ROOT_PASSWORD ?? "minioadmin",
+async function getS3Client() {
+  const { S3Client } = await import("@aws-sdk/client-s3");
+  return new S3Client({
+    region: "us-east-1",
+    endpoint: process.env.S3_ENDPOINT ?? "http://rustfs:9000",
+    credentials: {
+      accessKeyId: process.env.S3_ACCESS_KEY ?? "minioadmin",
+      secretAccessKey: process.env.S3_SECRET_KEY ?? "minioadmin",
+    },
+    forcePathStyle: true,
   });
 }
 
@@ -226,11 +227,12 @@ async function resolveDocumentContent(input: DocumentIngestionInput): Promise<Re
     const [fileRecord] = await db.select().from(files).where(eq(files.id, fileId));
     if (!fileRecord) throw new Error(`File record ${fileId} not found`);
 
-    const minio = await getMinioClient();
-    const bucket = process.env.MINIO_BUCKET ?? "nova-files";
-    const stream = await minio.getObject(bucket, fileRecord.storagePath);
+    const { GetObjectCommand } = await import("@aws-sdk/client-s3");
+    const s3 = await getS3Client();
+    const bucket = process.env.S3_BUCKET ?? "nova-files";
+    const response = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: fileRecord.storagePath }));
     const buffers: Buffer[] = [];
-    for await (const chunk of stream) {
+    for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
       buffers.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
     const fileBuffer = Buffer.concat(buffers);

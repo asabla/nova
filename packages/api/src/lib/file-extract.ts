@@ -1,4 +1,4 @@
-import { getObjectBuffer } from "./minio";
+import { getObjectBuffer } from "./s3";
 import { extractFromHtml } from "@nova/shared/content";
 import { decodeBuffer } from "@nova/shared/utils";
 import { logger } from "./logger";

@@ -5,7 +5,7 @@ import { app } from "./app";
 import { adminApp } from "./admin-app";
 import { env } from "./lib/env";
 import { logger } from "./lib/logger";
-import { ensureBucket } from "./lib/minio";
+import { ensureBucket } from "./lib/s3";
 import { ensureAllCollections } from "./lib/qdrant";
 import { handleWsUpgrade, handleWsClose, handleWsMessage, initWsPubSub, type WSData } from "./lib/ws";
 import { auth } from "./lib/auth";

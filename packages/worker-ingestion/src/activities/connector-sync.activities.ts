@@ -1,6 +1,6 @@
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { db } from "@nova/worker-shared/db";
-import { putObjectBuffer } from "@nova/worker-shared/minio";
+import { putObjectBuffer } from "@nova/worker-shared/s3";
 import { deletePointsByFilter, COLLECTIONS } from "@nova/worker-shared/qdrant";
 import {
   knowledgeConnectors,
@@ -211,7 +211,7 @@ async function syncDriveItems(
         contentType,
         sizeBytes: item.size ?? buffer.length,
         storagePath,
-        storageBucket: process.env.MINIO_BUCKET ?? "nova-files",
+        storageBucket: process.env.S3_BUCKET ?? "nova-files",
         metadata: {
           provider: connector.provider,
           connectorId: input.connectorId,

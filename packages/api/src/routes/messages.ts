@@ -896,7 +896,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
 
                 if (ext === "excalidraw") {
                   try {
-                    const { getObjectBuffer } = await import("../lib/minio");
+                    const { getObjectBuffer } = await import("../lib/s3");
                     const buf = await getObjectBuffer(of_.storageKey);
                     const content = buf.toString("utf-8");
                     const title = of_.name.replace(/\.excalidraw$/, "") || "Diagram";
@@ -928,7 +928,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
                   filename: of_.name, contentType,
                   sizeBytes: of_.sizeBytes,
                   storagePath: of_.storageKey,
-                  storageBucket: env.MINIO_BUCKET,
+                  storageBucket: env.S3_BUCKET,
                   metadata: { source: "sandbox" },
                 }).returning();
 
@@ -963,7 +963,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
                 contentType: output.mimeType ?? "image/png",
                 sizeBytes: output.sizeBytes ?? 0,
                 storagePath: output.storageKey,
-                storageBucket: envMod.env.MINIO_BUCKET,
+                storageBucket: envMod.env.S3_BUCKET,
                 metadata: { source: "image_generation", revisedPrompt: output.revisedPrompt },
               }).returning();
 
