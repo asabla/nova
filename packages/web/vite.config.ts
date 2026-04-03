@@ -23,8 +23,8 @@ export default defineConfig({
     reportCompressedSize: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          excalidraw: ["@excalidraw/excalidraw"],
+        manualChunks(id) {
+          if (id.includes("@excalidraw/excalidraw")) return "excalidraw";
         },
       },
     },

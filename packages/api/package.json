@@ -23,7 +23,7 @@
     "@opentelemetry/semantic-conventions": "^1.40.0",
     "@qdrant/js-client-rest": "^1.17.0",
     "@temporalio/client": "^1.11.7",
-    "better-auth": "^1.5.6",
+    "better-auth": "~1.2.12",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.10",
     "ioredis": "^5.4.2",
