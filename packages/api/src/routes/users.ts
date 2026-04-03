@@ -51,6 +51,21 @@ userRoutes.patch("/me", zValidator("json", updateProfileSchema), async (c) => {
   return c.json(result[0]);
 });
 
+// POST /me/onboarding-complete - Mark onboarding as completed
+userRoutes.post("/me/onboarding-complete", async (c) => {
+  const userId = c.get("userId");
+  const orgId = c.get("orgId");
+
+  const result = await db
+    .update(userProfiles)
+    .set({ onboardingCompletedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(userProfiles.userId, userId), eq(userProfiles.orgId, orgId), isNull(userProfiles.deletedAt)))
+    .returning();
+
+  if (result.length === 0) throw AppError.notFound("User profile");
+  return c.json({ ok: true });
+});
+
 // GET /me/sessions - List active sessions
 userRoutes.get("/me/sessions", async (c) => {
   const userId = c.get("userId");

@@ -225,6 +225,37 @@ export const agentService = {
       .orderBy(desc(agentVersions.version));
   },
 
+  async rollbackToVersion(orgId: string, agentId: string, versionId: string, userId: string) {
+    // Fetch the target version
+    const [targetVersion] = await db.select().from(agentVersions)
+      .where(and(eq(agentVersions.id, versionId), eq(agentVersions.agentId, agentId), eq(agentVersions.orgId, orgId)));
+
+    if (!targetVersion) throw AppError.notFound("Version not found");
+
+    // Apply version snapshot to the agent
+    const [updated] = await db.update(agents).set({
+      systemPrompt: targetVersion.systemPrompt,
+      modelId: targetVersion.modelId,
+      modelParams: targetVersion.modelParams,
+      updatedAt: new Date(),
+    }).where(and(eq(agents.id, agentId), eq(agents.orgId, orgId))).returning();
+
+    if (!updated) throw AppError.notFound("Agent not found");
+
+    // Create a new version entry for audit trail
+    await this.createVersion(orgId, agentId, {
+      description: `Rolled back to version ${targetVersion.version}`,
+      snapshot: {
+        systemPrompt: targetVersion.systemPrompt,
+        modelId: targetVersion.modelId,
+        modelParams: targetVersion.modelParams,
+      },
+      createdBy: userId,
+    });
+
+    return updated;
+  },
+
   async update(orgId: string, agentId: string, data: Partial<{
     name: string;
     description: string;

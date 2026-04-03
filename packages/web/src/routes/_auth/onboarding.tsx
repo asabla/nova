@@ -10,6 +10,7 @@ import { api } from "../../lib/api";
 import { Button } from "../../components/ui/Button";
 import { Switch } from "../../components/ui/Switch";
 import { toast } from "../../components/ui/Toast";
+import { useAuthStore } from "../../stores/auth.store";
 
 export const Route = createFileRoute("/_auth/onboarding")({
   component: OnboardingPage,
@@ -37,7 +38,10 @@ function OnboardingPage() {
 
   const completeOnboarding = useMutation({
     mutationFn: () => api.post("/api/users/me/onboarding-complete", preferences),
-    onSuccess: () => navigate({ to: "/" }),
+    onSuccess: () => {
+      useAuthStore.setState({ onboardingCompleted: true });
+      navigate({ to: "/" });
+    },
     onError: () => {
       toast(t("onboarding.completeFailed", "Failed to complete onboarding. Please try again."), "error");
     },

@@ -252,6 +252,23 @@ agentRoutes.get("/:id/versions", async (c) => {
   return c.json({ data: versions });
 });
 
+// Rollback to a specific version
+agentRoutes.post("/:id/versions/:versionId/rollback", requireRole("power-user"), async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const userRole = c.get("userRole");
+  const agentId = c.req.param("id");
+  const versionId = c.req.param("versionId");
+
+  const existing = await agentService.get(orgId, agentId);
+  if (!existing) throw AppError.notFound("Agent not found");
+  assertOwnerOrAdmin(userRole, userId, existing.ownerId);
+
+  const updated = await agentService.rollbackToVersion(orgId, agentId, versionId, userId);
+  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "agent.rollback", resourceType: "agent", resourceId: agentId, details: { versionId } });
+  return c.json(updated);
+});
+
 // Test agent with sample prompt
 agentRoutes.post("/:id/test", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");

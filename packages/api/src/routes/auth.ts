@@ -349,10 +349,10 @@ authRoutes.post("/init", async (c) => {
 
     // Fetch the user's role in the target org
     const [profile] = await db
-      .select({ role: userProfiles.role, displayName: userProfiles.displayName })
+      .select({ role: userProfiles.role, displayName: userProfiles.displayName, onboardingCompletedAt: userProfiles.onboardingCompletedAt })
       .from(userProfiles)
       .where(and(eq(userProfiles.userId, novaUser.id), eq(userProfiles.orgId, targetOrgId), isNull(userProfiles.deletedAt)));
-    return c.json({ orgId: targetOrgId, role: profile?.role ?? "member", displayName: profile?.displayName });
+    return c.json({ orgId: targetOrgId, role: profile?.role ?? "member", displayName: profile?.displayName, onboardingCompletedAt: profile?.onboardingCompletedAt ?? null });
   }
 
   // Create a personal org for the user
@@ -375,7 +375,7 @@ authRoutes.post("/init", async (c) => {
     role: "org-admin",
   });
 
-  return c.json({ orgId: org.id, role: "org-admin", displayName: userName });
+  return c.json({ orgId: org.id, role: "org-admin", displayName: userName, onboardingCompletedAt: null });
 });
 
 // Better Auth catch-all handler (handles login, register, session, etc.)

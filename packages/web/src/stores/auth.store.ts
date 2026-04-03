@@ -6,6 +6,7 @@ interface AuthState {
   user: any | null;
   activeOrgId: string | null;
   initOrgError: string | null;
+  onboardingCompleted: boolean;
   setSession: (session: any | null) => void;
   setActiveOrg: (orgId: string) => void;
   initOrg: () => Promise<void>;
@@ -20,6 +21,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   activeOrgId: getActiveOrgId(),
   initOrgError: null,
+  onboardingCompleted: true, // default true to avoid flash redirect
   setSession: (session) => set({ session, user: session?.user ?? null }),
   setActiveOrg: (orgId) => {
     setActiveOrgId(orgId);
@@ -43,6 +45,7 @@ export const useAuthStore = create<AuthState>((set) => ({
             setActiveOrgId(data.orgId);
             set((state) => ({
               activeOrgId: data.orgId,
+              onboardingCompleted: !!data.onboardingCompletedAt,
               user: state.user ? { ...state.user, role: data.role, displayName: data.displayName } : state.user,
             }));
           }

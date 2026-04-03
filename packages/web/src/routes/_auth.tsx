@@ -3,6 +3,7 @@ import { Sidebar } from "../components/layout/Sidebar";
 import { Header } from "../components/layout/Header";
 import { StatusBanner } from "../components/layout/StatusBanner";
 import { SystemStatusBanner } from "../components/layout/SystemStatusBanner";
+import { WhatsNewModal } from "../components/layout/WhatsNewModal";
 import { useAuthStore } from "../stores/auth.store";
 import { useUIStore } from "../stores/ui.store";
 import { useTheme } from "../hooks/useTheme";
@@ -43,6 +44,12 @@ export const Route = createFileRoute("/_auth")({
       // Normal flow — let initOrg handle it
       await initOrg();
     }
+
+    // Redirect to onboarding if not completed (but not if already on onboarding page)
+    const { onboardingCompleted } = useAuthStore.getState();
+    if (!onboardingCompleted && !window.location.pathname.startsWith("/onboarding")) {
+      throw redirect({ to: "/onboarding" });
+    }
   },
   component: AuthLayout,
 });
@@ -63,6 +70,7 @@ function AuthLayout() {
           <Outlet />
         </main>
       </div>
+      <WhatsNewModal />
     </div>
   );
 }
