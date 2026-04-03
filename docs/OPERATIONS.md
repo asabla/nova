@@ -470,3 +470,169 @@ open http://localhost:8233
 # Open MinIO Console
 open http://localhost:9001
 ```
+
+---
+
+## 7. Observability
+
+Nova includes an optional observability stack activated via Docker Compose profile. See `docs/OBSERVABILITY.md` for the full guide.
+
+### Quick Start
+
+```bash
+docker compose --profile observability up -d
+```
+
+### Services
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| Grafana | 3002 | Dashboards and alerting (default login: admin/admin) |
+| Prometheus | 9090 | Metrics collection and storage |
+| Loki | 3100 | Log aggregation (queried via Grafana) |
+| Tempo | 3200 | Distributed tracing |
+
+### Dashboards
+
+Grafana ships with 7 pre-configured dashboards covering API performance, worker health, database metrics, Redis usage, infrastructure overview, and more. Access at `http://your-server:3002`.
+
+### Key Capabilities
+
+- **Traces**: Tempo collects distributed traces across API requests and Temporal workflows. Use trace IDs to follow a request end-to-end.
+- **Logs**: Loki aggregates structured JSON logs from all services. Filter by service, level, traceId, or any JSON field.
+- **Metrics**: Prometheus scrapes Node.js, PostgreSQL, Redis, and MinIO exporters.
+
+---
+
+## 8. Backup Procedures
+
+### Automated Database Backup
+
+Use the provided backup script with cron for automated daily backups:
+
+```bash
+# Manual backup
+./infra/scripts/db-backup.sh                          # Backup to ./backups/
+./infra/scripts/db-backup.sh /mnt/backups             # Custom directory
+
+# Restore from backup (interactive -- confirms before dropping DB)
+./infra/scripts/db-restore.sh backups/nova_20260402_120000.sql.gz
+```
+
+### Cron Schedule
+
+```bash
+# Daily at 2 AM, 30-day retention (default)
+0 2 * * * cd /path/to/nova && ./infra/scripts/db-backup.sh /mnt/backups >> /var/log/nova-backup.log 2>&1
+
+# Custom retention: 14 days
+0 2 * * * cd /path/to/nova && BACKUP_RETENTION_DAYS=14 ./infra/scripts/db-backup.sh /mnt/backups >> /var/log/nova-backup.log 2>&1
+```
+
+### Retention Policy
+
+The backup script automatically cleans up backups older than `BACKUP_RETENTION_DAYS` (default: 30 days). Temporal DB should be backed up separately with a 14-day retention.
+
+### Restore Procedure
+
+1. Stop application services: `docker compose stop api gateway worker-agent worker-ingestion worker-background`
+2. Run restore: `./infra/scripts/db-restore.sh <backup-file.sql.gz>`
+3. Restart services: `docker compose up -d`
+4. Verify with health check: `curl -s http://localhost:3000/health/ready | jq`
+
+---
+
+## 9. Alerting
+
+### Pre-Configured Grafana Alerts
+
+The observability stack includes pre-configured alert rules:
+
+| Alert | Threshold | Severity |
+|-------|-----------|----------|
+| API error rate | > 5% of requests returning 5xx | Critical |
+| P95 latency | > 5 seconds | Warning |
+| Temporal workflow failures | > 10% failure rate | Critical |
+| Memory usage | > 85% of container limit | Warning |
+
+### Notification Channels
+
+Configure alert notification channels in Grafana (Settings > Notification channels):
+- Email, Slack, PagerDuty, webhooks, and others supported out of the box
+- Alerts fire when thresholds are breached for 5 minutes (configurable)
+
+### Health Endpoint Monitoring
+
+In addition to Grafana alerts, set up an external uptime monitor on:
+- `/health` -- basic liveness (should always return 200)
+- `/health/ready` -- readiness with dependency checks (returns 503 when critical services are down)
+
+---
+
+## 10. Scaling Guidance
+
+### When to Scale Workers
+
+- **Task queue backlog growing**: Check Temporal UI at port 8233. If pending tasks consistently exceed 100 on any queue, add worker instances.
+- **Workflow latency increasing**: If agent response times degrade, scale `worker-agent` first -- it handles the most resource-intensive work (LLM orchestration).
+
+```bash
+# Scale workers horizontally
+docker compose up -d --scale worker-agent=3 --scale worker-ingestion=2
+```
+
+### Database Connection Pool Tuning
+
+- Default PostgreSQL `max_connections` is 100. Each API instance and worker uses a connection pool.
+- Monitor active connections: `SELECT count(*) FROM pg_stat_activity WHERE datname = 'nova';`
+- If connections approach the limit, either increase `max_connections` in PostgreSQL config or use PgBouncer as a connection pooler.
+- Rule of thumb: allow 10 connections per API instance + 5 per worker instance + 20 headroom.
+
+### Redis Memory Monitoring
+
+```bash
+# Check current memory usage
+docker compose exec redis redis-cli info memory | grep used_memory_human
+
+# Check eviction policy
+docker compose exec redis redis-cli config get maxmemory-policy
+```
+
+- Redis is used for cache, pub/sub (stream relay), and rate limiting. It is ephemeral by design.
+- If memory usage grows above 80% of available RAM, investigate for leaked stream-event lists: `docker compose exec redis redis-cli DBSIZE`
+- Stream event lists (`stream-events:{channelId}`) are cleaned up after delivery but can accumulate if clients disconnect without consuming.
+
+---
+
+## 11. Incident Response
+
+### First Steps
+
+1. **Check Grafana dashboards** at `http://your-server:3002` for an overview of system health, error rates, and latency.
+2. **Check health endpoint**: `curl -s http://your-server:3000/health/ready | jq` -- identifies which dependencies are down.
+3. **Check container status**: `docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Health}}"`
+
+### Tracing Slow Requests
+
+1. Find the `requestId` from API logs or the `X-Request-Id` response header.
+2. In Grafana, go to the Tempo data source and search by trace ID.
+3. The trace shows the full request lifecycle: middleware, database queries, Redis calls, and any downstream service calls.
+
+### Correlating Logs with Traces
+
+1. In Grafana, navigate to the Loki data source (Explore view).
+2. Filter by `traceId` to see all log entries for a specific request:
+   ```
+   {service="api"} | json | traceId="<trace-id>"
+   ```
+3. This shows the complete log trail including errors, warnings, and timing information.
+
+### Common Incident Patterns
+
+| Symptom | Likely Cause | Quick Fix |
+|---------|-------------|-----------|
+| 503 on `/health/ready` | PostgreSQL or Redis down | `docker compose restart postgres redis` |
+| High P95 latency | Slow DB queries or LLM provider issues | Check Tempo traces; check `pg_stat_activity` for long queries |
+| Worker not processing | Worker disconnected from Temporal | `docker compose restart worker-agent` and check Temporal task queue pollers |
+| Streaming stalled | Redis pub/sub issue or SSE connection dropped | Check Redis connectivity; restart API if needed |
+| OOM kills | Worker processing too many concurrent LLM calls | Scale workers or reduce concurrency; check `docker stats` |
