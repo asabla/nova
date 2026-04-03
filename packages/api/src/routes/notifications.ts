@@ -3,10 +3,11 @@ import { zValidator } from "../lib/validator";
 import { z } from "zod";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
-import { notifications } from "@nova/shared/schemas";
-import { eq, and, isNull, desc, sql } from "drizzle-orm";
+import { notifications, notificationBroadcasts, userProfiles } from "@nova/shared/schemas";
+import { eq, and, isNull, isNotNull, desc, sql, lte, or } from "drizzle-orm";
 import { parsePagination, buildPaginatedResponse } from "@nova/shared/utils";
 import { notificationService, upsertPreference, getStructuredPrefs } from "../services/notification.service";
+import { requireRole } from "../middleware/rbac";
 
 const notificationsRouter = new Hono<AppContext>();
 
@@ -291,6 +292,146 @@ notificationsRouter.post("/webhook", zValidator("json", webhookNotificationSchem
       url: data.url,
     }, 502);
   }
+});
+
+// --- Broadcasts (fan-out announcements) ---
+
+// GET /broadcasts - Get unread broadcasts for the current user
+notificationsRouter.get("/broadcasts", async (c) => {
+  const userId = c.get("userId");
+  const orgId = c.get("orgId");
+  const userRole = c.get("userRole");
+  const now = new Date();
+
+  // Determine which audiences this user belongs to
+  const audiences = ["all_users"];
+  if (userRole === "org-admin" || userRole === "super-admin") audiences.push("org_admins");
+  if (userRole === "super-admin") audiences.push("super_admins");
+
+  // Find published broadcasts targeting this user's audiences
+  const broadcasts = await db
+    .select()
+    .from(notificationBroadcasts)
+    .where(and(
+      isNotNull(notificationBroadcasts.publishedAt),
+      lte(notificationBroadcasts.publishedAt, now),
+      or(isNull(notificationBroadcasts.expiresAt), sql`${notificationBroadcasts.expiresAt} > ${now}`),
+      or(isNull(notificationBroadcasts.orgId), eq(notificationBroadcasts.orgId, orgId)),
+      sql`${notificationBroadcasts.audience} = ANY(${audiences})`,
+      isNull(notificationBroadcasts.deletedAt),
+    ))
+    .orderBy(desc(notificationBroadcasts.publishedAt))
+    .limit(20);
+
+  // Filter out broadcasts the user has already seen (check if notification already exists)
+  const broadcastIds = broadcasts.map((b) => b.id);
+  if (broadcastIds.length === 0) return c.json({ data: [] });
+
+  const seen = await db
+    .select({ resourceId: notifications.resourceId })
+    .from(notifications)
+    .where(and(
+      eq(notifications.userId, userId),
+      eq(notifications.type, "broadcast"),
+      sql`${notifications.resourceId} = ANY(${broadcastIds})`,
+    ));
+
+  const seenIds = new Set(seen.map((s) => s.resourceId));
+  const unseen = broadcasts.filter((b) => !seenIds.has(b.id));
+
+  return c.json({ data: unseen });
+});
+
+// POST /broadcasts/:id/dismiss - Mark a broadcast as seen
+notificationsRouter.post("/broadcasts/:id/dismiss", async (c) => {
+  const userId = c.get("userId");
+  const orgId = c.get("orgId");
+  const broadcastId = c.req.param("id");
+
+  // Create a notification record to mark it as seen
+  await db.insert(notifications).values({
+    orgId,
+    userId,
+    type: "broadcast",
+    title: "Broadcast dismissed",
+    resourceType: "broadcast",
+    resourceId: broadcastId,
+    isRead: true,
+    readAt: new Date(),
+  }).onConflictDoNothing();
+
+  return c.json({ ok: true });
+});
+
+// POST /broadcasts - Create a new broadcast (org-admin or super-admin)
+const createBroadcastSchema = z.object({
+  audience: z.enum(["all_users", "org_admins", "super_admins"]),
+  type: z.enum(["feature_announcement", "tip", "changelog", "maintenance"]).optional(),
+  title: z.string().min(1).max(200),
+  body: z.string().max(2000).optional(),
+  ctaUrl: z.string().url().optional(),
+  ctaLabel: z.string().max(100).optional(),
+  publishNow: z.boolean().optional(),
+  expiresAt: z.string().datetime().optional(),
+});
+
+notificationsRouter.post("/broadcasts", requireRole("org-admin"), zValidator("json", createBroadcastSchema), async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const data = c.req.valid("json");
+
+  const [broadcast] = await db.insert(notificationBroadcasts).values({
+    orgId,
+    audience: data.audience,
+    type: data.type ?? "feature_announcement",
+    title: data.title,
+    body: data.body,
+    ctaUrl: data.ctaUrl,
+    ctaLabel: data.ctaLabel,
+    publishedAt: data.publishNow ? new Date() : null,
+    expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+    createdBy: userId,
+  }).returning();
+
+  return c.json(broadcast, 201);
+});
+
+// GET /broadcasts/admin - List all broadcasts for admin management
+notificationsRouter.get("/broadcasts/admin", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+
+  const broadcasts = await db
+    .select()
+    .from(notificationBroadcasts)
+    .where(and(eq(notificationBroadcasts.orgId, orgId), isNull(notificationBroadcasts.deletedAt)))
+    .orderBy(desc(notificationBroadcasts.createdAt))
+    .limit(50);
+
+  return c.json({ data: broadcasts });
+});
+
+// POST /broadcasts/:id/publish - Publish a draft broadcast
+notificationsRouter.post("/broadcasts/:id/publish", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  const [broadcast] = await db
+    .update(notificationBroadcasts)
+    .set({ publishedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(notificationBroadcasts.id, c.req.param("id")), eq(notificationBroadcasts.orgId, orgId)))
+    .returning();
+
+  if (!broadcast) return c.json({ error: "Broadcast not found" }, 404);
+  return c.json(broadcast);
+});
+
+// DELETE /broadcasts/:id - Delete a broadcast
+notificationsRouter.delete("/broadcasts/:id", requireRole("org-admin"), async (c) => {
+  const orgId = c.get("orgId");
+  await db
+    .update(notificationBroadcasts)
+    .set({ deletedAt: new Date() })
+    .where(and(eq(notificationBroadcasts.id, c.req.param("id")), eq(notificationBroadcasts.orgId, orgId)));
+
+  return c.json({ ok: true });
 });
 
 export { notificationsRouter as notificationRoutes };
