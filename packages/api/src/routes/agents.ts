@@ -220,6 +220,44 @@ agentRoutes.post("/marketplace/:id/install", async (c) => {
   return c.json(clonedAgent, 201);
 });
 
+// Toggle marketplace sync for an installed agent
+agentRoutes.patch("/:id/sync", requireRole("power-user"), async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const userRole = c.get("userRole");
+  const { enabled } = z.object({ enabled: z.boolean() }).parse(await c.req.json());
+
+  const existing = await agentService.get(orgId, c.req.param("id"));
+  if (!existing) throw AppError.notFound("Agent not found");
+  assertOwnerOrAdmin(userRole, userId, existing.ownerId);
+
+  if (enabled && !existing.clonedFromAgentId) {
+    throw AppError.badRequest("Only agents installed from the marketplace can enable sync");
+  }
+
+  const agent = await agentService.update(orgId, c.req.param("id"), { syncWithMarketplace: enabled });
+  return c.json(agent);
+});
+
+// Check for and apply marketplace updates
+agentRoutes.post("/:id/sync", requireRole("power-user"), async (c) => {
+  const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const userRole = c.get("userRole");
+
+  const existing = await agentService.get(orgId, c.req.param("id"));
+  if (!existing) throw AppError.notFound("Agent not found");
+  assertOwnerOrAdmin(userRole, userId, existing.ownerId);
+
+  const updated = await agentService.checkMarketplaceSync(orgId, c.req.param("id"), userId);
+  if (!updated) {
+    return c.json({ synced: false, message: "Agent is already up to date" });
+  }
+
+  await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "agent.sync", resourceType: "agent", resourceId: c.req.param("id") });
+  return c.json({ synced: true, agent: updated });
+});
+
 // Create a version snapshot
 agentRoutes.post("/:id/version", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");

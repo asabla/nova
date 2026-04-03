@@ -29,6 +29,8 @@ export const agents = pgTable("agents", {
   builtinTools: jsonb("builtin_tools").$type<string[]>(),
   starters: jsonb("starters").$type<string[]>(),
   clonedFromAgentId: uuid("cloned_from_agent_id"),
+  /** When true, agent auto-syncs prompt/config updates from the marketplace source */
+  syncWithMarketplace: boolean("sync_with_marketplace").notNull().default(false),
   customWorkerId: uuid("custom_worker_id").references(() => customWorkers.id, { onDelete: "set null" }),
   currentVersion: integer("current_version").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

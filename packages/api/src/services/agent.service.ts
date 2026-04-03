@@ -282,6 +282,71 @@ export const agentService = {
     return agent;
   },
 
+  /**
+   * Check for and apply updates from the marketplace source agent.
+   * Only applies to agents with syncWithMarketplace=true and a clonedFromAgentId.
+   * Returns the updated agent if synced, null if already up-to-date.
+   */
+  async checkMarketplaceSync(orgId: string, agentId: string, userId: string) {
+    const agent = await this.get(orgId, agentId);
+    if (!agent.syncWithMarketplace || !agent.clonedFromAgentId) return null;
+
+    // Fetch the source agent from the system org
+    const [source] = await db.select().from(agents)
+      .where(and(eq(agents.id, agent.clonedFromAgentId), isNull(agents.deletedAt)));
+
+    if (!source) return null;
+
+    // Check if source has been updated since our last sync
+    if (source.updatedAt <= agent.updatedAt) return null;
+
+    // Create a version snapshot before applying updates
+    await this.createVersion(orgId, agentId, {
+      description: `Pre-sync snapshot (before marketplace update)`,
+      snapshot: {
+        systemPrompt: agent.systemPrompt,
+        modelId: agent.modelId,
+        modelParams: agent.modelParams,
+      },
+      createdBy: userId,
+    });
+
+    // Apply the source agent's updates
+    const [updated] = await db.update(agents).set({
+      systemPrompt: source.systemPrompt,
+      modelId: source.modelId,
+      modelParams: source.modelParams,
+      updatedAt: new Date(),
+    }).where(and(eq(agents.id, agentId), eq(agents.orgId, orgId))).returning();
+
+    // Create a post-sync version
+    await this.createVersion(orgId, agentId, {
+      description: `Synced from marketplace (source updated at ${source.updatedAt.toISOString()})`,
+      snapshot: {
+        systemPrompt: source.systemPrompt,
+        modelId: source.modelId,
+        modelParams: source.modelParams,
+      },
+      createdBy: userId,
+    });
+
+    return updated;
+  },
+
+  /**
+   * Find all agents in any org that have sync enabled for a given source agent.
+   * Used when a marketplace agent is updated to push changes to synced clones.
+   */
+  async findSyncedClones(sourceAgentId: string) {
+    return db.select({ id: agents.id, orgId: agents.orgId, ownerId: agents.ownerId })
+      .from(agents)
+      .where(and(
+        eq(agents.clonedFromAgentId, sourceAgentId),
+        eq(agents.syncWithMarketplace, true),
+        isNull(agents.deletedAt),
+      ));
+  },
+
   async delete(orgId: string, agentId: string) {
     const [agent] = await db
       .update(agents)
