@@ -36,6 +36,83 @@ In production, remove host port mappings for internal services in `docker-compos
 
 ---
 
+## Deployment Scenarios
+
+Nova supports three deployment scenarios:
+
+### 1. Local Development
+
+Run infrastructure in Docker and application services via Bun/Node.js for hot-reload:
+
+```bash
+docker compose up -d postgres redis minio qdrant temporal temporal-db searxng
+bun run dev        # Starts API, web, admin, and workers with hot-reload
+```
+
+### 2. Self-Hosted Production
+
+Use the production override file, which enforces required secrets via `:?` validation and removes host port mappings for internal services:
+
+```bash
+# Copy and fill in production secrets
+cp .env.example .env.production
+
+# Start with production overrides
+docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
+```
+
+The `docker-compose.production.yml` file requires the following env vars (will fail to start if missing):
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `REDIS_URL` | Redis connection string |
+| `BETTER_AUTH_SECRET` | Session signing secret |
+| `BETTER_AUTH_URL` | Public URL for auth callbacks |
+| `CORS_ORIGINS` | Allowed CORS origins |
+| `APP_URL` | Public application URL |
+| `MINIO_ENDPOINT` | MinIO/S3 endpoint |
+| `MINIO_PUBLIC_URL` | Public MinIO URL for presigned URLs |
+| `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | Object storage credentials |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` | Database credentials |
+| `TEMPORAL_DB_PASSWORD` | Temporal database password |
+| `NOVA_GATEWAY_JWT_SECRET` | Internal gateway JWT secret |
+
+Resource limits are set in the production override: API gets 2GB/4 CPU, each worker gets 4GB/4 CPU, web/admin get 256MB/0.5 CPU.
+
+### 3. Enterprise (Self-Managed Hardware)
+
+Same as self-hosted production, but the customer brings their own infrastructure. Key differences:
+
+- May use managed PostgreSQL (RDS, Cloud SQL) and managed Redis (ElastiCache, Memorystore) instead of containerized instances
+- May bring their own monitoring stack -- Nova exports OTLP traces that can be routed to any compatible collector
+- Temporal UI is disabled by default in production (moved to the `debug` profile); enable selectively behind auth
+
+---
+
+## Observability Stack (Optional)
+
+An optional observability profile adds a full monitoring stack:
+
+```bash
+docker compose --profile observability up -d
+```
+
+This starts:
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| Grafana | 3002 | Dashboards and alerting |
+| Prometheus | 9090 | Metrics collection |
+| Loki | 3100 | Log aggregation |
+| Tempo | 3200 | Distributed tracing |
+| Alloy | -- | Telemetry pipeline (collects and forwards) |
+| Exporters (x4) | -- | PostgreSQL, Redis, MinIO, Node.js metrics |
+
+See `docs/OBSERVABILITY.md` for the full observability guide including dashboard descriptions and alert configuration.
+
+---
+
 ## Quick Start (Docker Compose)
 
 ### 1. Clone and configure environment
@@ -236,6 +313,23 @@ Scale each independently based on workload.
 
 ### PostgreSQL
 
+Automated backup and restore scripts are provided:
+
+```bash
+# Automated backup (compressed, with retention cleanup)
+./infra/scripts/db-backup.sh                          # Backup to ./backups/
+./infra/scripts/db-backup.sh /mnt/backups             # Custom directory
+BACKUP_RETENTION_DAYS=14 ./infra/scripts/db-backup.sh # Custom retention (default: 30 days)
+
+# Automated restore (interactive confirmation, drops and recreates DB)
+./infra/scripts/db-restore.sh backups/nova_20260402_120000.sql.gz
+
+# Cron example: daily backup at 2 AM
+0 2 * * * cd /path/to/nova && ./infra/scripts/db-backup.sh /mnt/backups >> /var/log/nova-backup.log 2>&1
+```
+
+Manual backup/restore via Docker:
+
 ```bash
 # Backup (from host)
 docker compose exec postgres pg_dump -U nova -Fc nova > nova_$(date +%Y%m%d).dump
@@ -330,6 +424,24 @@ docker compose logs -f --tail=100
 ```
 
 For production, pipe to a log aggregator (Loki, ELK, Datadog, etc.) via Docker logging drivers.
+
+---
+
+## Production Checklist
+
+Before going live, verify the following:
+
+- [ ] **`BETTER_AUTH_SECRET`** is not the default value (`change-me-in-production-use-openssl-rand-base64-32`). Generate with `openssl rand -base64 32`
+- [ ] **`CORS_ORIGINS`** is set to your exact production domain(s), not `*` or `localhost`
+- [ ] **PostgreSQL password** is changed from the default `nova:nova` in both `DATABASE_URL` and the `postgres` service
+- [ ] **MinIO credentials** are changed from `minioadmin:minioadmin`
+- [ ] **Redis persistence** is enabled -- the production override sets `appendonly yes` with `appendfsync everysec`
+- [ ] **Source maps** are disabled in Vite production builds (default behavior; verify `GENERATE_SOURCEMAP` is not set to `true`)
+- [ ] **Host port mappings** are removed for internal services (the production override handles this with `ports: !reset []`)
+- [ ] **Temporal UI** is disabled or behind authentication (production override moves it to the `debug` profile)
+- [ ] **TLS** is configured via nginx or a cloud load balancer
+- [ ] **Backup schedule** is configured (see Backup & Recovery section above)
+- [ ] **Health check** returns 200: `curl -s https://your-domain.com/health/ready | jq`
 
 ---
 
