@@ -22,7 +22,10 @@ const envSchema = z.object({
   QDRANT_URL: z.string().default("http://localhost:6333"),
   QDRANT_API_KEY: z.string().optional(),
 
-  BETTER_AUTH_SECRET: z.string().min(32),
+  BETTER_AUTH_SECRET: z.string().min(32).refine(
+    (v) => process.env.NODE_ENV !== "production" || v !== "change-me-in-production-use-openssl-rand-base64-32",
+    { message: "BETTER_AUTH_SECRET must be changed from the default placeholder in production" },
+  ),
   BETTER_AUTH_URL: z.string().url(),
 
   CORS_ORIGINS: z.string().default("http://localhost:5173"),
