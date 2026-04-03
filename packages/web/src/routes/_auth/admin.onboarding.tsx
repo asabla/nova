@@ -182,7 +182,7 @@ function OrgOnboardingPage() {
             {t("admin.onboarding.teamHeading", "Invite Your Team")}
           </h3>
           <p className="text-sm text-text-secondary text-center">
-            {t("admin.onboarding.teamBody", "You can invite team members now or later from {"Admin › Members"}. For SSO-based organizations, users will be auto-provisioned on first login.")}
+            {t("admin.onboarding.teamBody", "You can invite team members now or later from Admin › Members. For SSO-based organizations, users will be auto-provisioned on first login.")}
           </p>
           <div className="space-y-3">
             <div className="p-4 rounded-xl bg-surface-secondary border border-border">
