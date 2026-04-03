@@ -85,9 +85,9 @@ NOVA is a self-hosted-first AI chat platform with multi-tenancy designed in from
 - Single point of failure unless deployed as Redis Sentinel or Cluster
 - Memory-bound: large pub/sub workloads need monitoring
 
-### Object Storage: MinIO (S3-compatible)
+### Object Storage: RustFS (S3-compatible)
 
-**Decision:** MinIO for all file storage (uploads, artifacts, exports).
+**Decision:** RustFS for all file storage (uploads, artifacts, exports).
 
 **Rationale:**
 - S3-compatible API means zero code changes to switch to AWS S3, GCS, or other providers
@@ -96,8 +96,8 @@ NOVA is a self-hosted-first AI chat platform with multi-tenancy designed in from
 - Console UI for debugging
 
 **Trade-offs:**
-- Production MinIO with erasure coding needs minimum 4 drives
-- Single-node MinIO is acceptable for dev/staging but not production durability
+- Production RustFS with erasure coding needs minimum 4 drives
+- Single-node RustFS is acceptable for dev/staging but not production durability
 
 ### ~~AI Model Gateway: LiteLLM~~ (Removed)
 

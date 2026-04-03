@@ -25,7 +25,7 @@ services:
     command: redis-server --appendonly yes --appendfsync everysec --requirepass ${REDIS_PASSWORD:-}
     ports: !reset []
 
-  # ─── MinIO ──────────────────────────────────────────
+  # ─── RustFS ──────────────────────────────────────────
   minio:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}

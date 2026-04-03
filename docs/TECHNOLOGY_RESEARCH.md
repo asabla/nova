@@ -295,7 +295,7 @@ litellm_settings:
 ### Prometheus + Grafana
 - Infrastructure metrics: CPU, memory, request rate, error rate
 - Custom metrics: SSE stream count, WebSocket connections, queue depths
-- Pre-built Grafana dashboards for PostgreSQL, Redis, MinIO
+- Pre-built Grafana dashboards for PostgreSQL, Redis, RustFS
 
 ---
 

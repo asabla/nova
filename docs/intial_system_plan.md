@@ -390,7 +390,7 @@ until the current phase passes the REFLECT check.
 | Workflow engine | Temporal for all durable async work: agent loops, deep research, file ingestion, scheduled runs, notifications |
 | Database | PostgreSQL 16 + pgvector (RAG) + pg_trgm (full-text search). ORM: Drizzle ORM + drizzle-kit for migrations. |
 | Cache / queue | Redis 7. Used for: session store, pub/sub (SSE fan-out), rate limiting, job deduplication |
-| Object storage | MinIO (S3-compatible). All files — uploads, artifacts, exports — go through MinIO. |
+| Object storage | RustFS (S3-compatible). All files — uploads, artifacts, exports — go through RustFS. |
 | Auth library | Better Auth with: local credentials adapter, Azure Entra ID OIDC adapter, magic-link adapter |
 | Observability | OpenTelemetry → LangFuse for LLM tracing. Prometheus + Grafana for infrastructure. |
 | Monorepo | Bun workspaces. Single `package.json` at root, packages under `packages/`. |
@@ -579,7 +579,7 @@ C4 Component diagram for the API package:
 - Domain services (ConversationService, AgentService, KnowledgeService, etc.)
 - LiteLLM client
 - Temporal client
-- MinIO client
+- RustFS client
 - Redis client
 - Drizzle DB client
 
@@ -597,7 +597,7 @@ collect results → synthesis LLM call → citation extraction →
 report assembly → complete
 
 **FileIngestionWorkflow:**
-File uploaded to MinIO → extract text (activity) →
+File uploaded to RustFS → extract text (activity) →
 chunk text (activity) → embed chunks in parallel (activity) →
 upsert into pgvector (activity) → mark document indexed → complete
 
@@ -840,9 +840,9 @@ Infrastructure:
 - [ ] cert-manager + Let's Encrypt TLS
 - [ ] Horizontal pod autoscaling for api + worker
 - [ ] PgBouncer connection pooling
-- [ ] S3 (AWS) as production MinIO alternative
+- [ ] S3 (AWS) as production RustFS alternative
 - [ ] Secrets management (External Secrets Operator + AWS Secrets Manager / Vault)
-- [ ] Database backup strategy (pg_dump → MinIO/S3 daily)
+- [ ] Database backup strategy (pg_dump → RustFS/S3 daily)
 - [ ] Multi-region deployment notes
 
 Internationalisation:
@@ -889,7 +889,7 @@ Each file must cover:
 - WebSocket handler design (upgrade, rooms, event dispatch)
 - LiteLLM client: streaming, function calling, retry on 429, model fallback
 - SSE implementation: token-by-token fan-out via Redis pub/sub across API pods
-- File upload pipeline: multipart → MinIO presigned URL → FileIngestionWorkflow trigger
+- File upload pipeline: multipart → RustFS presigned URL → FileIngestionWorkflow trigger
 - RAG pipeline: embed query via LiteLLM → pgvector cosine search → context window packing
 - Temporal client: workflow start, signal, query patterns
 - Better Auth configuration: adapters, session cookie settings, PKCE for Entra
@@ -920,7 +920,7 @@ Each file must cover:
   - `upsertChunks(chunks[])` → pgvector bulk insert
   - `runInSandbox(code, lang)` → Firecracker VM spawn + execute + collect
   - `sendNotification(event)` → Redis pub/sub + email queue
-  - `extractFileText(fileKey)` → MinIO fetch + PDF/DOCX/XLSX text extraction
+  - `extractFileText(fileKey)` → RustFS fetch + PDF/DOCX/XLSX text extraction
 - Workflow definitions with full signal/query handler specs
 - Error handling: activity retries (exponential backoff), workflow cancellation cleanup
 - Firecracker VM manager: pool of pre-warmed VMs, assignment on demand, hard timeout kill

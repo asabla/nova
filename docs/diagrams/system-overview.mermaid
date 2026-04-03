@@ -28,7 +28,7 @@ graph TB
             NovaDB["PostgreSQL 16\n(NOVA DB)\npgvector + pg_trgm"]
             TemporalDB["PostgreSQL 16\n(Temporal DB)\nInternal state"]
             Redis["Redis 7.2+\nSessions / Pub-Sub\nRate Limiting"]
-            MinIO["MinIO\n(S3-compatible)\nFile Storage"]
+            RustFS["RustFS\n(S3-compatible)\nFile Storage"]
         end
 
         subgraph Observability
@@ -52,7 +52,7 @@ graph TB
     APIServer -- "MCP Protocol\nstdio / HTTP" --> MCPServers
     APIServer -- "SQL + pgvector" --> NovaDB
     APIServer -- "Pub/Sub + Sessions" --> Redis
-    APIServer -- "S3 API\nPresigned URLs" --> MinIO
+    APIServer -- "S3 API\nPresigned URLs" --> RustFS
     APIServer -- "gRPC\n@temporalio/client" --> TemporalServer
 
     TemporalServer -- "Internal state" --> TemporalDB
@@ -60,7 +60,7 @@ graph TB
 
     TemporalWorker -- "gRPC\n@temporalio/worker" --> TemporalServer
     TemporalWorker -- "SQL + pgvector" --> NovaDB
-    TemporalWorker -- "S3 API" --> MinIO
+    TemporalWorker -- "S3 API" --> RustFS
     TemporalWorker -- "Pub/Sub" --> Redis
     TemporalWorker -- "OpenAI-compat API" --> LiteLLM
     TemporalWorker -- "Execute code" --> CodeSandbox

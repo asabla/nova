@@ -38,7 +38,7 @@ adminHealthRoutes.get("/", async (c) => {
     checks.qdrant = { status: "unhealthy", error: err.message };
   }
 
-  // MinIO
+  // RustFS
   try {
     const minioUrl = env.MINIO_ENDPOINT ?? "http://minio:9000";
     const start = Date.now();

@@ -94,7 +94,7 @@ Error handler → Security headers → CORS → Request ID → Logger → **Publ
 |---------|------|---------|
 | PostgreSQL | 5432 | Main database (pg_trgm) |
 | Redis | 6379 | Cache, pub/sub, rate limiting |
-| MinIO | 9000/9001 | S3-compatible file storage |
+| RustFS | 9000/9001 | S3-compatible file storage |
 | Qdrant | 6333/6334 | Vector search engine |
 | Temporal | 7233 | Workflow orchestration (separate DB) |
 | Temporal UI | 8233 | Workflow dashboard |
@@ -107,7 +107,7 @@ LLM calls go directly to providers (OpenAI, Anthropic, etc.) — no proxy layer.
 | Service | Port | Purpose |
 |---------|------|---------|
 | Grafana | 3002 | Dashboards (7 pre-built), alerting, trace/log exploration |
-| Prometheus | 9090 | Metrics (8 scrape targets: API, Temporal, PG, Redis, Qdrant, MinIO, nginx x2) |
+| Prometheus | 9090 | Metrics (8 scrape targets: API, Temporal, PG, Redis, Qdrant, RustFS, nginx x2) |
 | Loki | 3100 | Log aggregation (all Docker containers via Alloy) |
 | Tempo | 3200 | Distributed tracing (OTLP from API + workers) |
 | Alloy | 4317/4318 | OTLP receiver + Docker log tailing |

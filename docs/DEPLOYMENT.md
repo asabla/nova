@@ -9,7 +9,7 @@
 | Minimum (all-in-one) | 4 cores | 16 GB | 100 GB SSD | Small team, low traffic |
 | Recommended | 8 cores | 32 GB | 250 GB SSD | Medium workloads |
 
-Workers are CPU/memory-intensive during LLM orchestration. Size disk for PostgreSQL, MinIO file storage, and Qdrant vectors.
+Workers are CPU/memory-intensive during LLM orchestration. Size disk for PostgreSQL, RustFS file storage, and Qdrant vectors.
 
 ### Software
 
@@ -26,7 +26,7 @@ Workers are CPU/memory-intensive during LLM orchestration. Size disk for Postgre
 | Gateway | 3001 | Internal only |
 | PostgreSQL | 5432 | Internal only |
 | Redis | 6379 | Internal only |
-| MinIO | 9000 / 9001 | Internal (proxied via nginx at `/storage/`) |
+| RustFS | 9000 / 9001 | Internal (proxied via nginx at `/storage/`) |
 | Qdrant | 6333 / 6334 | Internal only |
 | Temporal | 7233 | Internal only |
 | Temporal UI | 8233 | Internal (admin access only) |
@@ -71,8 +71,8 @@ The `docker-compose.production.yml` file requires the following env vars (will f
 | `BETTER_AUTH_URL` | Public URL for auth callbacks |
 | `CORS_ORIGINS` | Allowed CORS origins |
 | `APP_URL` | Public application URL |
-| `MINIO_ENDPOINT` | MinIO/S3 endpoint |
-| `MINIO_PUBLIC_URL` | Public MinIO URL for presigned URLs |
+| `MINIO_ENDPOINT` | RustFS/S3 endpoint |
+| `MINIO_PUBLIC_URL` | Public RustFS URL for presigned URLs |
 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` | Object storage credentials |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` | Database credentials |
 | `TEMPORAL_DB_PASSWORD` | Temporal database password |
@@ -107,7 +107,7 @@ This starts:
 | Loki | 3100 | Log aggregation |
 | Tempo | 3200 | Distributed tracing |
 | Alloy | -- | Telemetry pipeline (collects and forwards) |
-| Exporters (x4) | -- | PostgreSQL, Redis, MinIO, Node.js metrics |
+| Exporters (x4) | -- | PostgreSQL, Redis, RustFS, Node.js metrics |
 
 See `docs/OBSERVABILITY.md` for the full observability guide including dashboard descriptions and alert configuration.
 
@@ -195,7 +195,7 @@ curl -s https://your-domain.com/health/ready | jq
 curl -s -X POST https://your-domain.com/api/health/diagnostics | jq
 ```
 
-The `/health/ready` endpoint checks PostgreSQL, Redis, MinIO, and Temporal connectivity. Returns `200` when healthy, `503` when critical services (database, redis) are down.
+The `/health/ready` endpoint checks PostgreSQL, Redis, RustFS, and Temporal connectivity. Returns `200` when healthy, `503` when critical services (database, redis) are down.
 
 ---
 
@@ -257,14 +257,14 @@ Terminate TLS at the load balancer (AWS ALB, GCP LB, Cloudflare, etc.) and proxy
 | `BETTER_AUTH_SECRET` | `openssl rand -base64 32` | Session signing, auth tokens |
 | `NOVA_GATEWAY_JWT_SECRET` | `openssl rand -base64 32` | Internal gateway auth |
 | PostgreSQL password | `openssl rand -base64 16` | `DATABASE_URL`, `docker-compose.yml` postgres env |
-| MinIO credentials | Custom strong password | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` |
+| RustFS credentials | Custom strong password | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` |
 
 ### Defaults that must be changed
 
 The following ship with insecure defaults for development convenience:
 
 - **PostgreSQL**: `nova:nova` -- change `POSTGRES_PASSWORD` in both the `postgres` and `temporal-db` services, plus `DATABASE_URL`
-- **MinIO**: `minioadmin:minioadmin` -- change `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` in all services that reference them (api, gateway, workers, db-init, minio)
+- **RustFS**: `minioadmin:minioadmin` -- change `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` in all services that reference them (api, gateway, workers, db-init, minio)
 - **`BETTER_AUTH_SECRET`**: `change-me-in-production-use-openssl-rand-base64-32`
 
 ### Rotation
@@ -293,7 +293,7 @@ docker compose up -d --scale worker-agent=3 --scale worker-ingestion=2
 |---------|-----------------|
 | PostgreSQL | Vertical scaling, read replicas, or managed (RDS, Cloud SQL) |
 | Redis | Vertical scaling or managed (ElastiCache, Memorystore) |
-| MinIO | Distributed mode or switch to S3/GCS |
+| RustFS | Distributed mode or switch to S3/GCS |
 | Qdrant | Qdrant Cloud or distributed deployment |
 | Temporal | Temporal Cloud or self-hosted cluster mode |
 
@@ -341,10 +341,10 @@ docker compose exec temporal-db pg_dump -U nova -Fc temporal > temporal_$(date +
 docker compose exec -i postgres pg_restore -U nova -d nova --clean < nova_20260330.dump
 ```
 
-### MinIO (file storage)
+### RustFS (file storage)
 
 ```bash
-# Install mc (MinIO client) on host
+# Install mc (RustFS client) on host
 # Configure alias
 mc alias set nova http://localhost:9000 minioadmin minioadmin
 
@@ -380,7 +380,7 @@ Redis is used for cache and pub/sub -- it is ephemeral by design. The `redis_dat
 |------|-----------|-----------|
 | PostgreSQL | Daily + before upgrades | 30 days |
 | Temporal DB | Daily | 14 days |
-| MinIO | Daily incremental | 30 days |
+| RustFS | Daily incremental | 30 days |
 | Qdrant | Weekly | 7 days (re-generable) |
 
 ---
@@ -392,7 +392,7 @@ Redis is used for cache and pub/sub -- it is ephemeral by design. The `redis_dat
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
 | `/health` | GET | None | Basic liveness (`{"status":"ok"}`) |
-| `/health/ready` | GET | None | Readiness with dependency checks (DB, Redis, MinIO, Temporal) |
+| `/health/ready` | GET | None | Readiness with dependency checks (DB, Redis, RustFS, Temporal) |
 | `/health/system` | GET | None | Runtime info (version, memory, uptime) |
 | `/api/health/diagnostics` | POST | None | Full diagnostic suite (DB extensions, LLM providers, DNS) |
 
@@ -434,7 +434,7 @@ Before going live, verify the following:
 - [ ] **`BETTER_AUTH_SECRET`** is not the default value (`change-me-in-production-use-openssl-rand-base64-32`). Generate with `openssl rand -base64 32`
 - [ ] **`CORS_ORIGINS`** is set to your exact production domain(s), not `*` or `localhost`
 - [ ] **PostgreSQL password** is changed from the default `nova:nova` in both `DATABASE_URL` and the `postgres` service
-- [ ] **MinIO credentials** are changed from `minioadmin:minioadmin`
+- [ ] **RustFS credentials** are changed from `minioadmin:minioadmin`
 - [ ] **Redis persistence** is enabled -- the production override sets `appendonly yes` with `appendfsync everysec`
 - [ ] **Source maps** are disabled in Vite production builds (default behavior; verify `GENERATE_SOURCEMAP` is not set to `true`)
 - [ ] **Host port mappings** are removed for internal services (the production override handles this with `ports: !reset []`)

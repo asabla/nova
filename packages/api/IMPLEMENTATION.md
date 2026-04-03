@@ -60,7 +60,7 @@ packages/api/
 │   ├── lib/
 │   │   ├── db.ts                 # Drizzle client (postgres-js driver)
 │   │   ├── redis.ts              # ioredis client (single instance + pub/sub pair)
-│   │   ├── minio.ts              # MinIO client (presigned URLs, bucket ops)
+│   │   ├── minio.ts              # RustFS client (presigned URLs, bucket ops)
 │   │   ├── temporal.ts           # @temporalio/client (Connection, WorkflowClient)
 │   │   ├── auth.ts               # Better Auth instance (betterAuth config)
 │   │   ├── litellm.ts            # HTTP client wrapper for LiteLLM API
@@ -513,7 +513,7 @@ app.get("/api/workflows/:workflowId/progress", async (c) => {
 
 ---
 
-## MinIO Client
+## RustFS Client
 
 ```typescript
 // src/lib/minio.ts
@@ -529,7 +529,7 @@ export const minio = new MinioClient({
 
 const BUCKET = process.env.MINIO_BUCKET ?? "nova-files";
 
-// Generate presigned upload URL (client uploads directly to MinIO)
+// Generate presigned upload URL (client uploads directly to RustFS)
 export async function getUploadUrl(orgId: string, filename: string): Promise<string> {
   const key = `${orgId}/${crypto.randomUUID()}/${filename}`;
   return minio.presignedPutObject(BUCKET, key, 60 * 15); // 15 min expiry

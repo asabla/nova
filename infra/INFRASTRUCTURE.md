@@ -283,7 +283,7 @@ The development seed creates:
 2. Add language runtimes: Python 3.12, Node.js 20, Bash
 3. Include common packages: numpy, pandas, matplotlib (Python), lodash (Node.js)
 4. Compress as ext4 filesystem image
-5. Store in MinIO for fast retrieval
+5. Store in RustFS for fast retrieval
 
 ### Pool Management
 - Pre-warm pool of 5-20 VMs (configurable per deployment)
@@ -427,7 +427,7 @@ jobs:
 | PostgreSQL (NOVA) | High | Phase 5: Streaming replication + pgBouncer | 5 |
 | PostgreSQL (Temporal) | Medium | Temporal Cloud as managed alternative | 5 |
 | Redis | Medium | Phase 5: Redis Sentinel (3-node) | 5 |
-| MinIO | Medium | Phase 5: Erasure coding (4+ nodes) | 5 |
+| RustFS | Medium | Phase 5: Erasure coding (4+ nodes) | 5 |
 | Temporal Server | Medium | Multi-replica + separate DB | 5 |
 | LiteLLM | Low (stateless) | 2+ replicas behind load balancer | 2 |
 | API Server | Low (stateless) | 2+ replicas behind ingress | 1 |
@@ -443,7 +443,7 @@ jobs:
 - WebSocket connections > 5000 per pod
 - PostgreSQL connection count > 80% of max
 - Redis memory usage > 80%
-- MinIO disk usage > 80%
+- RustFS disk usage > 80%
 - Temporal workflow failure rate > 5%
 - LiteLLM 429 rate > 10% (upstream rate limiting)
 - Bun process RSS > 2GB (potential memory leak)

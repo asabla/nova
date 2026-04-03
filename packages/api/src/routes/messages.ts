@@ -601,7 +601,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
           "",
           "### Working with tabular data",
           "CSV/XLSX file content shown in messages is only a PREVIEW (schema + first ~10 rows).",
-          "The actual data is NOT in the conversation — it is stored in MinIO and must be accessed via tools.",
+          "The actual data is NOT in the conversation — it is stored in RustFS and must be accessed via tools.",
           "For complete data analysis:",
           "1. **PREFERRED**: Use `code_execute` with `input_file_ids` to load the file with pandas in the sandbox",
           "2. **Alternative**: Use `read_file` to retrieve full text content",

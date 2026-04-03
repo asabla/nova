@@ -9,14 +9,14 @@ All endpoints are on the API server (default `:3000`).
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
 | `/health` | GET | No | Liveness probe. Returns `{ status: "ok" }` |
-| `/health/ready` | GET | No | Readiness probe. Checks DB, Redis, MinIO, Temporal |
+| `/health/ready` | GET | No | Readiness probe. Checks DB, Redis, RustFS, Temporal |
 | `/health/system` | GET | No | Runtime info: Bun version, memory usage, DB version, uptime |
-| `/health/diagnostics` | POST | No | Deep check: DB extensions (pg_trgm), Redis version, MinIO, LLM providers, Temporal, DNS |
+| `/health/diagnostics` | POST | No | Deep check: DB extensions (pg_trgm), Redis version, RustFS, LLM providers, Temporal, DNS |
 
 ### `/health/ready` Response
 
 - **HTTP 200** with `status: "healthy"` -- all services OK
-- **HTTP 200** with `status: "degraded"` -- non-critical service down (MinIO, Temporal)
+- **HTTP 200** with `status: "degraded"` -- non-critical service down (RustFS, Temporal)
 - **HTTP 503** with `status: "down"` -- critical service down (database or Redis)
 - Each check includes `latencyMs` for performance monitoring
 
@@ -117,13 +117,13 @@ docker compose exec redis redis-cli PUBSUB CHANNELS "stream-events:*"
 
 - Verify `REDIS_URL` is `redis://redis:6379` (Docker) or `redis://localhost:6379` (local dev)
 
-### MinIO Bucket Errors
+### RustFS Bucket Errors
 
 ```bash
-# Check MinIO health
+# Check RustFS health
 curl -s http://localhost:9000/minio/health/live
 
-# Open MinIO Console
+# Open RustFS Console
 open http://localhost:9001   # login: minioadmin / minioadmin
 
 # List buckets (from inside the container)
@@ -255,7 +255,7 @@ docker compose logs api | grep '"requestId":"<id>"'
 - `ECONNREFUSED` on port 5432 -- PostgreSQL down or not ready
 - `ECONNREFUSED` on port 6379 -- Redis down
 - `ETIMEDOUT` on Temporal address -- Temporal server unreachable
-- `NoSuchBucket` -- MinIO bucket not created (run db-init or create manually)
+- `NoSuchBucket` -- RustFS bucket not created (run db-init or create manually)
 - `connection pool exhausted` -- too many concurrent DB connections; check pool size
 - `WORKFLOW_EXECUTION_ALREADY_STARTED` -- duplicate workflow dispatch; usually safe to ignore
 
@@ -467,7 +467,7 @@ bun run db:studio
 # Open Temporal UI
 open http://localhost:8233
 
-# Open MinIO Console
+# Open RustFS Console
 open http://localhost:9001
 ```
 
@@ -500,7 +500,7 @@ Grafana ships with 7 pre-configured dashboards covering API performance, worker 
 
 - **Traces**: Tempo collects distributed traces across API requests and Temporal workflows. Use trace IDs to follow a request end-to-end.
 - **Logs**: Loki aggregates structured JSON logs from all services. Filter by service, level, traceId, or any JSON field.
-- **Metrics**: Prometheus scrapes Node.js, PostgreSQL, Redis, and MinIO exporters.
+- **Metrics**: Prometheus scrapes Node.js, PostgreSQL, Redis, and RustFS exporters.
 
 ---
 

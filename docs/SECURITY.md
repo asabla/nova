@@ -23,7 +23,7 @@ Internet <-> Load Balancer <-> API Server <-> Internal Services
                                    |
                                    +-> PostgreSQL (NOVA data)
                                    +-> Redis (sessions, pub/sub)
-                                   +-> MinIO (files)
+                                   +-> RustFS (files)
                                    +-> LiteLLM (model gateway)
                                    +-> Temporal (workflows)
                                    +-> Worker -> Code Sandbox
@@ -75,7 +75,7 @@ Critical trust boundaries:
 - ALL database queries include `WHERE org_id = $currentOrgId` enforced at the service layer
 - Drizzle query builder wraps all queries with org scoping middleware
 - Integration tests verify cross-org isolation (create data in org A, attempt access from org B)
-- File access via MinIO presigned URLs scoped to org-specific bucket prefixes
+- File access via RustFS presigned URLs scoped to org-specific bucket prefixes
 - API never exposes internal database IDs in URLs; use UUID v7
 
 **Phase:** 1 (core implementation), 2 (integration tests)
@@ -129,7 +129,7 @@ Critical trust boundaries:
 - No `dangerouslySetInnerHTML` without DOMPurify
 - Code blocks rendered with syntax highlighting (no script execution)
 - Mermaid diagrams rendered in sandboxed iframe or via DOMPurify-safe SVG
-- User-uploaded images served from MinIO with `Content-Disposition: attachment` for non-image types
+- User-uploaded images served from RustFS with `Content-Disposition: attachment` for non-image types
 
 **Phase:** 1 (DOMPurify + CSP)
 
@@ -234,7 +234,7 @@ CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
 ### Retention
 - Default: 90 days
 - Configurable per-org (admin setting)
-- Archived to MinIO as compressed JSON after retention period
+- Archived to RustFS as compressed JSON after retention period
 - GDPR deletion: anonymize actor_id but preserve action records
 
 ---
@@ -244,7 +244,7 @@ CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
 | Classification | Examples | Storage | Access |
 |---------------|---------|---------|--------|
 | **Critical** | Passwords, API keys, OAuth tokens | Hashed/encrypted in PostgreSQL | Never logged, never exposed in API |
-| **Sensitive** | Conversation content, file contents, agent memory | PostgreSQL + MinIO (encrypted at rest) | Org-scoped, user-authorized |
+| **Sensitive** | Conversation content, file contents, agent memory | PostgreSQL + RustFS (encrypted at rest) | Org-scoped, user-authorized |
 | **Internal** | Audit logs, usage stats, system config | PostgreSQL | Admin-only |
 | **Public** | Shared conversation links, public agent listings | PostgreSQL | Read-only, expiring tokens |
 
@@ -254,7 +254,7 @@ CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
 
 ### At Rest
 - PostgreSQL: Full-disk encryption on the volume (LUKS or cloud-provider encryption)
-- MinIO: Server-side encryption (SSE-S3) enabled by default
+- RustFS: Server-side encryption (SSE-S3) enabled by default
 - Redis: Not encrypted at rest (acceptable for ephemeral cache/session data)
 - Backups: Encrypted with AES-256 before upload to backup storage
 
@@ -286,7 +286,7 @@ Strict-Transport-Security: max-age=31536000; includeSubDomains
 |------------|--------|-------|
 | OWASP Top 10 coverage | All 10 addressed in this document | 1-4 |
 | Audit logging | Comprehensive (see above) | 1 |
-| Data encryption at rest | PostgreSQL + MinIO encryption | 1 |
+| Data encryption at rest | PostgreSQL + RustFS encryption | 1 |
 | Data encryption in transit | TLS 1.3+ | 1 |
 | GDPR data export | User data export endpoint | 5 |
 | GDPR right to deletion | Anonymization workflow | 5 |

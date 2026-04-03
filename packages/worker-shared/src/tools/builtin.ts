@@ -325,7 +325,7 @@ export const codeExecuteTool = tool({
       inputFiles,
     });
 
-    // Upload output files to MinIO
+    // Upload output files to RustFS
     let outputFileInfo: { name: string; sizeBytes: number }[] = [];
     if (result.outputFiles.length > 0) {
       const { putObjectBuffer } = await import("../minio");

@@ -21,7 +21,7 @@ const DEFAULT_MODEL = "gpt-image-1";
 
 /**
  * Generate an image using the org's configured OpenAI-compatible provider.
- * Uploads the result to MinIO and returns the storage key.
+ * Uploads the result to RustFS and returns the storage key.
  */
 export async function generateImage(
   orgId: string,
@@ -56,7 +56,7 @@ export async function generateImage(
     throw new Error("Image response contained neither b64_json nor url");
   }
 
-  // Upload to MinIO
+  // Upload to RustFS
   const ext = "png";
   const mimeType = "image/png";
   const key = `${orgId}/generated-images/${randomUUID()}.${ext}`;

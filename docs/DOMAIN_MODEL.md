@@ -36,8 +36,8 @@ Tenant boundary. All org-scoped data references this table.
 | `name` | `text` | NO | | Display name |
 | `slug` | `text` | NO | | URL-safe unique slug |
 | `domain` | `text` | YES | | Custom domain (e.g. `chat.acme.com`) |
-| `logo_url` | `text` | YES | | S3/MinIO path |
-| `favicon_url` | `text` | YES | | S3/MinIO path |
+| `logo_url` | `text` | YES | | S3/RustFS path |
+| `favicon_url` | `text` | YES | | S3/RustFS path |
 | `primary_color` | `text` | YES | | Hex color for theming |
 | `custom_css` | `text` | YES | | Injected CSS for white-labeling |
 | `billing_plan` | `text` | YES | | `free`, `pro`, `enterprise` (SaaS mode) |
@@ -110,7 +110,7 @@ Per-org profile for a user. A user can belong to multiple orgs.
 | `user_id` | `uuid` | NO | | FK `users` |
 | `org_id` | `uuid` | NO | | FK `organisations` |
 | `display_name` | `text` | YES | | |
-| `avatar_url` | `text` | YES | | S3/MinIO path |
+| `avatar_url` | `text` | YES | | S3/RustFS path |
 | `timezone` | `text` | YES | `'UTC'` | IANA timezone |
 | `locale` | `text` | YES | `'en'` | i18n locale |
 | `theme` | `text` | YES | `'system'` | `light`, `dark`, `system` |
@@ -578,7 +578,7 @@ Join table between conversations and tags. Also links to folders.
 
 ### 9.1 `files`
 
-Uploaded files stored in MinIO.
+Uploaded files stored in RustFS.
 
 | Column | Type | Nullable | Default | Notes |
 |---|---|---|---|---|
@@ -589,8 +589,8 @@ Uploaded files stored in MinIO.
 | `filename` | `text` | NO | | Original filename |
 | `content_type` | `text` | NO | | MIME type |
 | `size_bytes` | `bigint` | NO | | |
-| `storage_path` | `text` | NO | | MinIO object key |
-| `storage_bucket` | `text` | NO | | MinIO bucket name |
+| `storage_path` | `text` | NO | | RustFS object key |
+| `storage_bucket` | `text` | NO | | RustFS bucket name |
 | `checksum_sha256` | `text` | YES | | For dedup and integrity |
 | `is_public` | `boolean` | NO | `false` | Public URL access |
 | `metadata` | `jsonb` | YES | | Extracted metadata (page count, dimensions, etc.) |

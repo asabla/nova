@@ -4,37 +4,37 @@
   "graphTooltip": 1,
   "panels": [
     {
-      "type": "row", "title": "MinIO Overview",
+      "type": "row", "title": "RustFS Overview",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "collapsed": false
     },
     {
       "type": "stat", "title": "Buckets",
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "minio_cluster_bucket_total", "instant": true, "legendFormat": "" }],
+      "targets": [{ "expr": "minio_cluster_bucket_total or rustfs_cluster_bucket_total", "instant": true, "legendFormat": "" }],
       "fieldConfig": { "defaults": { "noValue": "0", "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } } }
     },
     {
       "type": "stat", "title": "Total Storage Used",
-      "description": "Updates when MinIO's background scanner runs",
+      "description": "Total bytes stored in RustFS",
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "minio_cluster_usage_total_bytes", "instant": true, "legendFormat": "" }],
+      "targets": [{ "expr": "minio_cluster_usage_total_bytes or rustfs_cluster_usage_total_bytes", "instant": true, "legendFormat": "" }],
       "fieldConfig": { "defaults": { "noValue": "0 B", "unit": "bytes", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 5368709120 }, { "color": "red", "value": 10737418240 }] } } }
     },
     {
       "type": "stat", "title": "Object Count",
-      "description": "Updates when MinIO's background scanner runs",
+      "description": "Total objects stored in RustFS",
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "minio_cluster_usage_object_total", "instant": true, "legendFormat": "" }],
+      "targets": [{ "expr": "minio_cluster_usage_object_total or rustfs_cluster_usage_object_total", "instant": true, "legendFormat": "" }],
       "fieldConfig": { "defaults": { "noValue": "0", "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } } }
     },
     {
       "type": "stat", "title": "Disk Free",
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "minio_cluster_capacity_usable_free_bytes", "instant": true, "legendFormat": "" }],
+      "targets": [{ "expr": "minio_cluster_capacity_usable_free_bytes or rustfs_cluster_capacity_usable_free_bytes", "instant": true, "legendFormat": "" }],
       "fieldConfig": { "defaults": { "noValue": "N/A", "unit": "bytes", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 5368709120 }, { "color": "green", "value": 53687091200 }] } } }
     },
     {
@@ -46,7 +46,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "expr": "sum(rate(minio_s3_requests_total[5m])) by (api)", "legendFormat": "{{api}}" }
+        { "expr": "sum(rate(minio_s3_requests_total[5m])) by (api) or sum(rate(rustfs_s3_requests_total[5m])) by (api)", "legendFormat": "{{api}}" }
       ],
       "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 15, "lineWidth": 2 } } }
     },
@@ -55,8 +55,8 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "expr": "sum(rate(minio_s3_requests_rejected_auth_total[5m]))", "legendFormat": "auth rejected" },
-        { "expr": "sum(rate(minio_s3_requests_rejected_invalid_total[5m]))", "legendFormat": "invalid rejected" }
+        { "expr": "sum(rate(minio_s3_requests_rejected_auth_total[5m])) or sum(rate(rustfs_s3_requests_rejected_auth_total[5m]))", "legendFormat": "auth rejected" },
+        { "expr": "sum(rate(minio_s3_requests_rejected_invalid_total[5m])) or sum(rate(rustfs_s3_requests_rejected_invalid_total[5m]))", "legendFormat": "invalid rejected" }
       ],
       "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 15, "lineWidth": 2 } },
         "overrides": [
@@ -74,8 +74,8 @@
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 15 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "expr": "sum(increase(minio_s3_traffic_received_bytes[5m]))", "legendFormat": "received" },
-        { "expr": "sum(increase(minio_s3_traffic_sent_bytes[5m]))", "legendFormat": "sent" }
+        { "expr": "sum(increase(minio_s3_traffic_received_bytes[5m])) or sum(increase(rustfs_s3_traffic_received_bytes[5m]))", "legendFormat": "received" },
+        { "expr": "sum(increase(minio_s3_traffic_sent_bytes[5m])) or sum(increase(rustfs_s3_traffic_sent_bytes[5m]))", "legendFormat": "sent" }
       ],
       "fieldConfig": { "defaults": { "unit": "decbytes", "custom": { "fillOpacity": 15, "lineWidth": 2 } },
         "overrides": [
@@ -87,11 +87,11 @@
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["nova", "infrastructure", "minio"],
+  "tags": ["nova", "infrastructure", "rustfs", "s3"],
   "templating": { "list": [] },
   "time": { "from": "now-1h", "to": "now" },
   "timezone": "browser",
-  "title": "Nova MinIO",
+  "title": "Nova RustFS",
   "uid": "nova-minio",
-  "version": 3
+  "version": 4
 }

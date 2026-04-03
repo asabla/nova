@@ -580,7 +580,7 @@ export function MarkdownRenderer({ content }: Props) {
 ## File Upload (Presigned URL Pattern)
 
 1. Client requests a presigned upload URL from the API
-2. Client uploads directly to MinIO using the presigned URL
+2. Client uploads directly to RustFS using the presigned URL
 3. Client notifies the API that the upload is complete
 
 ```typescript
@@ -598,7 +598,7 @@ export function useFileUpload() {
         size: file.size,
       });
 
-      // 2. Upload directly to MinIO
+      // 2. Upload directly to RustFS
       await fetch(uploadUrl, {
         method: "PUT",
         body: file,

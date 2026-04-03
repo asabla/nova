@@ -1,7 +1,7 @@
 /**
  * E2E tests for the file attachment → LLM streaming pipeline.
  *
- * These tests run against the live Docker services (API, MinIO, Postgres, LiteLLM).
+ * These tests run against the live Docker services (API, RustFS, Postgres, LiteLLM).
  * Prerequisite: `docker compose up -d` with a seeded database.
  *
  * Run:  API_BASE_URL=http://localhost:5173 bun test packages/api/tests/e2e/file-attachment-stream.test.ts

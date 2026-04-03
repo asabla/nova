@@ -21,7 +21,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   const services = [
     { name: "PostgreSQL", status: healthData?.db ?? "checking" },
     { name: "Redis", status: healthData?.redis ?? "checking" },
-    { name: "MinIO", status: healthData?.minio ?? "checking" },
+    { name: "RustFS", status: healthData?.minio ?? "checking" },
     { name: "LiteLLM", status: healthData?.litellm ?? "checking" },
     { name: "Temporal", status: healthData?.temporal ?? "checking" },
   ];

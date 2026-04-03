@@ -397,7 +397,7 @@
 | # | Story | Source |
 |---|-------|--------|
 | 203 | As a new admin I am guided through a setup wizard on first login (org name, model provider, first user) so that initial configuration is easy | GAP |
-| 204 | As an admin I can view a system health dashboard showing database, Redis, MinIO, LiteLLM, and Temporal status so that I can diagnose issues | GAP |
+| 204 | As an admin I can view a system health dashboard showing database, Redis, RustFS, LiteLLM, and Temporal status so that I can diagnose issues | GAP |
 | 205 | As an admin I can run a diagnostic check that tests all external service connections and reports results | GAP |
 | 206 | As an admin I can see when the system was last updated and what version is running | GAP |
 

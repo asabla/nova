@@ -23,7 +23,7 @@ async function getMinioClient() {
 }
 
 /**
- * Download file from MinIO, extract text content, chunk, embed, and upsert to Qdrant.
+ * Download file from RustFS, extract text content, chunk, embed, and upsert to Qdrant.
  */
 export async function ingestFileContent(fileId: string, orgId: string): Promise<void> {
   const [file] = await db.select().from(files).where(eq(files.id, fileId));
@@ -31,7 +31,7 @@ export async function ingestFileContent(fileId: string, orgId: string): Promise<
 
   const ct = (file.contentType ?? "").toLowerCase();
 
-  // Download file from MinIO
+  // Download file from RustFS
   const minio = await getMinioClient();
   const bucket = process.env.MINIO_BUCKET ?? "nova-files";
   const stream = await minio.getObject(bucket, file.storagePath);

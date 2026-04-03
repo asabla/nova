@@ -536,7 +536,7 @@ Better Auth manages these routes. NOVA mounts them at `/api/auth/`. Request/resp
 
 | Method | Path | Auth | Description | Stories |
 |---|---|---|---|---|
-| GET | `/api/v1/admin/health` | org-admin | System health dashboard (PostgreSQL, Redis, MinIO, LiteLLM, Temporal status) | 204 |
+| GET | `/api/v1/admin/health` | org-admin | System health dashboard (PostgreSQL, Redis, RustFS, LiteLLM, Temporal status) | 204 |
 | POST | `/api/v1/admin/diagnostics` | org-admin | Run diagnostic check on all external services | 205 |
 | GET | `/api/v1/admin/version` | org-admin | Get system version and last update time | 206 |
 | GET | `/api/v1/admin/settings` | super | Get system-wide settings | 203 |

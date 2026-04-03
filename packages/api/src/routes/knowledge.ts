@@ -181,7 +181,7 @@ knowledgeRoutes.post("/:id/documents/upload", async (c) => {
     const contentType = file.type || "application/octet-stream";
     const key = `${orgId}/${crypto.randomUUID()}/${filename}`;
 
-    // Upload directly to MinIO via the client (avoids presigned URL localhost issues in Docker)
+    // Upload directly to RustFS via the client (avoids presigned URL localhost issues in Docker)
     const buffer = Buffer.from(await file.arrayBuffer());
     await minio.putObject(env.MINIO_BUCKET, key, buffer, buffer.length, {
       "Content-Type": contentType,

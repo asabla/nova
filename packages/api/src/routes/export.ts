@@ -480,7 +480,7 @@ exportRoutes.get(
 // ---------------------------------------------------------------------------
 // GET /export/download/:exportId - Download a completed export
 // Re-generates the export data from the job metadata. For large exports in
-// production, this would stream from object storage (S3/MinIO).
+// production, this would stream from object storage (S3/RustFS).
 // ---------------------------------------------------------------------------
 exportRoutes.get(
   "/download/:exportId",

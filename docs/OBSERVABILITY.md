@@ -80,7 +80,7 @@ Vector search metrics.
 | REST/gRPC Request Rate | Search and upsert operations |
 | Request Latency | Search p95 above 500ms = collection needs optimization |
 
-### Nova MinIO
+### Nova RustFS
 
 S3-compatible storage metrics.
 
@@ -277,7 +277,7 @@ rate(nova_http_requests_total{status=~"5.."}[5m])
 | nginx-exporter-web | `nginx_connections_active`, `nginx_http_requests_total` |
 | nginx-exporter-admin | `nginx_connections_active`, `nginx_http_requests_total` |
 
-Prometheus also scrapes Temporal, Qdrant, and MinIO natively (they expose `/metrics` endpoints).
+Prometheus also scrapes Temporal, Qdrant, and RustFS natively (they expose `/metrics` endpoints).
 
 ---
 

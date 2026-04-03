@@ -6,7 +6,7 @@ sequenceDiagram
     participant LiteLLM
     participant Tools as Tool / MCP Server
     participant Search as Search Tools
-    participant MinIO
+    participant RustFS
     participant DB as PostgreSQL
     participant Redis
     participant Email as Email Provider
@@ -92,13 +92,13 @@ sequenceDiagram
     rect rgb(240, 255, 240)
         Note over Client, DB: 3. FileIngestionWorkflow -- Extract, chunk, embed, upsert
         Client->>API: POST /knowledge/{collectionId}/documents (file)
-        API->>MinIO: Upload raw file
+        API->>RustFS: Upload raw file
         API->>DB: Insert Document row (status: processing)
         API->>Temporal: startWorkflow("FileIngestionWorkflow", docId)
         API-->>Client: 202 Accepted (documentId)
 
         Temporal->>Worker: Execute extractTextActivity
-        Worker->>MinIO: Download raw file
+        Worker->>RustFS: Download raw file
         Worker->>Worker: Parse PDF / DOCX / MD / TXT / HTML
         Worker-->>Temporal: ExtractedText
 

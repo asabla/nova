@@ -36,7 +36,7 @@ graph TB
         subgraph "Infrastructure Clients"
             LiteLLMClient["LiteLLM Client\nOpenAI-compat HTTP\nStreaming SSE"]
             TemporalClient["Temporal Client\n@temporalio/client\ngRPC to Temporal Server"]
-            MinIOClient["MinIO Client\nS3-compat SDK\nPresigned URL generation"]
+            RustFSClient["RustFS Client\nS3-compat SDK\nPresigned URL generation"]
             RedisClient["Redis Client\nioredis\nPub/Sub + Cache"]
             DrizzleDB["Drizzle DB Client\nPostgreSQL driver\npgvector + pg_trgm"]
         end
@@ -45,7 +45,7 @@ graph TB
     subgraph "External Dependencies"
         PostgreSQL[("PostgreSQL 16\nNOVA DB")]
         Redis_Ext[("Redis 7.2+")]
-        MinIO_Ext[("MinIO")]
+        RustFS_Ext[("RustFS")]
         LiteLLM_Ext["LiteLLM Gateway"]
         Temporal_Ext["Temporal Server"]
     end
@@ -82,13 +82,13 @@ graph TB
     MessageService --> DrizzleDB
     MessageService --> LiteLLMClient
     MessageService --> RedisClient
-    FileService --> MinIOClient
+    FileService --> RustFSClient
     FileService --> DrizzleDB
     SearchService --> DrizzleDB
     MCPGateway --> RedisClient
 
     DrizzleDB --> PostgreSQL
     RedisClient --> Redis_Ext
-    MinIOClient --> MinIO_Ext
+    RustFSClient --> RustFS_Ext
     LiteLLMClient --> LiteLLM_Ext
     TemporalClient --> Temporal_Ext

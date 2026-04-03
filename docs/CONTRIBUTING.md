@@ -16,7 +16,7 @@ Nova is a self-hosted AI chat platform built as a Bun monorepo. This guide will 
 ```bash
 cp .env.example .env   # Configure environment variables
 bun install            # Install all workspace dependencies
-make setup             # Provision infrastructure (Postgres, Redis, MinIO, Qdrant, Temporal, etc.)
+make setup             # Provision infrastructure (Postgres, Redis, RustFS, Qdrant, Temporal, etc.)
 make dev               # Start everything
 ```
 

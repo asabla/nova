@@ -38,12 +38,9 @@ scrape_configs:
     metrics_path: /metrics
     scrape_interval: 30s
 
-  # ─── Infrastructure: MinIO ─────────────────────────
-  - job_name: "minio"
-    static_configs:
-      - targets: ["nova-minio:9000"]
-    metrics_path: /minio/v2/metrics/cluster
-    scrape_interval: 30s
+  # ─── Infrastructure: RustFS (S3 storage) ────────────
+  # RustFS exports metrics via OTLP to Alloy, not Prometheus scrape.
+  # Metrics are available in Prometheus via Alloy's OTLP receiver.
 
   # ─── Nginx: Web App ────────────────────────────────
   - job_name: "nginx-web"

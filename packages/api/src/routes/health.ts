@@ -31,7 +31,7 @@ health.get("/ready", async (c) => {
     checks.redis = { status: "error", error: err.message };
   }
 
-  // MinIO check
+  // RustFS check
   try {
     const start = performance.now();
     const minioUrl = env.MINIO_ENDPOINT ?? "http://localhost:9000";
@@ -155,14 +155,14 @@ health.post("/diagnostics", async (c) => {
     results.redis = { status: "fail", message: err.message, latencyMs: 0 };
   }
 
-  // 4. MinIO / Object Storage
+  // 4. RustFS / Object Storage
   try {
     const start = performance.now();
     const minioUrl = env.MINIO_ENDPOINT ?? "http://localhost:9000";
     const res = await fetch(`${minioUrl}/minio/health/live`, { signal: AbortSignal.timeout(5000) });
     results.minio = {
       status: res.ok ? "pass" : "fail",
-      message: res.ok ? "MinIO healthy" : `HTTP ${res.status}`,
+      message: res.ok ? "RustFS healthy" : `HTTP ${res.status}`,
       latencyMs: Math.round(performance.now() - start),
     };
   } catch (err: any) {

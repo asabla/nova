@@ -20,7 +20,7 @@ export async function executeSandboxCode(params: {
   timeoutMs?: number;
   toolCallId?: string;
   messageId?: string;
-  /** MinIO storage keys for files to inject into /sandbox/input/ */
+  /** RustFS storage keys for files to inject into /sandbox/input/ */
   inputFileKeys?: { name: string; storageKey: string }[];
 }): Promise<{
   executionId: string;
@@ -39,7 +39,7 @@ export async function executeSandboxCode(params: {
 
   const timeoutMs = Math.min(params.timeoutMs ?? 30_000, 300_000);
 
-  // Download input files from MinIO
+  // Download input files from RustFS
   let inputFiles: SandboxFile[] | undefined;
   if (params.inputFileKeys && params.inputFileKeys.length > 0) {
     inputFiles = await Promise.all(
@@ -63,7 +63,7 @@ export async function executeSandboxCode(params: {
   const durationMs = Date.now() - startTime;
   const executionId = randomUUID();
 
-  // Upload output files to MinIO
+  // Upload output files to RustFS
   const outputFiles: SandboxOutputFile[] = [];
   for (const file of result.outputFiles) {
     const storageKey = `${params.orgId}/sandbox/${executionId}/${file.name}`;

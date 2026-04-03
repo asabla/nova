@@ -342,7 +342,7 @@ export async function executeToolCall(
           inputFiles,
         });
 
-        // Upload output files to MinIO
+        // Upload output files to RustFS
         let outputFileInfo: { name: string; sizeBytes: number; storageKey: string }[] = [];
         if (result.outputFiles.length > 0) {
           const { putObjectBuffer } = await import("@nova/worker-shared/minio");

@@ -116,7 +116,7 @@ docker compose up -d
 | API | 3000 | Backend API (Hono + Bun) |
 | PostgreSQL | 5432 | Database (pg_trgm) |
 | Redis | 6379 | Cache, pub/sub, rate limiting |
-| MinIO | 9000/9001 | S3-compatible file storage |
+| RustFS | 9000/9001 | S3-compatible file storage |
 | Qdrant | 6333/6334 | Vector search engine |
 | Temporal | 7233 | Workflow orchestration |
 | Temporal UI | 8233 | Temporal dashboard |

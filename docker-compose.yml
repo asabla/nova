@@ -35,7 +35,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # ─── RustFS (S3-compatible storage, MinIO replacement) ──
+  # ─── RustFS (S3-compatible object storage) ───────────
   minio:
     image: rustfs/rustfs:1.0.0-alpha.90
     container_name: nova-minio
@@ -46,6 +46,7 @@ services:
     environment:
       RUSTFS_ROOT_USER: minioadmin
       RUSTFS_ROOT_PASSWORD: minioadmin
+      RUSTFS_OBS_ENDPOINT: nova-alloy:4317
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
@@ -530,7 +531,7 @@ services:
     volumes:
       - ./infra/observability/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
-    command: --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.retention.time=30d
+    command: --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.retention.time=30d --web.enable-remote-write-receiver
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy || exit 1"]
       interval: 10s

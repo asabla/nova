@@ -39,7 +39,7 @@ NOVA is a self-hosted-first AI chat platform with multi-tenancy, custom agents, 
           |         +----------+  |  +---------+           |
           |         |             |            |           |
    +------+------+  |  +----------+------+  +--+----------+--+
-   | PostgreSQL  |  |  |    Redis       |  |    MinIO       |
+   | PostgreSQL  |  |  |    Redis       |  |    RustFS       |
    | (NOVA DB)   |  |  |  (pub/sub,    |  | (S3-compat     |
    | + pg_trgm   |  |  |   sessions,   |  |  file store)   |
    +------+------+  |  |   rate lim)   |  +----------------+
@@ -78,7 +78,7 @@ NOVA is a self-hosted-first AI chat platform with multi-tenancy, custom agents, 
 
   Note: Arrows represent primary data flow directions.
   API Server connects to ALL data stores directly.
-  Workers connect to PostgreSQL (NOVA DB), MinIO, Redis, Qdrant.
+  Workers connect to PostgreSQL (NOVA DB), RustFS, Redis, Qdrant.
   LLM calls go directly to providers (OpenAI, Anthropic, etc.) — no proxy.
   Two PostgreSQL instances: NOVA DB and Temporal internal DB.
   LangFuse is optional (disabled by default, enabled via env vars).
@@ -156,7 +156,7 @@ Bun has a known issue where `idleTimeout` silently kills SSE streams:
 | Database (Temporal) | PostgreSQL | 16.x | Separate instance for Temporal server |
 | ORM | Drizzle | Pin 1.0-beta.x; upgrade to 1.0 when stable | + drizzle-kit + drizzle-zod |
 | Cache/PubSub | Redis | 7.2+ | Sessions, pub/sub, rate limiting |
-| Object Storage | MinIO | Pin RELEASE tag (e.g. RELEASE.2026-03-01) | S3-compatible |
+| Object Storage | RustFS | Pin RELEASE tag (e.g. RELEASE.2026-03-01) | S3-compatible |
 | Vector Search | Qdrant | Pin release tag | Dedicated vector DB; replaced pgvector for all embedding/similarity search |
 | ~~Model Gateway~~ | ~~LiteLLM~~ | ~~Removed~~ | LLM calls go directly to providers via provider registry in DB |
 | Workflow Engine | Temporal | Pin auto-setup image tag (e.g. 1.24.x) | Durable workflows, human-in-loop |

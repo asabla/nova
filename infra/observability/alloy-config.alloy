@@ -100,7 +100,19 @@ otelcol.receiver.otlp "default" {
   }
 
   output {
-    traces = [otelcol.exporter.otlp.tempo.input]
+    metrics = [otelcol.exporter.prometheus.rustfs.input]
+    traces  = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+// Expose OTLP metrics as Prometheus endpoint (scraped by Prometheus)
+otelcol.exporter.prometheus "rustfs" {
+  forward_to = [prometheus.remote_write.default.receiver]
+}
+
+prometheus.remote_write "default" {
+  endpoint {
+    url = "http://prometheus:9090/api/v1/write"
   }
 }
 

@@ -157,7 +157,7 @@ const faqs: FaqItem[] = [
   {
     question: "How is my data stored?",
     answer:
-      "All data is stored in your PostgreSQL database on your own infrastructure. Files are stored in MinIO (S3-compatible). Nothing is sent to external services unless you configure external AI providers.",
+      "All data is stored in your PostgreSQL database on your own infrastructure. Files are stored in RustFS (S3-compatible). Nothing is sent to external services unless you configure external AI providers.",
   },
   {
     question: "What AI providers are supported?",
