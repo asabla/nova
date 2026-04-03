@@ -15,6 +15,7 @@
     "packages/admin"
   ],
   "scripts": {
+    "postinstall": "sed -i.bak 's/z\\.function().returns(z\\.array(z\\.string()))/z.custom()/g' node_modules/@tanstack/router-generator/dist/esm/config.js node_modules/@tanstack/router-generator/dist/cjs/config.cjs 2>/dev/null; rm -f node_modules/@tanstack/router-generator/dist/esm/config.js.bak node_modules/@tanstack/router-generator/dist/cjs/config.cjs.bak",
     "dev": "bun run --filter '*' dev",
     "dev:api": "bun run --filter @nova/api dev",
     "dev:web": "bun run --filter @nova/web dev",
