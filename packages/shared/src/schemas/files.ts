@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, boolean, bigint, integer, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 export const files = pgTable("files", {
@@ -40,11 +39,5 @@ export const fileChunks = pgTable("file_chunks", {
   index("idx_file_chunks_org_id").on(table.orgId),
 ]);
 
-export const selectFileSchema = createSelectSchema(files);
-export const insertFileSchema = createInsertSchema(files, {
-  filename: z.string().min(1).max(500),
-  contentType: z.string().min(1),
-}).omit({ id: true, orgId: true, userId: true, createdAt: true, updatedAt: true, deletedAt: true });
-
-export type File = z.infer<typeof selectFileSchema>;
-export type InsertFile = z.infer<typeof insertFileSchema>;
+export type File = typeof files.$inferSelect;
+export type InsertFile = typeof files.$inferInsert;

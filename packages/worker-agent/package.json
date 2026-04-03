@@ -8,21 +8,21 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@nova/gateway": "workspace:*",
     "@nova/shared": "workspace:*",
     "@nova/worker-shared": "workspace:*",
-    "@nova/gateway": "workspace:*",
-    "@openai/agents": "^0.7.0",
+    "@openai/agents": "^0.8.2",
     "@temporalio/activity": "^1.11.7",
     "@temporalio/client": "^1.11.7",
     "@temporalio/worker": "^1.11.7",
     "@temporalio/workflow": "^1.11.7",
-    "drizzle-orm": "^0.39.3",
+    "drizzle-orm": "^0.45.2",
     "openai": "^6.27.0",
     "tsx": "^4.19.4",
     "zod": "3.25.76"
   },
   "devDependencies": {
-    "typescript": "^5.8.3",
-    "@types/node": "^22.15.2"
+    "typescript": "^6.0.2",
+    "@types/node": "^25.5.0"
   }
 }

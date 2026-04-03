@@ -14,7 +14,7 @@
     "@temporalio/client": "^1.11.7",
     "@temporalio/worker": "^1.11.7",
     "@temporalio/workflow": "^1.11.7",
-    "drizzle-orm": "^0.39.3",
+    "drizzle-orm": "^0.45.2",
     "exif-reader": "^2.0.1",
     "image-size": "^2.0.1",
     "mupdf": "^1.27.0",
@@ -24,14 +24,14 @@
     "tree-sitter-wasms": "^0.1.12",
     "tsx": "^4.19.4",
     "unpdf": "^1.4.0",
-    "web-tree-sitter": "^0.24.7",
+    "web-tree-sitter": "^0.26.8",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "youtube-transcript": "^1.3.0",
     "zod": "3.25.76"
   },
   "devDependencies": {
-    "typescript": "^5.8.3",
-    "@types/node": "^22.15.2",
+    "typescript": "^6.0.2",
+    "@types/node": "^25.5.0",
     "@types/papaparse": "^5.3.15"
   }
 }

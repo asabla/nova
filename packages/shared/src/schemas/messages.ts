@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, boolean, integer, jsonb, smallint, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 import { conversations } from "./conversations";
@@ -81,18 +80,5 @@ export const messageNotes = pgTable("message_notes", {
   index("idx_message_notes_org_id").on(table.orgId),
 ]);
 
-export const selectMessageSchema = createSelectSchema(messages);
-export const insertMessageSchema = createInsertSchema(messages, {
-  content: z.string().optional(),
-  senderType: z.enum(["user", "assistant", "system", "tool"]),
-  contentType: z.enum(["text", "image", "audio", "video", "file"]).default("text"),
-  status: z.enum(["streaming", "completed", "failed", "cancelled"]).default("completed"),
-}).omit({
-  id: true, orgId: true, createdAt: true, updatedAt: true, deletedAt: true,
-  tokenCountPrompt: true, tokenCountCompletion: true, costCents: true,
-  isEdited: true, editHistory: true,
-});
-export const updateMessageSchema = insertMessageSchema.partial();
-
-export type Message = z.infer<typeof selectMessageSchema>;
-export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Message = typeof messages.$inferSelect;
+export type InsertMessage = typeof messages.$inferInsert;

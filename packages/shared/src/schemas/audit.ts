@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, jsonb, inet, index } from "drizzle-orm/pg-core";
 import { createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 
@@ -24,5 +23,4 @@ export const auditLogs = pgTable("audit_logs", {
   index("idx_audit_logs_action").on(table.action),
 ]);
 
-export const selectAuditLogSchema = createSelectSchema(auditLogs);
-export type AuditLog = z.infer<typeof selectAuditLogSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;

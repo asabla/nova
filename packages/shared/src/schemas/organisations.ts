@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, boolean, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 
 export const organisations = pgTable("organisations", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -37,12 +36,5 @@ export const orgSettings = pgTable("org_settings", {
   uniqueIndex("idx_org_settings_org_key").on(table.orgId, table.key),
 ]);
 
-export const selectOrganisationSchema = createSelectSchema(organisations);
-export const insertOrganisationSchema = createInsertSchema(organisations, {
-  name: z.string().min(1).max(200),
-  slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/),
-}).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-export const updateOrganisationSchema = insertOrganisationSchema.partial();
-
-export type Organisation = z.infer<typeof selectOrganisationSchema>;
-export type InsertOrganisation = z.infer<typeof insertOrganisationSchema>;
+export type Organisation = typeof organisations.$inferSelect;
+export type InsertOrganisation = typeof organisations.$inferInsert;

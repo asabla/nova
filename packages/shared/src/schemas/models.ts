@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, boolean, integer, jsonb, numeric, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 
 export const modelProviders = pgTable("model_providers", {
@@ -45,17 +44,5 @@ export const models = pgTable("models", {
   uniqueIndex("idx_models_org_external_id").on(table.orgId, table.modelIdExternal),
 ]);
 
-export const selectModelProviderSchema = createSelectSchema(modelProviders);
-export const insertModelProviderSchema = createInsertSchema(modelProviders, {
-  name: z.string().min(1).max(200),
-  type: z.enum(["openai", "anthropic", "azure", "ollama", "custom"]),
-}).omit({ id: true, orgId: true, createdAt: true, updatedAt: true, deletedAt: true });
-
-export const selectModelSchema = createSelectSchema(models);
-export const insertModelSchema = createInsertSchema(models, {
-  name: z.string().min(1).max(200),
-  modelIdExternal: z.string().min(1),
-}).omit({ id: true, orgId: true, createdAt: true, updatedAt: true, deletedAt: true });
-
-export type ModelProvider = z.infer<typeof selectModelProviderSchema>;
-export type Model = z.infer<typeof selectModelSchema>;
+export type ModelProvider = typeof modelProviders.$inferSelect;
+export type Model = typeof models.$inferSelect;

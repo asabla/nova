@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, boolean, integer, jsonb, numeric, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 
@@ -62,16 +61,5 @@ export const promptTemplateVersions = pgTable("prompt_template_versions", {
   index("idx_prompt_template_versions_org_id").on(table.orgId),
 ]);
 
-export const selectPromptTemplateSchema = createSelectSchema(promptTemplates);
-export const insertPromptTemplateSchema = createInsertSchema(promptTemplates, {
-  name: z.string().min(1).max(200),
-  content: z.string().min(1),
-  visibility: z.enum(["private", "team", "org"]).default("private"),
-}).omit({
-  id: true, orgId: true, ownerId: true,
-  createdAt: true, updatedAt: true, deletedAt: true,
-  currentVersion: true, usageCount: true, avgRating: true, isApproved: true, isPublished: true,
-});
-
-export type PromptTemplate = z.infer<typeof selectPromptTemplateSchema>;
-export type InsertPromptTemplate = z.infer<typeof insertPromptTemplateSchema>;
+export type PromptTemplate = typeof promptTemplates.$inferSelect;
+export type InsertPromptTemplate = typeof promptTemplates.$inferInsert;

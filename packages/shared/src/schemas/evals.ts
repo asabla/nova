@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, boolean, integer, jsonb, numeric, index, uniqueIndex, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 import { messages } from "./messages";
@@ -148,51 +147,14 @@ export const promptOptimizationRuns = pgTable("prompt_optimization_runs", {
 // Zod schemas & types
 // ---------------------------------------------------------------------------
 
-export const selectSystemPromptSchema = createSelectSchema(systemPrompts);
-export const insertSystemPromptSchema = createInsertSchema(systemPrompts, {
-  slug: z.string().min(1).max(100),
-  name: z.string().min(1).max(200),
-}).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-
-export const selectSystemPromptVersionSchema = createSelectSchema(systemPromptVersions);
-export const insertSystemPromptVersionSchema = createInsertSchema(systemPromptVersions, {
-  content: z.string().min(1),
-  generatedBy: z.enum(["seed", "human", "auto_optimization"]).default("human"),
-  status: z.enum(["draft", "testing", "active", "retired"]).default("draft"),
-  trafficPct: z.number().int().min(0).max(100).default(0),
-}).omit({ id: true, createdAt: true, updatedAt: true });
-
-export const selectEvalDimensionSchema = createSelectSchema(evalDimensions);
-export const insertEvalDimensionSchema = createInsertSchema(evalDimensions, {
-  evalType: z.enum(["chat", "planning", "research"]),
-  name: z.string().min(1).max(100),
-  description: z.string().min(1),
-  weight: z.string().regex(/^\d\.\d{1,2}$/),
-}).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-
-export const selectEvalRunSchema = createSelectSchema(evalRuns);
-export const insertEvalRunSchema = createInsertSchema(evalRuns, {
-  evalType: z.enum(["chat", "planning", "research"]),
-  executionTier: z.enum(["direct", "sequential", "orchestrated"]).nullable().optional(),
-  status: z.enum(["pending", "completed", "failed"]).default("pending"),
-}).omit({ id: true, createdAt: true, updatedAt: true });
-
-export const selectEvalAggregateSchema = createSelectSchema(evalAggregates);
-
-export const selectPromptOptimizationRunSchema = createSelectSchema(promptOptimizationRuns);
-export const insertPromptOptimizationRunSchema = createInsertSchema(promptOptimizationRuns, {
-  triggerReason: z.enum(["score_below_threshold", "negative_feedback_spike", "manual"]),
-  status: z.enum(["analyzing", "generating", "awaiting_approval", "approved", "rejected", "deployed"]).default("analyzing"),
-}).omit({ id: true, createdAt: true, updatedAt: true });
-
-export type SystemPrompt = z.infer<typeof selectSystemPromptSchema>;
-export type InsertSystemPrompt = z.infer<typeof insertSystemPromptSchema>;
-export type SystemPromptVersion = z.infer<typeof selectSystemPromptVersionSchema>;
-export type InsertSystemPromptVersion = z.infer<typeof insertSystemPromptVersionSchema>;
-export type EvalDimension = z.infer<typeof selectEvalDimensionSchema>;
-export type InsertEvalDimension = z.infer<typeof insertEvalDimensionSchema>;
-export type EvalRun = z.infer<typeof selectEvalRunSchema>;
-export type InsertEvalRun = z.infer<typeof insertEvalRunSchema>;
-export type EvalAggregate = z.infer<typeof selectEvalAggregateSchema>;
-export type PromptOptimizationRun = z.infer<typeof selectPromptOptimizationRunSchema>;
-export type InsertPromptOptimizationRun = z.infer<typeof insertPromptOptimizationRunSchema>;
+export type SystemPrompt = typeof systemPrompts.$inferSelect;
+export type InsertSystemPrompt = typeof systemPrompts.$inferInsert;
+export type SystemPromptVersion = typeof systemPromptVersions.$inferSelect;
+export type InsertSystemPromptVersion = typeof systemPromptVersions.$inferInsert;
+export type EvalDimension = typeof evalDimensions.$inferSelect;
+export type InsertEvalDimension = typeof evalDimensions.$inferInsert;
+export type EvalRun = typeof evalRuns.$inferSelect;
+export type InsertEvalRun = typeof evalRuns.$inferInsert;
+export type EvalAggregate = typeof evalAggregates.$inferSelect;
+export type PromptOptimizationRun = typeof promptOptimizationRuns.$inferSelect;
+export type InsertPromptOptimizationRun = typeof promptOptimizationRuns.$inferInsert;

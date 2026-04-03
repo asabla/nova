@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, boolean, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 
@@ -55,12 +54,5 @@ export const mcpServerWhitelist = pgTable("mcp_server_whitelist", {
   uniqueIndex("idx_mcp_server_whitelist_org_pattern").on(table.orgId, table.urlPattern),
 ]);
 
-export const selectMcpServerSchema = createSelectSchema(mcpServers);
-export const insertMcpServerSchema = createInsertSchema(mcpServers, {
-  name: z.string().min(1).max(200),
-  url: z.string().url(),
-  authType: z.enum(["none", "bearer", "api_key"]).optional(),
-}).omit({ id: true, orgId: true, registeredById: true, createdAt: true, updatedAt: true, deletedAt: true, healthStatus: true, lastHealthCheckAt: true });
-
-export type McpServer = z.infer<typeof selectMcpServerSchema>;
-export type InsertMcpServer = z.infer<typeof insertMcpServerSchema>;
+export type McpServer = typeof mcpServers.$inferSelect;
+export type InsertMcpServer = typeof mcpServers.$inferInsert;

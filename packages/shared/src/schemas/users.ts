@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, boolean, index, uniqueIndex, inet } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 
 export const users = pgTable("users", {
@@ -73,19 +72,6 @@ export const mfaCredentials = pgTable("mfa_credentials", {
   index("idx_mfa_credentials_user_id").on(table.userId),
 ]);
 
-export const selectUserSchema = createSelectSchema(users);
-export const insertUserSchema = createInsertSchema(users, {
-  email: z.string().email(),
-}).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-
-export const selectUserProfileSchema = createSelectSchema(userProfiles);
-export const insertUserProfileSchema = createInsertSchema(userProfiles, {
-  displayName: z.string().min(1).max(200).optional(),
-  theme: z.enum(["light", "dark", "system"]).default("system"),
-  fontSize: z.enum(["small", "medium", "large"]).default("medium"),
-  role: z.enum(["org-admin", "power-user", "member", "viewer"]).default("member"),
-}).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-
 export const magicLinkTokens = pgTable("magic_link_tokens", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -98,6 +84,6 @@ export const magicLinkTokens = pgTable("magic_link_tokens", {
   index("idx_magic_link_tokens_user_id").on(table.userId),
 ]);
 
-export type User = z.infer<typeof selectUserSchema>;
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type UserProfile = z.infer<typeof selectUserProfileSchema>;
+export type User = typeof users.$inferSelect;
+export type InsertUser = typeof users.$inferInsert;
+export type UserProfile = typeof userProfiles.$inferSelect;

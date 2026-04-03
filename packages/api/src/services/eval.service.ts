@@ -86,7 +86,7 @@ export async function listEvalRuns(orgId: string, pagination: PaginationInput, e
     db.select({ count: sql<number>`count(*)` }).from(evalRuns).where(where),
   ]);
 
-  return buildPaginatedResponse(rows, countResult?.count ?? 0, page, pageSize);
+  return buildPaginatedResponse(rows, countResult?.count ?? 0, { offset, limit, page, pageSize });
 }
 
 export async function getEvalRun(orgId: string, evalRunId: string) {

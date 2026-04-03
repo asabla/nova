@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, boolean, integer, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 import { messages } from "./messages";
@@ -70,12 +69,5 @@ export const toolCalls = pgTable("tool_calls", {
   index("idx_tool_calls_org_id").on(table.orgId),
 ]);
 
-export const selectToolSchema = createSelectSchema(tools);
-export const insertToolSchema = createInsertSchema(tools, {
-  name: z.string().min(1).max(200),
-  type: z.enum(["builtin", "openapi", "custom"]),
-  tags: z.array(z.string()).optional(),
-}).omit({ id: true, orgId: true, registeredById: true, approvedById: true, approvedAt: true, rejectionReason: true, createdAt: true, updatedAt: true, deletedAt: true, currentVersion: true });
-
-export type Tool = z.infer<typeof selectToolSchema>;
-export type InsertTool = z.infer<typeof insertToolSchema>;
+export type Tool = typeof tools.$inferSelect;
+export type InsertTool = typeof tools.$inferInsert;

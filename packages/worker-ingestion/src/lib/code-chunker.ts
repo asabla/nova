@@ -1,4 +1,4 @@
-import type TreeSitter from "web-tree-sitter";
+import type { Node, Tree } from "web-tree-sitter";
 import type { ContentChunk, ChunkMetadata, ChunkOptions } from "@nova/shared/content";
 import { chunkContent } from "@nova/shared/content";
 import { getLanguageForExtension, createParser } from "./tree-sitter-languages";
@@ -66,7 +66,7 @@ const SYMBOL_NODE_TYPES: Record<string, SymbolKind> = {
 /**
  * Check if a node is at the top level or exported.
  */
-function isExportedNode(node: TreeSitter.SyntaxNode): boolean {
+function isExportedNode(node: Node): boolean {
   const parent = node.parent;
   if (!parent) return false;
   // JS/TS export
@@ -82,7 +82,7 @@ function isExportedNode(node: TreeSitter.SyntaxNode): boolean {
 /**
  * Try to extract the name of a symbol from a tree-sitter node.
  */
-function extractSymbolName(node: TreeSitter.SyntaxNode): string | null {
+function extractSymbolName(node: Node): string | null {
   // Direct name child
   const nameNode = node.childForFieldName("name");
   if (nameNode) return nameNode.text;
@@ -118,7 +118,7 @@ function extractSymbolName(node: TreeSitter.SyntaxNode): string | null {
 /**
  * Determine the symbol kind, handling wrapper nodes like export_statement.
  */
-function resolveSymbolKind(node: TreeSitter.SyntaxNode): SymbolKind | null {
+function resolveSymbolKind(node: Node): SymbolKind | null {
   const direct = SYMBOL_NODE_TYPES[node.type];
   if (direct) return direct;
 
@@ -134,7 +134,7 @@ function resolveSymbolKind(node: TreeSitter.SyntaxNode): SymbolKind | null {
 /**
  * Extract top-level symbols from a tree-sitter tree.
  */
-function extractSymbols(tree: TreeSitter.Tree): ExtractedSymbol[] {
+function extractSymbols(tree: Tree): ExtractedSymbol[] {
   const symbols: ExtractedSymbol[] = [];
   const root = tree.rootNode;
 
@@ -256,13 +256,15 @@ export async function chunkCodeFile(
   }
 
   // Parse the file with web-tree-sitter (WASM)
-  let tree: TreeSitter.Tree;
+  let tree: Tree;
   try {
     const parser = await createParser(language);
     if (!parser) {
       return chunkAsText(content, filePath, opts);
     }
-    tree = parser.parse(content);
+    const parsed = parser.parse(content);
+    if (!parsed) return chunkAsText(content, filePath, opts);
+    tree = parsed;
   } catch (err) {
     logger.warn({ err, filename }, "[code-chunker] tree-sitter parse failed");
     return chunkAsText(content, filePath, opts);

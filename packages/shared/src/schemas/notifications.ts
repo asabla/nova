@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, boolean, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 
@@ -39,9 +38,4 @@ export const notificationPreferences = pgTable("notification_preferences", {
   uniqueIndex("idx_notification_prefs_unique").on(table.userId, table.orgId, table.notificationType, table.channel),
 ]);
 
-export const selectNotificationSchema = createSelectSchema(notifications);
-export const insertNotificationSchema = createInsertSchema(notifications).omit({
-  id: true, createdAt: true, updatedAt: true, deletedAt: true, isRead: true, readAt: true,
-});
-
-export type Notification = z.infer<typeof selectNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;

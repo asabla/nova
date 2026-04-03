@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { createSelectSchema, createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 import { agents } from "./agents";
@@ -24,7 +23,5 @@ export const agentMemoryVectors = pgTable("agent_memory_vectors", {
   index("idx_agent_memory_vectors_user_id").on(table.userId),
 ]);
 
-export const selectAgentMemoryVectorSchema = createSelectSchema(agentMemoryVectors);
-export const insertAgentMemoryVectorSchema = createInsertSchema(agentMemoryVectors);
-export type AgentMemoryVector = z.infer<typeof selectAgentMemoryVectorSchema>;
-export type InsertAgentMemoryVector = z.infer<typeof insertAgentMemoryVectorSchema>;
+export type AgentMemoryVector = typeof agentMemoryVectors.$inferSelect;
+export type InsertAgentMemoryVector = typeof agentMemoryVectors.$inferInsert;

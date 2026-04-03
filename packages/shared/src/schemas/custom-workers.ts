@@ -1,5 +1,4 @@
 import { pgTable, text, uuid, timestamp, boolean, integer, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
-import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
@@ -29,25 +28,19 @@ export const customWorkers = pgTable("custom_workers", {
   uniqueIndex("idx_custom_workers_org_name").on(table.orgId, table.name),
 ]);
 
-export const selectCustomWorkerSchema = createSelectSchema(customWorkers);
-export const insertCustomWorkerSchema = createInsertSchema(customWorkers, {
+export const insertCustomWorkerSchema = z.object({
   name: z.string().min(1).max(200),
+  description: z.string().nullish(),
   url: z.string().url(),
   workflowTypes: z.array(z.string()).min(1),
   authType: z.enum(["hmac", "bearer", "mtls"]).default("hmac"),
+  authSecretEncrypted: z.string().nullish(),
+  isEnabled: z.boolean().default(true),
   timeoutSeconds: z.number().int().min(10).max(3600).default(300),
-}).omit({
-  id: true,
-  orgId: true,
-  registeredById: true,
-  isBuiltin: true,
-  healthStatus: true,
-  lastHealthCheckAt: true,
-  createdAt: true,
-  updatedAt: true,
-  deletedAt: true,
+  fallbackToBuiltin: z.boolean().default(true),
+  config: z.record(z.unknown()).default({}),
 });
 export const updateCustomWorkerSchema = insertCustomWorkerSchema.partial();
 
-export type CustomWorker = z.infer<typeof selectCustomWorkerSchema>;
-export type InsertCustomWorker = z.infer<typeof insertCustomWorkerSchema>;
+export type CustomWorker = typeof customWorkers.$inferSelect;
+export type InsertCustomWorker = typeof customWorkers.$inferInsert;

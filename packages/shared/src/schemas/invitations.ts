@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 
@@ -24,13 +23,4 @@ export const invitations = pgTable("invitations", {
   index("idx_invitations_expires_at").on(table.expiresAt),
 ]);
 
-export const selectInvitationSchema = createSelectSchema(invitations);
-export const insertInvitationSchema = createInsertSchema(invitations, {
-  email: z.string().email(),
-  role: z.enum(["org-admin", "power-user", "member", "viewer"]).default("member"),
-}).omit({
-  id: true, orgId: true, invitedById: true, tokenHash: true,
-  createdAt: true, updatedAt: true, deletedAt: true, acceptedAt: true,
-});
-
-export type Invitation = z.infer<typeof selectInvitationSchema>;
+export type Invitation = typeof invitations.$inferSelect;

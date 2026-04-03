@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, boolean, bigint, integer, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 import { agents } from "./agents";
@@ -100,17 +99,5 @@ export const conversationKnowledgeCollections = pgTable("conversation_knowledge_
   uniqueIndex("idx_conv_knowledge_collections_conv_coll").on(table.conversationId, table.knowledgeCollectionId),
 ]);
 
-export const selectConversationSchema = createSelectSchema(conversations);
-export const insertConversationSchema = createInsertSchema(conversations, {
-  title: z.string().min(1).max(500).optional(),
-  systemPrompt: z.string().max(10_000).optional(),
-  visibility: z.enum(["private", "team", "public"]).default("private"),
-}).omit({
-  id: true, orgId: true, ownerId: true,
-  createdAt: true, updatedAt: true, deletedAt: true,
-  totalTokens: true, estimatedCostCents: true,
-});
-export const updateConversationSchema = insertConversationSchema.partial();
-
-export type Conversation = z.infer<typeof selectConversationSchema>;
-export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type Conversation = typeof conversations.$inferSelect;
+export type InsertConversation = typeof conversations.$inferInsert;

@@ -1,4 +1,4 @@
-import type TreeSitter from "web-tree-sitter";
+import type { Parser as ParserType, Language, Node } from "web-tree-sitter";
 import { logger } from "@nova/worker-shared/logger";
 
 /** Extension → language name mapping */
@@ -44,8 +44,10 @@ const WASM_GRAMMAR_NAMES: Record<string, string> = {
 };
 
 let parserInitialized = false;
-let TreeSitterModule: typeof TreeSitter | null = null;
-const loadedGrammars = new Map<string, TreeSitter.Language>();
+let ParserClass: typeof ParserType | null = null;
+const loadedGrammars = new Map<string, Language>();
+
+export type { Node as SyntaxNode };
 
 export function getLanguageForExtension(ext: string): string | null {
   return EXTENSION_MAP[ext.toLowerCase()] ?? null;
@@ -54,21 +56,21 @@ export function getLanguageForExtension(ext: string): string | null {
 /**
  * Initialize web-tree-sitter (must be called once before loading grammars).
  */
-async function ensureInitialized(): Promise<typeof TreeSitter> {
-  if (TreeSitterModule && parserInitialized) return TreeSitterModule;
+async function ensureInitialized(): Promise<typeof ParserType> {
+  if (ParserClass && parserInitialized) return ParserClass;
 
   const mod = await import("web-tree-sitter");
-  TreeSitterModule = mod.default;
-  await TreeSitterModule.init();
+  ParserClass = mod.Parser;
+  await ParserClass.init();
   parserInitialized = true;
-  return TreeSitterModule;
+  return ParserClass;
 }
 
 /**
  * Lazy-load a tree-sitter WASM grammar by language name.
  * Grammars are cached after first load.
  */
-export async function loadGrammar(language: string): Promise<TreeSitter.Language | null> {
+export async function loadGrammar(language: string): Promise<Language | null> {
   if (loadedGrammars.has(language)) {
     return loadedGrammars.get(language)!;
   }
@@ -77,11 +79,12 @@ export async function loadGrammar(language: string): Promise<TreeSitter.Language
   if (!wasmName) return null;
 
   try {
-    const TS = await ensureInitialized();
+    await ensureInitialized();
 
     // tree-sitter-wasms provides .wasm files that can be resolved via require.resolve
     const wasmPath = require.resolve(`tree-sitter-wasms/out/${wasmName}.wasm`);
-    const grammar = await TS.Language.load(wasmPath);
+    const { Language: LangClass } = await import("web-tree-sitter");
+    const grammar = await LangClass.load(wasmPath);
     loadedGrammars.set(language, grammar);
     return grammar;
   } catch (err) {
@@ -93,12 +96,12 @@ export async function loadGrammar(language: string): Promise<TreeSitter.Language
 /**
  * Create a new parser instance with the given language.
  */
-export async function createParser(language: string): Promise<TreeSitter | null> {
-  const TS = await ensureInitialized();
+export async function createParser(language: string): Promise<ParserType | null> {
+  const Parser = await ensureInitialized();
   const grammar = await loadGrammar(language);
   if (!grammar) return null;
 
-  const parser = new TS();
+  const parser = new Parser();
   parser.setLanguage(grammar);
   return parser;
 }

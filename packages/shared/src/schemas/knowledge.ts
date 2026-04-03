@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, integer, jsonb, boolean, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 
@@ -139,38 +138,15 @@ export const knowledgeConnectors = pgTable("knowledge_connectors", {
   index("idx_knowledge_connectors_sync").on(table.syncEnabled, table.lastSyncAt),
 ]);
 
-export const selectKnowledgeConnectorSchema = createSelectSchema(knowledgeConnectors);
-export const insertKnowledgeConnectorSchema = createInsertSchema(knowledgeConnectors, {
-  provider: z.enum(["sharepoint", "onedrive", "teams"]),
-  tenantId: z.string().min(1),
-  clientId: z.string().min(1),
-  clientSecretEncrypted: z.string().min(1),
-  resourceId: z.string().min(1),
-  syncIntervalMinutes: z.number().int().min(60).max(1440).default(360),
-}).omit({ id: true, orgId: true, createdBy: true, createdAt: true, updatedAt: true, deletedAt: true, lastSyncAt: true, lastSyncStatus: true, lastSyncError: true, deltaCursor: true, syncedDocumentCount: true });
-export type KnowledgeConnector = z.infer<typeof selectKnowledgeConnectorSchema>;
-export type InsertKnowledgeConnector = z.infer<typeof insertKnowledgeConnectorSchema>;
+export type KnowledgeConnector = typeof knowledgeConnectors.$inferSelect;
+export type InsertKnowledgeConnector = typeof knowledgeConnectors.$inferInsert;
 
-export const selectKnowledgeCollectionSchema = createSelectSchema(knowledgeCollections);
-export const insertKnowledgeCollectionSchema = createInsertSchema(knowledgeCollections, {
-  name: z.string().min(1).max(200),
-  visibility: z.enum(["private", "team", "public"]).default("private"),
-}).omit({ id: true, orgId: true, ownerId: true, createdAt: true, updatedAt: true, deletedAt: true, version: true, lastIndexedAt: true, status: true });
+export type KnowledgeCollection = typeof knowledgeCollections.$inferSelect;
+export type InsertKnowledgeCollection = typeof knowledgeCollections.$inferInsert;
 
-export type KnowledgeCollection = z.infer<typeof selectKnowledgeCollectionSchema>;
-export type InsertKnowledgeCollection = z.infer<typeof insertKnowledgeCollectionSchema>;
+export type KnowledgeDocument = typeof knowledgeDocuments.$inferSelect;
 
-export const selectKnowledgeDocumentSchema = createSelectSchema(knowledgeDocuments);
-export type KnowledgeDocument = z.infer<typeof selectKnowledgeDocumentSchema>;
+export type KnowledgeTag = typeof knowledgeTags.$inferSelect;
+export type InsertKnowledgeTag = typeof knowledgeTags.$inferInsert;
 
-export const selectKnowledgeTagSchema = createSelectSchema(knowledgeTags);
-export const insertKnowledgeTagSchema = createInsertSchema(knowledgeTags, {
-  name: z.string().min(1).max(100),
-  color: z.string().max(20).optional(),
-  source: z.enum(["auto", "manual"]).default("manual"),
-}).omit({ id: true, orgId: true, createdAt: true, updatedAt: true });
-export type KnowledgeTag = z.infer<typeof selectKnowledgeTagSchema>;
-export type InsertKnowledgeTag = z.infer<typeof insertKnowledgeTagSchema>;
-
-export const selectKnowledgeDocumentTagAssignmentSchema = createSelectSchema(knowledgeDocumentTagAssignments);
-export type KnowledgeDocumentTagAssignment = z.infer<typeof selectKnowledgeDocumentTagAssignmentSchema>;
+export type KnowledgeDocumentTagAssignment = typeof knowledgeDocumentTagAssignments.$inferSelect;

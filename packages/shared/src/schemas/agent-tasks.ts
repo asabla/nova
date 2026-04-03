@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, jsonb, integer, index } from "drizzle-orm/pg-core";
 import { createSelectSchema, createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 
 export const agentTasks = pgTable("agent_tasks", {
@@ -22,7 +21,5 @@ export const agentTasks = pgTable("agent_tasks", {
   index("idx_agent_tasks_parent_task_id").on(table.parentTaskId),
 ]);
 
-export const selectAgentTaskSchema = createSelectSchema(agentTasks);
-export const insertAgentTaskSchema = createInsertSchema(agentTasks);
-export type AgentTask = z.infer<typeof selectAgentTaskSchema>;
-export type InsertAgentTask = z.infer<typeof insertAgentTaskSchema>;
+export type AgentTask = typeof agentTasks.$inferSelect;
+export type InsertAgentTask = typeof agentTasks.$inferInsert;

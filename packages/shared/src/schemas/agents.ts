@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, boolean, integer, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 import { conversations } from "./conversations";
@@ -146,19 +145,5 @@ export const agentStarterTemplates = pgTable("agent_starter_templates", {
   index("idx_agent_starter_templates_org_id").on(table.orgId),
 ]);
 
-export const selectAgentSchema = createSelectSchema(agents);
-export const insertAgentSchema = createInsertSchema(agents, {
-  name: z.string().min(1).max(200),
-  visibility: z.enum(["private", "team", "org", "public"]).default("private"),
-  toolApprovalMode: z.enum(["auto", "always-ask", "never"]).default("always-ask"),
-  memoryScope: z.enum(["per-user", "per-conversation", "global"]).default("per-user"),
-  memoryLimitMb: z.number().int().positive().max(1024).nullable().optional(),
-}).omit({
-  id: true, orgId: true, ownerId: true,
-  createdAt: true, updatedAt: true, deletedAt: true,
-  currentVersion: true,
-});
-export const updateAgentSchema = insertAgentSchema.partial();
-
-export type Agent = z.infer<typeof selectAgentSchema>;
-export type InsertAgent = z.infer<typeof insertAgentSchema>;
+export type Agent = typeof agents.$inferSelect;
+export type InsertAgent = typeof agents.$inferInsert;

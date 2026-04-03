@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, bigint, integer, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 
@@ -38,11 +37,5 @@ export const groupMemberships = pgTable("group_memberships", {
   index("idx_group_memberships_user_id").on(table.userId),
 ]);
 
-export const selectGroupSchema = createSelectSchema(groups);
-export const insertGroupSchema = createInsertSchema(groups, {
-  name: z.string().min(1).max(200),
-}).omit({ id: true, orgId: true, createdAt: true, updatedAt: true, deletedAt: true });
-export const updateGroupSchema = insertGroupSchema.partial();
-
-export type Group = z.infer<typeof selectGroupSchema>;
-export type InsertGroup = z.infer<typeof insertGroupSchema>;
+export type Group = typeof groups.$inferSelect;
+export type InsertGroup = typeof groups.$inferInsert;

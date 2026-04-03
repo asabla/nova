@@ -94,7 +94,7 @@
   },
   "dependencies": {
     "@nova/shared": "workspace:*",
-    "@openai/agents": "^0.7.0",
+    "@openai/agents": "^0.8.2",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/exporter-trace-otlp-grpc": "^0.214.0",
     "@opentelemetry/instrumentation-http": "^0.214.0",
@@ -102,8 +102,8 @@
     "@opentelemetry/sdk-node": "^0.214.0",
     "@opentelemetry/sdk-trace-node": "^2.6.1",
     "@opentelemetry/semantic-conventions": "^1.40.0",
-    "@qdrant/js-client-rest": "1.13.0",
-    "drizzle-orm": "^0.39.3",
+    "@qdrant/js-client-rest": "^1.17.0",
+    "drizzle-orm": "^0.45.2",
     "ioredis": "^5.4.2",
     "minio": "^8.0.4",
     "openai": "^6.27.0",
@@ -113,7 +113,7 @@
     "zod": "3.25.76"
   },
   "devDependencies": {
-    "typescript": "^5.8.3",
-    "@types/node": "^22.15.2"
+    "typescript": "^6.0.2",
+    "@types/node": "^25.5.0"
   }
 }

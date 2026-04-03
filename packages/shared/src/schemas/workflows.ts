@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 import { conversations } from "./conversations";
@@ -31,5 +30,4 @@ export const workflows = pgTable("workflows", {
   index("idx_workflows_org_status").on(table.orgId, table.status),
 ]);
 
-export const selectWorkflowSchema = createSelectSchema(workflows);
-export type Workflow = z.infer<typeof selectWorkflowSchema>;
+export type Workflow = typeof workflows.$inferSelect;

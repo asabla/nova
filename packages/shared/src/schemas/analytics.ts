@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, bigint, integer, index, unique } from "drizzle-orm/pg-core";
 import { createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 import { groups } from "./groups";
@@ -30,5 +29,4 @@ export const usageStats = pgTable("usage_stats", {
   unique("uq_usage_stats_daily").on(table.orgId, table.userId, table.groupId, table.modelId, table.period, table.periodStart).nullsNotDistinct(),
 ]);
 
-export const selectUsageStatsSchema = createSelectSchema(usageStats);
-export type UsageStats = z.infer<typeof selectUsageStatsSchema>;
+export type UsageStats = typeof usageStats.$inferSelect;

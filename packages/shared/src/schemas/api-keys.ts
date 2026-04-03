@@ -1,6 +1,5 @@
 import { pgTable, text, uuid, timestamp, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { z } from "zod";
 import { organisations } from "./organisations";
 import { users } from "./users";
 
@@ -23,13 +22,4 @@ export const apiKeys = pgTable("api_keys", {
   index("idx_api_keys_org_user").on(table.orgId, table.userId),
 ]);
 
-export const selectApiKeySchema = createSelectSchema(apiKeys);
-export const insertApiKeySchema = createInsertSchema(apiKeys, {
-  name: z.string().min(1).max(200),
-}).omit({
-  id: true, orgId: true, userId: true, keyHash: true, keyPrefix: true,
-  createdAt: true, updatedAt: true, deletedAt: true,
-  lastUsedAt: true, revokedAt: true,
-});
-
-export type ApiKey = z.infer<typeof selectApiKeySchema>;
+export type ApiKey = typeof apiKeys.$inferSelect;

@@ -13,7 +13,7 @@
     "db:seed": "bun run src/lib/seed.ts"
   },
   "dependencies": {
-    "@hono/zod-validator": "^0.5.0",
+    "@hono/zod-validator": "^0.7.6",
     "@nova/shared": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/exporter-trace-otlp-grpc": "^0.214.0",
@@ -21,11 +21,11 @@
     "@opentelemetry/resources": "^2.6.1",
     "@opentelemetry/sdk-trace-base": "^2.6.1",
     "@opentelemetry/semantic-conventions": "^1.40.0",
-    "@qdrant/js-client-rest": "1.13.0",
+    "@qdrant/js-client-rest": "^1.17.0",
     "@temporalio/client": "^1.11.7",
-    "better-auth": "~1.2.7",
-    "drizzle-orm": "^0.39.3",
-    "hono": "^4.7.6",
+    "better-auth": "^1.5.6",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.10",
     "ioredis": "^5.4.2",
     "minio": "^8.0.4",
     "openai": "^6.27.0",
@@ -39,7 +39,7 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "drizzle-kit": "^0.30.6",
-    "typescript": "^5.8.3"
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^6.0.2"
   }
 }
