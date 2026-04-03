@@ -51,8 +51,16 @@ bun test packages/api/tests/lib/stream-relay.test.ts  # Single test file
 bun run storybook        # Dev server on port 6006
 
 # Docker
-docker compose build api web worker-agent worker-ingestion worker-background
-docker compose up -d api web worker-agent worker-ingestion worker-background
+docker compose build api web admin worker-agent worker-ingestion worker-background
+docker compose up -d api web admin worker-agent worker-ingestion worker-background
+
+# Observability (optional)
+make observability                # Start Grafana + Prometheus + Loki + Tempo
+make observability-down           # Stop observability stack
+
+# Database backup/restore
+./infra/scripts/db-backup.sh      # Backup to ./backups/
+./infra/scripts/db-restore.sh backups/nova_YYYYMMDD_HHMMSS.sql.gz
 ```
 
 **Unit tests** use `bun:test` (`describe`, `it`, `expect`). Test files live in `packages/*/tests/`.
@@ -87,11 +95,29 @@ Error handler → Security headers → CORS → Request ID → Logger → **Publ
 | PostgreSQL | 5432 | Main database (pg_trgm) |
 | Redis | 6379 | Cache, pub/sub, rate limiting |
 | MinIO | 9000/9001 | S3-compatible file storage |
-| *(removed)* | *(4000)* | LLM calls go directly to providers (OpenAI, Anthropic, etc.) |
 | Qdrant | 6333/6334 | Vector search engine |
 | Temporal | 7233 | Workflow orchestration (separate DB) |
 | Temporal UI | 8233 | Workflow dashboard |
 | SearxNG | 8888 | Web search |
+
+LLM calls go directly to providers (OpenAI, Anthropic, etc.) — no proxy layer.
+
+### Observability stack (optional, `--profile observability`)
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| Grafana | 3002 | Dashboards (7 pre-built), alerting, trace/log exploration |
+| Prometheus | 9090 | Metrics (8 scrape targets: API, Temporal, PG, Redis, Qdrant, MinIO, nginx x2) |
+| Loki | 3100 | Log aggregation (all Docker containers via Alloy) |
+| Tempo | 3200 | Distributed tracing (OTLP from API + workers) |
+| Alloy | 4317/4318 | OTLP receiver + Docker log tailing |
+
+Enable with `make observability` or `OTEL_ENABLED=true docker compose --profile observability up -d`.
+
+- **Traces**: API creates root span per HTTP request, workers create child spans via traceId propagation through Temporal workflow args → Redis events. Spans: `agent.run` → `tool: {name}` → `stream.done`
+- **Metrics**: prom-client in API (`/metrics`), infrastructure exporters (postgres-exporter, redis-exporter, nginx-exporter)
+- **Logs**: Pino JSON to stdout, Alloy tails Docker containers, nginx uses `json_combined` log format with `source` label ("web" or "admin")
+- **Bun limitation**: OTel SDK's `SimpleSpanProcessor` doesn't fire `onEnd()` in Bun. Custom manual span buffer + OTLP/HTTP JSON export via native `fetch` in `packages/api/src/lib/telemetry.ts`
 
 ## Typecheck Architecture
 
