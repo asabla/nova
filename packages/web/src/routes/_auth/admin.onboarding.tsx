@@ -182,19 +182,19 @@ function OrgOnboardingPage() {
             {t("admin.onboarding.teamHeading", "Invite Your Team")}
           </h3>
           <p className="text-sm text-text-secondary text-center">
-            {t("admin.onboarding.teamBody", "You can invite team members now or later from Admin > Members. For SSO-based organizations, users will be auto-provisioned on first login.")}
+            {t("admin.onboarding.teamBody", "You can invite team members now or later from {"Admin › Members"}. For SSO-based organizations, users will be auto-provisioned on first login.")}
           </p>
           <div className="space-y-3">
             <div className="p-4 rounded-xl bg-surface-secondary border border-border">
-              <p className="text-sm font-medium text-text">Admin > Members</p>
+              <p className="text-sm font-medium text-text">{"Admin › Members"}</p>
               <p className="text-xs text-text-tertiary mt-1">Invite users via email or configure SSO for automatic provisioning</p>
             </div>
             <div className="p-4 rounded-xl bg-surface-secondary border border-border">
-              <p className="text-sm font-medium text-text">Admin > SSO</p>
+              <p className="text-sm font-medium text-text">{"Admin › SSO"}</p>
               <p className="text-xs text-text-tertiary mt-1">Connect Azure AD, Google, or GitHub for single sign-on</p>
             </div>
             <div className="p-4 rounded-xl bg-surface-secondary border border-border">
-              <p className="text-sm font-medium text-text">Admin > Groups</p>
+              <p className="text-sm font-medium text-text">{"Admin › Groups"}</p>
               <p className="text-xs text-text-tertiary mt-1">Organize users into groups with model access and spending controls</p>
             </div>
           </div>
