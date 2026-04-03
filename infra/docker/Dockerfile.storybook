@@ -26,7 +26,7 @@ COPY packages/web/ packages/web/
 RUN cd packages/web && bunx storybook build -o storybook-static
 
 # ─── Runtime Stage ─────────────────────────────────
-FROM nginx:alpine
+FROM nginx:1.28-alpine
 
 COPY --from=builder /app/packages/web/storybook-static /usr/share/nginx/html
 

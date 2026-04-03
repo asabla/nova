@@ -27,7 +27,7 @@ COPY packages/admin/ packages/admin/
 RUN cd packages/admin && bunx vite build
 
 # ── Runtime ──────────────────────────────────────
-FROM nginx:alpine
+FROM nginx:1.28-alpine
 
 COPY --from=builder /app/packages/admin/dist /usr/share/nginx/html
 COPY infra/docker/nginx-admin.conf /etc/nginx/conf.d/default.conf
