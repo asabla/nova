@@ -53,6 +53,7 @@ import { Route as AuthAdminSsoRouteImport } from './routes/_auth/admin.sso'
 import { Route as AuthAdminSecurityRouteImport } from './routes/_auth/admin.security'
 import { Route as AuthAdminRateLimitsRouteImport } from './routes/_auth/admin.rate-limits'
 import { Route as AuthAdminOrgSettingsRouteImport } from './routes/_auth/admin.org-settings'
+import { Route as AuthAdminOnboardingRouteImport } from './routes/_auth/admin.onboarding'
 import { Route as AuthAdminModelsRouteImport } from './routes/_auth/admin.models'
 import { Route as AuthAdminMembersRouteImport } from './routes/_auth/admin.members'
 import { Route as AuthAdminIntegrationsRouteImport } from './routes/_auth/admin.integrations'
@@ -288,6 +289,11 @@ const AuthAdminOrgSettingsRoute = AuthAdminOrgSettingsRouteImport.update({
   path: '/org-settings',
   getParentRoute: () => AuthAdminRoute,
 } as any)
+const AuthAdminOnboardingRoute = AuthAdminOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => AuthAdminRoute,
+} as any)
 const AuthAdminModelsRoute = AuthAdminModelsRouteImport.update({
   id: '/models',
   path: '/models',
@@ -391,6 +397,7 @@ export interface FileRoutesByFullPath {
   '/admin/integrations': typeof AuthAdminIntegrationsRoute
   '/admin/members': typeof AuthAdminMembersRoute
   '/admin/models': typeof AuthAdminModelsRoute
+  '/admin/onboarding': typeof AuthAdminOnboardingRoute
   '/admin/org-settings': typeof AuthAdminOrgSettingsRoute
   '/admin/rate-limits': typeof AuthAdminRateLimitsRoute
   '/admin/security': typeof AuthAdminSecurityRoute
@@ -447,6 +454,7 @@ export interface FileRoutesByTo {
   '/admin/integrations': typeof AuthAdminIntegrationsRoute
   '/admin/members': typeof AuthAdminMembersRoute
   '/admin/models': typeof AuthAdminModelsRoute
+  '/admin/onboarding': typeof AuthAdminOnboardingRoute
   '/admin/org-settings': typeof AuthAdminOrgSettingsRoute
   '/admin/rate-limits': typeof AuthAdminRateLimitsRoute
   '/admin/security': typeof AuthAdminSecurityRoute
@@ -507,6 +515,7 @@ export interface FileRoutesById {
   '/_auth/admin/integrations': typeof AuthAdminIntegrationsRoute
   '/_auth/admin/members': typeof AuthAdminMembersRoute
   '/_auth/admin/models': typeof AuthAdminModelsRoute
+  '/_auth/admin/onboarding': typeof AuthAdminOnboardingRoute
   '/_auth/admin/org-settings': typeof AuthAdminOrgSettingsRoute
   '/_auth/admin/rate-limits': typeof AuthAdminRateLimitsRoute
   '/_auth/admin/security': typeof AuthAdminSecurityRoute
@@ -567,6 +576,7 @@ export interface FileRouteTypes {
     | '/admin/integrations'
     | '/admin/members'
     | '/admin/models'
+    | '/admin/onboarding'
     | '/admin/org-settings'
     | '/admin/rate-limits'
     | '/admin/security'
@@ -623,6 +633,7 @@ export interface FileRouteTypes {
     | '/admin/integrations'
     | '/admin/members'
     | '/admin/models'
+    | '/admin/onboarding'
     | '/admin/org-settings'
     | '/admin/rate-limits'
     | '/admin/security'
@@ -682,6 +693,7 @@ export interface FileRouteTypes {
     | '/_auth/admin/integrations'
     | '/_auth/admin/members'
     | '/_auth/admin/models'
+    | '/_auth/admin/onboarding'
     | '/_auth/admin/org-settings'
     | '/_auth/admin/rate-limits'
     | '/_auth/admin/security'
@@ -1021,6 +1033,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthAdminOrgSettingsRouteImport
       parentRoute: typeof AuthAdminRoute
     }
+    '/_auth/admin/onboarding': {
+      id: '/_auth/admin/onboarding'
+      path: '/onboarding'
+      fullPath: '/admin/onboarding'
+      preLoaderRoute: typeof AuthAdminOnboardingRouteImport
+      parentRoute: typeof AuthAdminRoute
+    }
     '/_auth/admin/models': {
       id: '/_auth/admin/models'
       path: '/models'
@@ -1129,6 +1148,7 @@ interface AuthAdminRouteChildren {
   AuthAdminIntegrationsRoute: typeof AuthAdminIntegrationsRoute
   AuthAdminMembersRoute: typeof AuthAdminMembersRoute
   AuthAdminModelsRoute: typeof AuthAdminModelsRoute
+  AuthAdminOnboardingRoute: typeof AuthAdminOnboardingRoute
   AuthAdminOrgSettingsRoute: typeof AuthAdminOrgSettingsRoute
   AuthAdminRateLimitsRoute: typeof AuthAdminRateLimitsRoute
   AuthAdminSecurityRoute: typeof AuthAdminSecurityRoute
@@ -1150,6 +1170,7 @@ const AuthAdminRouteChildren: AuthAdminRouteChildren = {
   AuthAdminIntegrationsRoute: AuthAdminIntegrationsRoute,
   AuthAdminMembersRoute: AuthAdminMembersRoute,
   AuthAdminModelsRoute: AuthAdminModelsRoute,
+  AuthAdminOnboardingRoute: AuthAdminOnboardingRoute,
   AuthAdminOrgSettingsRoute: AuthAdminOrgSettingsRoute,
   AuthAdminRateLimitsRoute: AuthAdminRateLimitsRoute,
   AuthAdminSecurityRoute: AuthAdminSecurityRoute,
