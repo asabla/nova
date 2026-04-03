@@ -7,7 +7,7 @@ import { generateImage } from "../image-generation";
  */
 export function createImageGenerateTool(orgId: string) {
   return tool({
-    name: "image_generate",
+      name: "image_generate",
     description:
       "Generate an image from a text description. Use when the user asks you to create, draw, design, or generate an image, illustration, icon, diagram, or any visual content. " +
       "Provide a detailed, descriptive prompt for best results. The generated image will be displayed inline in the chat.",
@@ -31,7 +31,7 @@ export function createImageGenerateTool(orgId: string) {
           description: "Image quality level (default: auto)",
         },
       },
-      required: ["prompt"],
+      required: ["prompt", "size", "quality"],
       additionalProperties: false,
     },
     execute: async (args: unknown) => {

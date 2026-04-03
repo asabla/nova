@@ -96,7 +96,7 @@ export const webSearchTool = tool({
       query: { type: "string", description: "The search query" },
       maxResults: { type: "number", description: "Maximum number of results to return (default 5)" },
     },
-    required: ["query"],
+    required: ["query", "maxResults"],
     additionalProperties: false,
   },
   execute: async (args: unknown) => {
@@ -372,7 +372,7 @@ export const codeExecuteTool = tool({
  */
 export function createSearchWorkspaceTool(orgId: string) {
   return tool({
-    name: "search_workspace",
+      name: "search_workspace",
     description:
       "Search the workspace for information across past conversations, messages, knowledge base documents, and files. " +
       "Supports keyword (full-text) and semantic (embedding-based) search, plus date range filtering. " +
@@ -766,7 +766,7 @@ const readFileTool = tool({
  */
 export function createQueryKnowledgeTool(orgId: string, collectionIds: string[]) {
   return tool({
-    name: "query_knowledge",
+      name: "query_knowledge",
     description:
       "Search the attached knowledge collections by text similarity. Returns relevant document chunks ranked by relevance. " +
       "Use this to find information from the user's internal knowledge base. " +
