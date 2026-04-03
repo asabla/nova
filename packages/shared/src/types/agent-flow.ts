@@ -54,6 +54,8 @@ export interface PlanNodeResult {
 export interface PlanNode {
   id: string;
   description: string;
+  /** Short, user-friendly summary of what this step does. Falls back to description if absent. */
+  userDescription?: string;
   tools?: string[];
   /** IDs of nodes that must complete before this one can start. */
   dependencies: string[];

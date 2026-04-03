@@ -51,6 +51,39 @@ export function budgetGuard() {
           ),
         );
 
+      // --- Model access enforcement ---
+      // Check if any group restricts which models the user can access.
+      // Union semantics: if ANY group allows the model, access is granted.
+      const groupsWithModelRestrictions = userGroups.filter(
+        (g) => Array.isArray((g as any).modelAccess) && ((g as any).modelAccess as string[]).length > 0,
+      );
+
+      if (groupsWithModelRestrictions.length > 0) {
+        // Try to extract the requested model from the request body
+        let requestedModel: string | undefined;
+        try {
+          const cloned = c.req.raw.clone();
+          const body = await cloned.json();
+          requestedModel = body?.model ?? body?.modelId;
+        } catch { /* not JSON or no model field — skip check */ }
+
+        if (requestedModel) {
+          const allowedByAnyGroup = groupsWithModelRestrictions.some((g) => {
+            const allowed = (g as any).modelAccess as string[];
+            // Check against both UUID and external model name
+            return allowed.includes(requestedModel!);
+          });
+
+          if (!allowedByAnyGroup) {
+            throw AppError.forbidden(
+              `Model "${requestedModel}" is not allowed for your group(s). ` +
+              `Contact your organization admin to update model access permissions.`,
+            );
+          }
+        }
+      }
+
+      // --- Budget limits enforcement ---
       // Check each group's limits
       const startOfMonth = new Date();
       startOfMonth.setDate(1);

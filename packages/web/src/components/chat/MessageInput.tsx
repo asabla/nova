@@ -11,6 +11,7 @@ import { MentionPopup, useMentionTrigger, type MentionCandidate } from "./Mentio
 import { SlashCommand, getSlashCommand } from "./SlashCommand";
 import { useSlashCommandTrigger } from "./useSlashCommandTrigger";
 import { HelpDialog } from "./HelpDialog";
+import { PromptPickerDialog } from "./PromptPickerDialog";
 import { Dialog } from "../ui/Dialog";
 import { NewResearchForm, type NewResearchFormSubmitData } from "../research/NewResearchForm";
 import { api } from "../../lib/api";
@@ -69,6 +70,7 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [promptPickerOpen, setPromptPickerOpen] = useState(false);
   const [researchModalOpen, setResearchModalOpen] = useState(false);
   const [researchDismissed, setResearchDismissed] = useState(false);
 
@@ -189,7 +191,11 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
       const def = getSlashCommand(command);
       if (!def) return;
 
-      if (def.clientOnly) {
+      if (command === "/prompt") {
+        setContent("");
+        saveDraft("");
+        setPromptPickerOpen(true);
+      } else if (def.clientOnly) {
         if (command === "/help") {
           setContent("");
           saveDraft("");
@@ -560,6 +566,18 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
       </div>
 
       <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
+
+      {/* Prompt template picker */}
+      <PromptPickerDialog
+        open={promptPickerOpen}
+        onClose={() => setPromptPickerOpen(false)}
+        onSelect={(templateContent) => {
+          setContent(templateContent);
+          saveDraft(templateContent);
+          setPromptPickerOpen(false);
+          requestAnimationFrame(() => textareaRef.current?.focus());
+        }}
+      />
 
       {/* Deep Research modal */}
       <Dialog

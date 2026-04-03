@@ -64,15 +64,16 @@ function PlanNodeRow({ node, depth = 0, allNodes, onRetryStep }: { node: PlanNod
             )}
           </span>
 
-          {/* Description */}
+          {/* Description — prefer user-friendly version when available */}
           <span
             className={clsx(
               "text-sm flex-1 min-w-0 truncate",
               node.status === "completed" ? "text-text-secondary line-through" : "text-text",
               node.status === "running" && "font-medium",
             )}
+            title={node.description}
           >
-            {node.description}
+            {node.userDescription || node.description}
           </span>
 
           {/* Sub-plan badge */}

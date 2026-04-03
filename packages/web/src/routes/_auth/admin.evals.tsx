@@ -404,6 +404,7 @@ function SystemPromptsTab() {
 
 function PromptVersionList({ slug }: { slug: string }) {
   const queryClient = useQueryClient();
+  const [inspectContent, setInspectContent] = useState<{ version: number; content: string } | null>(null);
 
   const { data: versions } = useQuery({
     queryKey: ["evals-prompt-versions", slug],
@@ -449,7 +450,14 @@ function PromptVersionList({ slug }: { slug: string }) {
                 <span className="text-xs text-[var(--color-text-secondary)]">{v.trafficPct}% traffic</span>
               )}
             </div>
-            <div className="text-xs text-[var(--color-text-secondary)] mt-1 truncate">{v.content.slice(0, 120)}...</div>
+            <button
+              type="button"
+              onClick={() => setInspectContent({ version: v.version, content: v.content })}
+              className="text-xs text-[var(--color-text-secondary)] mt-1 truncate block max-w-full text-left hover:text-[var(--color-text-primary)] hover:underline cursor-pointer"
+              title="Click to view full prompt"
+            >
+              {v.content.slice(0, 120)}{v.content.length > 120 ? "..." : ""}
+            </button>
             {v.avgScore && (
               <div className="text-xs mt-1">
                 Score: <span className="font-medium">{Math.round(parseFloat(v.avgScore) * 100)}%</span>
@@ -491,6 +499,20 @@ function PromptVersionList({ slug }: { slug: string }) {
       {(versions ?? []).length === 0 && (
         <div className="text-xs text-[var(--color-text-secondary)]">No versions found.</div>
       )}
+
+      {/* Full prompt inspection dialog */}
+      <Dialog
+        open={!!inspectContent}
+        onClose={() => setInspectContent(null)}
+        title={inspectContent ? `Prompt — Version ${inspectContent.version}` : ""}
+        size="lg"
+      >
+        {inspectContent && (
+          <pre className="text-sm text-[var(--color-text-primary)] bg-[var(--color-bg-secondary)] rounded-lg p-4 overflow-auto max-h-[60vh] whitespace-pre-wrap font-mono leading-relaxed">
+            {inspectContent.content}
+          </pre>
+        )}
+      </Dialog>
     </div>
   );
 }

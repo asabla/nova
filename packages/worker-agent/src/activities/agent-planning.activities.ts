@@ -40,13 +40,15 @@ Respond with ONLY valid JSON:
   "nodes": [
     {
       "id": "step-1",
-      "description": "What to do in this step",
+      "description": "Detailed technical instruction for the agent executing this step",
+      "userDescription": "Short, plain-language summary of what this step does (shown to the user)",
       "tools": ["tool_name"],
       "dependencies": []
     },
     {
       "id": "step-2",
-      "description": "Next step",
+      "description": "Detailed technical instruction for the next step",
+      "userDescription": "Plain-language summary for the user",
       "tools": ["tool_name"],
       "dependencies": ["step-1"]
     }
@@ -55,6 +57,8 @@ Respond with ONLY valid JSON:
 
 Rules:
 - Use IDs like "step-1", "step-2", etc.
+- "description" should contain detailed, technical instructions for the agent (what to do, what to pass, expected output).
+- "userDescription" should be a short, non-technical summary understandable by end users (e.g. "Search the web for recent articles" instead of "Execute web_search tool with query parameters extracted from user intent").
 - "dependencies" is an array of step IDs that must complete before this step can start.
 - The first step(s) always have "dependencies": [].
 - Keep plans concise: 2-8 nodes maximum.
@@ -205,6 +209,7 @@ ${parallelInstructions}`,
     const nodes: PlanNode[] = (parsed.nodes ?? []).map((n: any, i: number) => ({
       id: n.id ?? `step-${i + 1}`,
       description: n.description ?? "",
+      userDescription: n.userDescription || undefined,
       tools: Array.isArray(n.tools) ? n.tools : undefined,
       dependencies: Array.isArray(n.dependencies) ? n.dependencies : [],
       status: "pending" as const,
