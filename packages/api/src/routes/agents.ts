@@ -8,6 +8,7 @@ import { writeAuditLog } from "../services/audit.service";
 import { parsePagination, AppError } from "@nova/shared/utils";
 import { db } from "../lib/db";
 import { agentStarterTemplates, promptTemplates } from "@nova/shared/schemas";
+import { requireRole, assertOwnerOrAdmin } from "../middleware/rbac";
 
 const agentRoutes = new Hono<AppContext>();
 
@@ -42,7 +43,7 @@ const createAgentSchema = z.object({
   effortLevel: z.enum(["low", "medium", "high"]).optional(),
 });
 
-agentRoutes.post("/", async (c) => {
+agentRoutes.post("/", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const { defaultTier, effortLevel, ...rest } = createAgentSchema.parse(await c.req.json());
@@ -81,8 +82,16 @@ const updateAgentSchema = z.object({
   effortLevel: z.enum(["low", "medium", "high"]).optional(),
 }).passthrough();
 
-agentRoutes.patch("/:id", async (c) => {
+agentRoutes.patch("/:id", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const userRole = c.get("userRole");
+
+  // Ownership check: only owner or org-admin can update
+  const existing = await agentService.get(orgId, c.req.param("id"));
+  if (!existing) throw AppError.notFound("Agent not found");
+  assertOwnerOrAdmin(userRole, userId, existing.ownerId);
+
   const rawBody = await c.req.json();
   const result = updateAgentSchema.safeParse(rawBody);
   if (!result.success) {
@@ -107,16 +116,22 @@ agentRoutes.patch("/:id", async (c) => {
   return c.json(agent);
 });
 
-agentRoutes.delete("/:id", async (c) => {
+agentRoutes.delete("/:id", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
+  const userRole = c.get("userRole");
+
+  const existing = await agentService.get(orgId, c.req.param("id"));
+  if (!existing) throw AppError.notFound("Agent not found");
+  assertOwnerOrAdmin(userRole, userId, existing.ownerId);
+
   await agentService.delete(orgId, c.req.param("id"));
   await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "agent.delete", resourceType: "agent", resourceId: c.req.param("id") });
   return c.body(null, 204);
 });
 
 // Clone agent
-agentRoutes.post("/:id/clone", async (c) => {
+agentRoutes.post("/:id/clone", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const original = await agentService.get(orgId, c.req.param("id"));
@@ -135,7 +150,7 @@ agentRoutes.post("/:id/clone", async (c) => {
 });
 
 // Set webhook URL
-agentRoutes.patch("/:id/webhook", async (c) => {
+agentRoutes.patch("/:id/webhook", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const { webhookUrl } = z.object({ webhookUrl: z.string().url().nullable() }).parse(await c.req.json());
   const agent = await agentService.update(orgId, c.req.param("id"), { webhookUrl });
@@ -143,7 +158,7 @@ agentRoutes.patch("/:id/webhook", async (c) => {
 });
 
 // Set cron schedule
-agentRoutes.patch("/:id/schedule", async (c) => {
+agentRoutes.patch("/:id/schedule", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const { cronSchedule } = z.object({ cronSchedule: z.string().max(100).nullable() }).parse(await c.req.json());
   const agent = await agentService.update(orgId, c.req.param("id"), { cronSchedule });
@@ -151,7 +166,7 @@ agentRoutes.patch("/:id/schedule", async (c) => {
 });
 
 // Trigger agent execution manually
-agentRoutes.post("/:id/trigger", async (c) => {
+agentRoutes.post("/:id/trigger", requireRole("member"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const { input } = z.object({ input: z.string().optional() }).parse(await c.req.json());
@@ -178,7 +193,7 @@ agentRoutes.get("/marketplace/browse", async (c) => {
 });
 
 // Publish agent to marketplace
-agentRoutes.post("/:id/publish", async (c) => {
+agentRoutes.post("/:id/publish", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const body = await c.req.json().catch(() => ({}));
@@ -189,7 +204,7 @@ agentRoutes.post("/:id/publish", async (c) => {
 });
 
 // Unpublish agent
-agentRoutes.post("/:id/unpublish", async (c) => {
+agentRoutes.post("/:id/unpublish", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const agent = await agentService.update(orgId, c.req.param("id"), { isPublished: false });
   return c.json(agent);
@@ -206,7 +221,7 @@ agentRoutes.post("/marketplace/:id/install", async (c) => {
 });
 
 // Create a version snapshot
-agentRoutes.post("/:id/version", async (c) => {
+agentRoutes.post("/:id/version", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const agent = await agentService.get(orgId, c.req.param("id"));
@@ -238,7 +253,7 @@ agentRoutes.get("/:id/versions", async (c) => {
 });
 
 // Test agent with sample prompt
-agentRoutes.post("/:id/test", async (c) => {
+agentRoutes.post("/:id/test", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const agent = await agentService.get(orgId, c.req.param("id"));
   if (!agent) throw AppError.notFound("Agent not found");
@@ -276,7 +291,7 @@ const bulkAgentSchema = z.object({
   newOwnerId: z.string().uuid().optional(),
 });
 
-agentRoutes.post("/bulk", async (c) => {
+agentRoutes.post("/bulk", requireRole("org-admin"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const { agentIds, action, newOwnerId } = bulkAgentSchema.parse(await c.req.json());
@@ -328,7 +343,7 @@ agentRoutes.get("/:id/starters", async (c) => {
   return c.json({ data: rows.map((r) => ({ ...r.template, sortOrder: r.sortOrder })) });
 });
 
-agentRoutes.post("/:id/starters", async (c) => {
+agentRoutes.post("/:id/starters", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const agentId = c.req.param("id");
   const { promptTemplateId, sortOrder } = z.object({
@@ -345,7 +360,7 @@ agentRoutes.post("/:id/starters", async (c) => {
   return c.json(row ?? { agentId, promptTemplateId }, 201);
 });
 
-agentRoutes.delete("/:id/starters/:templateId", async (c) => {
+agentRoutes.delete("/:id/starters/:templateId", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const agentId = c.req.param("id");
   const templateId = c.req.param("templateId");
@@ -361,7 +376,7 @@ agentRoutes.delete("/:id/starters/:templateId", async (c) => {
   return c.body(null, 204);
 });
 
-agentRoutes.patch("/:id/starters/reorder", async (c) => {
+agentRoutes.patch("/:id/starters/reorder", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const agentId = c.req.param("id");
   const { templateIds } = z.object({

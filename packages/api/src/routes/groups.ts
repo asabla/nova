@@ -8,6 +8,7 @@ import { groups, groupMemberships, usageStats } from "@nova/shared/schemas";
 import { userProfiles, users } from "@nova/shared/schemas";
 import { writeAuditLog } from "../services/audit.service";
 import { AppError } from "@nova/shared/utils";
+import { requireRole } from "../middleware/rbac";
 
 const groupRoutes = new Hono<AppContext>();
 
@@ -60,7 +61,7 @@ const createGroupSchema = z.object({
   dataRetentionDays: z.number().int().positive().optional(),
 });
 
-groupRoutes.post("/", zValidator("json", createGroupSchema), async (c) => {
+groupRoutes.post("/", requireRole("org-admin"), zValidator("json", createGroupSchema), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const data = c.req.valid("json");
@@ -84,7 +85,7 @@ groupRoutes.post("/", zValidator("json", createGroupSchema), async (c) => {
 
 const updateGroupSchema = createGroupSchema.partial();
 
-groupRoutes.patch("/:id", zValidator("json", updateGroupSchema), async (c) => {
+groupRoutes.patch("/:id", requireRole("org-admin"), zValidator("json", updateGroupSchema), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const data = c.req.valid("json");
@@ -109,7 +110,7 @@ groupRoutes.patch("/:id", zValidator("json", updateGroupSchema), async (c) => {
   return c.json(group);
 });
 
-groupRoutes.delete("/:id", async (c) => {
+groupRoutes.delete("/:id", requireRole("org-admin"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
 
@@ -161,6 +162,7 @@ groupRoutes.get("/:id/members", async (c) => {
 // Add member to group
 groupRoutes.post(
   "/:id/members",
+  requireRole("org-admin"),
   zValidator("json", z.object({ userId: z.string().uuid() })),
   async (c) => {
     const orgId = c.get("orgId");
@@ -191,7 +193,7 @@ groupRoutes.post(
 );
 
 // Remove member from group
-groupRoutes.delete("/:id/members/:userId", async (c) => {
+groupRoutes.delete("/:id/members/:userId", requireRole("org-admin"), async (c) => {
   const orgId = c.get("orgId");
   const actorId = c.get("userId");
   const groupId = c.req.param("id");
@@ -249,7 +251,7 @@ const modelAccessSchema = z.object({
   allowedModels: z.array(z.string().min(1)).min(0),
 });
 
-groupRoutes.patch("/:id/model-access", zValidator("json", modelAccessSchema), async (c) => {
+groupRoutes.patch("/:id/model-access", requireRole("org-admin"), zValidator("json", modelAccessSchema), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const groupId = c.req.param("id");
@@ -313,7 +315,7 @@ const spendingLimitsSchema = z.object({
   storageQuotaMb: z.number().int().positive().nullable().optional(),
 });
 
-groupRoutes.patch("/:id/spending-limits", zValidator("json", spendingLimitsSchema), async (c) => {
+groupRoutes.patch("/:id/spending-limits", requireRole("org-admin"), zValidator("json", spendingLimitsSchema), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const groupId = c.req.param("id");

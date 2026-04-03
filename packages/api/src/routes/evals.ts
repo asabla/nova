@@ -6,6 +6,7 @@ import type { AppContext } from "../types/context";
 import { AppError } from "@nova/shared/utils";
 import { getTemporalClient } from "../lib/temporal";
 import * as evalService from "../services/eval.service";
+import { requireRole } from "../middleware/rbac";
 
 const evalRoutes = new Hono<AppContext>();
 
@@ -60,7 +61,7 @@ evalRoutes.get("/dimensions", async (c) => {
   return c.json(data);
 });
 
-evalRoutes.put("/dimensions/:id", zValidator("json", z.object({
+evalRoutes.put("/dimensions/:id", requireRole("org-admin"), zValidator("json", z.object({
   weight: z.string().regex(/^\d\.\d{1,2}$/).optional(),
   isEnabled: z.boolean().optional(),
 })), async (c) => {
@@ -87,7 +88,7 @@ evalRoutes.get("/prompts/:slug/versions", async (c) => {
   return c.json(data);
 });
 
-evalRoutes.post("/prompts/:slug/versions/:id/approve", async (c) => {
+evalRoutes.post("/prompts/:slug/versions/:id/approve", requireRole("org-admin"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const result = await evalService.approvePromptVersion(orgId, c.req.param("slug"), c.req.param("id"), userId);
@@ -95,21 +96,21 @@ evalRoutes.post("/prompts/:slug/versions/:id/approve", async (c) => {
   return c.json(result);
 });
 
-evalRoutes.post("/prompts/:slug/versions/:id/reject", async (c) => {
+evalRoutes.post("/prompts/:slug/versions/:id/reject", requireRole("org-admin"), async (c) => {
   const orgId = c.get("orgId");
   const result = await evalService.rejectPromptVersion(orgId, c.req.param("id"));
   if (!result) throw AppError.notFound("Version not found");
   return c.json(result);
 });
 
-evalRoutes.post("/prompts/:slug/versions/:id/deploy", async (c) => {
+evalRoutes.post("/prompts/:slug/versions/:id/deploy", requireRole("org-admin"), async (c) => {
   const orgId = c.get("orgId");
   const result = await evalService.deployPromptVersion(orgId, c.req.param("slug"), c.req.param("id"));
   if (!result) throw AppError.notFound("Prompt or version not found");
   return c.json(result);
 });
 
-evalRoutes.patch("/prompts/:slug/versions/:id/traffic", zValidator("json", z.object({
+evalRoutes.patch("/prompts/:slug/versions/:id/traffic", requireRole("org-admin"), zValidator("json", z.object({
   trafficPct: z.number().int().min(0).max(100),
 })), async (c) => {
   const orgId = c.get("orgId");
@@ -129,7 +130,7 @@ evalRoutes.get("/optimizations", async (c) => {
   return c.json(data);
 });
 
-evalRoutes.post("/optimizations", zValidator("json", z.object({
+evalRoutes.post("/optimizations", requireRole("org-admin"), zValidator("json", z.object({
   slug: z.string().min(1),
 })), async (c) => {
   const orgId = c.get("orgId");
@@ -160,7 +161,7 @@ evalRoutes.get("/settings", async (c) => {
   return c.json(data);
 });
 
-evalRoutes.put("/settings", zValidator("json", z.record(z.string(), z.string())), async (c) => {
+evalRoutes.put("/settings", requireRole("org-admin"), zValidator("json", z.record(z.string(), z.string())), async (c) => {
   const orgId = c.get("orgId");
   const body = c.req.valid("json");
   await evalService.updateEvalSettings(orgId, body);

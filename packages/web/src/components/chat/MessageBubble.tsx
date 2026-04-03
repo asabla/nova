@@ -93,9 +93,21 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
   const { data: modelsData } = useQuery({
     queryKey: queryKeys.models.all,
     queryFn: () => api.get<any>("/api/models"),
-    enabled: showModelSelector,
+    staleTime: 5 * 60 * 1000,
   });
   const availableModels: any[] = (modelsData as any)?.data ?? [];
+
+  // Resolve model display name from models data instead of string-manipulating the raw ID
+  const modelDisplayName = useMemo(() => {
+    if (!message.modelId) return null;
+    const model = availableModels.find((m: any) => m.id === message.modelId || m.modelIdExternal === message.modelId);
+    if (model) return model.name;
+    // If the ID looks like a known model name (not a UUID), format it
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-/.test(message.modelId)) {
+      return message.modelId.replace(/^(claude-|gpt-|gemini-)/, "").split("-").slice(0, 2).join("-");
+    }
+    return null; // Hide badge for unresolvable UUIDs
+  }, [message.modelId, availableModels]);
 
   // Close model selector on outside click
   useEffect(() => {
@@ -214,7 +226,10 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
     <div className={clsx(
       "group flex gap-3 py-3",
       isAssistant && "bg-surface-secondary/50 -mx-2 px-5 rounded-xl",
-      isUser && "px-4",
+      isAssistant && message.metadata?.tier === "direct" && "border-l-2 border-success/40",
+      isAssistant && message.metadata?.tier === "sequential" && "border-l-2 border-primary/40",
+      isAssistant && message.metadata?.tier === "orchestrated" && "border-l-2 border-warning/40",
+      isUser && "px-4 flex-row-reverse",
     )}>
       <div className="shrink-0 mt-0.5">
         {isUser ? (
@@ -226,14 +241,14 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
         )}
       </div>
 
-      <div className={clsx("flex flex-col", isUser ? "max-w-[80%] items-start" : "flex-1 min-w-0")}>
+      <div className={clsx("flex flex-col", isUser ? "max-w-[80%] items-end" : "flex-1 min-w-0")}>
         {/* Sender name + timestamp header */}
-        <div className="flex items-center gap-2 mb-1">
+        <div className={clsx("flex items-center gap-2 mb-1", isUser && "flex-row-reverse")}>
           <span className="text-sm font-semibold text-text">
             {isUser ? (userName || t("messages.you", { defaultValue: "You" })) : "NOVA"}
           </span>
-          {isAssistant && message.modelId && (
-            <Badge variant="primary">{message.modelId.replace(/^(claude-|gpt-|gemini-)/, "").split("-").slice(0, 2).join("-")}</Badge>
+          {isAssistant && modelDisplayName && (
+            <Badge variant="primary">{modelDisplayName}</Badge>
           )}
           <span className="text-[10px] text-text-tertiary">{timeStr}</span>
         </div>
@@ -298,9 +313,6 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
             {/* Plan summary - persisted from execution */}
             {isAssistant && message.metadata?.plan && (
               <div className="my-1">
-                {message.metadata.tier && (
-                  <TierBadge tier={message.metadata.tier as ExecutionTier} reasoning={null} />
-                )}
                 <PlanDAGView plan={message.metadata.plan as Plan} isRunning={false} defaultCollapsed={true} onRetryStep={onRetryStep} />
               </div>
             )}
@@ -443,7 +455,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
 
         {/* Actions - visible by default on touch devices, hover-reveal on desktop */}
         {!isEditing && (
-          <div className="flex items-center gap-1 mt-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity">
+          <div className={clsx("flex items-center gap-1 mt-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100 transition-opacity", isUser && "flex-row-reverse")}>
             <button
               onClick={handleCopy}
               className="text-text-tertiary hover:text-text-secondary p-1 rounded"

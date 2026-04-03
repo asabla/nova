@@ -4,6 +4,7 @@ import { zValidator } from "../lib/validator";
 import type { AppContext } from "../types/context";
 import { promptService } from "../services/prompt.service";
 import { parsePagination } from "@nova/shared/utils";
+import { requireRole, assertOwnerOrAdmin } from "../middleware/rbac";
 
 const promptRoutes = new Hono<AppContext>();
 
@@ -68,7 +69,7 @@ const createPromptSchema = z.object({
   bgColor: z.string().max(50).optional(),
 });
 
-promptRoutes.post("/", zValidator("json", createPromptSchema), async (c) => {
+promptRoutes.post("/", requireRole("member"), zValidator("json", createPromptSchema), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const body = c.req.valid("json");
@@ -76,8 +77,14 @@ promptRoutes.post("/", zValidator("json", createPromptSchema), async (c) => {
   return c.json(prompt, 201);
 });
 
-promptRoutes.patch("/:id", async (c) => {
+promptRoutes.patch("/:id", requireRole("member"), async (c) => {
   const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const userRole = c.get("userRole");
+
+  const existing = await promptService.get(orgId, c.req.param("id"));
+  assertOwnerOrAdmin(userRole, userId, existing.ownerId);
+
   const body = z.object({
     name: z.string().min(1).max(200).optional(),
     description: z.string().max(2000).optional(),
@@ -92,8 +99,14 @@ promptRoutes.patch("/:id", async (c) => {
   return c.json(prompt);
 });
 
-promptRoutes.delete("/:id", async (c) => {
+promptRoutes.delete("/:id", requireRole("member"), async (c) => {
   const orgId = c.get("orgId");
+  const userId = c.get("userId");
+  const userRole = c.get("userRole");
+
+  const existing = await promptService.get(orgId, c.req.param("id"));
+  assertOwnerOrAdmin(userRole, userId, existing.ownerId);
+
   await promptService.delete(orgId, c.req.param("id"));
   return c.body(null, 204);
 });

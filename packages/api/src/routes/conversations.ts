@@ -11,6 +11,7 @@ import { db } from "../lib/db";
 import { userProfiles, users, agents, conversationKnowledgeCollections, knowledgeCollections } from "@nova/shared/schemas";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { getTemporalClient } from "../lib/temporal";
+import { requireRole } from "../middleware/rbac";
 
 const conversations = new Hono<AppContext>();
 
@@ -38,7 +39,7 @@ const bulkActionSchema = z.object({
     .optional(),
 });
 
-conversations.post("/bulk", zValidator("json", bulkActionSchema), async (c) => {
+conversations.post("/bulk", requireRole("member"), zValidator("json", bulkActionSchema), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const { ids, action, payload } = c.req.valid("json");
@@ -89,7 +90,7 @@ const createSchema = z.object({
   visibility: z.enum(["private", "team", "public"]).optional(),
 });
 
-conversations.post("/", zValidator("json", createSchema), async (c) => {
+conversations.post("/", requireRole("member"), zValidator("json", createSchema), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const data = c.req.valid("json");
@@ -116,7 +117,7 @@ const updateSchema = z.object({
   isArchived: z.boolean().optional(),
 });
 
-conversations.patch("/:id", zValidator("json", updateSchema), async (c) => {
+conversations.patch("/:id", requireRole("member"), zValidator("json", updateSchema), async (c) => {
   const orgId = c.get("orgId");
   const data = c.req.valid("json");
   const conversation = await conversationService.updateConversation(orgId, c.req.param("id"), data);
@@ -124,7 +125,7 @@ conversations.patch("/:id", zValidator("json", updateSchema), async (c) => {
   return c.json(conversation);
 });
 
-conversations.delete("/:id", async (c) => {
+conversations.delete("/:id", requireRole("member"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const conversation = await conversationService.deleteConversation(orgId, c.req.param("id"));

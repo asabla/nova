@@ -106,6 +106,14 @@ export function SlashCommand({ query, onSelect, onClose, position, visible }: Sl
     el?.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
 
+  // Flip to below input if menu would overflow above viewport
+  const [flipToBottom, setFlipToBottom] = useState(false);
+  useEffect(() => {
+    if (!visible || !ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    setFlipToBottom(rect.top < 0);
+  }, [visible, filtered.length]);
+
   if (!visible || filtered.length === 0) return null;
 
   return (
@@ -115,7 +123,10 @@ export function SlashCommand({ query, onSelect, onClose, position, visible }: Sl
         "absolute z-50 w-72 bg-surface border border-border rounded-xl shadow-lg overflow-hidden",
         "animate-in fade-in zoom-in-95 duration-100",
       )}
-      style={{ bottom: "100%", left: position.left, marginBottom: 8 }}
+      style={flipToBottom
+        ? { top: "100%", left: position.left, marginTop: 8 }
+        : { bottom: "100%", left: position.left, marginBottom: 8 }
+      }
     >
       <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">
         Slash Commands

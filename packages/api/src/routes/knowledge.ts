@@ -9,6 +9,7 @@ import { s3 } from "../lib/s3";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { env } from "../lib/env";
 import { listModels } from "../lib/litellm";
+import { requireRole, assertOwnerOrAdmin } from "../middleware/rbac";
 
 const knowledgeRoutes = new Hono<AppContext>();
 
@@ -47,14 +48,14 @@ const createTagSchema = z.object({
   color: z.string().max(20).optional(),
 });
 
-knowledgeRoutes.post("/tags", async (c) => {
+knowledgeRoutes.post("/tags", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const body = createTagSchema.parse(await c.req.json());
   const tag = await knowledgeService.createTag(orgId, body);
   return c.json(tag, 201);
 });
 
-knowledgeRoutes.delete("/tags/:tagId", async (c) => {
+knowledgeRoutes.delete("/tags/:tagId", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   await knowledgeService.deleteTag(orgId, c.req.param("tagId"));
   return c.body(null, 204);
@@ -87,7 +88,7 @@ const createCollectionSchema = z.object({
   embeddingModelId: z.string().uuid().optional(),
 });
 
-knowledgeRoutes.post("/", async (c) => {
+knowledgeRoutes.post("/", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const body = createCollectionSchema.parse(await c.req.json());
@@ -96,9 +97,14 @@ knowledgeRoutes.post("/", async (c) => {
   return c.json(collection, 201);
 });
 
-knowledgeRoutes.patch("/:id", async (c) => {
+knowledgeRoutes.patch("/:id", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
+  const userRole = c.get("userRole");
+
+  const existing = await knowledgeService.getCollection(orgId, c.req.param("id"));
+  assertOwnerOrAdmin(userRole, userId, existing.ownerId);
+
   const body = z.object({
     name: z.string().min(1).max(200).optional(),
     description: z.string().max(2000).optional(),
@@ -116,9 +122,14 @@ knowledgeRoutes.patch("/:id", async (c) => {
   return c.json(collection);
 });
 
-knowledgeRoutes.delete("/:id", async (c) => {
+knowledgeRoutes.delete("/:id", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
+  const userRole = c.get("userRole");
+
+  const existing = await knowledgeService.getCollection(orgId, c.req.param("id"));
+  assertOwnerOrAdmin(userRole, userId, existing.ownerId);
+
   await knowledgeService.deleteCollection(orgId, c.req.param("id"));
   await writeAuditLog({ orgId, actorId: userId, actorType: "user", action: "knowledge.collection.delete", resourceType: "knowledge_collection", resourceId: c.req.param("id") });
   return c.body(null, 204);
@@ -139,7 +150,7 @@ const addDocumentSchema = z.object({
   content: z.string().max(500_000).optional(),
 });
 
-knowledgeRoutes.post("/:id/documents", async (c) => {
+knowledgeRoutes.post("/:id/documents", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const collectionId = c.req.param("id");
@@ -159,7 +170,7 @@ knowledgeRoutes.post("/:id/documents", async (c) => {
 });
 
 // Upload files directly to a collection (multipart/form-data)
-knowledgeRoutes.post("/:id/documents/upload", async (c) => {
+knowledgeRoutes.post("/:id/documents/upload", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const collectionId = c.req.param("id");
@@ -229,20 +240,20 @@ const addDocTagSchema = z.object({
   name: z.string().min(1).max(100),
 });
 
-knowledgeRoutes.post("/:collectionId/documents/:docId/tags", async (c) => {
+knowledgeRoutes.post("/:collectionId/documents/:docId/tags", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const body = addDocTagSchema.parse(await c.req.json());
   const tag = await knowledgeService.addTagToDocument(orgId, c.req.param("docId"), body.name);
   return c.json(tag, 201);
 });
 
-knowledgeRoutes.delete("/:collectionId/documents/:docId/tags/:tagId", async (c) => {
+knowledgeRoutes.delete("/:collectionId/documents/:docId/tags/:tagId", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   await knowledgeService.removeTagFromDocument(orgId, c.req.param("docId"), c.req.param("tagId"));
   return c.body(null, 204);
 });
 
-knowledgeRoutes.delete("/:collectionId/documents/:docId", async (c) => {
+knowledgeRoutes.delete("/:collectionId/documents/:docId", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   await knowledgeService.removeDocument(orgId, c.req.param("docId"));
@@ -260,7 +271,7 @@ knowledgeRoutes.delete("/:collectionId/documents/:docId", async (c) => {
 });
 
 // Delete a document by ID (without needing collection ID in path)
-knowledgeRoutes.delete("/documents/:docId", async (c) => {
+knowledgeRoutes.delete("/documents/:docId", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   await knowledgeService.removeDocument(orgId, c.req.param("docId"));
@@ -269,7 +280,7 @@ knowledgeRoutes.delete("/documents/:docId", async (c) => {
 });
 
 // Re-index all documents in a collection
-knowledgeRoutes.post("/:id/reindex", async (c) => {
+knowledgeRoutes.post("/:id/reindex", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const collectionId = c.req.param("id");
@@ -318,7 +329,7 @@ const updateConfigSchema = z.object({
   chunkOverlap: z.number().int().min(0).optional(),
 });
 
-knowledgeRoutes.patch("/:id/config", async (c) => {
+knowledgeRoutes.patch("/:id/config", requireRole("power-user"), async (c) => {
   const orgId = c.get("orgId");
   const userId = c.get("userId");
   const body = updateConfigSchema.parse(await c.req.json());
