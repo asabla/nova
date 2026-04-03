@@ -50,7 +50,7 @@ const createM365ConnectorSchema = z.object({
   syncIntervalMinutes: z.number().int().min(60).max(1440).optional(),
   folderFilter: z.string().optional(),
   fileTypeFilter: z.array(z.string()).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 const createGitConnectorSchema = z.object({
@@ -63,7 +63,7 @@ const createGitConnectorSchema = z.object({
   syncIntervalMinutes: z.number().int().min(60).max(1440).optional(),
   includeGlobs: z.array(z.string()).optional(),
   excludeGlobs: z.array(z.string()).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 const createConnectorSchema = z.union([createM365ConnectorSchema, createGitConnectorSchema]);
@@ -143,7 +143,7 @@ const updateConnectorSchema = z.object({
   folderFilter: z.string().nullable().optional(),
   fileTypeFilter: z.array(z.string()).nullable().optional(),
   clientSecret: z.string().min(1).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 knowledgeConnectorRoutes.patch("/:collectionId/connectors/:connectorId", async (c) => {

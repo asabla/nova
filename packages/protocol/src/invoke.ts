@@ -20,7 +20,7 @@ export type EffortConfig = z.infer<typeof effortConfigSchema>;
 
 export const toolCallRecordSchema = z.object({
   toolName: z.string(),
-  input: z.record(z.unknown()),
+  input: z.record(z.string(), z.unknown()),
   output: z.unknown(),
   error: z.string().optional(),
   durationMs: z.number(),

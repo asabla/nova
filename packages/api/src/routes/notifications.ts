@@ -165,7 +165,7 @@ const emailNotificationSchema = z.object({
   subject: z.string().min(1).max(500),
   body: z.string().min(1).max(10_000),
   templateId: z.string().optional(),
-  templateVars: z.record(z.string()).optional(),
+  templateVars: z.record(z.string(), z.string()).optional(),
 });
 
 notificationsRouter.post("/email", zValidator("json", emailNotificationSchema), async (c) => {
@@ -202,7 +202,7 @@ notificationsRouter.post("/email", zValidator("json", emailNotificationSchema), 
 const webhookNotificationSchema = z.object({
   url: z.string().url(),
   event: z.string().min(1).max(200),
-  payload: z.record(z.unknown()).optional(),
+  payload: z.record(z.string(), z.unknown()).optional(),
   secret: z.string().optional(),
 });
 

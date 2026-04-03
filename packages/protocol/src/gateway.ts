@@ -18,14 +18,14 @@ export const streamToolStatusRequestSchema = z.object({
   channelId: z.string(),
   tool: z.string(),
   status: z.enum(["pending", "running", "completed", "failed", "approval_required", "timeout"]),
-  args: z.record(z.unknown()).optional(),
+  args: z.record(z.string(), z.unknown()).optional(),
   resultSummary: z.string().optional(),
 });
 
 export const streamEventRequestSchema = z.object({
   channelId: z.string(),
   type: z.string(),
-  payload: z.record(z.unknown()),
+  payload: z.record(z.string(), z.unknown()),
 });
 
 export const streamDoneRequestSchema = z.object({
@@ -54,17 +54,17 @@ export const dbCreateMessageRequestSchema = z.object({
   conversationId: z.string().uuid(),
   role: z.enum(["user", "assistant", "system", "tool"]),
   content: z.string(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const dbUpdateMessageRequestSchema = z.object({
   content: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const dbUpdateWorkflowRequestSchema = z.object({
   status: z.string(),
-  result: z.record(z.unknown()).optional(),
+  result: z.record(z.string(), z.unknown()).optional(),
   error: z.string().optional(),
 });
 
@@ -92,7 +92,7 @@ export const llmEmbeddingRequestSchema = z.object({
 export const vectorSearchRequestSchema = z.object({
   collection: z.string(),
   query: z.array(z.number()),
-  filter: z.record(z.unknown()).optional(),
+  filter: z.record(z.string(), z.unknown()).optional(),
   limit: z.number().optional(),
 });
 
@@ -101,13 +101,13 @@ export const vectorUpsertRequestSchema = z.object({
   points: z.array(z.object({
     id: z.string(),
     vector: z.array(z.number()),
-    payload: z.record(z.unknown()).optional(),
+    payload: z.record(z.string(), z.unknown()).optional(),
   })),
 });
 
 export const vectorDeleteRequestSchema = z.object({
   collection: z.string(),
-  filter: z.record(z.unknown()),
+  filter: z.record(z.string(), z.unknown()),
 });
 
 // --- Storage ---

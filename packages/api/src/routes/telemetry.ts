@@ -10,7 +10,7 @@ const frontendEventSchema = z.object({
   events: z.array(z.object({
     type: z.enum(["error", "vital", "navigation"]),
     timestamp: z.string(),
-    data: z.record(z.unknown()),
+    data: z.record(z.string(), z.unknown()),
   })).max(50),
 });
 

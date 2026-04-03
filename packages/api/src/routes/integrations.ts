@@ -43,7 +43,7 @@ const webhookConfigSchema = z.object({
 
 const upsertSchema = z.object({
   isEnabled: z.boolean().default(true),
-  config: z.record(z.unknown()),
+  config: z.record(z.string(), z.unknown()),
 });
 
 const integrationRoutes = new Hono<AppContext>();

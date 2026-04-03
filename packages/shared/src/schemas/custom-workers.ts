@@ -38,7 +38,7 @@ export const insertCustomWorkerSchema = z.object({
   isEnabled: z.boolean().default(true),
   timeoutSeconds: z.number().int().min(10).max(3600).default(300),
   fallbackToBuiltin: z.boolean().default(true),
-  config: z.record(z.unknown()).default({}),
+  config: z.record(z.string(), z.unknown()).default({}),
 });
 export const updateCustomWorkerSchema = insertCustomWorkerSchema.partial();
 

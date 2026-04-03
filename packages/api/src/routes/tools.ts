@@ -35,7 +35,7 @@ const createToolSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
   type: z.enum(["function", "openapi", "mcp"]),
-  schema: z.record(z.unknown()).optional(),
+  schema: z.record(z.string(), z.unknown()).optional(),
   endpoint: z.string().url().optional(),
 });
 

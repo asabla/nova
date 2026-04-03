@@ -55,7 +55,7 @@ orgRoutes.put("/settings", requireRole("org-admin"), async (c) => {
 orgRoutes.put("/settings/bulk", requireRole("org-admin"), async (c) => {
   const orgId = c.get("orgId");
   const { settings: settingsMap } = z.object({
-    settings: z.record(z.string()),
+    settings: z.record(z.string(), z.string()),
   }).parse(await c.req.json());
 
   for (const [key, value] of Object.entries(settingsMap)) {

@@ -43,7 +43,7 @@ const testAgentSchema = z.object({
   prompt: z.string().min(1).max(5000),
   systemPrompt: z.string().max(100_000).optional(),
   modelId: z.string().optional(),
-  modelParams: z.record(z.unknown()).optional(),
+  modelParams: z.record(z.string(), z.unknown()).optional(),
 });
 
 const generatePromptSchema = z.object({

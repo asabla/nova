@@ -24,7 +24,7 @@ agentToolRoutes.get("/:agentId/tools", async (c) => {
 
 agentToolRoutes.post(
   "/:agentId/tools",
-  zValidator("json", z.object({ toolId: z.string().uuid(), configOverrides: z.record(z.any()).optional() })),
+  zValidator("json", z.object({ toolId: z.string().uuid(), configOverrides: z.record(z.string(), z.any()).optional() })),
   async (c) => {
     const orgId = c.get("orgId");
     const agentId = c.req.param("agentId");
@@ -120,7 +120,7 @@ agentToolRoutes.get("/:agentId/skills", async (c) => {
 
 agentToolRoutes.post(
   "/:agentId/skills",
-  zValidator("json", z.object({ skillName: z.string().min(1), config: z.record(z.any()).optional() })),
+  zValidator("json", z.object({ skillName: z.string().min(1), config: z.record(z.string(), z.any()).optional() })),
   async (c) => {
     const orgId = c.get("orgId");
     const agentId = c.req.param("agentId");

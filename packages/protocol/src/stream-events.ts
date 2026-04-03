@@ -19,7 +19,7 @@ export const toolStatusEventSchema = z.object({
   type: z.literal("tool_status"),
   tool: z.string(),
   status: z.enum(["pending", "running", "completed", "failed", "approval_required", "timeout"]),
-  args: z.record(z.unknown()).optional(),
+  args: z.record(z.string(), z.unknown()).optional(),
   resultSummary: z.string().optional(),
 });
 

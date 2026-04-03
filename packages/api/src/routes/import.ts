@@ -24,7 +24,7 @@ const importRoutes = new Hono<AppContext>();
 const chatgptImportSchema = z.array(
   z.object({
     title: z.string().optional(),
-    mapping: z.record(z.any()).optional(),
+    mapping: z.record(z.string(), z.any()).optional(),
     create_time: z.number().optional(),
   }).passthrough(),
 ).min(1, "Expected a non-empty array of conversations");

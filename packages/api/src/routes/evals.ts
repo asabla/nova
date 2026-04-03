@@ -160,7 +160,7 @@ evalRoutes.get("/settings", async (c) => {
   return c.json(data);
 });
 
-evalRoutes.put("/settings", zValidator("json", z.record(z.string())), async (c) => {
+evalRoutes.put("/settings", zValidator("json", z.record(z.string(), z.string())), async (c) => {
   const orgId = c.get("orgId");
   const body = c.req.valid("json");
   await evalService.updateEvalSettings(orgId, body);

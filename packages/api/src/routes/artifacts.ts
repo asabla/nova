@@ -31,7 +31,7 @@ const createSchema = z.object({
   content: z.string().optional(),
   fileId: z.string().uuid().optional(),
   language: z.string().max(50).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 // Create artifact manually
@@ -58,7 +58,7 @@ artifactRoutes.post("/artifacts", async (c) => {
 // Update artifact content/metadata
 const updateSchema = z.object({
   content: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 artifactRoutes.patch("/artifacts/:id", async (c) => {
