@@ -11,6 +11,15 @@ bun.lock
 .env.local
 .env.*.local
 
+# Compiled JS artifacts (tsc output outside dist/)
+*.js.map
+packages/*/src/**/*.js
+packages/*/tests/**/*.js
+scripts/*.js
+playwright.config.js
+packages/*/drizzle.config.js
+packages/*/scripts/*.js
+
 # Other
 *.log
 .DS_Store
