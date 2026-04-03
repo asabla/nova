@@ -46,7 +46,7 @@ services:
     environment:
       RUSTFS_ROOT_USER: minioadmin
       RUSTFS_ROOT_PASSWORD: minioadmin
-      RUSTFS_OBS_ENDPOINT: nova-alloy:4317
+      RUSTFS_OBS_ENDPOINT: http://nova-alloy:4317
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"

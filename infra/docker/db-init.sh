@@ -92,7 +92,7 @@ console.log('  Better Auth tables ensured.');
 echo "[2/3] Seeding database..."
 bun run src/lib/seed.ts
 
-echo "[3/3] Ensuring MinIO bucket..."
+echo "[3/3] Ensuring S3 bucket..."
 bun run /app/db-init-bucket.ts
 
 echo "=== DB Init complete ==="
