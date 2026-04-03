@@ -7,7 +7,7 @@ import { logger } from "../lib/logger";
 import type { AppContext } from "../types/context";
 import { db } from "../lib/db";
 import { env } from "../lib/env";
-import { ssoProviders, ssoSessions } from "@nova/shared/schemas";
+import { ssoProviders, ssoSessions, groups, groupMemberships } from "@nova/shared/schemas";
 import { users, userProfiles, sessions, organisations, orgSettings } from "@nova/shared/schemas";
 import { writeAuditLog } from "../services/audit.service";
 import { AppError } from "@nova/shared/utils";
@@ -43,7 +43,7 @@ function getProviderConfig(provider: SupportedProvider): OAuthProviderConfig | n
         authorizeUrl: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`,
         tokenUrl: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
         userInfoUrl: "https://graph.microsoft.com/v1.0/me",
-        scopes: ["openid", "profile", "email", "User.Read"],
+        scopes: ["openid", "profile", "email", "User.Read", "GroupMember.Read.All"],
         mapProfile: (data) => ({
           externalId: (data.id ?? data.sub) as string,
           email: (data.mail ?? data.userPrincipalName) as string,
@@ -89,6 +89,68 @@ function getProviderConfig(provider: SupportedProvider): OAuthProviderConfig | n
     default:
       return null;
   }
+}
+
+/**
+ * Sync Azure AD group memberships for a user after SSO login.
+ * Fetches the user's group memberships from Microsoft Graph and maps them
+ * to Nova groups via the ssoGroupId field.
+ */
+async function syncAzureADGroups(accessToken: string, userId: string, orgId: string): Promise<void> {
+  // Fetch user's group memberships from Microsoft Graph
+  const res = await fetch("https://graph.microsoft.com/v1.0/me/memberOf?$select=id,displayName,@odata.type", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!res.ok) {
+    logger.warn({ status: res.status }, "Failed to fetch Azure AD group memberships");
+    return;
+  }
+
+  const data = (await res.json()) as { value: Array<{ "@odata.type": string; id: string; displayName: string }> };
+  const adGroups = (data.value ?? []).filter((v) => v["@odata.type"] === "#microsoft.graph.group");
+
+  if (adGroups.length === 0) return;
+
+  const adGroupIds = adGroups.map((g) => g.id);
+
+  // Find Nova groups in this org that have a matching ssoGroupId
+  const novaGroups = await db
+    .select({ id: groups.id, ssoGroupId: groups.ssoGroupId })
+    .from(groups)
+    .where(and(eq(groups.orgId, orgId), isNull(groups.deletedAt)));
+
+  const mappedGroups = novaGroups.filter((g) => g.ssoGroupId && adGroupIds.includes(g.ssoGroupId));
+
+  if (mappedGroups.length === 0) return;
+
+  // Get current Nova group memberships for this user
+  const currentMemberships = await db
+    .select({ groupId: groupMemberships.groupId })
+    .from(groupMemberships)
+    .where(and(eq(groupMemberships.userId, userId), eq(groupMemberships.orgId, orgId), isNull(groupMemberships.deletedAt)));
+
+  const currentGroupIds = new Set(currentMemberships.map((m) => m.groupId));
+  const targetGroupIds = new Set(mappedGroups.map((g) => g.id));
+
+  // Add missing memberships
+  for (const groupId of targetGroupIds) {
+    if (!currentGroupIds.has(groupId)) {
+      await db.insert(groupMemberships).values({ groupId, userId, orgId }).onConflictDoNothing();
+    }
+  }
+
+  // Remove memberships for SSO-mapped groups the user is no longer in
+  const ssoMappedGroupIds = new Set(novaGroups.filter((g) => g.ssoGroupId).map((g) => g.id));
+  for (const groupId of currentGroupIds) {
+    if (ssoMappedGroupIds.has(groupId) && !targetGroupIds.has(groupId)) {
+      await db.update(groupMemberships).set({ deletedAt: new Date() })
+        .where(and(eq(groupMemberships.groupId, groupId), eq(groupMemberships.userId, userId), eq(groupMemberships.orgId, orgId), isNull(groupMemberships.deletedAt)));
+    }
+  }
+
+  logger.info({ userId, orgId, synced: mappedGroups.length }, "Azure AD group sync completed");
 }
 
 // In-memory state store for CSRF protection (use Redis in production)
@@ -434,6 +496,15 @@ ssoOAuthRoutes.get("/:provider/callback", async (c) => {
           ? new Date(Date.now() + (tokenData.expires_in as number) * 1000)
           : null,
       });
+    }
+
+    // ── Step 5.5: Sync Azure AD group memberships ──
+    if (provider === "azure-ad" && ssoProviderRow && accessToken) {
+      try {
+        await syncAzureADGroups(accessToken, userId, ssoProviderRow.orgId);
+      } catch (err) {
+        logger.warn({ err, userId, provider }, "Azure AD group sync failed (non-blocking)");
+      }
     }
 
     // ── Step 6: Audit log ──
