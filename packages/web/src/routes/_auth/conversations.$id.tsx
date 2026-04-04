@@ -267,6 +267,9 @@ function ConversationPage() {
     try {
       // First, save the edit (storing old content in history)
       await api.patch(`/api/conversations/${id}/messages/${messageId}`, { content });
+
+      // Truncate all messages after this one (hides old responses)
+      await api.post(`/api/conversations/${id}/messages/${messageId}/truncate-after`);
       await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
 
       // Then trigger a re-run using all messages up to and including the edited one
@@ -304,7 +307,30 @@ function ConversationPage() {
     if (!msg) return;
 
     const idx = messages.indexOf(msg);
-    const previousMessages = messages.slice(0, idx + 1);
+
+    // For user messages: truncate everything after (including old assistant response), then re-stream
+    // For assistant messages: truncate this message and everything after, then re-stream
+    const truncateFromId = msg.senderType === "user" ? messageId : messageId;
+    const previousMessages = msg.senderType === "user"
+      ? messages.slice(0, idx + 1) // include the user message
+      : messages.slice(0, idx);     // exclude the assistant message being rerun
+
+    // Soft-delete messages after the truncation point
+    try {
+      if (msg.senderType === "user") {
+        await api.post(`/api/conversations/${id}/messages/${messageId}/truncate-after`);
+      } else {
+        // For assistant rerun, find the preceding user message and truncate from there
+        const prevUserMsg = messages.slice(0, idx).reverse().find((m: any) => m.senderType === "user");
+        if (prevUserMsg) {
+          await api.post(`/api/conversations/${id}/messages/${prevUserMsg.id}/truncate-after`);
+        }
+      }
+      await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
+    } catch {
+      // Non-blocking — continue with rerun even if truncation fails
+    }
+
     const modelParams = getModelParams();
 
     const apiUrl = import.meta.env.VITE_API_URL ?? "";

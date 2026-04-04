@@ -1142,6 +1142,15 @@ messagesRouter.delete("/:conversationId/messages", async (c) => {
   return c.json({ ok: true, deleted: count });
 });
 
+// Delete all messages after a given message (for rerun/branching)
+messagesRouter.post("/:conversationId/messages/:messageId/truncate-after", async (c) => {
+  const orgId = c.get("orgId");
+  const conversationId = c.req.param("conversationId");
+  const messageId = c.req.param("messageId");
+  const count = await messageService.deleteMessagesAfter(orgId, conversationId, messageId);
+  return c.json({ ok: true, deleted: count });
+});
+
 messagesRouter.delete("/:conversationId/messages/:messageId", async (c) => {
   const orgId = c.get("orgId");
   const message = await messageService.deleteMessage(orgId, c.req.param("messageId"));

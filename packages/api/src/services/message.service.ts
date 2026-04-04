@@ -221,6 +221,33 @@ export async function deleteMessage(orgId: string, messageId: string) {
   return result[0] ?? null;
 }
 
+/**
+ * Soft-delete all messages in a conversation that were created after a given message.
+ * Used for rerun/edit-and-rerun to hide old responses before generating new ones.
+ */
+export async function deleteMessagesAfter(orgId: string, conversationId: string, afterMessageId: string) {
+  // Get the target message's createdAt timestamp
+  const [target] = await db.select({ createdAt: messages.createdAt })
+    .from(messages)
+    .where(and(eq(messages.id, afterMessageId), eq(messages.conversationId, conversationId), eq(messages.orgId, orgId)));
+
+  if (!target) return 0;
+
+  const result = await db
+    .update(messages)
+    .set({ deletedAt: new Date() })
+    .where(and(
+      eq(messages.conversationId, conversationId),
+      eq(messages.orgId, orgId),
+      isNull(messages.deletedAt),
+      sql`${messages.createdAt} > ${target.createdAt}`,
+    ))
+    .returning({ id: messages.id });
+
+  for (const row of result) syncMessageDelete(row.id);
+  return result.length;
+}
+
 export async function clearMessages(orgId: string, conversationId: string) {
   const result = await db
     .update(messages)
