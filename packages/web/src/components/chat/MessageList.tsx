@@ -5,6 +5,7 @@ import { MessageBubble } from "./MessageBubble";
 import { StreamingMessage } from "./StreamingMessage";
 import { TypingIndicator } from "./TypingIndicator";
 import type { ActiveTool, AgentFlowState } from "../../hooks/useSSE";
+import { useBranchStore, getActivePath } from "../../stores/branch.store";
 
 interface MessageListProps {
   messages: any[];
@@ -38,6 +39,14 @@ export function MessageList({ messages, artifactsByMessageId, streamingContent, 
     }
     return undefined;
   }, [messages]);
+
+  // Compute active branch path through the message tree
+  const activeChildren = useBranchStore((s) => s.activeChildren);
+  const activePath = useMemo(
+    () => getActivePath(conversationId ?? "", messages, activeChildren),
+    [conversationId, messages, activeChildren],
+  );
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
   const [showNewMessages, setShowNewMessages] = useState(false);
@@ -121,13 +130,13 @@ export function MessageList({ messages, artifactsByMessageId, streamingContent, 
       aria-live="polite"
     >
       <div className="max-w-5xl mx-auto py-4 px-4">
-        {messages.length === 0 && !isStreaming && (
+        {activePath.length === 0 && !isStreaming && (
           <div className="text-center py-16 text-sm text-text-tertiary">
             {t("messages.empty", { defaultValue: "No messages yet. Start the conversation below." })}
           </div>
         )}
 
-        {messages
+        {activePath
           .filter((msg: any) => msg.status !== "streaming")
           .map((msg: any) => (
           <MessageBubble
