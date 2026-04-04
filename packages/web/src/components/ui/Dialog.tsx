@@ -25,11 +25,13 @@ export function Dialog({ open, onClose, title, children, className, size = "md" 
     if (open && !dialog.open) {
       previousFocusRef.current = document.activeElement as HTMLElement | null;
       dialog.showModal();
-      // Focus first interactive element inside the dialog
-      const focusable = dialog.querySelector<HTMLElement>(
+      // Focus the first input/textarea (preferred), falling back to any focusable element.
+      // This prevents the close button from stealing focus when the dialog has form fields.
+      const preferredFocus = dialog.querySelector<HTMLElement>('input:not([type="hidden"]), textarea');
+      const fallbackFocus = dialog.querySelector<HTMLElement>(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
       );
-      focusable?.focus();
+      (preferredFocus ?? fallbackFocus)?.focus();
     } else if (!open && dialog.open) {
       dialog.close();
       // Restore focus to the element that opened the dialog
