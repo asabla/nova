@@ -229,7 +229,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
       isAssistant && message.metadata?.tier === "direct" && "border-l-2 border-success/40",
       isAssistant && message.metadata?.tier === "sequential" && "border-l-2 border-primary/40",
       isAssistant && message.metadata?.tier === "orchestrated" && "border-l-2 border-warning/40",
-      isUser && "flex-row-reverse px-4",
+      isUser && "flex-row-reverse",
     )}>
       <div className="shrink-0 mt-0.5">
         {isUser ? (
@@ -329,7 +329,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
                     <MarkdownRenderer content={displayContent} youtubeVideoId={youtubeVideoId} />
                   </div>
                 ) : (
-                  <p className="text-sm text-text leading-relaxed whitespace-pre-wrap bg-surface-secondary/50 px-3.5 py-2.5 rounded-2xl rounded-tr-md inline-block">{displayContent}</p>
+                  <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">{displayContent}</p>
                 )
               ) : message.status === "streaming" ? (
                 <div className="flex items-center gap-1.5 py-2">
