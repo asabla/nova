@@ -257,6 +257,8 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
+    // Re-focus the textarea so the user can immediately type the next message
+    requestAnimationFrame(() => textareaRef.current?.focus());
   }, [content, disabled, onSend, onFileUpload, pendingFiles]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
