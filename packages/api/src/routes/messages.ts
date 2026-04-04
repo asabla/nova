@@ -836,7 +836,8 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
 
         const toolSummary = toolCallRecords.length > 0
           ? toolCallRecords.map((r: any) => ({ name: r.toolName, durationMs: r.durationMs, error: r.error, args: r.input }))
-          : undefined;
+          : relayResult?.toolRecords?.map((r: any) => ({ name: r.name, args: r.args, resultSummary: r.resultSummary }))
+            ?? undefined;
 
         // Compute usage metrics
         const usagePromptTokens = relayResult?.usage?.prompt_tokens ?? 0;

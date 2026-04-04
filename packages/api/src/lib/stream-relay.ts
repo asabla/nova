@@ -15,7 +15,7 @@ export async function relayRedisToSSE(
   stream: { writeSSE: (event: { event: string; data: string }) => Promise<void> },
   channelId: string,
   opts: RelayOptions = {},
-): Promise<{ content: string; usage: { prompt_tokens?: number; completion_tokens?: number } } | null> {
+): Promise<{ content: string; usage: { prompt_tokens?: number; completion_tokens?: number }; toolRecords?: { name: string; status: string; args?: Record<string, unknown>; resultSummary?: string }[] } | null> {
   const timeoutMs = opts.timeoutMs ?? 30_000;
 
   const relayStartMs = Date.now();
@@ -24,6 +24,7 @@ export async function relayRedisToSSE(
     let settled = false;
     let accumulatedContent = "";
     let relayTraceId: string | undefined;
+    const toolRecords: { name: string; status: string; args?: Record<string, unknown>; resultSummary?: string }[] = [];
 
     const timeout = setTimeout(() => {
       if (settled) return;
@@ -77,6 +78,16 @@ export async function relayRedisToSSE(
             break;
 
           case "tool_status":
+            // Accumulate tool records for persistence in message metadata
+            {
+              const existing = toolRecords.find((t) => t.name === data.tool);
+              if (existing) {
+                existing.status = data.status;
+                if (data.resultSummary) existing.resultSummary = data.resultSummary;
+              } else {
+                toolRecords.push({ name: data.tool, status: data.status, args: data.args, resultSummary: data.resultSummary });
+              }
+            }
             stream.writeSSE({
               event: "tool_status",
               data: JSON.stringify({
@@ -86,7 +97,7 @@ export async function relayRedisToSSE(
                 ...(data.resultSummary ? { resultSummary: data.resultSummary } : {}),
               }),
             }).catch(() => {
-              if (!settled) { settled = true; cleanup(); resolve({ content: accumulatedContent, usage: {} }); }
+              if (!settled) { settled = true; cleanup(); resolve({ content: accumulatedContent, usage: {}, toolRecords }); }
             });
             break;
 
@@ -129,6 +140,7 @@ export async function relayRedisToSSE(
             resolve({
               content: data.content ?? accumulatedContent,
               usage: data.usage ?? {},
+              toolRecords: toolRecords.length > 0 ? toolRecords : undefined,
             });
             break;
 
