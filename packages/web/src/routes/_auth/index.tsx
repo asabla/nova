@@ -16,8 +16,9 @@ import { setPendingFiles as storePendingFiles } from "../../lib/pending-files";
 import { ALLOWED_MIME_TYPES } from "@nova/shared/constants";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { MentionPopup, useMentionTrigger, type MentionCandidate } from "../../components/chat/MentionPopup";
-import { SlashCommand } from "../../components/chat/SlashCommand";
+import { SlashCommand, getSlashCommand } from "../../components/chat/SlashCommand";
 import { useSlashCommandTrigger } from "../../components/chat/useSlashCommandTrigger";
+import { PromptPickerDialog } from "../../components/chat/PromptPickerDialog";
 import { Dialog } from "../../components/ui/Dialog";
 import { NewResearchForm, type NewResearchFormSubmitData } from "../../components/research/NewResearchForm";
 import { toast } from "../../components/ui/Toast";
@@ -48,6 +49,7 @@ function HomePage() {
   const [message, setMessage] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [researchModalOpen, setResearchModalOpen] = useState(false);
+  const [promptPickerOpen, setPromptPickerOpen] = useState(false);
   const [selectedStarter, setSelectedStarter] = useState<ExploreTemplate | null>(null);
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
   const [knowledgeSearch, setKnowledgeSearch] = useState("");
@@ -125,11 +127,29 @@ function HomePage() {
   const slash = useSlashCommandTrigger(message, textareaRef);
   const handleSlashSelect = useCallback(
     (command: string) => {
+      const def = getSlashCommand(command);
+
+      // Handle /prompt specially — open the template picker
+      if (command === "/prompt") {
+        setMessage("");
+        setPromptPickerOpen(true);
+        return;
+      }
+
+      // Handle other client-only commands
+      if (def?.clientOnly) {
+        setMessage("");
+        if (command === "/help") {
+          navigate({ to: "/explore" });
+        }
+        return;
+      }
+
       const newValue = slash.handleSelect(command);
       setMessage(newValue);
       requestAnimationFrame(() => textareaRef.current?.focus());
     },
-    [slash.handleSelect],
+    [slash.handleSelect, navigate],
   );
 
   // Fetch explore templates for quick starters
@@ -511,6 +531,17 @@ function HomePage() {
           }
           setSelectedStarter(null);
           handleStartConversation(resolvedMessage);
+        }}
+      />
+
+      {/* Prompt picker from /prompt slash command */}
+      <PromptPickerDialog
+        open={promptPickerOpen}
+        onClose={() => setPromptPickerOpen(false)}
+        onSelect={(content) => {
+          setPromptPickerOpen(false);
+          setMessage(content);
+          requestAnimationFrame(() => textareaRef.current?.focus());
         }}
       />
     </div>
