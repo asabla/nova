@@ -33,7 +33,7 @@ function ConversationPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
-  const { tokens, status, activeTools, agentFlow, startStream, reconnectStream, stopStream, pauseStream, resumeStream, resetStream } = useSSEStream();
+  const { tokens, status, activeTools, agentFlow, doneData, startStream, reconnectStream, stopStream, pauseStream, resumeStream, resetStream } = useSSEStream();
   const { onKeystroke, stopTyping } = useTypingIndicator(id);
 
   const { data: conversation, isLoading: isConversationLoading } = useQuery(conversationDetailOptions(id));
@@ -73,13 +73,29 @@ function ConversationPage() {
 
   useEffect(() => {
     if (status === "done" || status === "error") {
-      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
+      // After stream completes, set the new message as the active branch sibling
+      // so the tree view immediately shows the new response
+      if (status === "done" && doneData?.messageId) {
+        // Refetch messages first so we have the new message with its parentMessageId
+        queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) }).then(() => {
+          // After refetch, find the new message and set it as active
+          const freshMessages = queryClient.getQueryData<any>(queryKeys.conversations.messages(id));
+          const newMsg = (freshMessages?.data ?? []).find((m: any) => m.id === doneData.messageId);
+          if (newMsg?.parentMessageId) {
+            import("../../stores/branch.store").then(({ useBranchStore }) => {
+              useBranchStore.getState().setActiveChild(id, newMsg.parentMessageId, newMsg.id);
+            });
+          }
+        });
+      } else {
+        queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
+      }
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.detail(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.artifacts(id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
       resetStream();
     }
-  }, [status, id, queryClient, resetStream]);
+  }, [status, id, queryClient, resetStream, doneData]);
 
   // Auto-reconnect to an in-progress stream when navigating back to a conversation
   useEffect(() => {
