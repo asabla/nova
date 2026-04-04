@@ -36,8 +36,6 @@ function isArticleUrl(url: string): boolean {
     const u = new URL(url);
     // Homepage URLs (path is "/" or empty) are usually not articles
     if (u.pathname === "/" || u.pathname === "") return false;
-    // Very short paths are likely section pages, not articles
-    if (u.pathname.split("/").filter(Boolean).length < 2) return false;
     return true;
   } catch {
     return true;
@@ -80,7 +78,7 @@ async function searchSearxNG(
     return deduped.slice(0, maxResults).map((r) => ({
       title: r.title,
       url: r.url,
-      snippet: (r.content ?? "").slice(0, 300),
+      snippet: (r.content ?? "").slice(0, 500),
     }));
   } catch {
     return null;
@@ -94,13 +92,13 @@ export const webSearchTool = tool({
     type: "object" as const,
     properties: {
       query: { type: "string", description: "The search query" },
-      maxResults: { type: "number", description: "Maximum number of results to return (default 5)" },
+      maxResults: { type: "number", description: "Maximum number of results to return (default 10)" },
     },
-    required: ["query", "maxResults"],
+    required: ["query"],
     additionalProperties: false,
   },
   execute: async (args: unknown) => {
-    const { query, maxResults = 5 } = args as { query: string; maxResults?: number };
+    const { query, maxResults = 10 } = args as { query: string; maxResults?: number };
     const searxngUrl = process.env.SEARXNG_URL;
 
     // Use SearxNG (self-hosted) if available, fall back to DuckDuckGo
