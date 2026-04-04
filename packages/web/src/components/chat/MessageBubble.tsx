@@ -229,7 +229,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
       isAssistant && message.metadata?.tier === "direct" && "border-l-2 border-success/40",
       isAssistant && message.metadata?.tier === "sequential" && "border-l-2 border-primary/40",
       isAssistant && message.metadata?.tier === "orchestrated" && "border-l-2 border-warning/40",
-      isUser && "px-4 flex-row-reverse",
+      isUser && "flex-row-reverse bg-surface-secondary/30 border border-border rounded-2xl px-4",
     )}>
       <div className="shrink-0 mt-0.5">
         {isUser ? (

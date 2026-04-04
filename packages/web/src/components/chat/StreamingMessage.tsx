@@ -1,8 +1,8 @@
 import { useMemo } from "react";
+import { clsx } from "clsx";
 import { MarkdownRenderer } from "../markdown/MarkdownRenderer";
 import { InlineToolStatusList } from "./InlineToolStatus";
 import { ThinkingIndicator } from "./ThinkingIndicator";
-import { TierBadge } from "./TierBadge";
 import { PlanDAGView } from "./PlanDAGView";
 import { InteractionPanel } from "./InteractionPanel";
 import { AnimatedOrb, StreamingStatusIndicator } from "./StreamingStatusIndicator";
@@ -26,7 +26,12 @@ export function StreamingMessage({ content, activeTools, agentFlow, conversation
   const { visibleContent, thinkingContent, isThinking, hasThinkingContent } = useThinkingParser(content);
 
   return (
-    <div className="flex gap-3 py-3 bg-surface-secondary/50 -mx-2 px-5 rounded-xl" style={{ contain: "content" }}>
+    <div className={clsx(
+      "flex gap-3 py-3 bg-surface-secondary/50 -mx-2 px-5 rounded-xl",
+      agentFlow?.tier === "direct" && "border-l-2 border-success/40",
+      agentFlow?.tier === "sequential" && "border-l-2 border-primary/40",
+      agentFlow?.tier === "orchestrated" && "border-l-2 border-warning/40",
+    )} style={{ contain: "content" }}>
       <div className="shrink-0 mt-0.5">
         <AnimatedOrb />
       </div>
@@ -41,12 +46,6 @@ export function StreamingMessage({ content, activeTools, agentFlow, conversation
 
         {activeTools && activeTools.length > 0 && (
           <InlineToolStatusList tools={activeTools} />
-        )}
-
-        {agentFlow?.tier && (
-          <div className="my-1">
-            <TierBadge tier={agentFlow.tier} reasoning={agentFlow.tierReasoning} />
-          </div>
         )}
 
         {agentFlow?.plan && (agentFlow.tier === "sequential" || agentFlow.tier === "orchestrated") && (
