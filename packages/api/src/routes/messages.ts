@@ -162,6 +162,7 @@ messagesRouter.post("/:conversationId/messages", zValidator("json", sendMessageS
     senderType: "user",
     senderUserId: userId,
     content: data.content,
+    parentMessageId: data.parentMessageId,
   });
 
   if (data.attachments) {
@@ -189,6 +190,7 @@ const streamSchema = z.object({
   topP: z.number().min(0).max(1).optional(),
   maxTokens: z.number().int().positive().optional(),
   enableTools: z.boolean().optional().default(true),
+  parentMessageId: z.string().uuid().optional(),
 });
 
 // Default tool definitions included in chat completions when tools are enabled
@@ -719,6 +721,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
           content: "",
           status: "streaming",
           modelId: resolvedModelId ?? undefined,
+          parentMessageId: body.parentMessageId,
         });
 
         // Initialize Redis keys for stream reconnection
@@ -1058,6 +1061,7 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         senderType: "assistant",
         content: fullContent,
         modelId: resolvedModelId ?? undefined,
+        parentMessageId: body.parentMessageId,
         tokenCountPrompt: promptTokens,
         tokenCountCompletion: completionTokens,
         costCents,
@@ -1140,6 +1144,13 @@ messagesRouter.delete("/:conversationId/messages", async (c) => {
   const orgId = c.get("orgId");
   const count = await messageService.clearMessages(orgId, c.req.param("conversationId"));
   return c.json({ ok: true, deleted: count });
+});
+
+// Get sibling messages (messages sharing the same parentMessageId) for branch navigation
+messagesRouter.get("/:conversationId/messages/:messageId/siblings", async (c) => {
+  const orgId = c.get("orgId");
+  const siblings = await messageService.listSiblings(orgId, c.req.param("messageId"));
+  return c.json({ data: siblings });
 });
 
 // Delete all messages after a given message (for rerun/branching)

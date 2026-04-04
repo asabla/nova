@@ -57,12 +57,52 @@ export async function listMessages(orgId: string, conversationId: string, pagina
     }
   }
 
-  const enriched = data.map((m) => ({
-    ...m,
-    attachments: attachmentsByMessage[m.id] ?? [],
-  }));
+  // Compute sibling metadata for branching UI
+  const siblingGroups = new Map<string, typeof data>();
+  for (const m of data) {
+    const key = m.parentMessageId ?? `__root_${m.id}`;
+    if (!siblingGroups.has(key)) siblingGroups.set(key, []);
+    siblingGroups.get(key)!.push(m);
+  }
+
+  const enriched = data.map((m) => {
+    const key = m.parentMessageId ?? `__root_${m.id}`;
+    const siblings = siblingGroups.get(key) ?? [m];
+    const siblingIndex = siblings.findIndex((s) => s.id === m.id);
+    return {
+      ...m,
+      attachments: attachmentsByMessage[m.id] ?? [],
+      siblingCount: siblings.length,
+      siblingIndex: siblingIndex >= 0 ? siblingIndex : 0,
+    };
+  });
 
   return buildPaginatedResponse(enriched, countResult[0]?.count ?? 0, { offset, limit, page, pageSize });
+}
+
+export async function listSiblings(orgId: string, messageId: string) {
+  // Find the target message's parentMessageId
+  const [target] = await db.select({ parentMessageId: messages.parentMessageId, conversationId: messages.conversationId })
+    .from(messages)
+    .where(and(eq(messages.id, messageId), eq(messages.orgId, orgId)));
+
+  if (!target || !target.parentMessageId) return [];
+
+  return db.select({
+    id: messages.id,
+    content: sql<string>`LEFT(${messages.content}, 100)`.as("content"),
+    createdAt: messages.createdAt,
+    modelId: messages.modelId,
+    senderType: messages.senderType,
+  })
+    .from(messages)
+    .where(and(
+      eq(messages.parentMessageId, target.parentMessageId),
+      eq(messages.conversationId, target.conversationId),
+      eq(messages.orgId, orgId),
+      isNull(messages.deletedAt),
+    ))
+    .orderBy(asc(messages.createdAt));
 }
 
 export async function getMessage(orgId: string, messageId: string) {
@@ -82,6 +122,7 @@ export async function createMessage(orgId: string, data: {
   modelId?: string;
   contentType?: string;
   metadata?: unknown;
+  parentMessageId?: string;
   status?: "streaming" | "completed" | "failed" | "cancelled";
   tokenCountPrompt?: number;
   tokenCountCompletion?: number;
@@ -97,6 +138,7 @@ export async function createMessage(orgId: string, data: {
     modelId: data.modelId,
     contentType: data.contentType ?? "text",
     metadata: data.metadata,
+    parentMessageId: data.parentMessageId,
     status: data.status ?? "completed",
     tokenCountPrompt: data.tokenCountPrompt,
     tokenCountCompletion: data.tokenCountCompletion,
