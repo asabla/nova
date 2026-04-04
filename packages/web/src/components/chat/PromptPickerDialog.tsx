@@ -1,15 +1,24 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Search, FileText, ArrowLeft, Send } from "lucide-react";
+import { Search, FileText, ArrowLeft, ArrowRight } from "lucide-react";
 import { clsx } from "clsx";
 import { Dialog } from "../ui/Dialog";
+import { Button } from "../ui/Button";
 import { api } from "../../lib/api";
 import { queryKeys } from "../../lib/query-keys";
 
 interface TemplateVariable {
   name: string;
   description: string;
+}
+
+interface TemplateInput {
+  id: string;
+  type: "text" | "textarea" | "file";
+  label: string;
+  placeholder: string;
+  required: boolean;
 }
 
 interface PromptTemplate {
@@ -20,7 +29,9 @@ interface PromptTemplate {
   category?: string | null;
   icon?: string | null;
   color?: string | null;
+  bgColor?: string | null;
   variables?: TemplateVariable[] | null;
+  inputs?: TemplateInput[] | null;
 }
 
 interface PromptPickerDialogProps {
@@ -39,11 +50,38 @@ function interpolate(content: string, values: Record<string, string>): string {
   return content.replace(/\{\{(\w+)\}\}/g, (_, key) => values[key] ?? `{{${key}}}`);
 }
 
+/** Convert template variables or extracted vars into TemplateInput-like objects */
+function buildInputs(tmpl: PromptTemplate): TemplateInput[] {
+  // Prefer the structured inputs field (used by explore templates)
+  if (tmpl.inputs?.length) {
+    return tmpl.inputs.filter((i) => i.type !== "file");
+  }
+
+  // Fall back to variables array
+  const vars = tmpl.variables?.length
+    ? tmpl.variables
+    : extractVariables(tmpl.content).map((name) => ({ name, description: name.replace(/_/g, " ") }));
+
+  return vars.map((v) => {
+    const isLong = ["code", "contract", "policy", "document", "original", "material",
+      "feedback", "notes", "diff", "schema", "content"].includes(v.name)
+      || v.description.length > 50;
+
+    return {
+      id: v.name,
+      type: isLong ? "textarea" as const : "text" as const,
+      label: v.description || v.name.replace(/_/g, " "),
+      placeholder: v.description || v.name.replace(/_/g, " "),
+      required: true,
+    };
+  });
+}
+
 export function PromptPickerDialog({ open, onClose, onSelect }: PromptPickerDialogProps) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<PromptTemplate | null>(null);
-  const [variableValues, setVariableValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, string>>({});
 
   const { data, isLoading } = useQuery({
     queryKey: [...queryKeys.prompts.all, "list"],
@@ -77,144 +115,106 @@ export function PromptPickerDialog({ open, onClose, onSelect }: PromptPickerDial
     return groups;
   }, [filtered]);
 
-  const handleSelectTemplate = useCallback((tmpl: PromptTemplate) => {
-    const vars = tmpl.variables?.length
-      ? tmpl.variables.map((v) => v.name)
-      : extractVariables(tmpl.content);
+  const inputs = useMemo(() => selectedTemplate ? buildInputs(selectedTemplate) : [], [selectedTemplate]);
 
-    if (vars.length === 0) {
-      // No variables — insert directly
+  const handleSelectTemplate = useCallback((tmpl: PromptTemplate) => {
+    const tmplInputs = buildInputs(tmpl);
+    if (tmplInputs.length === 0) {
       onSelect(tmpl.content);
       return;
     }
-
-    // Show variable fill step
     setSelectedTemplate(tmpl);
-    setVariableValues({});
+    setValues({});
   }, [onSelect]);
 
   const handleBack = useCallback(() => {
     setSelectedTemplate(null);
-    setVariableValues({});
+    setValues({});
   }, []);
 
-  const handleSubmitVariables = useCallback(() => {
+  const handleSubmit = useCallback(() => {
     if (!selectedTemplate) return;
-    const result = interpolate(selectedTemplate.content, variableValues);
+    const result = interpolate(selectedTemplate.content, values);
     onSelect(result);
     setSelectedTemplate(null);
-    setVariableValues({});
-  }, [selectedTemplate, variableValues, onSelect]);
+    setValues({});
+  }, [selectedTemplate, values, onSelect]);
 
   const handleClose = useCallback(() => {
     setSelectedTemplate(null);
-    setVariableValues({});
+    setValues({});
     setSearch("");
     onClose();
   }, [onClose]);
 
-  // Get variable definitions: prefer schema variables, fall back to extracting from content
-  const currentVariables: TemplateVariable[] = useMemo(() => {
-    if (!selectedTemplate) return [];
-    if (selectedTemplate.variables?.length) return selectedTemplate.variables;
-    return extractVariables(selectedTemplate.content).map((name) => ({
-      name,
-      description: name.replace(/_/g, " "),
-    }));
-  }, [selectedTemplate]);
+  const handleChange = useCallback((id: string, value: string) => {
+    setValues((prev) => ({ ...prev, [id]: value }));
+  }, []);
 
-  // Preview the interpolated content
-  const preview = useMemo(() => {
-    if (!selectedTemplate) return "";
-    return interpolate(selectedTemplate.content, variableValues);
-  }, [selectedTemplate, variableValues]);
-
-  const allFilled = currentVariables.every((v) => variableValues[v.name]?.trim());
+  const allFilled = inputs.filter((i) => i.required).every((i) => values[i.id]?.trim());
 
   return (
     <Dialog
       open={open}
       onClose={handleClose}
-      title={
-        selectedTemplate
-          ? selectedTemplate.name
-          : t("prompts.pickTemplate", { defaultValue: "Use a Prompt Template" })
-      }
-      size="md"
+      title={selectedTemplate?.name ?? t("prompts.pickTemplate", { defaultValue: "Use a Prompt Template" })}
+      size={selectedTemplate ? "lg" : "md"}
     >
       {selectedTemplate ? (
-        /* ── Variable fill step ── */
-        <div className="space-y-4">
-          {selectedTemplate.description && (
-            <p className="text-xs text-text-tertiary">{selectedTemplate.description}</p>
-          )}
-
-          {/* Variable inputs */}
-          <div className="space-y-3">
-            {currentVariables.map((v) => {
-              const isLong = v.name === "code" || v.name === "contract" || v.name === "policy"
-                || v.name === "document" || v.name === "original" || v.name === "material"
-                || v.name === "feedback" || v.name === "notes" || v.name === "diff"
-                || v.name === "schema" || v.description.length > 40;
-
-              return (
-                <div key={v.name}>
-                  <label className="block text-xs font-medium text-text mb-1 capitalize">
-                    {v.description || v.name.replace(/_/g, " ")}
-                  </label>
-                  {isLong ? (
-                    <textarea
-                      value={variableValues[v.name] ?? ""}
-                      onChange={(e) => setVariableValues((prev) => ({ ...prev, [v.name]: e.target.value }))}
-                      placeholder={v.description}
-                      rows={4}
-                      className="w-full text-sm bg-surface-secondary border border-border rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary text-text placeholder:text-text-tertiary resize-y"
-                    />
-                  ) : (
-                    <input
-                      type="text"
-                      value={variableValues[v.name] ?? ""}
-                      onChange={(e) => setVariableValues((prev) => ({ ...prev, [v.name]: e.target.value }))}
-                      placeholder={v.description}
-                      className="w-full h-9 text-sm bg-surface-secondary border border-border rounded-xl px-3 focus:outline-none focus:ring-1 focus:ring-primary text-text placeholder:text-text-tertiary"
-                      autoFocus={currentVariables.indexOf(v) === 0}
-                    />
-                  )}
-                </div>
-              );
-            })}
+        /* ── Variable fill step (matches explore TemplateInputDialog) ── */
+        <div>
+          {/* Context header */}
+          <div className="flex items-start gap-3 mb-6 p-3 rounded-lg bg-surface-secondary">
+            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <FileText className="h-4 w-4 text-primary" aria-hidden="true" />
+            </div>
+            <p className="text-sm text-text-secondary leading-relaxed">
+              {selectedTemplate.description}
+            </p>
           </div>
 
-          {/* Preview */}
-          {Object.values(variableValues).some((v) => v.trim()) && (
-            <div>
-              <p className="text-xs font-medium text-text-tertiary mb-1">Preview</p>
-              <pre className="text-xs text-text-secondary bg-surface-secondary rounded-xl p-3 max-h-32 overflow-y-auto whitespace-pre-wrap font-mono">
-                {preview}
-              </pre>
-            </div>
-          )}
+          {/* Input fields */}
+          <div className="space-y-5">
+            {inputs.map((input, idx) => (
+              <div key={input.id}>
+                <label htmlFor={`prompt-${input.id}`} className="block text-sm font-medium text-text mb-1.5">
+                  {input.label}
+                </label>
+                {input.type === "textarea" ? (
+                  <textarea
+                    id={`prompt-${input.id}`}
+                    value={values[input.id] ?? ""}
+                    onChange={(e) => handleChange(input.id, e.target.value)}
+                    placeholder={input.placeholder}
+                    rows={6}
+                    autoFocus={idx === 0}
+                    className="w-full px-3 py-2.5 rounded-lg border text-sm text-text bg-surface placeholder:text-text-tertiary resize-y min-h-[120px] max-h-[320px] font-mono transition-colors border-border focus:border-primary focus:ring-primary/20 focus:outline-none focus:ring-2"
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    id={`prompt-${input.id}`}
+                    value={values[input.id] ?? ""}
+                    onChange={(e) => handleChange(input.id, e.target.value)}
+                    placeholder={input.placeholder}
+                    autoFocus={idx === 0}
+                    className="w-full px-3 py-2.5 rounded-lg border text-sm text-text bg-surface placeholder:text-text-tertiary transition-colors border-border focus:border-primary focus:ring-primary/20 focus:outline-none focus:ring-2"
+                  />
+                )}
+              </div>
+            ))}
+          </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-between pt-1">
-            <button
-              onClick={handleBack}
-              className="flex items-center gap-1 text-xs text-text-tertiary hover:text-text-secondary transition-colors"
-            >
-              <ArrowLeft className="h-3 w-3" /> {t("common.back", "Back")}
-            </button>
-            <button
-              onClick={handleSubmitVariables}
-              disabled={!allFilled}
-              className={clsx(
-                "flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors",
-                allFilled
-                  ? "bg-primary text-primary-foreground hover:bg-primary-dark"
-                  : "bg-surface-tertiary text-text-tertiary cursor-not-allowed",
-              )}
-            >
-              <Send className="h-3.5 w-3.5" /> {t("prompts.useTemplate", { defaultValue: "Use Template" })}
-            </button>
+          {/* Actions — matching explore modal */}
+          <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border">
+            <Button variant="ghost" onClick={handleBack}>
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              {t("common.back", "Back")}
+            </Button>
+            <Button variant="primary" onClick={handleSubmit} disabled={!allFilled}>
+              {t("prompts.useTemplate", { defaultValue: "Use Template" })}
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Button>
           </div>
         </div>
       ) : (
@@ -251,10 +251,8 @@ export function PromptPickerDialog({ open, onClose, onSelect }: PromptPickerDial
                   </h3>
                   <div className="space-y-1">
                     {items.map((tmpl) => {
-                      const vars = tmpl.variables?.length
-                        ? tmpl.variables
-                        : extractVariables(tmpl.content).map((n) => ({ name: n, description: n }));
-                      const hasVars = vars.length > 0;
+                      const tmplInputs = buildInputs(tmpl);
+                      const hasVars = tmplInputs.length > 0;
 
                       return (
                         <button
@@ -263,10 +261,7 @@ export function PromptPickerDialog({ open, onClose, onSelect }: PromptPickerDial
                           className="w-full flex items-start gap-3 p-3 rounded-xl text-left hover:bg-surface-secondary transition-colors group"
                         >
                           <div className="shrink-0 mt-0.5">
-                            <div className={clsx(
-                              "h-8 w-8 rounded-lg flex items-center justify-center",
-                              "bg-primary/10",
-                            )}>
+                            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
                               <FileText className="h-4 w-4 text-primary" aria-hidden="true" />
                             </div>
                           </div>
@@ -281,9 +276,9 @@ export function PromptPickerDialog({ open, onClose, onSelect }: PromptPickerDial
                             )}
                             {hasVars && (
                               <div className="flex flex-wrap gap-1 mt-1.5">
-                                {vars.map((v) => (
-                                  <span key={v.name} className="text-[10px] px-1.5 py-0.5 rounded bg-surface-tertiary text-text-tertiary">
-                                    {v.name}
+                                {tmplInputs.map((input) => (
+                                  <span key={input.id} className="text-[10px] px-1.5 py-0.5 rounded bg-surface-tertiary text-text-tertiary">
+                                    {input.id}
                                   </span>
                                 ))}
                               </div>
