@@ -75,13 +75,23 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
   const [researchDismissed, setResearchDismissed] = useState(false);
   const prevStreamingRef = useRef(isStreaming);
 
-  // Re-focus textarea when streaming ends
+  // Re-focus textarea when streaming ends — use a short delay to survive
+  // React re-renders from query cache invalidation that happen on stream completion
   useEffect(() => {
     if (prevStreamingRef.current && !isStreaming) {
-      requestAnimationFrame(() => textareaRef.current?.focus());
+      const timer = setTimeout(() => textareaRef.current?.focus(), 300);
+      return () => clearTimeout(timer);
     }
     prevStreamingRef.current = isStreaming;
   }, [isStreaming]);
+
+  // Focus textarea when entering a conversation (new or navigated to)
+  useEffect(() => {
+    if (!disabled) {
+      const timer = setTimeout(() => textareaRef.current?.focus(), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [conversationId, disabled]);
 
   // --- Knowledge collection quick-attach ---
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
