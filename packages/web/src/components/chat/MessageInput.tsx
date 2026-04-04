@@ -73,6 +73,15 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
   const [promptPickerOpen, setPromptPickerOpen] = useState(false);
   const [researchModalOpen, setResearchModalOpen] = useState(false);
   const [researchDismissed, setResearchDismissed] = useState(false);
+  const prevStreamingRef = useRef(isStreaming);
+
+  // Re-focus textarea when streaming ends
+  useEffect(() => {
+    if (prevStreamingRef.current && !isStreaming) {
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    }
+    prevStreamingRef.current = isStreaming;
+  }, [isStreaming]);
 
   // --- Knowledge collection quick-attach ---
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
