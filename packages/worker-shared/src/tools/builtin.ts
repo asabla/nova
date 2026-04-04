@@ -94,7 +94,7 @@ export const webSearchTool = tool({
       query: { type: "string", description: "The search query" },
       maxResults: { type: "number", description: "Maximum number of results to return (default 10)" },
     },
-    required: ["query"],
+    required: ["query", "maxResults"],
     additionalProperties: false,
   },
   execute: async (args: unknown) => {
