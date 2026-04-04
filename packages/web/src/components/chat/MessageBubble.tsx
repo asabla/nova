@@ -8,8 +8,8 @@ import { ArtifactRenderer } from "./ArtifactRenderer";
 import { DynamicWidget } from "./DynamicWidget";
 import { ToolSummaryCompact } from "./InlineToolStatus";
 import { ThinkingIndicator } from "./ThinkingIndicator";
-import { TierBadge } from "./TierBadge";
 import { PlanDAGView } from "./PlanDAGView";
+import { BranchNavigator } from "./BranchNavigator";
 import { AttachmentPreview } from "../common/AttachmentPreview";
 import { parseThinkBlocksComplete } from "../../lib/think-parser";
 import type { ExecutionTier, Plan } from "@nova/shared/types";
@@ -43,6 +43,9 @@ interface MessageBubbleProps {
     modelId?: string | null;
     metadata?: Record<string, any> | null;
     rating?: "up" | "down" | null;
+    parentMessageId?: string | null;
+    siblingCount?: number;
+    siblingIndex?: number;
     attachments?: {
       id: string;
       fileId?: string | null;
@@ -61,11 +64,14 @@ interface MessageBubbleProps {
   onNote?: (messageId: string, content: string) => void;
   onFork?: (messageId: string) => void;
   onRetryStep?: (stepId: string) => void;
+  onBranchSwitch?: (parentId: string, siblingId: string) => void;
+  /** All messages in the conversation (used for sibling lookup during branch navigation) */
+  allMessages?: any[];
   /** YouTube video ID from conversation context for timestamp auto-linking */
   youtubeVideoId?: string;
 }
 
-export const MessageBubble = memo(function MessageBubble({ message, artifacts, userName, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork, onRetryStep, youtubeVideoId }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message, artifacts, userName, onRate, onEdit, onEditAndRerun, onRerun, onNote, onFork, onRetryStep, onBranchSwitch, allMessages, youtubeVideoId }: MessageBubbleProps) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -251,6 +257,24 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
             <Badge variant="primary">{modelDisplayName}</Badge>
           )}
           <span className="text-[10px] text-text-tertiary">{timeStr}</span>
+          {(message.siblingCount ?? 1) > 1 && message.parentMessageId && onBranchSwitch && allMessages && (
+            <BranchNavigator
+              siblingIndex={message.siblingIndex ?? 0}
+              siblingCount={message.siblingCount ?? 1}
+              onPrev={() => {
+                const siblings = allMessages.filter((m: any) => m.parentMessageId === message.parentMessageId);
+                siblings.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                const currentIdx = siblings.findIndex((s: any) => s.id === message.id);
+                if (currentIdx > 0) onBranchSwitch(message.parentMessageId!, siblings[currentIdx - 1].id);
+              }}
+              onNext={() => {
+                const siblings = allMessages.filter((m: any) => m.parentMessageId === message.parentMessageId);
+                siblings.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                const currentIdx = siblings.findIndex((s: any) => s.id === message.id);
+                if (currentIdx < siblings.length - 1) onBranchSwitch(message.parentMessageId!, siblings[currentIdx + 1].id);
+              }}
+            />
+          )}
         </div>
 
         {isEditing ? (

@@ -175,9 +175,13 @@ function ConversationPage() {
         attachments = [...(attachments ?? []), ...preUploadedAttachments];
       }
 
-      await api.post(`/api/conversations/${id}/messages`, {
+      // Chain to the last message in the conversation (the active path's tail)
+      const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+
+      const userMsg = await api.post<any>(`/api/conversations/${id}/messages`, {
         content,
         senderType: "user",
+        parentMessageId: lastMessage?.id ?? undefined,
         ...(attachments?.length ? { attachments } : {}),
       });
 
@@ -191,6 +195,7 @@ function ConversationPage() {
         model: model ?? "default",
         ...modelParams,
         enableTools: true,
+        parentMessageId: userMsg.id,
         messages: [
           ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
           ...messages
@@ -265,28 +270,38 @@ function ConversationPage() {
 
   const handleEditAndRerun = useCallback(async (messageId: string, content: string) => {
     try {
-      // First, save the edit (storing old content in history)
-      await api.patch(`/api/conversations/${id}/messages/${messageId}`, { content });
-
-      // Truncate all messages after this one (hides old responses)
-      await api.post(`/api/conversations/${id}/messages/${messageId}/truncate-after`);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
-
-      // Then trigger a re-run using all messages up to and including the edited one
       const msg = messages.find((m: any) => m.id === messageId);
       if (!msg) return;
 
-      const idx = messages.indexOf(msg);
-      const previousMessages = messages.slice(0, idx);
+      // Create a NEW user message as a sibling (same parent as original)
+      const newUserMsg = await api.post<any>(`/api/conversations/${id}/messages`, {
+        content,
+        parentMessageId: msg.parentMessageId ?? undefined,
+      });
+
+      // Set the new user message as the active branch
+      if (msg.parentMessageId) {
+        const { useBranchStore } = await import("../../stores/branch.store");
+        useBranchStore.getState().setActiveChild(id, msg.parentMessageId, newUserMsg.id);
+      }
+
+      await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
+
+      // Build history from the active path up to the new user message
+      const activePath = messages.filter((m: any) => {
+        const idx = messages.indexOf(msg);
+        return messages.indexOf(m) < idx;
+      });
       const modelParams = getModelParams();
 
       const apiUrl = import.meta.env.VITE_API_URL ?? "";
       startStream(`${apiUrl}/api/conversations/${id}/messages/stream`, {
         model: conversation?.modelId ?? "default",
         ...modelParams,
+        parentMessageId: newUserMsg.id,
         messages: [
           ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
-          ...previousMessages
+          ...activePath
             .filter((m: any) => m.content != null && m.content !== "")
             .map((m: any) => ({
               role: m.senderType === "user" ? "user" : "assistant",
@@ -308,35 +323,28 @@ function ConversationPage() {
 
     const idx = messages.indexOf(msg);
 
-    // For user messages: truncate everything after (including old assistant response), then re-stream
-    // For assistant messages: truncate this message and everything after, then re-stream
-    const truncateFromId = msg.senderType === "user" ? messageId : messageId;
-    const previousMessages = msg.senderType === "user"
-      ? messages.slice(0, idx + 1) // include the user message
-      : messages.slice(0, idx);     // exclude the assistant message being rerun
+    // Determine the parent for the new sibling message
+    // For assistant messages: create a sibling under the same parent (the user message)
+    // For user messages: create a new assistant child under this user message
+    const parentId = msg.senderType === "assistant"
+      ? msg.parentMessageId  // same parent = sibling of old assistant response
+      : messageId;            // user message IS the parent for the new assistant response
 
-    // Soft-delete messages after the truncation point
-    try {
-      if (msg.senderType === "user") {
-        await api.post(`/api/conversations/${id}/messages/${messageId}/truncate-after`);
-      } else {
-        // For assistant rerun, find the preceding user message and truncate from there
-        const prevUserMsg = messages.slice(0, idx).reverse().find((m: any) => m.senderType === "user");
-        if (prevUserMsg) {
-          await api.post(`/api/conversations/${id}/messages/${prevUserMsg.id}/truncate-after`);
-        }
-      }
-      await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
-    } catch {
-      // Non-blocking — continue with rerun even if truncation fails
-    }
+    // Build message history up to (but not including) the message being rerun
+    const previousMessages = msg.senderType === "user"
+      ? messages.slice(0, idx + 1)  // include the user message
+      : messages.slice(0, idx);     // exclude the assistant message
 
     const modelParams = getModelParams();
+    const baseTemp = modelParams.temperature ?? 0.7;
 
     const apiUrl = import.meta.env.VITE_API_URL ?? "";
     startStream(`${apiUrl}/api/conversations/${id}/messages/stream`, {
       model: modelId ?? conversation?.modelId ?? "default",
       ...modelParams,
+      // Add temperature jitter so reruns produce different output
+      temperature: baseTemp + Math.random() * 0.15,
+      parentMessageId: parentId ?? undefined,
       messages: [
         ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
         ...previousMessages

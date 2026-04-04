@@ -42,6 +42,10 @@ export function MessageList({ messages, artifactsByMessageId, streamingContent, 
 
   // Compute active branch path through the message tree
   const activeChildren = useBranchStore((s) => s.activeChildren);
+  const setActiveChild = useBranchStore((s) => s.setActiveChild);
+  const handleBranchSwitch = useCallback((parentId: string, siblingId: string) => {
+    if (conversationId) setActiveChild(conversationId, parentId, siblingId);
+  }, [conversationId, setActiveChild]);
   const activePath = useMemo(
     () => getActivePath(conversationId ?? "", messages, activeChildren),
     [conversationId, messages, activeChildren],
@@ -152,6 +156,8 @@ export function MessageList({ messages, artifactsByMessageId, streamingContent, 
             onNote={onNote}
             onFork={onFork}
             onRetryStep={onRetryStep}
+            onBranchSwitch={handleBranchSwitch}
+            allMessages={messages}
           />
         ))}
 
