@@ -487,6 +487,7 @@ export function MessageInput({ onSend, onStop, onPause, onResume, isStreaming, i
 
           <textarea
             ref={textareaRef}
+            autoFocus
             value={content}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
