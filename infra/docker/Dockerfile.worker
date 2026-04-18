@@ -26,11 +26,6 @@ COPY packages/web/package.json packages/web/
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile
 
-# Strip TypeScript source from @openai/agents-core to prevent tsx from
-# loading .ts files instead of compiled .js (causes zod v3 compat issues)
-RUN rm -rf node_modules/@openai/agents-core/src \
-           node_modules/@openai/agents-openai/src
-
 # Patch: agents-core uses .superRefine() on ComputerUseCallItem which produces
 # ZodEffects — but zod v3 compat discriminatedUnion requires ZodObject with .shape.
 RUN for f in node_modules/@openai/agents-core/dist/types/protocol.mjs \
@@ -73,8 +68,6 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile --production
 
 # Re-patch after production install
-RUN rm -rf node_modules/@openai/agents-core/src \
-           node_modules/@openai/agents-openai/src
 RUN for f in node_modules/@openai/agents-core/dist/types/protocol.mjs \
              node_modules/@openai/agents-core/dist/types/protocol.js; do \
       bun -e " \
@@ -108,4 +101,4 @@ COPY --from=builder /app/package.json ./
 USER node
 
 ENV WORKER_PACKAGE=${WORKER_PACKAGE}
-CMD npx tsx packages/${WORKER_PACKAGE}/dist/index.js
+CMD node packages/${WORKER_PACKAGE}/dist/index.js
