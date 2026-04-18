@@ -129,10 +129,11 @@ NOVA is a self-hosted-first AI chat platform with multi-tenancy designed in from
 - ~2-4GB additional RAM for the Temporal server in production
 - Significant learning curve (event sourcing, deterministic constraints)
 
+> From the [Temporal TypeScript SDK README](https://github.com/temporalio/sdk-typescript): *"Worker-level features rely heavily on specific Node.js internals, such as native modules, worker threads, and the vm module for workflow sandboxing. Due to these dependencies, running Temporal Workers in non-Node.js environments is **strongly discouraged**."*
+
 **Consequences:**
 - `packages/worker-agent`, `packages/worker-ingestion`, `packages/worker-background` MUST use Node.js runtime, not Bun
-- `packages/api` uses `@temporalio/client` only (lighter, likely Bun-compatible for gRPC calls)
-- Validate `@temporalio/client` under Bun early in Phase 1
+- `packages/api` uses `@temporalio/client` only (lighter, Bun-compatible — verified in production)
 - Docker Compose includes `temporal-server` and `temporal-ui` services
 
 ### Authentication: Better Auth
