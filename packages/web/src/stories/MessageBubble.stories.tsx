@@ -206,6 +206,64 @@ export const LongUserMessage: Story = {
   },
 };
 
+/**
+ * Tight-fit invariant: user message bubbles MUST hug the content width.
+ * A one-word "hi" and a one-sentence message should both render as compact
+ * right-aligned bubbles, NOT full-width boxes. If a regression ever makes
+ * the bubble expand to the column width, this story makes it obvious.
+ */
+export const UserBubbleTightFit: Story = {
+  render: () => (
+    <div className="space-y-3">
+      <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary">
+        Single word
+      </p>
+      <MessageBubble
+        message={createMessage({ id: "u1", content: "hi" })}
+        userName="Alice"
+        {...mockCallbacks}
+      />
+
+      <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary mt-4">
+        Short sentence
+      </p>
+      <MessageBubble
+        message={createMessage({ id: "u2", content: "Can you summarise the latest release notes?" })}
+        userName="Alice"
+        {...mockCallbacks}
+      />
+
+      <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary mt-4">
+        Paragraph (should still wrap at a comfortable width, not span the whole column)
+      </p>
+      <MessageBubble
+        message={createMessage({
+          id: "u3",
+          content:
+            "I'm working on a React app and I want to understand the trade-offs between using TanStack Query and Zustand for server state — which one should I reach for when the data is mostly read-only?",
+        })}
+        userName="Alice"
+        {...mockCallbacks}
+      />
+
+      <p className="text-xs font-semibold uppercase tracking-wider text-text-tertiary mt-4">
+        Assistant response (full-width bg is expected here)
+      </p>
+      <MessageBubble
+        message={createMessage({
+          id: "a1",
+          senderType: "assistant",
+          content: "TanStack Query is the better fit for read-heavy server data — it handles caching, background refetching, and deduping out of the box.",
+        })}
+        {...mockCallbacks}
+      />
+    </div>
+  ),
+  parameters: {
+    layout: "padded",
+  },
+};
+
 /** Gallery of all message variants */
 export const AllVariants: Story = {
   render: () => (

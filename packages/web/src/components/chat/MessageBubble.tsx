@@ -343,7 +343,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
 
             <div
               className={clsx(
-                "w-full",
+                isAssistant ? "w-full" : "max-w-full",
                 message.status === "failed" && "border-l-2 border-danger/50 pl-3",
               )}
             >
@@ -353,7 +353,7 @@ export const MessageBubble = memo(function MessageBubble({ message, artifacts, u
                     <MarkdownRenderer content={displayContent} youtubeVideoId={youtubeVideoId} />
                   </div>
                 ) : (
-                  <p className="text-sm text-text leading-relaxed whitespace-pre-wrap">{displayContent}</p>
+                  <p className="inline-block text-sm text-text leading-relaxed whitespace-pre-wrap bg-surface-secondary/50 px-3.5 py-2.5 rounded-2xl rounded-tr-md">{displayContent}</p>
                 )
               ) : message.status === "streaming" ? (
                 <div className="flex items-center gap-1.5 py-2">
