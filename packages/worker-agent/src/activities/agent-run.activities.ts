@@ -36,6 +36,8 @@ export interface AgentRunInput {
   allowedBuiltinTools?: string[] | null;
   /** Knowledge collection IDs attached to the conversation for RAG */
   knowledgeCollectionIds?: string[];
+  /** Conversation ID — used to forward file context when delegating to agents via invoke_agent */
+  conversationId?: string;
   /** When set, research-specific tools are injected and research results are tracked. */
   researchConfig?: ResearchConfig;
   /** OTel trace ID for distributed trace correlation */
@@ -80,7 +82,7 @@ export async function runAgentLoop(input: AgentRunInput): Promise<AgentRunResult
   const tid = runSpan ? deriveTraceContext(runSpan) : input.traceId;
 
   // Build tools list: built-in (filtered by agent config) + any custom tools from DB
-  const tools: FunctionTool<any, any>[] = getBuiltinTools(input.orgId, input.allowedBuiltinTools, input.knowledgeCollectionIds);
+  const tools: FunctionTool<any, any>[] = getBuiltinTools(input.orgId, input.allowedBuiltinTools, input.knowledgeCollectionIds, input.conversationId);
   if (input.agentId) {
     const custom = await loadCustomTools(input.agentId);
     tools.push(...custom);

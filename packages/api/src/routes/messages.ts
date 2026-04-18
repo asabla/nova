@@ -384,11 +384,11 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
   }
 
   // Fetch storagePath for all attached files
-  let fileRecords: Record<string, { storagePath: string; contentType: string; filename: string | null }> = {};
+  let fileRecords: Record<string, { storagePath: string; contentType: string; filename: string | null; sizeBytes: number | null }> = {};
   if (fileIdsNeeded.length > 0) {
-    const rows = await db.select({ id: files.id, storagePath: files.storagePath, contentType: files.contentType, filename: files.filename }).from(files).where(inArray(files.id, fileIdsNeeded));
+    const rows = await db.select({ id: files.id, storagePath: files.storagePath, contentType: files.contentType, filename: files.filename, sizeBytes: files.sizeBytes }).from(files).where(inArray(files.id, fileIdsNeeded));
     for (const r of rows) {
-      fileRecords[r.id] = { storagePath: r.storagePath, contentType: r.contentType, filename: r.filename };
+      fileRecords[r.id] = { storagePath: r.storagePath, contentType: r.contentType, filename: r.filename, sizeBytes: r.sizeBytes };
     }
   }
 
@@ -574,6 +574,8 @@ messagesRouter.post("/:conversationId/messages/stream", zValidator("json", strea
         and(
           eq(messagesTable.conversationId, conversationId),
           eq(messageAttachments.orgId, orgId),
+          isNull(messagesTable.deletedAt),
+          isNull(messageAttachments.deletedAt),
           isNull(files.deletedAt),
         ),
       );

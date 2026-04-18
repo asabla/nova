@@ -119,7 +119,7 @@ export async function agentSubtaskWorkflow(input: SubtaskInput): Promise<Subtask
         const startTime = Date.now();
         const results = await Promise.all(
           result.toolCalls.map((tc) =>
-            executeToolCall(input.orgId, input.agentId, tc.id, tc.name, tc.arguments),
+            executeToolCall(input.orgId, input.agentId, tc.id, tc.name, tc.arguments, undefined, input.conversationId),
           ),
         );
         const durationMs = Date.now() - startTime;

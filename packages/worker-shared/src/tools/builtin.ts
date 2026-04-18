@@ -183,69 +183,235 @@ export const fetchUrlTool = tool({
   },
 });
 
-export const invokeAgentTool = tool({
-  name: "invoke_agent",
-  description:
-    "Delegate a task to a specialized agent. Use when users @mention an agent or when the task matches an agent's expertise.",
-  parameters: {
-    type: "object" as const,
-    properties: {
-      agent_id: { type: "string", description: "The agent's ID" },
-      task: {
-        type: "string",
-        description: "Clear description of what the agent should do",
-      },
-    },
-    required: ["agent_id", "task"],
-    additionalProperties: false,
-  },
-  execute: async (args: unknown) => {
-    const { agent_id, task } = args as { agent_id: string; task: string };
+/**
+ * Fetch file metadata for all files attached to a conversation.
+ * Returns an array of { fileId, filename, contentType, sizeBytes, storagePath }.
+ */
+async function getConversationFiles(conversationId: string) {
+  const { messageAttachments, messages: messagesTable, files } = await import("@nova/shared/schema");
+  return db
+    .selectDistinct({
+      fileId: messageAttachments.fileId,
+      filename: files.filename,
+      contentType: files.contentType,
+      sizeBytes: files.sizeBytes,
+      storagePath: files.storagePath,
+    })
+    .from(messageAttachments)
+    .innerJoin(messagesTable, eq(messageAttachments.messageId, messagesTable.id))
+    .innerJoin(files, eq(messageAttachments.fileId, files.id))
+    .where(
+      and(
+        eq(messagesTable.conversationId, conversationId),
+        isNull(messagesTable.deletedAt),
+        isNull(messageAttachments.deletedAt),
+        isNull(files.deletedAt),
+      ),
+    );
+}
 
-    // Look up the agent config
-    const { agents } = await import("@nova/shared/schemas");
-    const [agent] = await db
-      .select()
-      .from(agents)
-      .where(
-        and(
-          eq(agents.id, agent_id),
-          eq(agents.isEnabled, true),
-          isNull(agents.deletedAt),
-        ),
-      );
+export interface ConversationFileRef {
+  fileId: string | null;
+  filename: string | null;
+  contentType: string | null;
+  sizeBytes: number | null;
+  storagePath: string | null;
+}
 
-    if (!agent) {
-      return { error: `Agent ${agent_id} not found or is disabled` };
+const RAG_INDEXED_TYPES = new Set([
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+]);
+const TABULAR_MIMES = new Set([
+  "text/csv",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+]);
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const MAX_INLINE_CHARS = 8000;
+
+/** True when the file's content should be inlined directly (small text-based formats). */
+export function shouldInlineFile(f: Pick<ConversationFileRef, "contentType" | "storagePath">): boolean {
+  if (!f.storagePath) return false;
+  return !RAG_INDEXED_TYPES.has(f.contentType ?? "");
+}
+
+/** Decode a file buffer to text based on its content type / filename. Returns null for non-text formats. */
+export async function decodeFileBuffer(
+  buffer: Buffer,
+  contentType: string,
+  filename: string | null,
+): Promise<string | null> {
+  if (contentType === XLSX_MIME || filename?.endsWith(".xlsx")) {
+    const XLSX = await import("xlsx");
+    const workbook = XLSX.read(buffer, { type: "buffer" });
+    const parts: string[] = [];
+    for (const sheetName of workbook.SheetNames) {
+      const ws = workbook.Sheets[sheetName];
+      if (!ws) continue;
+      if (workbook.SheetNames.length > 1) parts.push(`## Sheet: ${sheetName}\n`);
+      parts.push(XLSX.utils.sheet_to_csv(ws));
     }
+    return parts.join("\n");
+  }
+  if (contentType === "text/csv" || filename?.endsWith(".csv")) {
+    return buffer.toString("utf-8");
+  }
+  if (contentType.startsWith("text/") || contentType === "application/json" || contentType === "application/xml") {
+    return buffer.toString("utf-8");
+  }
+  return null;
+}
 
-    const model = agent.modelId ?? (await getDefaultChatModel());
-    const temperature =
-      (agent.modelParams as any)?.temperature ?? 0.7;
-    const maxTokens =
-      (agent.modelParams as any)?.maxTokens ?? 16384;
+/**
+ * Pure formatter: turns file metadata + pre-fetched text contents into a markdown
+ * file-context string. Extracted for testability — no DB/S3 access.
+ */
+export function formatFileContext(
+  files: ConversationFileRef[],
+  contents: Map<string, string>,
+): string {
+  if (files.length === 0) return "";
 
-    const messages = [
-      ...(agent.systemPrompt
-        ? [{ role: "system" as const, content: agent.systemPrompt }]
-        : []),
-      { role: "user" as const, content: task },
-    ];
+  const sections: string[] = [];
+  const manifestLines: string[] = [];
 
-    const result = await openai.chat.completions.create({
-      model,
-      messages,
-      temperature,
-      max_tokens: maxTokens,
-    });
+  for (const f of files) {
+    const sizeStr = `${((f.sizeBytes ?? 0) / 1024).toFixed(1)} KB`;
+    const isTabular = TABULAR_MIMES.has(f.contentType ?? "");
+    const tabularHint = isTabular ? " [TABULAR]" : "";
+    manifestLines.push(`- "${f.filename}" (id: ${f.fileId}, type: ${f.contentType}, ${sizeStr})${tabularHint}`);
 
-    const content = result.choices?.[0]?.message?.content ?? "";
-    return {
-      agent_name: agent.name,
-      response: content,
-    };
-  },
-});
+    if (f.fileId && contents.has(f.fileId)) {
+      const text = contents.get(f.fileId)!;
+      const truncated = text.length > MAX_INLINE_CHARS;
+      const content = truncated ? text.slice(0, MAX_INLINE_CHARS) + "\n... (truncated)" : text;
+      sections.push(`--- File: ${f.filename} (id: ${f.fileId}) ---\n${content}\n--- End of file ---`);
+    }
+  }
+
+  const parts = [
+    "## Files available in this conversation",
+    manifestLines.join("\n"),
+  ];
+  if (sections.length > 0) {
+    parts.push("", "## File contents", sections.join("\n\n"));
+  }
+  return parts.join("\n");
+}
+
+/**
+ * Build a file context string for the target agent, including a manifest
+ * and inlined content for small text-based files.
+ */
+export async function buildFileContext(conversationId: string): Promise<string> {
+  const convFiles = await getConversationFiles(conversationId);
+  if (convFiles.length === 0) return "";
+
+  const { getObjectBuffer } = await import("../s3");
+  const contents = new Map<string, string>();
+
+  for (const f of convFiles) {
+    if (!shouldInlineFile(f) || !f.fileId) continue;
+    try {
+      const buffer = await getObjectBuffer(f.storagePath!);
+      const text = await decodeFileBuffer(buffer, f.contentType ?? "", f.filename);
+      if (text) contents.set(f.fileId, text);
+    } catch {
+      // File read failed — agent can still use read_file tool
+    }
+  }
+
+  return formatFileContext(convFiles, contents);
+}
+
+/** Default invoke_agent tool (no conversation file context). */
+export const invokeAgentTool = createInvokeAgentTool();
+
+/**
+ * Factory for the invoke_agent tool. When conversationId is provided,
+ * the target agent receives the conversation's file manifest and inlined
+ * content so it can work with attached files.
+ */
+export function createInvokeAgentTool(conversationId?: string) {
+  return tool({
+    name: "invoke_agent",
+    description:
+      "Delegate a task to a specialized agent. Use when users @mention an agent or when the task matches an agent's expertise.",
+    parameters: {
+      type: "object" as const,
+      properties: {
+        agent_id: { type: "string", description: "The agent's ID" },
+        task: {
+          type: "string",
+          description: "Clear description of what the agent should do",
+        },
+      },
+      required: ["agent_id", "task"],
+      additionalProperties: false,
+    },
+    execute: async (args: unknown) => {
+      const { agent_id, task } = args as { agent_id: string; task: string };
+
+      // Look up the agent config
+      const { agents } = await import("@nova/shared/schemas");
+      const [agent] = await db
+        .select()
+        .from(agents)
+        .where(
+          and(
+            eq(agents.id, agent_id),
+            eq(agents.isEnabled, true),
+            isNull(agents.deletedAt),
+          ),
+        );
+
+      if (!agent) {
+        return { error: `Agent ${agent_id} not found or is disabled` };
+      }
+
+      const model = agent.modelId ?? (await getDefaultChatModel());
+      const temperature =
+        (agent.modelParams as any)?.temperature ?? 0.7;
+      const maxTokens =
+        (agent.modelParams as any)?.maxTokens ?? 16384;
+
+      // Build file context from the conversation if available
+      let fileContext = "";
+      if (conversationId) {
+        try {
+          fileContext = await buildFileContext(conversationId);
+        } catch {
+          // Non-fatal — target agent just won't have file context
+        }
+      }
+
+      const userContent = fileContext
+        ? `${task}\n\n${fileContext}`
+        : task;
+
+      const messages = [
+        ...(agent.systemPrompt
+          ? [{ role: "system" as const, content: agent.systemPrompt }]
+          : []),
+        { role: "user" as const, content: userContent },
+      ];
+
+      const result = await openai.chat.completions.create({
+        model,
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+      });
+
+      const content = result.choices?.[0]?.message?.content ?? "";
+      return {
+        agent_name: agent.name,
+        response: content,
+      };
+    },
+  });
+}
 
 export const codeExecuteTool = tool({
   name: "code_execute",
@@ -829,9 +995,17 @@ export const builtinTools = [webSearchTool, fetchUrlTool, invokeAgentTool, codeE
  * When allowedTools is provided, only returns tools whose names are in the list.
  * When allowedTools is null/undefined, returns all tools (backward compatible).
  * When knowledgeCollectionIds is provided, adds the query_knowledge tool.
+ * When conversationId is provided, invoke_agent forwards file context to target agents.
  */
-export function getBuiltinTools(orgId?: string, allowedTools?: string[] | null, knowledgeCollectionIds?: string[]): FunctionTool<any, any>[] {
+export function getBuiltinTools(orgId?: string, allowedTools?: string[] | null, knowledgeCollectionIds?: string[], conversationId?: string): FunctionTool<any, any>[] {
   let tools: FunctionTool<any, any>[] = [...builtinTools];
+
+  // Replace the default invoke_agent tool with a conversation-aware version
+  if (conversationId) {
+    tools = tools.map((t) =>
+      t.name === "invoke_agent" ? createInvokeAgentTool(conversationId) : t,
+    );
+  }
   if (orgId) {
     tools.push(createSearchWorkspaceTool(orgId));
     if (knowledgeCollectionIds && knowledgeCollectionIds.length > 0) {

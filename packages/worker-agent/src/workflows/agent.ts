@@ -776,6 +776,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         orgId: input.orgId,
         allowedBuiltinTools,
         knowledgeCollectionIds: input.knowledgeCollectionIds,
+        conversationId: input.conversationId,
         researchConfig: rc,
         traceId: tid,
       });
@@ -1252,7 +1253,16 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
       const nodeBase = agent?.systemPrompt
         ? `${agent.systemPrompt}\n\nYou are executing step "${node.id}": ${node.description}\nBe focused and concise. Complete this specific step only.${continuationNote}`
         : `You are executing step "${node.id}": ${node.description}\nBe focused and concise. Complete this specific step only.${continuationNote}`;
-      const systemPrompt = applyEffortToPrompt(nodeBase, nodeEffort)!;
+
+      // Carry over file manifest from the enriched system prompt in messageHistory
+      // so subtask nodes can access attached files via read_file / code_execute.
+      let nodePrompt = nodeBase;
+      const enrichedSystemContent = messageHistory.find((m) => m.role === "system")?.content ?? "";
+      const fileSectionMatch = enrichedSystemContent.match(/## Files in this conversation[\s\S]*?(?=\n## (?!Files|Working with)|$)/);
+      if (fileSectionMatch) {
+        nodePrompt = `${nodeBase}\n\n${fileSectionMatch[0].trim()}`;
+      }
+      const systemPrompt = applyEffortToPrompt(nodePrompt, nodeEffort)!;
 
       // Run the agent loop with tools — this handles tool calls natively
       const allowedBuiltinTools = (agent as any)?.builtinTools ?? null;
@@ -1268,6 +1278,7 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
         orgId: input.orgId,
         allowedBuiltinTools,
         knowledgeCollectionIds: input.knowledgeCollectionIds,
+        conversationId: input.conversationId,
         researchConfig: input.researchConfig,
         traceId: tid,
       });
@@ -1336,7 +1347,13 @@ export async function agentWorkflow(input: AgentWorkflowInput): Promise<AgentWor
             traceId: tid,
             task: node.description,
             context: input.userMessage ?? "",
-            systemPrompt: agent?.systemPrompt,
+            systemPrompt: (() => {
+              let sp = agent?.systemPrompt ?? "";
+              const enrichedSys = messageHistory.find((m) => m.role === "system")?.content ?? "";
+              const match = enrichedSys.match(/## Files in this conversation[\s\S]*?(?=\n## (?!Files|Working with)|$)/);
+              if (match) sp = sp ? `${sp}\n\n${match[0].trim()}` : match[0].trim();
+              return sp || undefined;
+            })(),
             tools: node.tools,
             model: node.assignedModel ?? modelId,
             modelParams: input.modelParams,

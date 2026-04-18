@@ -184,6 +184,7 @@ export async function executeToolCall(
   toolName: string,
   toolArguments: string,
   knowledgeCollectionIds?: string[],
+  conversationId?: string,
 ): Promise<StructuredToolResult> {
   try {
     const args = JSON.parse(toolArguments);
@@ -284,12 +285,25 @@ export async function executeToolCall(
           };
         }
 
+        // Build file context from the conversation so the target agent can see attached files
+        let fileContext = "";
+        if (conversationId) {
+          try {
+            const { buildFileContext } = await import("@nova/worker-shared/tools");
+            fileContext = await buildFileContext(conversationId);
+          } catch {
+            // Non-fatal — target agent just won't have file context
+          }
+        }
+
+        const userContent = fileContext ? `${task}\n\n${fileContext}` : task;
+
         const targetModel = targetAgent.modelId ?? await getDefaultChatModel();
         const msgs = [
           ...(targetAgent.systemPrompt
             ? [{ role: "system" as const, content: targetAgent.systemPrompt }]
             : []),
-          { role: "user" as const, content: task },
+          { role: "user" as const, content: userContent },
         ];
 
         const agentCallParams = await buildChatParams(targetModel, {
