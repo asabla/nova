@@ -17,6 +17,7 @@ import { useClipboardPaste } from "../../hooks/useClipboardPaste";
 import { useTypingIndicator } from "../../hooks/useTypingIndicator";
 import { toast } from "../../components/ui/Toast";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
+import { computeRerunPlan, computeEditAndRerunPlan } from "../../lib/rerun";
 
 
 export const Route = createFileRoute("/_auth/conversations/$id")({
@@ -286,38 +287,26 @@ function ConversationPage() {
 
   const handleEditAndRerun = useCallback(async (messageId: string, content: string) => {
     try {
-      const msg = messages.find((m: any) => m.id === messageId);
-      if (!msg) return;
+      const plan = computeEditAndRerunPlan(messages, messageId);
+      if (!plan) return;
 
-      // Create a NEW user message as a sibling (same parent as original)
-      const newUserMsg = await api.post<any>(`/api/conversations/${id}/messages`, {
-        content,
-        parentMessageId: msg.parentMessageId ?? undefined,
-      });
+      // Edit the user message in place (server appends old content to editHistory)
+      await api.patch(`/api/conversations/${id}/messages/${messageId}`, { content });
 
-      // Set the new user message as the active branch
-      if (msg.parentMessageId) {
-        const { useBranchStore } = await import("../../stores/branch.store");
-        useBranchStore.getState().setActiveChild(id, msg.parentMessageId, newUserMsg.id);
-      }
-
+      // Soft-delete the old assistant response and anything that followed, then
+      // refetch so the UI reflects the truncation before the new response streams in
+      await api.post(`/api/conversations/${id}/messages/${plan.anchorId}/truncate-after`, {});
       await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
 
-      // Build history from the active path up to the new user message
-      const activePath = messages.filter((m: any) => {
-        const idx = messages.indexOf(msg);
-        return messages.indexOf(m) < idx;
-      });
       const modelParams = getModelParams();
-
       const apiUrl = import.meta.env.VITE_API_URL ?? "";
       startStream(`${apiUrl}/api/conversations/${id}/messages/stream`, {
         model: conversation?.modelId ?? "default",
         ...modelParams,
-        parentMessageId: newUserMsg.id,
+        parentMessageId: plan.parentMessageId,
         messages: [
           ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
-          ...activePath
+          ...plan.history
             .filter((m: any) => m.content != null && m.content !== "")
             .map((m: any) => ({
               role: m.senderType === "user" ? "user" : "assistant",
@@ -334,44 +323,38 @@ function ConversationPage() {
   }, [id, messages, conversation, startStream, getModelParams, queryClient, t]);
 
   const handleRerun = useCallback(async (messageId: string, modelId?: string) => {
-    const msg = messages.find((m: any) => m.id === messageId);
-    if (!msg) return;
+    try {
+      const plan = computeRerunPlan(messages, messageId);
+      if (!plan) return;
 
-    const idx = messages.indexOf(msg);
+      // Soft-delete the old response (and anything after) so it disappears from
+      // view before the new one streams in
+      await api.post(`/api/conversations/${id}/messages/${plan.anchorId}/truncate-after`, {});
+      await queryClient.invalidateQueries({ queryKey: queryKeys.conversations.messages(id) });
 
-    // Determine the parent for the new sibling message
-    // For assistant messages: create a sibling under the same parent (the user message)
-    // For user messages: create a new assistant child under this user message
-    const parentId = msg.senderType === "assistant"
-      ? msg.parentMessageId  // same parent = sibling of old assistant response
-      : messageId;            // user message IS the parent for the new assistant response
-
-    // Build message history up to (but not including) the message being rerun
-    const previousMessages = msg.senderType === "user"
-      ? messages.slice(0, idx + 1)  // include the user message
-      : messages.slice(0, idx);     // exclude the assistant message
-
-    const modelParams = getModelParams();
-    const baseTemp = modelParams.temperature ?? 0.7;
-
-    const apiUrl = import.meta.env.VITE_API_URL ?? "";
-    startStream(`${apiUrl}/api/conversations/${id}/messages/stream`, {
-      model: modelId ?? conversation?.modelId ?? "default",
-      ...modelParams,
-      // Add temperature jitter so reruns produce different output
-      temperature: baseTemp + Math.random() * 0.15,
-      parentMessageId: parentId ?? undefined,
-      messages: [
-        ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
-        ...previousMessages
-          .filter((m: any) => m.content != null && m.content !== "")
-          .map((m: any) => ({
-            role: m.senderType === "user" ? "user" : "assistant",
-            content: m.content,
-          })),
-      ],
-    });
-  }, [id, messages, conversation, startStream, getModelParams]);
+      const modelParams = getModelParams();
+      const baseTemp = modelParams.temperature ?? 0.7;
+      const apiUrl = import.meta.env.VITE_API_URL ?? "";
+      startStream(`${apiUrl}/api/conversations/${id}/messages/stream`, {
+        model: modelId ?? conversation?.modelId ?? "default",
+        ...modelParams,
+        // Temperature jitter so reruns produce different output
+        temperature: baseTemp + Math.random() * 0.15,
+        parentMessageId: plan.parentMessageId,
+        messages: [
+          ...(conversation?.systemPrompt ? [{ role: "system", content: conversation.systemPrompt }] : []),
+          ...plan.history
+            .filter((m: any) => m.content != null && m.content !== "")
+            .map((m: any) => ({
+              role: m.senderType === "user" ? "user" : "assistant",
+              content: m.content,
+            })),
+        ],
+      });
+    } catch {
+      toast(t("conversations.rerunFailed", "Failed to re-run message"), "error");
+    }
+  }, [id, messages, conversation, startStream, getModelParams, queryClient, t]);
 
   const forkAtMessage = useMutation({
     mutationFn: (messageId: string) =>

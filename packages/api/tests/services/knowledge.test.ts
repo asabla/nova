@@ -58,10 +58,18 @@ mock.module("../../src/lib/redis", () => ({
 }));
 
 mock.module("../../src/lib/qdrant-sync", () => ({
+  syncConversationUpsert: () => {},
+  syncConversationDelete: () => {},
+  syncMessageUpsert: () => {},
+  syncMessageDelete: () => {},
+  syncAgentUpsert: () => {},
+  syncAgentDelete: () => {},
   syncKnowledgeDocUpsert: () => {},
   syncKnowledgeDocDelete: () => {},
   syncKnowledgeChunksByDocumentDelete: () => {},
   syncKnowledgeChunksByCollectionDelete: () => {},
+  syncFileUpsert: () => {},
+  syncFileDelete: () => {},
 }));
 
 mock.module("../../src/lib/qdrant", () => ({
