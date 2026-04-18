@@ -38,19 +38,39 @@ COPY packages/admin/package.json packages/admin/
 COPY packages/api/package.json packages/api/
 COPY packages/web/package.json packages/web/
 
+# Install deps, then patch and slim node_modules in the same RUN so the
+# deleted bytes never land in a layer (a separate `rm -rf` step would leave
+# them in the earlier install layer).
+#
+# Patches applied:
+#  - agents-core: .superRefine() on ComputerUseCallItem produces ZodEffects,
+#    but zod v3 compat discriminatedUnion requires ZodObject with .shape.
+#
+# Slimming @temporalio/core-bridge:
+#  - Drop darwin and windows prebuilts (~73 MB) — we only run on linux.
+#  - Drop Rust source trees (src/, sdk-core/, bridge-macros/, ts/, Cargo.*)
+#    (~7 MB) — only needed to compile from source.
+#  - Keep linux x64 + arm64 prebuilts so the image is portable across
+#    both architectures.
 RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun install --frozen-lockfile
-
-# Patch: agents-core uses .superRefine() on ComputerUseCallItem which produces
-# ZodEffects — but zod v3 compat discriminatedUnion requires ZodObject with .shape.
-RUN for f in node_modules/@openai/agents-core/dist/types/protocol.mjs \
+    bun install --frozen-lockfile && \
+    for f in node_modules/@openai/agents-core/dist/types/protocol.mjs \
              node_modules/@openai/agents-core/dist/types/protocol.js; do \
       bun -e " \
         const code = await Bun.file('$f').text(); \
         const patched = code.replace(/\}\)\.superRefine\(\(value,\s*ctx\)\s*=>\s*\{[\s\S]*?\n\}\);/g, '});'); \
         await Bun.write('$f', patched); \
       "; \
-    done
+    done && \
+    rm -rf node_modules/@temporalio/core-bridge/releases/aarch64-apple-darwin \
+           node_modules/@temporalio/core-bridge/releases/x86_64-apple-darwin \
+           node_modules/@temporalio/core-bridge/releases/x86_64-pc-windows-msvc \
+           node_modules/@temporalio/core-bridge/src \
+           node_modules/@temporalio/core-bridge/sdk-core \
+           node_modules/@temporalio/core-bridge/bridge-macros \
+           node_modules/@temporalio/core-bridge/ts \
+           node_modules/@temporalio/core-bridge/Cargo.lock \
+           node_modules/@temporalio/core-bridge/Cargo.toml
 
 # Copy and build shared packages (same for all workers)
 COPY packages/shared/ packages/shared/
