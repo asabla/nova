@@ -4,7 +4,7 @@ initTelemetry("nova-worker-agent");
 import path from "node:path";
 import { runWorker } from "@nova/worker-shared/run-worker";
 import { logger } from "@nova/worker-shared/logger";
-import * as activities from "./activities";
+import * as activities from "./activities/index.js";
 
 const WORKFLOW_BUNDLE_PATH = path.resolve(import.meta.dirname, "workflow-bundle.js");
 

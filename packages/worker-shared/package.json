@@ -5,90 +5,112 @@
   "exports": {
     "./db": {
       "types": "./dist/db.d.ts",
+      "node": "./dist/db.js",
       "default": "./src/db.ts"
     },
     "./redis": {
       "types": "./dist/redis.d.ts",
+      "node": "./dist/redis.js",
       "default": "./src/redis.ts"
     },
     "./env": {
       "types": "./dist/env.d.ts",
+      "node": "./dist/env.js",
       "default": "./src/env.ts"
     },
     "./litellm": {
       "types": "./dist/litellm.d.ts",
+      "node": "./dist/litellm.js",
       "default": "./src/litellm.ts"
     },
     "./models": {
       "types": "./dist/models.d.ts",
+      "node": "./dist/models.js",
       "default": "./src/models.ts"
     },
     "./stream": {
       "types": "./dist/stream-publisher.d.ts",
+      "node": "./dist/stream-publisher.js",
       "default": "./src/stream-publisher.ts"
     },
     "./qdrant": {
       "types": "./dist/qdrant.d.ts",
+      "node": "./dist/qdrant.js",
       "default": "./src/qdrant.ts"
     },
     "./s3": {
       "types": "./dist/s3.d.ts",
+      "node": "./dist/s3.js",
       "default": "./src/s3.ts"
     },
     "./sandbox": {
       "types": "./dist/docker-sandbox.d.ts",
+      "node": "./dist/docker-sandbox.js",
       "default": "./src/docker-sandbox.ts"
     },
     "./tar": {
       "types": "./dist/tar.d.ts",
+      "node": "./dist/tar.js",
       "default": "./src/tar.ts"
     },
     "./model-client": {
       "types": "./dist/model-client.d.ts",
+      "node": "./dist/model-client.js",
       "default": "./src/model-client.ts"
     },
     "./agent-sdk-model": {
       "types": "./dist/agent-sdk-model.d.ts",
+      "node": "./dist/agent-sdk-model.js",
       "default": "./src/agent-sdk-model.ts"
     },
     "./message-convert": {
       "types": "./dist/message-convert.d.ts",
+      "node": "./dist/message-convert.js",
       "default": "./src/message-convert.ts"
     },
     "./tools": {
       "types": "./dist/tools/index.d.ts",
+      "node": "./dist/tools/index.js",
       "default": "./src/tools/index.ts"
     },
     "./research-queries": {
       "types": "./dist/research-queries.d.ts",
+      "node": "./dist/research-queries.js",
       "default": "./src/research-queries.ts"
     },
     "./reasoning-model": {
       "types": "./dist/reasoning-model.d.ts",
+      "node": "./dist/reasoning-model.js",
       "default": "./src/reasoning-model.ts"
     },
     "./microsoft-graph": {
       "types": "./dist/microsoft-graph.d.ts",
+      "node": "./dist/microsoft-graph.js",
       "default": "./src/microsoft-graph.ts"
     },
     "./prompt-resolver": {
       "types": "./dist/prompt-resolver.d.ts",
+      "node": "./dist/prompt-resolver.js",
       "default": "./src/prompt-resolver.ts"
     },
     "./youtube": {
       "types": "./dist/youtube.d.ts",
+      "node": "./dist/youtube.js",
       "default": "./src/youtube.ts"
     },
     "./logger": {
       "types": "./dist/logger.d.ts",
+      "node": "./dist/logger.js",
       "default": "./src/logger.ts"
     },
     "./telemetry": {
       "types": "./dist/telemetry.d.ts",
+      "node": "./dist/telemetry.js",
       "default": "./src/telemetry.ts"
     },
     "./run-worker": {
       "types": "./dist/run-worker.d.ts",
+      "node": "./dist/run-worker.js",
       "default": "./src/run-worker.ts"
     }
   },

@@ -5,7 +5,22 @@
 ARG WORKER_PACKAGE=worker-agent
 
 # ── Stage 1: Shared base — deps install, patches, shared source build (cached across all workers) ──
-FROM oven/bun:1-alpine AS base
+#
+# Using the debian-slim variant (not alpine) so @temporalio/core-bridge's
+# glibc prebuilt binaries match the node:22-slim runtime stage and dlopen
+# cleanly during bundleWorkflowCode at build time.
+#
+# Both oven/bun images ship a `node` shim at /usr/local/bun-node-fallback-bin
+# that forwards to bun. That breaks webpack internals used by the bundle
+# step, so we install real Node.js and remove the shim.
+FROM oven/bun:1 AS base
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl ca-certificates && \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    rm -f /usr/local/bun-node-fallback-bin/node && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -102,4 +117,10 @@ COPY --from=builder /app/package.json ./
 USER node
 
 ENV WORKER_PACKAGE=${WORKER_PACKAGE}
-CMD node packages/${WORKER_PACKAGE}/dist/index.js
+# tsx (not plain `node`) because worker-shared/src/*.ts files import their
+# siblings without a `.js` extension — a TypeScript convention that's fine
+# under bundlers and tsx but breaks pure Node ESM resolution. tsx's loader
+# handles the resolution transparently and shipping it at runtime is
+# cheap. Adding explicit `.js` extensions everywhere was considered and
+# rejected as excessive churn for this cleanup pass.
+CMD npx tsx packages/${WORKER_PACKAGE}/dist/index.js
