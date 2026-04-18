@@ -59,9 +59,10 @@ ARG WORKER_PACKAGE
 # Copy only the target worker's source (this layer varies per worker)
 COPY packages/${WORKER_PACKAGE}/ packages/${WORKER_PACKAGE}/
 
-# Build the worker (shared + worker-shared already built in base)
+# Build the worker: tsc compiles TS → dist/, then bundleWorkflowCode
+# emits dist/workflow-bundle.js for Temporal's workflow sandbox.
 RUN rm -rf packages/${WORKER_PACKAGE}/dist packages/${WORKER_PACKAGE}/*.tsbuildinfo && \
-    cd packages/${WORKER_PACKAGE} && bunx tsc -b
+    cd packages/${WORKER_PACKAGE} && bun run build
 
 # Production deps only
 RUN --mount=type=cache,target=/root/.bun/install/cache \

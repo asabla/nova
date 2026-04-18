@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && bun run build:workflows",
+    "build:workflows": "tsx scripts/build-workflow-bundle.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
