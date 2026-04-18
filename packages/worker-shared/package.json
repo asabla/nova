@@ -86,6 +86,10 @@
     "./telemetry": {
       "types": "./dist/telemetry.d.ts",
       "default": "./src/telemetry.ts"
+    },
+    "./run-worker": {
+      "types": "./dist/run-worker.d.ts",
+      "default": "./src/run-worker.ts"
     }
   },
   "scripts": {
