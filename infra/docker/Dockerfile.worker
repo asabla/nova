@@ -79,20 +79,13 @@ COPY packages/${WORKER_PACKAGE}/ packages/${WORKER_PACKAGE}/
 RUN rm -rf packages/${WORKER_PACKAGE}/dist packages/${WORKER_PACKAGE}/*.tsbuildinfo && \
     cd packages/${WORKER_PACKAGE} && bun run build
 
-# Production deps only
-RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun install --frozen-lockfile --production
-
-# Re-patch after production install
-RUN for f in node_modules/@openai/agents-core/dist/types/protocol.mjs \
-             node_modules/@openai/agents-core/dist/types/protocol.js; do \
-      bun -e " \
-        const code = await Bun.file('$f').text(); \
-        const patched = code.replace(/\}\)\.superRefine\(\(value,\s*ctx\)\s*=>\s*\{[\s\S]*?\n\}\);/g, '});'); \
-        await Bun.write('$f', patched); \
-      "; \
-    done
-
+# The base stage already installed all deps (including dev) and patched
+# @openai/agents-core. We intentionally skip a second `bun install --production`
+# and the second patch pass: the install reinstates roughly the same tree we
+# just had and the patch has to run again to cover it. That round-trip cost
+# ~0.5-2s per build and made the Dockerfile harder to reason about. The
+# tradeoff is ~50-80 MB of dev deps (typescript, @types/*) in the final image.
+#
 # Note: zod 3.25+ has native ./v3 and ./v4 sub-path exports — no shims needed.
 
 # ── Stage 3: Runtime (Node.js — required by Temporal) ──
