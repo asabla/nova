@@ -21,8 +21,8 @@ import {
   type GraphDriveItem,
   type GraphMessage,
 } from "@nova/worker-shared/microsoft-graph";
-import type { ConnectorSyncInput } from "../workflows/connector-sync";
-import { syncRepoFiles } from "./repo-sync.activities";
+import type { ConnectorSyncInput } from "../workflows/connector-sync.js";
+import { syncRepoFiles } from "./repo-sync.activities.js";
 
 // ── Status Updates ──
 

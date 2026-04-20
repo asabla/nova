@@ -1,4 +1,4 @@
-import type { ContentChunk, ChunkMetadata, ChunkOptions } from "./types";
+import type { ContentChunk, ChunkMetadata, ChunkOptions } from "./types.js";
 
 const DEFAULTS: Required<ChunkOptions> = {
   maxChunkSize: 1500,

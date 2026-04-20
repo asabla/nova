@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import { DefaultLogger, type LogWriter } from "drizzle-orm";
 import postgres from "postgres";
-import { env } from "./env";
+import { env } from "./env.js";
 import { trace, context } from "@opentelemetry/api";
 
 const client = postgres(env.DATABASE_URL, {

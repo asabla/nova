@@ -1,4 +1,4 @@
-import type { Role } from "../constants/roles";
+import type { Role } from "../constants/roles.js";
 
 export interface SessionUser {
   id: string;

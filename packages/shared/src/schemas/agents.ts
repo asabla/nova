@@ -1,10 +1,10 @@
 import { pgTable, text, uuid, timestamp, boolean, integer, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { organisations } from "./organisations";
-import { users } from "./users";
-import { conversations } from "./conversations";
-import { promptTemplates } from "./prompts";
-import { customWorkers } from "./custom-workers";
+import { organisations } from "./organisations.js";
+import { users } from "./users.js";
+import { conversations } from "./conversations.js";
+import { promptTemplates } from "./prompts.js";
+import { customWorkers } from "./custom-workers.js";
 
 export const agents = pgTable("agents", {
   id: uuid("id").primaryKey().defaultRandom(),

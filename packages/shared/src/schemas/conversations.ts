@@ -1,9 +1,9 @@
 import { pgTable, text, uuid, timestamp, boolean, bigint, integer, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { organisations } from "./organisations";
-import { users } from "./users";
-import { agents } from "./agents";
-import { knowledgeCollections } from "./knowledge";
+import { organisations } from "./organisations.js";
+import { users } from "./users.js";
+import { agents } from "./agents.js";
+import { knowledgeCollections } from "./knowledge.js";
 export const conversations = pgTable("conversations", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").notNull().references(() => organisations.id, { onDelete: "cascade" }),

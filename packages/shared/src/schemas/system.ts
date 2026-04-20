@@ -1,7 +1,7 @@
 import { pgTable, text, uuid, timestamp, integer, jsonb, boolean, index, uniqueIndex, bigint } from "drizzle-orm/pg-core";
-import { organisations } from "./organisations";
-import { users } from "./users";
-import { files } from "./files";
+import { organisations } from "./organisations.js";
+import { users } from "./users.js";
+import { files } from "./files.js";
 
 export const systemHealthChecks = pgTable("system_health_checks", {
   id: uuid("id").primaryKey().defaultRandom(),

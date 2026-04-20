@@ -1,9 +1,9 @@
 import { pgTable, text, uuid, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { createSelectSchema } from "drizzle-zod";
-import { organisations } from "./organisations";
-import { users } from "./users";
-import { conversations } from "./conversations";
-import { agents } from "./agents";
+import { organisations } from "./organisations.js";
+import { users } from "./users.js";
+import { conversations } from "./conversations.js";
+import { agents } from "./agents.js";
 
 export const workflows = pgTable("workflows", {
   id: uuid("id").primaryKey().defaultRandom(),

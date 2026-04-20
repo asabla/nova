@@ -4,7 +4,7 @@ import type {
   PlanNodeStatus,
   UserInteractionRequest,
   UserInteractionResponse,
-} from "./agent-flow";
+} from "./agent-flow.js";
 
 export type SSEEvent =
   // --- Streaming ---

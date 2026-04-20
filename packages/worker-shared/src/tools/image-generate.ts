@@ -1,5 +1,5 @@
 import { tool } from "@openai/agents";
-import { generateImage } from "../image-generation";
+import { generateImage } from "../image-generation.js";
 
 /**
  * Factory: creates an image_generate tool scoped to a specific org.

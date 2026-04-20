@@ -1,9 +1,9 @@
 import { eq, and, isNull } from "drizzle-orm";
 import OpenAI from "openai";
-import { db } from "./db";
+import { db } from "./db.js";
 import { models, modelProviders } from "@nova/shared/schemas";
-import { env } from "./env";
-import { createProviderClient, type ResolvedProvider } from "./model-client";
+import { env } from "./env.js";
+import { createProviderClient, type ResolvedProvider } from "./model-client.js";
 
 let cachedDefaultModel: string | null = null;
 let cachedEmbeddingModel: string | null = null;

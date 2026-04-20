@@ -1,5 +1,5 @@
 import { eq, and, inArray, isNull, sql, desc } from "drizzle-orm";
-import { db } from "./db";
+import { db } from "./db.js";
 import { knowledgeChunks, knowledgeDocuments, files, fileChunks } from "@nova/shared/schemas";
 
 export interface KnowledgeChunkResult {

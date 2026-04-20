@@ -1,9 +1,9 @@
-import type { SandboxFile } from "./docker-sandbox";
-import { sandboxExecute } from "./docker-sandbox";
-import { openai } from "./litellm";
-import { getVisionModel } from "./models";
-import { env } from "./env";
-import { logger } from "./logger";
+import type { SandboxFile } from "./docker-sandbox.js";
+import { sandboxExecute } from "./docker-sandbox.js";
+import { openai } from "./litellm.js";
+import { getVisionModel } from "./models.js";
+import { env } from "./env.js";
+import { logger } from "./logger.js";
 
 const VISUAL_EXTENSIONS = new Set([
   ".png",

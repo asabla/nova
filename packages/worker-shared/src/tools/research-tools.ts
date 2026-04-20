@@ -4,8 +4,8 @@ import type { ResearchProgressType } from "@nova/shared/constants";
 import {
   publishResearchSource,
   publishResearchProgress,
-} from "../stream-publisher";
-import { queryKnowledgeCollections, fetchFileContents } from "../research-queries";
+} from "../stream-publisher.js";
+import { queryKnowledgeCollections, fetchFileContents } from "../research-queries.js";
 
 export interface ResearchSource {
   title: string;

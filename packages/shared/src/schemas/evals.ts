@@ -1,9 +1,9 @@
 import { pgTable, text, uuid, timestamp, boolean, integer, jsonb, numeric, index, uniqueIndex, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { organisations } from "./organisations";
-import { users } from "./users";
-import { messages } from "./messages";
-import { conversations } from "./conversations";
+import { organisations } from "./organisations.js";
+import { users } from "./users.js";
+import { messages } from "./messages.js";
+import { conversations } from "./conversations.js";
 
 // ---------------------------------------------------------------------------
 // System Prompts — named prompt slots replacing hardcoded constants

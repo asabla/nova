@@ -9,17 +9,17 @@ import {
   startChild,
   upsertSearchAttributes,
 } from "@temporalio/workflow";
-import type * as agentActivities from "../activities/agent-execution.activities";
-import type * as agentStepActivities from "../activities/agent-step.activities";
-import type * as agentRunActivities from "../activities/agent-run.activities";
-import type * as smartChatActivities from "../activities/smart-chat.activities";
-import type * as planningActivities from "../activities/agent-planning.activities";
-import type * as contextActivities from "../activities/agent-context.activities";
-import type * as streamActivities from "../activities/stream.activities";
-import type * as researchPersistenceActivities from "../activities/research-persistence.activities";
-import type * as proxyWorkerActivities from "../activities/proxy-worker.activities";
-import type * as resolveWorkerActivities from "../activities/resolve-worker.activities";
-import type * as promptResolutionActivities from "../activities/prompt-resolution.activities";
+import type * as agentActivities from "../activities/agent-execution.activities.js";
+import type * as agentStepActivities from "../activities/agent-step.activities.js";
+import type * as agentRunActivities from "../activities/agent-run.activities.js";
+import type * as smartChatActivities from "../activities/smart-chat.activities.js";
+import type * as planningActivities from "../activities/agent-planning.activities.js";
+import type * as contextActivities from "../activities/agent-context.activities.js";
+import type * as streamActivities from "../activities/stream.activities.js";
+import type * as researchPersistenceActivities from "../activities/research-persistence.activities.js";
+import type * as proxyWorkerActivities from "../activities/proxy-worker.activities.js";
+import type * as resolveWorkerActivities from "../activities/resolve-worker.activities.js";
+import type * as promptResolutionActivities from "../activities/prompt-resolution.activities.js";
 import type {
   AgentWorkflowInput,
   AgentWorkflowResult,
@@ -339,7 +339,7 @@ const { resolveWorkflowPrompts } = proxyActivities<typeof promptResolutionActivi
   retry: RETRY_POLICIES.EXTERNAL,
 });
 
-import type * as notificationActivities from "../activities/notification.activities";
+import type * as notificationActivities from "../activities/notification.activities.js";
 const { notifyAgentCompleteActivity } = proxyActivities<typeof notificationActivities>({
   startToCloseTimeout: "15 seconds",
   retry: RETRY_POLICIES.PUBLISH,

@@ -130,10 +130,4 @@ COPY --from=builder /app/package.json ./
 USER node
 
 ENV WORKER_PACKAGE=${WORKER_PACKAGE}
-# tsx (not plain `node`) because worker-shared/src/*.ts files import their
-# siblings without a `.js` extension — a TypeScript convention that's fine
-# under bundlers and tsx but breaks pure Node ESM resolution. tsx's loader
-# handles the resolution transparently and shipping it at runtime is
-# cheap. Adding explicit `.js` extensions everywhere was considered and
-# rejected as excessive churn for this cleanup pass.
-CMD npx tsx packages/${WORKER_PACKAGE}/dist/index.js
+CMD node packages/${WORKER_PACKAGE}/dist/index.js

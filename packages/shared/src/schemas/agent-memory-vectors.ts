@@ -1,8 +1,8 @@
 import { pgTable, text, uuid, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { createSelectSchema, createInsertSchema } from "drizzle-zod";
-import { organisations } from "./organisations";
-import { users } from "./users";
-import { agents } from "./agents";
+import { organisations } from "./organisations.js";
+import { users } from "./users.js";
+import { agents } from "./agents.js";
 
 export const agentMemoryVectors = pgTable("agent_memory_vectors", {
   id: uuid("id").primaryKey().defaultRandom(),

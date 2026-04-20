@@ -1,7 +1,7 @@
 import { pgTable, text, uuid, timestamp, boolean, index } from "drizzle-orm/pg-core";
-import { organisations } from "./organisations";
-import { users } from "./users";
-import { sessions } from "./users";
+import { organisations } from "./organisations.js";
+import { users } from "./users.js";
+import { sessions } from "./users.js";
 
 export const ssoProviders = pgTable("sso_providers", {
   id: uuid("id").primaryKey().defaultRandom(),

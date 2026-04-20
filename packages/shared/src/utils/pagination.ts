@@ -1,4 +1,4 @@
-import { DEFAULTS } from "../constants/defaults";
+import { DEFAULTS } from "../constants/defaults.js";
 
 export interface PaginationInput {
   page?: number;

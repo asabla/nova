@@ -1,6 +1,6 @@
 import { tool } from "@openai/agents";
 import { eq, and, isNull } from "drizzle-orm";
-import { db } from "../db";
+import { db } from "../db.js";
 
 /**
  * Load custom tools registered to an agent from the database and

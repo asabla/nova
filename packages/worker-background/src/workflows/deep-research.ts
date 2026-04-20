@@ -5,7 +5,7 @@ import {
   setHandler,
   condition,
 } from "@temporalio/workflow";
-import type * as activities from "../activities";
+import type * as activities from "../activities/index.js";
 import type { UserInteractionResponse } from "@nova/shared/types";
 import { RETRY_POLICIES } from "@nova/shared/constants";
 

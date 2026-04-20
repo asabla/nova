@@ -1,8 +1,8 @@
 import { pgTable, text, uuid, timestamp, bigint, integer, index, unique } from "drizzle-orm/pg-core";
 import { createSelectSchema } from "drizzle-zod";
-import { organisations } from "./organisations";
-import { users } from "./users";
-import { groups } from "./groups";
+import { organisations } from "./organisations.js";
+import { users } from "./users.js";
+import { groups } from "./groups.js";
 
 export const usageStats = pgTable("usage_stats", {
   id: uuid("id").primaryKey().defaultRandom(),

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { resolveModelClient } from "./models";
-import { putObjectBuffer } from "./s3";
-import { env } from "./env";
+import { resolveModelClient } from "./models.js";
+import { putObjectBuffer } from "./s3.js";
+import { env } from "./env.js";
 
 export interface ImageGenerationParams {
   prompt: string;

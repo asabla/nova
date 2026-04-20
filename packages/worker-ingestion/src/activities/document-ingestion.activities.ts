@@ -8,10 +8,10 @@ import { files } from "@nova/shared/schema";
 import { extractFromHtml, chunkContent } from "@nova/shared/content";
 import { decodeBuffer, stripNullBytes } from "@nova/shared/utils";
 import type { ContentChunk } from "@nova/shared/content";
-import type { DocumentIngestionInput } from "../workflows/document-ingestion";
-import { extractCsv, extractXlsx, tabularToDescriptor } from "../lib/extract-tabular";
-import { extractImageContent } from "../lib/extract-image";
-import { extractPptxContent } from "../lib/extract-pptx";
+import type { DocumentIngestionInput } from "../workflows/document-ingestion.js";
+import { extractCsv, extractXlsx, tabularToDescriptor } from "../lib/extract-tabular.js";
+import { extractImageContent } from "../lib/extract-image.js";
+import { extractPptxContent } from "../lib/extract-pptx.js";
 import {
   isYouTubeUrl,
   extractYouTubeVideoId,
@@ -20,9 +20,9 @@ import {
   assembleTranscriptMarkdown,
   chunkTranscriptWithTimestamps,
   type TranscriptSegment,
-} from "../lib/extract-youtube";
+} from "../lib/extract-youtube.js";
 import { upsertPoints, deletePointsByFilter, COLLECTIONS } from "@nova/worker-shared/qdrant";
-import { chunkCodeFile } from "../lib/code-chunker";
+import { chunkCodeFile } from "../lib/code-chunker.js";
 import { CODE_FILE_EXTENSIONS } from "@nova/shared/constants";
 import { logger } from "@nova/worker-shared/logger";
 

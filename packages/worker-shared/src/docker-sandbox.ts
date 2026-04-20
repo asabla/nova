@@ -1,8 +1,8 @@
 import { request } from "node:http";
 import { existsSync } from "node:fs";
-import { env } from "./env";
-import { createTar, extractTar, type TarEntry } from "./tar";
-import { logger } from "./logger";
+import { env } from "./env.js";
+import { createTar, extractTar, type TarEntry } from "./tar.js";
+import { logger } from "./logger.js";
 
 // ── Types ────────────────────────────────────────────────
 

@@ -7,34 +7,42 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "node": "./dist/index.js",
       "default": "./src/index.ts"
     },
     "./schema": {
       "types": "./dist/schemas/index.d.ts",
+      "node": "./dist/schemas/index.js",
       "default": "./src/schemas/index.ts"
     },
     "./schemas": {
       "types": "./dist/schemas/index.d.ts",
+      "node": "./dist/schemas/index.js",
       "default": "./src/schemas/index.ts"
     },
     "./types": {
       "types": "./dist/types/index.d.ts",
+      "node": "./dist/types/index.js",
       "default": "./src/types/index.ts"
     },
     "./constants": {
       "types": "./dist/constants/index.d.ts",
+      "node": "./dist/constants/index.js",
       "default": "./src/constants/index.ts"
     },
     "./utils": {
       "types": "./dist/utils/index.d.ts",
+      "node": "./dist/utils/index.js",
       "default": "./src/utils/index.ts"
     },
     "./content": {
       "types": "./dist/content/index.d.ts",
+      "node": "./dist/content/index.js",
       "default": "./src/content/index.ts"
     },
     "./skills": {
       "types": "./dist/skills.d.ts",
+      "node": "./dist/skills.js",
       "default": "./src/skills.ts"
     }
   },

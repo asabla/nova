@@ -6,7 +6,7 @@ import { getDefaultEmbeddingModel } from "@nova/worker-shared/models";
 import { upsertPoints, deletePointsByFilter, COLLECTIONS } from "@nova/worker-shared/qdrant";
 import { knowledgeDocuments, knowledgeChunks, knowledgeConnectors } from "@nova/shared/schemas";
 import type { ContentChunk } from "@nova/shared/content";
-import type { ConnectorSyncInput } from "../workflows/connector-sync";
+import type { ConnectorSyncInput } from "../workflows/connector-sync.js";
 import {
   createRepoProvider,
   filterTree,
@@ -17,8 +17,8 @@ import {
   cleanupClone,
   type RepoFile,
   type RepoProvider,
-} from "../lib/git-utils";
-import { chunkCodeFile } from "../lib/code-chunker";
+} from "../lib/git-utils.js";
+import { chunkCodeFile } from "../lib/code-chunker.js";
 import { logger } from "@nova/worker-shared/logger";
 
 interface EmbeddedChunk extends ContentChunk {

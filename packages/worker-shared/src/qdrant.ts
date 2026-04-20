@@ -1,5 +1,5 @@
 import { QdrantClient } from "@qdrant/js-client-rest";
-import { env } from "./env";
+import { env } from "./env.js";
 
 // ── Collection names ───────────────────────────────────────────────
 export const COLLECTIONS = {

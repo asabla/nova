@@ -1,7 +1,7 @@
 import { pgTable, text, uuid, timestamp, jsonb, index } from "drizzle-orm/pg-core";
-import { organisations } from "./organisations";
-import { messages } from "./messages";
-import { conversations } from "./conversations";
+import { organisations } from "./organisations.js";
+import { messages } from "./messages.js";
+import { conversations } from "./conversations.js";
 
 export const artifacts = pgTable("artifacts", {
   id: uuid("id").primaryKey().defaultRandom(),

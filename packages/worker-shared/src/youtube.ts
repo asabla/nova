@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { logger } from "./logger";
+import { logger } from "./logger.js";
 
 // ── Types ──
 

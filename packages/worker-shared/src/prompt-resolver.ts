@@ -1,5 +1,5 @@
 import { eq, and, isNull, inArray } from "drizzle-orm";
-import { db } from "./db";
+import { db } from "./db.js";
 import { systemPrompts, systemPromptVersions } from "@nova/shared/schemas";
 
 // ---------------------------------------------------------------------------

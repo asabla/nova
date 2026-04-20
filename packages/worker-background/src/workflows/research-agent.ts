@@ -1,6 +1,6 @@
 import { proxyActivities, CancellationScope } from "@temporalio/workflow";
-import type * as researchAgentActivities from "../activities/research-agent.activities";
-import type * as deepResearchActivities from "../activities/deep-research.activities";
+import type * as researchAgentActivities from "../activities/research-agent.activities.js";
+import type * as deepResearchActivities from "../activities/deep-research.activities.js";
 import { RETRY_POLICIES } from "@nova/shared/constants";
 
 const { runResearchAgentLoop } =

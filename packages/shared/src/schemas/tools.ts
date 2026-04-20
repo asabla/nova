@@ -1,9 +1,9 @@
 import { pgTable, text, uuid, timestamp, boolean, integer, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { organisations } from "./organisations";
-import { users } from "./users";
-import { messages } from "./messages";
-import { conversations } from "./conversations";
+import { organisations } from "./organisations.js";
+import { users } from "./users.js";
+import { messages } from "./messages.js";
+import { conversations } from "./conversations.js";
 
 export const tools = pgTable("tools", {
   id: uuid("id").primaryKey().defaultRandom(),

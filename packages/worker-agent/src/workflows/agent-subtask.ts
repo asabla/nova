@@ -4,9 +4,9 @@ import {
   defineSignal,
   setHandler,
 } from "@temporalio/workflow";
-import type * as agentStepActivities from "../activities/agent-step.activities";
-import type * as agentActivities from "../activities/agent-execution.activities";
-import type * as streamActivities from "../activities/stream.activities";
+import type * as agentStepActivities from "../activities/agent-step.activities.js";
+import type * as agentActivities from "../activities/agent-execution.activities.js";
+import type * as streamActivities from "../activities/stream.activities.js";
 import type {
   PlanNode,
   ToolCallRecord,

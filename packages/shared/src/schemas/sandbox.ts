@@ -1,6 +1,6 @@
 import { pgTable, text, uuid, timestamp, integer, bigint, index } from "drizzle-orm/pg-core";
-import { organisations } from "./organisations";
-import { messages } from "./messages";
+import { organisations } from "./organisations.js";
+import { messages } from "./messages.js";
 
 export const sandboxExecutions = pgTable("sandbox_executions", {
   id: uuid("id").primaryKey().defaultRandom(),

@@ -1,5 +1,5 @@
 import { proxyActivities, startChild } from "@temporalio/workflow";
-import type * as activities from "../activities";
+import type * as activities from "../activities/index.js";
 import { RETRY_POLICIES } from "@nova/shared/constants";
 import { connectorSyncWorkflow } from "./connector-sync.js";
 

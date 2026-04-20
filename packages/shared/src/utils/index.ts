@@ -1,6 +1,6 @@
-export * from "./errors";
-export * from "./url-validation";
-export * from "./slug";
-export * from "./pagination";
-export * from "./encoding";
-export { encrypt, decrypt, isEncrypted } from "./crypto";
+export * from "./errors.js";
+export * from "./url-validation.js";
+export * from "./slug.js";
+export * from "./pagination.js";
+export * from "./encoding.js";
+export { encrypt, decrypt, isEncrypted } from "./crypto.js";

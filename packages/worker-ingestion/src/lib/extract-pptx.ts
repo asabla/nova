@@ -2,7 +2,7 @@ import { openai } from "@nova/worker-shared/litellm";
 import { env } from "@nova/worker-shared/env";
 import { getVisionModel, buildChatParams } from "@nova/worker-shared/models";
 import { logger } from "@nova/worker-shared/logger";
-import { executeSandboxCode } from "../activities/sandbox.activities";
+import { executeSandboxCode } from "../activities/sandbox.activities.js";
 
 const MAX_SLIDES = 50;
 

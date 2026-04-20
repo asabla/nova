@@ -12,4 +12,4 @@ export const openai = new OpenAI({
   maxRetries: 0,
 });
 
-export { resolveModelClient } from "./models";
+export { resolveModelClient } from "./models.js";

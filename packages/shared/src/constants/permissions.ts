@@ -1,4 +1,4 @@
-import type { Role } from "./roles";
+import type { Role } from "./roles.js";
 
 export const PERMISSIONS = {
   "conversation.create": "member",

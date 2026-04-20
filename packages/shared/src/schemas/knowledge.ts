@@ -1,7 +1,7 @@
 import { pgTable, text, uuid, timestamp, integer, jsonb, boolean, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { organisations } from "./organisations";
-import { users } from "./users";
+import { organisations } from "./organisations.js";
+import { users } from "./users.js";
 
 export const knowledgeCollections = pgTable("knowledge_collections", {
   id: uuid("id").primaryKey().defaultRandom(),

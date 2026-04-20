@@ -7,14 +7,14 @@ import {
   fetchYouTubeTranscript,
   fetchYouTubeMetadata,
   assembleTranscriptMarkdown,
-} from "../youtube";
+} from "../youtube.js";
 import { eq, and, isNull } from "drizzle-orm";
-import { db } from "../db";
-import { openai } from "../litellm";
-import { getDefaultChatModel, getDefaultEmbeddingModel } from "../models";
-import { COLLECTIONS, searchVector, scrollFullText, scrollFiltered } from "../qdrant";
-import { createImageGenerateTool } from "./image-generate";
-import { logger } from "../logger";
+import { db } from "../db.js";
+import { openai } from "../litellm.js";
+import { getDefaultChatModel, getDefaultEmbeddingModel } from "../models.js";
+import { COLLECTIONS, searchVector, scrollFullText, scrollFiltered } from "../qdrant.js";
+import { createImageGenerateTool } from "./image-generate.js";
+import { logger } from "../logger.js";
 
 /**
  * Built-in tools extracted from agent-execution.activities.ts,

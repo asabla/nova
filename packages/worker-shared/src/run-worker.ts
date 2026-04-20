@@ -14,11 +14,11 @@ import path from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { Worker, NativeConnection, type WorkerOptions } from "@temporalio/worker";
 import { Connection, Client } from "@temporalio/client";
-import { env } from "./env";
-import { closeDb } from "./db";
-import { closeRedis } from "./redis";
-import { logger } from "./logger";
-import { shutdownTelemetry } from "./telemetry";
+import { env } from "./env.js";
+import { closeDb } from "./db.js";
+import { closeRedis } from "./redis.js";
+import { logger } from "./logger.js";
+import { shutdownTelemetry } from "./telemetry.js";
 
 export interface RunWorkerOptions {
   /** Human-readable name used for startup/shutdown log lines, e.g. "agent". */

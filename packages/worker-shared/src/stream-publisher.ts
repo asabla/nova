@@ -6,8 +6,8 @@ import type {
   UserInteractionRequest,
   UserInteractionResponse,
 } from "@nova/shared/types";
-import { redis } from "./redis";
-import { startChildSpan, isOtelEnabled } from "./telemetry";
+import { redis } from "./redis.js";
+import { startChildSpan, isOtelEnabled } from "./telemetry.js";
 
 const STREAM_BUFFER_TTL = 1800; // 30 minutes
 

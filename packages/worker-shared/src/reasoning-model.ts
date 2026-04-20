@@ -1,6 +1,6 @@
 import type { Model } from "@openai/agents-core";
 import type OpenAI from "openai";
-import { logger } from "./logger";
+import { logger } from "./logger.js";
 
 /**
  * Creates an Agent SDK Model that strips unsupported params from API requests.

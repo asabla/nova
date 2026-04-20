@@ -1,7 +1,7 @@
 import { parseHTML } from "linkedom";
 import { Readability } from "@mozilla/readability";
-import { htmlToMarkdown } from "./html-to-markdown";
-import type { ExtractedContent } from "./types";
+import { htmlToMarkdown } from "./html-to-markdown.js";
+import type { ExtractedContent } from "./types.js";
 
 const MAX_HTML_SIZE = 2 * 1024 * 1024; // 2MB cap
 

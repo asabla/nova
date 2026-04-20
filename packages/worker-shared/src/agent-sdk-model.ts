@@ -2,7 +2,7 @@ import { OpenAIChatCompletionsModel } from "@openai/agents-openai";
 import { setOpenAIAPI } from "@openai/agents";
 import type { ModelProvider, Model } from "@openai/agents-core";
 import type OpenAI from "openai";
-import { openai } from "./litellm";
+import { openai } from "./litellm.js";
 
 // Use Chat Completions API (not Responses API) since we call /chat/completions directly
 setOpenAIAPI("chat_completions");

@@ -1,6 +1,6 @@
 import { pgTable, text, uuid, timestamp, boolean, integer, jsonb, numeric, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { organisations } from "./organisations";
+import { organisations } from "./organisations.js";
 
 export const modelProviders = pgTable("model_providers", {
   id: uuid("id").primaryKey().defaultRandom(),

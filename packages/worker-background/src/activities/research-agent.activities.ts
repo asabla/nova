@@ -18,7 +18,7 @@ import {
   publishResearchError,
 } from "@nova/worker-shared/stream";
 import { getBuiltinTools } from "@nova/worker-shared/tools";
-import { createResearchTools, type ResearchSource, type ReportSection } from "./research-tools";
+import { createResearchTools, type ResearchSource, type ReportSection } from "./research-tools.js";
 import { getDefaultChatModel } from "@nova/worker-shared/models";
 import type { ResearchProgressType, ResearchStatus } from "@nova/shared/constants";
 

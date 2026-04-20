@@ -1,7 +1,7 @@
 import type { Node, Tree } from "web-tree-sitter";
 import type { ContentChunk, ChunkMetadata, ChunkOptions } from "@nova/shared/content";
 import { chunkContent } from "@nova/shared/content";
-import { getLanguageForExtension, createParser } from "./tree-sitter-languages";
+import { getLanguageForExtension, createParser } from "./tree-sitter-languages.js";
 import { extname } from "node:path";
 import { logger } from "@nova/worker-shared/logger";
 
